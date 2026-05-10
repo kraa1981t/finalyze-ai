@@ -228,8 +228,8 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   className={cn(
                     "w-full flex items-center justify-between p-4 md:p-5 rounded-[2rem] border-2 transition-all group relative overflow-hidden",
                     selectedType === cat.id 
-                      ? "border-primary bg-primary/10 text-white shadow-[0_0_30px_rgba(16,185,129,0.1)] scale-[1.02]" 
-                      : "border-white/5 bg-brand-alt/50 text-white hover:border-white/20 hover:bg-white/5"
+                      ? "border-primary bg-primary/10 text-brand-text shadow-[0_0_30px_rgba(16,185,129,0.1)] scale-[1.02]" 
+                      : "border-white/5 bg-brand-alt/50 text-brand-text hover:border-brand-text/20 hover:bg-brand-text/5"
                   )}
                 >
                   {selectedType === cat.id && (
@@ -241,7 +241,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "p-2.5 rounded-xl transition-all", 
-                      selectedType === cat.id ? "bg-primary text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-white/5 text-slate-100"
+                      selectedType === cat.id ? "bg-primary text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-brand-text/5 text-brand-muted"
                     )}>
                       {ICON_MAP[cat.icon]}
                     </div>
@@ -253,7 +253,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   
                   <div className={cn(
                     "p-1.5 rounded-lg transition-all",
-                    activeDropdown === cat.id ? "rotate-180 bg-primary/20 text-primary" : "text-slate-200"
+                    activeDropdown === cat.id ? "rotate-180 bg-primary/30 text-primary" : "text-brand-muted"
                   )}>
                     <ChevronDown size={14} />
                   </div>
@@ -270,30 +270,30 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                         initial={{ opacity: 0, y: 15, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute top-full left-0 right-0 mt-4 p-6 bg-[#0B0F1A] border border-white/10 rounded-[2.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] z-50 min-w-[300px] md:min-w-[400px] max-h-[450px] overflow-y-auto custom-scrollbar"
+                        className="absolute top-full left-0 right-0 mt-4 p-6 bg-brand-bg border border-brand-text/10 rounded-[2.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] z-50 min-w-[300px] md:min-w-[400px] max-h-[450px] overflow-y-auto custom-scrollbar"
                       >
                         <div className="flex items-center justify-between mb-4">
                            <div className="flex items-center gap-2">
                              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                             <span className="text-sm font-black text-white uppercase tracking-[0.2em]">{t.popularSymbols}</span>
+                             <span className="text-sm font-black text-brand-text uppercase tracking-[0.2em]">{t.popularSymbols}</span>
                            </div>
-                           <span className="text-xs font-bold text-slate-100 uppercase">{t[cat.id as keyof typeof t]}</span>
+                           <span className="text-xs font-bold text-brand-muted uppercase">{t[cat.id as keyof typeof t]}</span>
                         </div>
 
                         {/* Dropdown Search */}
                         <div className="relative mb-6">
-                           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-100" size={14} />
+                           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-muted" size={14} />
                            <input 
                              type="text"
                              placeholder={lang === 'ar' ? 'بحث عن أي رمز عالمي...' : 'Search global symbols...'}
                              value={dropdownSearch}
                              onChange={(e) => setDropdownSearch(e.target.value)}
-                             className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-10 pr-4 text-sm font-bold text-white placeholder:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                             className="w-full bg-brand-text/5 border border-brand-text/10 rounded-2xl py-3 pl-10 pr-4 text-sm font-bold text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                            />
                            {dropdownSearch && (
                              <button 
                                onClick={() => setDropdownSearch("")}
-                               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-100 hover:text-white"
+                               className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-muted hover:text-brand-text"
                              >
                                <X size={12} />
                              </button>
@@ -332,14 +332,14 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                                               setActiveDropdown(null);
                                               setValue("type", cat.id);
                                             }}
-                                            className="flex items-center justify-between p-3 rounded-xl text-sm font-black transition-all border bg-white/5 border-white/10 text-white hover:text-white hover:bg-white/10"
+                                            className="flex items-center justify-between p-3 rounded-xl text-sm font-black transition-all border bg-brand-text/5 border-brand-text/10 text-brand-text hover:text-brand-text hover:bg-brand-text/10"
                                           >
                                             <span>{sym}</span>
                                             <Plus size={10} className="opacity-100" />
                                           </button>
                                         ))}
                                         {results.length === 0 && (
-                                          <p className="text-xs text-slate-100 w-full text-center py-4 italic col-span-full">
+                                          <p className="text-xs text-brand-muted w-full text-center py-4 italic col-span-full">
                                             {lang === 'ar' ? 'لا توجد رموز إضافية مطابقة للبحث' : 'No additional matching symbols found'}
                                           </p>
                                         )}
@@ -349,7 +349,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                                 </div>
                               </>
                             ) : (
-                              <div className="py-6 text-center text-sm text-slate-100 font-bold italic">
+                              <div className="py-6 text-center text-sm text-brand-muted font-bold italic">
                                 {lang === 'ar' ? 'اكتب للبحث عن رموز إضافية...' : 'Type to search for additional symbols...'}
                               </div>
                             )}
@@ -360,7 +360,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                            <button 
                              type="button"
                              onClick={() => setActiveDropdown(null)}
-                             className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-sm font-black text-white transition-all uppercase tracking-widest"
+                             className="w-full py-3 bg-brand-text/5 hover:bg-brand-text/10 rounded-xl text-sm font-black text-brand-text transition-all uppercase tracking-widest"
                            >
                              {lang === 'ar' ? 'إغلاق القائمة' : 'Close Menu'}
                            </button>
@@ -374,8 +374,8 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
           </div>
         </div>
 
-        <div className="space-y-4 bg-brand-alt p-8 rounded-[3rem] border border-white/10 shadow-2xl transition-all">
-          <div className={cn("flex items-center justify-between border-b border-white/10 pb-6", isRTL ? "flex-row-reverse" : "flex-row")}>
+        <div className="space-y-4 bg-brand-alt p-8 rounded-[3rem] border border-brand-text/10 shadow-2xl transition-all">
+          <div className={cn("flex items-center justify-between border-b border-brand-text/10 pb-6", isRTL ? "flex-row-reverse" : "flex-row")}>
              <label className="text-base font-black text-brand-text opacity-100 uppercase tracking-[0.2em]">{t.selectSymbols}</label>
              <div className="flex gap-3">
                <button 
@@ -385,7 +385,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                     "text-sm font-black px-4 py-2 rounded-full transition-all",
                     SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols).every(s => selectedSymbols.includes(s))
                       ? "bg-primary text-white" 
-                      : "bg-white/10 text-white hover:bg-white/20"
+                      : "bg-brand-text/10 text-brand-text hover:bg-brand-text/20"
                   )}
                 >
                  {SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols).every(s => selectedSymbols.includes(s))
@@ -395,7 +395,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                <button 
                   type="button" 
                   onClick={clearAll}
-                  className="text-sm font-black text-white px-4 py-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
+                  className="text-sm font-black text-brand-text px-4 py-2 bg-brand-text/10 rounded-full hover:bg-brand-text/20 transition-colors"
                 >
                  {t.clear}
                </button>
@@ -422,7 +422,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                 
                 return (
                   <div key={group.label} className="space-y-3">
-                    <h6 className="text-sm font-black text-slate-100 uppercase tracking-widest px-2">
+                    <h6 className="text-sm font-black text-brand-muted uppercase tracking-widest px-2">
                       {t[group.label as keyof typeof t] || group.label}
                     </h6>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
@@ -434,8 +434,8 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                             className={cn(
                               "w-full flex items-center justify-center p-3 rounded-xl text-sm font-black transition-all border",
                               selectedSymbols.includes(sym)
-                                ? "bg-primary border-primary/50 text-white shadow-[0_5px_15px_rgba(16,185,129,0.2)]"
-                                : "bg-white/5 border-white/5 text-white hover:bg-white/10 hover:border-white/10"
+                                ? "bg-primary border-primary/50 text-brand-text shadow-[0_5px_15px_rgba(16,185,129,0.2)]"
+                                : "bg-brand-text/5 border-white/5 text-brand-text hover:bg-brand-text/10 hover:border-brand-text/10"
                             )}
                           >
                             {sym}
@@ -443,7 +443,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                           <button
                             type="button"
                             onClick={(e) => removeSymbol(sym, e)}
-                            className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-600 shadow-md"
+                            className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-brand-text rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-600 shadow-md"
                           >
                             <X size={8} />
                           </button>
@@ -456,23 +456,23 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             </div>
 
             {/* Global Symbol Search */}
-            <div className="space-y-4 pt-8 border-t border-white/10">
+            <div className="space-y-4 pt-8 border-t border-brand-text/10">
                <div className="relative">
-                 <Search className={cn("absolute top-1/2 -translate-y-1/2 text-slate-100", isRTL ? "right-4" : "left-4")} size={16} />
+                 <Search className={cn("absolute top-1/2 -translate-y-1/2 text-brand-muted", isRTL ? "right-4" : "left-4")} size={16} />
                  <input 
                    type="text"
                    placeholder={t.searchSymbol}
                    value={searchTerm}
                    onChange={(e) => setSearchTerm(e.target.value)}
                    className={cn(
-                     "w-full bg-white/5 border border-white/10 rounded-2xl py-4 text-sm font-bold text-white placeholder:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
+                     "w-full bg-brand-text/5 border border-brand-text/10 rounded-2xl py-4 text-sm font-bold text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
                      isRTL ? "pr-12 pl-4" : "pl-12 pr-4"
                    )}
                  />
                  {searchTerm && (
                    <button 
                      onClick={() => setSearchTerm("")}
-                     className={cn("absolute top-1/2 -translate-y-1/2 text-white hover:text-white", isRTL ? "left-4" : "right-4")}
+                     className={cn("absolute top-1/2 -translate-y-1/2 text-brand-text hover:text-brand-text", isRTL ? "left-4" : "right-4")}
                    >
                      <X size={14} />
                    </button>
@@ -506,15 +506,15 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                              className={cn(
                                "px-4 py-2 rounded-xl text-sm font-black border transition-all",
                                selectedSymbols.includes(sym)
-                                 ? "bg-primary border-primary text-white"
-                                 : "bg-white/5 border-white/10 text-white hover:border-white/30"
+                                 ? "bg-primary border-primary text-brand-text"
+                                 : "bg-brand-text/5 border-brand-text/10 text-brand-text hover:border-white/30"
                              )}
                            >
                              {sym}
                            </button>
                          ))}
                          {results.length === 0 && (
-                           <p className="text-sm text-slate-100 w-full text-center py-2 italic">No matching symbols found</p>
+                           <p className="text-sm text-brand-muted w-full text-center py-2 italic">No matching symbols found</p>
                          )}
                        </>
                      );
@@ -525,13 +525,13 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
 
 
             
-            <div className="pt-8 border-t border-white/10">
-               <label className="text-sm font-black text-white opacity-100 uppercase mb-3 block pl-2">{t.manualInput}</label>
+            <div className="pt-8 border-t border-brand-text/10">
+               <label className="text-sm font-black text-brand-text opacity-100 uppercase mb-3 block pl-2">{t.manualInput}</label>
                <input
                  {...register("symbol")}
                  dir="ltr"
                  placeholder="BTCUSD, SOLUSD, ETHUSD..."
-                 className="w-full p-5 bg-black/40 border border-white/10 rounded-2xl text-base font-mono focus:ring-4 ring-primary/20 focus:outline-none text-white placeholder:text-slate-200"
+                 className="w-full p-5 bg-black/40 border border-brand-text/10 rounded-2xl text-base font-mono focus:ring-4 ring-primary/20 focus:outline-none text-brand-text placeholder:text-brand-muted"
                />
             </div>
           </div>
@@ -549,11 +549,11 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   className={cn(
                     "flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left",
                     selectedStyle === style.id 
-                      ? "border-primary bg-primary/20 text-white shadow-lg" 
-                      : "border-white/10 bg-brand-alt text-white hover:border-white/20"
+                      ? "border-primary bg-primary/30 text-brand-text shadow-lg" 
+                      : "border-brand-text/10 bg-brand-alt text-brand-text hover:border-brand-text/20"
                   )}
                 >
-                  <div className={cn("p-2 rounded-lg", selectedStyle === style.id ? "bg-primary" : "bg-white/10")}>
+                  <div className={cn("p-2 rounded-lg", selectedStyle === style.id ? "bg-primary" : "bg-brand-text/10")}>
                     {ICON_MAP[style.icon]}
                   </div>
                   <div className="flex flex-col">
@@ -580,8 +580,8 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   className={cn(
                     "p-4 rounded-2xl border-2 text-sm font-black transition-all",
                     selectedTimeframe === tf.id 
-                      ? "border-secondary bg-secondary/20 text-white shadow-xl" 
-                      : "border-white/10 bg-brand-alt text-slate-100 hover:border-white/20"
+                      ? "border-secondary bg-secondary/20 text-brand-text shadow-xl" 
+                      : "border-brand-text/10 bg-brand-alt text-brand-muted hover:border-brand-text/20"
                   )}
                 >
                   {tf.label}
@@ -597,7 +597,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={analyzingIndex !== null}
-            className="w-full h-20 bg-brand-text text-brand-bg rounded-[2rem] font-display font-black text-2xl flex items-center justify-center gap-4 shadow-2xl hover:bg-primary hover:text-white transition-all group disabled:opacity-100"
+            className="w-full h-20 bg-brand-text text-brand-bg rounded-[2rem] font-display font-black text-2xl flex items-center justify-center gap-4 shadow-2xl hover:bg-primary hover:text-brand-text transition-all group disabled:opacity-100"
           >
             {analyzingIndex !== null ? (
               <>
@@ -606,7 +606,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
               </>
             ) : (
               <>
-                <Zap size={28} className="fill-secondary text-secondary group-hover:fill-white group-hover:text-white transition-colors" />
+                <Zap size={28} className="fill-secondary text-secondary group-hover:fill-white group-hover:text-brand-text transition-colors" />
                 <span>{t.startAnalysis}</span>
               </>
             )}

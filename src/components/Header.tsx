@@ -68,12 +68,12 @@ export default function Header({
               <Globe size={18} />
               <span className="text-[10px] uppercase font-black font-mono hidden sm:inline">{lang}</span>
             </button>
-            <div className="absolute right-0 top-full mt-2 w-32 bg-brand-alt border border-white/5 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+            <div className="absolute right-0 top-full mt-2 w-32 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
               {LANGUAGES.map((l) => (
                 <button
                   key={l.code}
                   onClick={() => onLangChange(l.code)}
-                  className="w-full px-4 py-2 text-left text-xs font-semibold hover:bg-white/5 text-brand-text transition-colors"
+                  className="w-full px-4 py-2 text-left text-xs font-semibold hover:bg-brand-text/5 text-brand-text transition-colors"
                 >
                   {l.label}
                 </button>

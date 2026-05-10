@@ -32,7 +32,7 @@ export default function Hero({ onStartAnalysis, lang }: HeroProps) {
           <div className="mt-12 relative max-w-5xl mx-auto group">
             <div className="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-[2rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
             
-            <div className="relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white/5 bg-slate-900 group">
+            <div className="relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-brand-text/5 bg-brand-alt group">
               <img 
                 src="https://images.unsplash.com/photo-1611974714658-04878a1c86e0?q=80&w=2070&auto=format&fit=crop" 
                 alt="AI Advanced Financial Analysis"
@@ -42,17 +42,17 @@ export default function Hero({ onStartAnalysis, lang }: HeroProps) {
               
               <div className="absolute inset-0 bg-gradient-to-t from-brand-bg via-transparent to-transparent flex flex-col justify-end p-8">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                  <div className="p-3 bg-brand-text/10 backdrop-blur-md rounded-2xl border border-brand-text/20">
                     <BarChart3 className="text-secondary" size={24} />
                   </div>
                   <div className="text-left">
-                    <h4 className="text-white font-bold text-xl">{t.title}</h4>
-                    <p className="text-white/60 text-sm">{t.subtitle}</p>
+                    <h4 className="text-brand-text font-bold text-xl">{t.title}</h4>
+                    <p className="text-brand-text/60 text-sm">{t.subtitle}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="absolute top-6 left-6 p-1.5 px-4 bg-white/20 backdrop-blur-xl rounded-full border border-white/30 text-white text-[10px] font-black uppercase tracking-[0.2em]">
+              <div className="absolute top-6 left-6 p-1.5 px-4 bg-brand-text/20 backdrop-blur-xl rounded-full border border-brand-text/30 text-brand-text text-[10px] font-black uppercase tracking-[0.2em]">
                 Live AI Engine Active
               </div>
             </div>

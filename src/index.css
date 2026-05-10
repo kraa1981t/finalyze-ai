@@ -7,6 +7,7 @@
   --color-brand-bg: #0F172A;
   --color-brand-alt: #1E293B;
   --color-brand-text: #F8FAFC;
+  --color-brand-muted: #94A3B8;
 }
 
 body {
@@ -29,12 +30,14 @@ body {
   --color-brand-bg: var(--color-brand-bg);
   --color-brand-alt: var(--color-brand-alt);
   --color-brand-text: var(--color-brand-text);
+  --color-brand-muted: var(--color-brand-muted);
 }
 
 .light {
   --color-brand-bg: #FFFFFF;
   --color-brand-alt: #F8FAFC;
   --color-brand-text: #0F172A;
+  --color-brand-muted: #64748B;
 }
 
 .market-card {
