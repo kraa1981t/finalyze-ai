@@ -80,7 +80,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-brand-bg">
+    <div className="min-h-screen flex-col bg-brand-bg relative p-3 md:p-16 flex">
+      <div className="site-frame" />
       <AnimatePresence>
         {!user && !loading && (
           <LoginOverlay onLogin={handleLogin} lang={lang} />
