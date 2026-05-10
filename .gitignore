@@ -1,3 +1,5 @@
 node_modules
 .env
 .env.local
+create_repo.ps1 
+push_to_github.bat 
