@@ -1,5 +1,18 @@
 node_modules
 .env
-.env.local
-create_repo.ps1 
-push_to_github.bat 
+.env*
+*.local
+dist
+.vscode
+.DS_Store
+
+# Temporary scripts
+*.bat
+*.ps1
+*.sh
+*.cmd
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
