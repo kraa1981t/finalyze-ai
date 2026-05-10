@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --color-primary: #10B981;
+  --color-secondary: #F59E0B;
+  --color-brand-bg: #0F172A;
+  --color-brand-alt: #1E293B;
+  --color-brand-text: #F8FAFC;
+}
+
+body {
+  background-color: var(--color-brand-bg);
+  color: var(--color-brand-text);
+  margin: 0;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 300ms, color 300ms;
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-primary: var(--color-primary);
+  --color-secondary: var(--color-secondary);
+  --color-brand-bg: var(--color-brand-bg);
+  --color-brand-alt: var(--color-brand-alt);
+  --color-brand-text: var(--color-brand-text);
+}
+
+.light {
+  --color-brand-bg: #FFFFFF;
+  --color-brand-alt: #F8FAFC;
+  --color-brand-text: #0F172A;
+}
+
+.market-card {
+  @apply relative overflow-hidden bg-brand-alt border border-slate-700 rounded-xl transition-all duration-300 hover:shadow-lg hover:border-primary/30;
+}
+
+.light .market-card {
+  @apply bg-white border-slate-200;
+}
+
+.gradient-line {
+  background: linear-gradient(90deg, #10B981 0%, #F59E0B 100%);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
