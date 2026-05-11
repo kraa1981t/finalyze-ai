@@ -72,10 +72,11 @@ export async function analyzeMarket(params: {
       1. DATA VERIFICATION: Look at the provided prices for ${timeframe}. Identify the color of the last 5 candles.
       2. CONSECUTIVE CANDLES: The user requires exactly "${settings.consecutiveCandles}" consecutive candles of the same color leading into the current state.
          - If you do not see ${settings.consecutiveCandles} consecutive candles of the same color, you CANNOT return "strong_buy" or "strong_sell".
-      3. MANDATORY CANDLE SIZE (HARD BLOCKER): Calculate the body size (Open-Close) for the current candle on ${timeframe}.
-         - If the body size is LESS than ${settings.minCandleSizePx} units, you MUST return "no_entry" or "neutral" immediately. No trade is allowed on small/weak candles. This is a MANDATORY requirement.
+      3. MANDATORY CANDLE MOMENTUM (HARD BLOCKER): Evaluate the body size (Open vs Close) of the current or most recent closed candle on ${timeframe}.
+         - The body must be visibly strong and show clear momentum relative to the average size of the previous 10 candles.
+         - If the body size is small, weak, or shows indecision (like a Doji), you MUST return "no_entry" or "neutral" immediately. No trade is allowed without strong momentum.
       4. SIMPLIFIED TIMEFRAME ALIGNMENT: 
-         - Compare ${timeframe} with the NEXT higher timeframe (${macro1}).
+         - Compare the trend of ${timeframe} with the NEXT higher timeframe (${macro1}).
          - If ${timeframe} is Bullish but ${macro1} is Bearish (or vice versa), you MUST return "no_entry". They must both match direction.
       5. PIVOT POINTS: Use levels (PP, R1, S1) only for finding the entry price after rules 2, 3, and 4 are confirmed.
       6. SECONDARY FACTORS: News and Sentiment can only be used to boost an already perfect technical setup. They cannot override any technical failure.
