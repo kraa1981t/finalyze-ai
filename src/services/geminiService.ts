@@ -104,39 +104,32 @@ export async function analyzeMarket(params: {
 
       ${marketDataContext}
 
-      **STRICT TECHNICAL MANDATES (NO EXCEPTIONS)**:
-      1. DATA VERIFICATION: You MUST look at the provided "Close" prices for ${timeframe}. Identify the color of each of the last 5 candles (Green if Close > Open, Red if Close < Open).
+      **STRICT TECHNICAL MANDATES (MANDATORY CONDITIONS)**:
+      1. DATA VERIFICATION: Look at the provided prices for ${timeframe}. Identify the color of the last 5 candles.
       2. CONSECUTIVE CANDLES: The user requires exactly "${settings.consecutiveCandles}" consecutive candles of the same color leading into the current state.
-         - If you do not see ${settings.consecutiveCandles} consecutive candles of the same color, you CANNOT return a "strong_buy" or "strong_sell".
-         - If the colors are mixed (e.g., Green-Red-Green), the maximum signal is "buy" or "sell", and confidence MUST be below 70%.
-      3. CANDLE BODY SIZE: Calculate the difference between Open and Close for the last 2 candles. If the body is less than ${settings.minCandleSizePx} units (pips/points), it is considered "Weak". You CANNOT give a "Strong" signal on weak candles.
-      4. TIMEFRAME ALIGNMENT (THE LAW): 
-         - Compare ${timeframe} with ${macro1} and ${macro2}.
-         - If ${timeframe} is Bullish but ${macro1} or ${macro2} is Bearish, you MUST return "no_entry" or "neutral". Conflict between timeframes is a major risk.
-      5. PIVOT POINTS: Pivot levels (PP, R1, S1) are for ENTRY confirmation only. They do not define the trend. Use them only to find the best price after the trend is confirmed by rules 2 and 4.
-      6. NEWS & SENTIMENT: Sentiment (Social Vote) is SECONDARY. 
-         - **NEW RULE**: Sentiment can only increase confidence if the technicals (Rules 1-4) are already perfect. 
-         - Sentiment CANNOT turn a "no_entry" into a "buy".
-         - Sentiment CANNOT turn a "neutral" into a "strong" signal.
-      7. TREND MATURITY:
-         - INFANCY: 1-2 candles of trend. Avoid.
-         - YOUTH: 3-6 candles with strong bodies. Optimal.
-         - AGING: >10 candles or decreasing body size. High risk of reversal.
+         - If you do not see ${settings.consecutiveCandles} consecutive candles of the same color, you CANNOT return "strong_buy" or "strong_sell".
+      3. MANDATORY CANDLE SIZE (HARD BLOCKER): Calculate the body size (Open-Close) for the current candle on ${timeframe}.
+         - If the body size is LESS than ${settings.minCandleSizePx} units, you MUST return "no_entry" or "neutral" immediately. No trade is allowed on small/weak candles. This is a MANDATORY requirement.
+      4. SIMPLIFIED TIMEFRAME ALIGNMENT: 
+         - Compare ${timeframe} with the NEXT higher timeframe (${macro1}).
+         - If ${timeframe} is Bullish but ${macro1} is Bearish (or vice versa), you MUST return "no_entry". They must both match direction.
+      5. PIVOT POINTS: Use levels (PP, R1, S1) only for finding the entry price after rules 2, 3, and 4 are confirmed.
+      6. SECONDARY FACTORS: News and Sentiment can only be used to boost an already perfect technical setup. They cannot override any technical failure.
 
-      **FINAL SIGNAL OUTPUT LOGIC**:
-      - "strong_buy"/"strong_sell": ALL rules (1, 2, 3, 4) must be met perfectly. Confidence >= 85%.
-      - "buy"/"sell": Rules 1 and 4 are met, but Rule 2 or 3 is slightly weak. Confidence ${settings.minConfidence}% - 84%.
-      - "no_entry"/"neutral": Any conflict between timeframes or less than ${settings.minConfidence}% confidence.
+      **FINAL SIGNAL LOGIC**:
+      - "strong_buy"/"strong_sell": Rules 2, 3, and 4 are perfectly satisfied. Confidence >= 85%.
+      - "buy"/"sell": Rules 3 and 4 are satisfied, but Rule 2 is slightly weaker. Confidence ${settings.minConfidence}% - 84%.
+      - "no_entry"/"neutral": Any failure of Rule 3 (Mandatory Size), any conflict in Rule 4 (Alignment), or low confidence.
 
       Return ONLY a VALID JSON object:
       {
         "symbol": "${symbol}",
         "signal": "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" | "no_entry",
         "confidence": number,
-        "summary": "Detailed technical report explaining the candle math and alignment...",
+        "summary": "Report explaining how mandatory candle size (${settings.minCandleSizePx}) and alignment with ${macro1} were verified...",
         "technicalScore": number,
         "sentimentScore": number,
-        "trendMaturity": "infancy" | "youth" | "aging" | "unknown",
+        "trendMaturity": "infancy" | "youth" | "aging",
         "trendAge": number,
         "historicalMatch": "Pattern description"
       }
