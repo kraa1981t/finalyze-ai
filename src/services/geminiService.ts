@@ -72,9 +72,10 @@ export async function analyzeMarket(params: {
       1. DATA VERIFICATION: Look at the provided prices for ${timeframe}. Identify the color of the last 5 candles.
       2. CONSECUTIVE CANDLES: The user requires exactly "${settings.consecutiveCandles}" consecutive candles of the same color leading into the current state.
          - If you do not see ${settings.consecutiveCandles} consecutive candles of the same color, you CANNOT return "strong_buy" or "strong_sell".
-      3. MANDATORY CANDLE MOMENTUM (HARD BLOCKER): Evaluate the body size (Open vs Close) of the current or most recent closed candle on ${timeframe}.
-         - The body must be visibly strong and show clear momentum relative to the average size of the previous 10 candles.
-         - If the body size is small, weak, or shows indecision (like a Doji), you MUST return "no_entry" or "neutral" immediately. No trade is allowed without strong momentum.
+      3. MANDATORY CANDLE SIZE IN PIXELS (HARD BLOCKER): Calculate the body size (Open vs Close) of the current or most recent closed candle on ${timeframe} and convert it to "Pixels" using this standard chart scaling formula:
+         - For Forex pairs (prices like 1.0850): 1 Pip (0.0001) = 10 Pixels. Calculate the pip difference and multiply by 10.
+         - For Crypto/Stocks (prices like 60000 or 150): $1 difference = 1 Pixel.
+         - If the calculated body size is LESS than ${settings.minCandleSizePx} Pixels, you MUST return "no_entry" or "neutral" immediately. No trade is allowed on candles smaller than ${settings.minCandleSizePx} Pixels. This is a MANDATORY mathematical requirement.
       4. SIMPLIFIED TIMEFRAME ALIGNMENT: 
          - Compare the trend of ${timeframe} with the NEXT higher timeframe (${macro1}).
          - If ${timeframe} is Bullish but ${macro1} is Bearish (or vice versa), you MUST return "no_entry". They must both match direction.
