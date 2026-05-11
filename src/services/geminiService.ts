@@ -20,6 +20,8 @@ function initializeKeys() {
 function getNextAiClient(): GoogleGenAI {
   initializeKeys();
   const key = apiKeys[currentKeyIndex];
+  // Round-robin: move to next key for the next request
+  currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
   return new GoogleGenAI({ apiKey: key });
 }
 
@@ -176,8 +178,8 @@ export async function analyzeMarket(params: {
         if (isRateLimit && apiKeys.length > 1) {
           rotateKey();
           attempt++;
-          // Wait 1.5 seconds before retrying with the next key to avoid spam
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          // Wait 5 seconds before retrying with the next key to avoid spam and allow quota reset
+          await new Promise(resolve => setTimeout(resolve, 5000));
         } else {
           // Unrecoverable error (e.g. 404 model not found) or no backup keys left
           throw err;

@@ -176,9 +176,9 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
           alert(`خطأ أثناء تحليل ${currentSymbol}:\n${msg}`);
         }
 
-        // Add 2-second delay between requests to prevent API Rate Limiting (429 errors)
+        // Add 3-second delay between requests to prevent API Rate Limiting (429 errors)
         if (i < allSymbolsToAnalyze.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 3000));
         }
       }
 
