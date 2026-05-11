@@ -93,7 +93,7 @@ export async function analyzeMarket(params: {
     const marketDataContext = `
       ${fetchedData.join('\n')}
       
-      Note: You MUST use these exact prices to calculate candle sizes and mathematically verify the momentum rules.
+      Note: You MUST use these exact prices to calculate candle sizes and verify momentum.
     `;
 
     const technicalPrompt = `
@@ -104,48 +104,40 @@ export async function analyzeMarket(params: {
 
       ${marketDataContext}
 
-      **DYNAMIC ANALYSIS RULES (TOP-DOWN STRATEGY)**:
-      1. Analyze the trend based ONLY on the provided live market data for the multiple timeframes. Do not guess or hallucinate data.
-      2. CONSECUTIVE CANDLES & DIRECTION: The user requested "${settings.consecutiveCandles}" consecutive candle(s). This means the CURRENT candle AND the preceding ${settings.consecutiveCandles} candle(s) on the Primary Timeframe (${timeframe}) MUST be the EXACT SAME COLOR (same direction). If they alternate colors, severely reduce confidence.
-      3. CANDLE SIZE CONDITION: The current candle on the Primary Timeframe (${timeframe}) AND the current candle on the Next Higher Timeframe (${macro1}) MUST BOTH be large/strong candles (visually representing >= ${settings.minCandleSizePx}px). If either is weak or a doji, reduce confidence.
-      4. MOMENTUM THRESHOLD: Calculate the momentum strength ONLY for the Primary Timeframe (${timeframe}) current candle. If its momentum >= ${settings.momentumThreshold}%, it strongly supports a trade entry.
-      5. STRICT SUPPLY/DEMAND ALIGNMENT: Check the 50-candle history across the 3 synchronized timeframes (${timeframe}, ${macro1}, ${macro2}). If historical S/D zones align in the exact same direction with a strength >= ${settings.supplyDemandStrength}%, this heavily increases confidence. If any macro timeframe contradicts the primary timeframe's direction, severely reduce your confidence score.
-      6. PIVOT POINTS (MICRO-TIMEFRAME ENTRY): Calculate standard Pivot Points (PP, R1, S1) using the provided data for the Micro Timeframe (${microTF}). For a Buy/Sell signal, the current price MUST be interacting with or very close to a key pivot level. If the price is floating in the middle of nowhere, reduce confidence.
-      7. TREND MATURITY ASSESSMENT (AGE OF TREND): Analyze the lifecycle of the current trend on the Primary Timeframe (${timeframe}) using the 50-candle history.
-         - INFANCY (مرحلة الطفولة): Trend has just started (e.g., 1-3 candles since a crossover or breakout). Risk: False signal. Avoid or proceed with extreme caution.
-         - YOUTH (مرحلة الشباب): Trend is clearly established and has strong, increasing momentum. Price is moving healthily. THIS IS THE OPTIMAL ENTRY PHASE.
-         - AGING (مرحلة الشيخوخة): Trend has been running for a long time (exhaustion), candles are getting smaller, or price is significantly overextended from the moving averages. If the trend is "Aging", severely reduce the confidence score.
-      ${settings.useIndicators ? '8. Use RSI and Moving Averages for momentum confirmation and to detect exhaustion.' : '8. (Indicators are disabled, skip RSI/MA).'}
-      9. LIVE NEWS & DISASTERS: Use your Google Search tool to check for breaking news, ongoing wars, economic collapses of major countries, or crises affecting ${symbol}. If a catastrophic event or highly volatile news is breaking RIGHT NOW, factor this heavily into the market state.
-      10. SOCIAL SENTIMENT VOTE: Search social media sentiment (reactions of whales, big traders, and the public) regarding ${symbol}. Calculate a "Sentiment Vote Percentage" (0-100) reflecting the bullishness/bearishness of the crowd. Assign this percentage to the \`sentimentScore\` field.
-      
-      **CONFIDENCE & SIGNAL RULES**:
-      Calculate a realistic final "confidence" percentage (0-100) based on how well the data met the technical conditions.
-      - If technical trend is Bullish and confidence >= 80%, return "signal": "strong_buy".
-      - If technical trend is Bullish and confidence between ${settings.minConfidence}% and 79%, return "signal": "buy".
-      - If technical trend is Bearish and confidence >= 80%, return "signal": "strong_sell".
-      - If technical trend is Bearish and confidence between ${settings.minConfidence}% and 79%, return "signal": "sell".
-      - If confidence is BELOW ${settings.minConfidence}% (due to contradictions, weak momentum, or poor alignment), return "signal": "no_entry".
+      **STRICT TECHNICAL MANDATES (NO EXCEPTIONS)**:
+      1. DATA VERIFICATION: You MUST look at the provided "Close" prices for ${timeframe}. Identify the color of each of the last 5 candles (Green if Close > Open, Red if Close < Open).
+      2. CONSECUTIVE CANDLES: The user requires exactly "${settings.consecutiveCandles}" consecutive candles of the same color leading into the current state.
+         - If you do not see ${settings.consecutiveCandles} consecutive candles of the same color, you CANNOT return a "strong_buy" or "strong_sell".
+         - If the colors are mixed (e.g., Green-Red-Green), the maximum signal is "buy" or "sell", and confidence MUST be below 70%.
+      3. CANDLE BODY SIZE: Calculate the difference between Open and Close for the last 2 candles. If the body is less than ${settings.minCandleSizePx} units (pips/points), it is considered "Weak". You CANNOT give a "Strong" signal on weak candles.
+      4. TIMEFRAME ALIGNMENT (THE LAW): 
+         - Compare ${timeframe} with ${macro1} and ${macro2}.
+         - If ${timeframe} is Bullish but ${macro1} or ${macro2} is Bearish, you MUST return "no_entry" or "neutral". Conflict between timeframes is a major risk.
+      5. PIVOT POINTS: Pivot levels (PP, R1, S1) are for ENTRY confirmation only. They do not define the trend. Use them only to find the best price after the trend is confirmed by rules 2 and 4.
+      6. NEWS & SENTIMENT: Sentiment (Social Vote) is SECONDARY. 
+         - **NEW RULE**: Sentiment can only increase confidence if the technicals (Rules 1-4) are already perfect. 
+         - Sentiment CANNOT turn a "no_entry" into a "buy".
+         - Sentiment CANNOT turn a "neutral" into a "strong" signal.
+      7. TREND MATURITY:
+         - INFANCY: 1-2 candles of trend. Avoid.
+         - YOUTH: 3-6 candles with strong bodies. Optimal.
+         - AGING: >10 candles or decreasing body size. High risk of reversal.
 
-      **SENTIMENT OVERRIDE RULE**:
-      - If the \`sentimentScore\` (Social Vote) is GREATER THAN OR EQUAL TO 60% in the EXACT SAME DIRECTION as the technical trend (e.g., Technical is Buy AND Sentiment is >= 60% Bullish), you MUST boost the final confidence to >= 80% and output a "strong_buy" or "strong_sell" signal. This confirms that the whales and public agree with the chart.
-      - If the \`sentimentScore\` contradicts the technical trend strongly, lower your technical confidence significantly.
-
-      **OUTPUT SPECIFICATIONS**:
-      - Provide a detailed summary STRICTLY IN ${lang === 'ar' ? 'ARABIC' : lang === 'fr' ? 'FRENCH' : 'ENGLISH'}.
-      - Ensure the "confidence" is a realistic percentage (0-100).
-      - Maintain a professional financial tone.
+      **FINAL SIGNAL OUTPUT LOGIC**:
+      - "strong_buy"/"strong_sell": ALL rules (1, 2, 3, 4) must be met perfectly. Confidence >= 85%.
+      - "buy"/"sell": Rules 1 and 4 are met, but Rule 2 or 3 is slightly weak. Confidence ${settings.minConfidence}% - 84%.
+      - "no_entry"/"neutral": Any conflict between timeframes or less than ${settings.minConfidence}% confidence.
 
       Return ONLY a VALID JSON object:
       {
         "symbol": "${symbol}",
         "signal": "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" | "no_entry",
         "confidence": number,
-        "summary": "Detailed report in the requested language...",
+        "summary": "Detailed technical report explaining the candle math and alignment...",
         "technicalScore": number,
         "sentimentScore": number,
         "trendMaturity": "infancy" | "youth" | "aging" | "unknown",
-        "trendAge": number (estimated candles),
+        "trendAge": number,
         "historicalMatch": "Pattern description"
       }
     `;
