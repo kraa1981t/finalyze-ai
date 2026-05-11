@@ -133,12 +133,15 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
-  });
+  // ONLY listen if not running as a Vercel function
+  if (process.env.VITE_DEV === 'true' || !isProd) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server listening on http://0.0.0.0:${PORT}`);
+    });
+  }
+  
+  return app;
 }
 
-startServer().catch(err => {
-  console.error("Failed to start server:", err);
-  process.exit(1);
-});
+// Export the promise for Vercel
+export default startServer();
