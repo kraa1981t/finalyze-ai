@@ -73,6 +73,48 @@ async function startServer() {
     }
   });
 
+  // API Route: AI Analysis Proxy (Resolves CORS issues)
+  app.post("/api/ai-analysis", async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      const apiKey = process.env.VITE_QWEN_API_KEY;
+      const apiUrl = process.env.VITE_QWEN_API_URL;
+      const model = process.env.VITE_QWEN_MODEL || "qwen-plus";
+
+      if (!apiKey || !apiUrl) {
+        return res.status(500).json({ error: "AI API credentials not configured on server." });
+      }
+
+      const response = await fetch(`${apiUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: "system", content: "You are a professional financial analyst AI. You provide strict, math-based technical analysis." },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.1,
+          response_format: { type: "json_object" }
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return res.status(response.status).json({ error: errorData.error?.message || "AI Provider Error" });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("AI Proxy error:", error);
+      res.status(500).json({ error: "Internal server error during AI analysis" });
+    }
+  });
+
   const distPath = path.resolve(process.cwd(), "dist");
   const isProd = process.env.NODE_ENV === "production";
 

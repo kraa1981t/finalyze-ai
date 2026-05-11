@@ -99,14 +99,6 @@ export async function analyzeMarket(params: {
       }
     `;
 
-    const apiKey = import.meta.env.VITE_QWEN_API_KEY;
-    const apiUrl = import.meta.env.VITE_QWEN_API_URL;
-    const model = import.meta.env.VITE_QWEN_MODEL || "qwen-plus";
-
-    if (!apiKey || !apiUrl) {
-      throw new Error("Qwen API Key or URL is missing in environment variables.");
-    }
-
     let attempt = 0;
     const maxRetries = 3;
     let lastError: any = null;
@@ -114,26 +106,19 @@ export async function analyzeMarket(params: {
 
     while (attempt <= maxRetries) {
       try {
-        const response = await fetch(`${apiUrl}/chat/completions`, {
+        const response = await fetch('/api/ai-analysis', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: model,
-            messages: [
-              { role: "system", content: "You are a professional financial analyst AI. You provide strict, math-based technical analysis." },
-              { role: "user", content: technicalPrompt }
-            ],
-            temperature: 0.1,
-            response_format: { type: "json_object" }
+            prompt: technicalPrompt
           })
         });
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+          throw new Error(errorData.error || `Server Error: ${response.status}`);
         }
 
         const data = await response.json();
@@ -148,7 +133,7 @@ export async function analyzeMarket(params: {
         attempt++;
         if (attempt <= maxRetries) {
           const waitTime = attempt * 2000;
-          console.warn(`[Qwen Retry] Attempt ${attempt} failed: ${err.message}. Retrying in ${waitTime}ms...`);
+          console.warn(`[AI Proxy Retry] Attempt ${attempt} failed: ${err.message}. Retrying in ${waitTime}ms...`);
           await new Promise(r => setTimeout(r, waitTime));
         }
       }
