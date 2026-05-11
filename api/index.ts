@@ -81,8 +81,11 @@ async function startServer() {
       const apiUrl = process.env.VITE_QWEN_API_URL;
       const model = process.env.VITE_QWEN_MODEL || "qwen-plus";
 
-      if (!apiKey || !apiUrl) {
-        return res.status(500).json({ error: "AI API credentials not configured on server." });
+      if (!apiKey) {
+        return res.status(500).json({ error: "Missing VITE_QWEN_API_KEY on server." });
+      }
+      if (!apiUrl) {
+        return res.status(500).json({ error: "Missing VITE_QWEN_API_URL on server." });
       }
 
       const response = await fetch(`${apiUrl}/chat/completions`, {
@@ -104,14 +107,17 @@ async function startServer() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        return res.status(response.status).json({ error: errorData.error?.message || "AI Provider Error" });
+        console.error("[Qwen API Error]:", response.status, errorData);
+        return res.status(response.status).json({ 
+          error: `AI Provider Error (${response.status}): ${JSON.stringify(errorData.error || errorData)}` 
+        });
       }
 
       const data = await response.json();
       res.json(data);
     } catch (error: any) {
       console.error("AI Proxy error:", error);
-      res.status(500).json({ error: "Internal server error during AI analysis" });
+      res.status(500).json({ error: `Internal server error: ${error.message}` });
     }
   });
 
