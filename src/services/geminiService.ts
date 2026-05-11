@@ -173,15 +173,19 @@ export async function analyzeMarket(params: {
       } catch (err: any) {
         lastError = err;
         const errMsg = err.message || "";
-        const isRateLimit = err.status === 429 || err.status === 403 || errMsg.includes("quota") || errMsg.includes("exhausted") || errMsg.includes("429");
+        const isRetryable = err.status === 429 || err.status === 403 || err.status === 503 || 
+                           errMsg.toLowerCase().includes("quota") || 
+                           errMsg.toLowerCase().includes("exhausted") || 
+                           errMsg.toLowerCase().includes("high demand") ||
+                           errMsg.toLowerCase().includes("unavailable");
         
-        if (isRateLimit && apiKeys.length > 1) {
-          rotateKey();
+        if (isRetryable && attempt < maxAttempts + 3) {
+          if (apiKeys.length > 1) rotateKey();
           attempt++;
-          // Wait 5 seconds before retrying with the next key to avoid spam and allow quota reset
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          const waitTime = Math.min(attempt * 3000, 15000);
+          console.warn(`[AI Retry] Attempt ${attempt} after error: ${errMsg}. Waiting ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
         } else {
-          // Unrecoverable error (e.g. 404 model not found) or no backup keys left
           throw err;
         }
       }
