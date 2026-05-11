@@ -1,36 +1,5 @@
 import { MarketType, AnalysisResult, TradingStyle, SignalType, StrategySettings } from "../types";
 import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
-import { GoogleGenAI } from "@google/genai";
-
-let apiKeys: string[] = [];
-let currentKeyIndex: number = 0;
-
-function initializeKeys() {
-  if (apiKeys.length > 0) return;
-  const keysStr = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEYS) || process.env.VITE_GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "";
-  apiKeys = keysStr.split(',').map(k => k.trim()).filter(k => k.length > 0);
-  console.log(`[AI Client] Loaded ${apiKeys.length} keys for rotation.`);
-  if (apiKeys.length === 0) {
-    const errorMsg = "تنبيه: مفاتيح Gemini API غير متوفرة. يرجى التأكد من إعداد VITE_GEMINI_API_KEYS في بيئة التطبيق (ملف .env).";
-    alert(errorMsg);
-    throw new Error(errorMsg);
-  }
-}
-
-function getNextAiClient(): GoogleGenAI {
-  initializeKeys();
-  const key = apiKeys[currentKeyIndex];
-  // Round-robin: move to next key for the next request
-  currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-  return new GoogleGenAI({ apiKey: key });
-}
-
-function rotateKey() {
-  if (apiKeys.length <= 1) return;
-  const oldKey = apiKeys[currentKeyIndex];
-  currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-  console.warn(`[Key Rotation] Key ending in ...${oldKey.slice(-4)} exhausted. Switched to key ending in ...${apiKeys[currentKeyIndex].slice(-4)}`);
-}
 
 async function fetchTimeframeData(symbol: string, timeframe: string): Promise<string> {
   try {
@@ -69,30 +38,25 @@ export async function analyzeMarket(params: {
   const { symbol, type, timeframe, tradingStyle, settings = DEFAULT_STRATEGY_SETTINGS, lang = 'en' } = params;
 
   try {
-    console.log(`[AI Client] Performing deep multi-timeframe analysis for ${symbol}...`);
+    console.log(`[Qwen AI] Performing deep multi-timeframe analysis for ${symbol}...`);
     
-    // Determine micro and macro timeframes for rigorous validation
     const TF_PROGRESSION = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M', '1Y'];
     const currentIndex = TF_PROGRESSION.indexOf(timeframe);
     
     let microTF = '1h';
     let macro1 = '1d';
-    let macro2 = '1w';
     
     if (currentIndex !== -1) {
        microTF = TF_PROGRESSION[Math.max(currentIndex - 1, 0)];
        macro1 = TF_PROGRESSION[Math.min(currentIndex + 1, TF_PROGRESSION.length - 1)];
-       macro2 = TF_PROGRESSION[Math.min(currentIndex + 2, TF_PROGRESSION.length - 1)];
     }
     
-    // Fetch all required timeframes concurrently
-    const timeframesToFetch = Array.from(new Set([microTF, timeframe, macro1, macro2]));
+    const timeframesToFetch = Array.from(new Set([microTF, timeframe, macro1]));
     const dataPromises = timeframesToFetch.map(tf => fetchTimeframeData(symbol, tf));
     const fetchedData = await Promise.all(dataPromises);
     
     const marketDataContext = `
       ${fetchedData.join('\n')}
-      
       Note: You MUST use these exact prices to calculate candle sizes and verify momentum.
     `;
 
@@ -135,86 +99,67 @@ export async function analyzeMarket(params: {
       }
     `;
 
-    console.log(`[AI Client] Calling Gemini API for ${symbol}...`);
-    
-    initializeKeys(); // Ensure keys are loaded to know the count
-    let attempt = 0;
-    const maxAttempts = Math.max(1, apiKeys.length);
-    let lastError: any = null;
-    let response: any = null;
+    const apiKey = import.meta.env.VITE_QWEN_API_KEY;
+    const apiUrl = import.meta.env.VITE_QWEN_API_URL;
+    const model = import.meta.env.VITE_QWEN_MODEL || "qwen-plus";
 
-    while (attempt < maxAttempts) {
+    if (!apiKey || !apiUrl) {
+      throw new Error("Qwen API Key or URL is missing in environment variables.");
+    }
+
+    let attempt = 0;
+    const maxRetries = 3;
+    let lastError: any = null;
+    let resultData: any = null;
+
+    while (attempt <= maxRetries) {
       try {
-        const ai = getNextAiClient();
-        response = await ai.models.generateContent({
-          model: "gemini-flash-latest",
-          contents: [{ role: "user", parts: [{ text: technicalPrompt }] }],
-          config: {
+        const response = await fetch(`${apiUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              { role: "system", content: "You are a professional financial analyst AI. You provide strict, math-based technical analysis." },
+              { role: "user", content: technicalPrompt }
+            ],
             temperature: 0.1,
-            responseMimeType: "application/json"
-          }
+            response_format: { type: "json_object" }
+          })
         });
-        break; // Success! Exit the retry loop.
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const rawText = data.choices[0]?.message?.content;
+        
+        if (!rawText) throw new Error("Empty response from AI engine.");
+        
+        resultData = JSON.parse(rawText);
+        break; // Success
       } catch (err: any) {
         lastError = err;
-        const errMsg = err.message || "";
-        const isRetryable = err.status === 429 || err.status === 403 || err.status === 503 || 
-                           errMsg.toLowerCase().includes("quota") || 
-                           errMsg.toLowerCase().includes("exhausted") || 
-                           errMsg.toLowerCase().includes("high demand") ||
-                           errMsg.toLowerCase().includes("unavailable");
-        
-        if (isRetryable && attempt < maxAttempts + 3) {
-          if (apiKeys.length > 1) rotateKey();
-          attempt++;
-          const waitTime = Math.min(attempt * 3000, 15000);
-          console.warn(`[AI Retry] Attempt ${attempt} after error: ${errMsg}. Waiting ${waitTime}ms...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        } else {
-          throw err;
+        attempt++;
+        if (attempt <= maxRetries) {
+          const waitTime = attempt * 2000;
+          console.warn(`[Qwen Retry] Attempt ${attempt} failed: ${err.message}. Retrying in ${waitTime}ms...`);
+          await new Promise(r => setTimeout(r, waitTime));
         }
       }
     }
 
-    if (!response) {
-       const keyStatus = apiKeys.map(k => `...${k.slice(-4)}`).join(', ');
-       throw new Error(`تم رفض الطلب من قبل الذكاء الاصطناعي (السبب: ${lastError?.message || 'غير معروف'}). تم تجربة ${apiKeys.length} مفاتيح.`);
-    }
-
-    const rawText = response.text;
-    
-    if (!rawText) {
-      throw new Error("تلقى التطبيق استجابة فارغة من الذكاء الاصطناعي.");
-    }
-    
-    let resultData;
-    try {
-      resultData = JSON.parse(rawText.replace(/```json/g, "").replace(/```/g, "").trim());
-    } catch (parseError) {
-      console.error("[AI JSON Parse Error]:", parseError, "Raw text:", rawText);
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          resultData = JSON.parse(jsonMatch[0]);
-        } catch (innerError) {
-          throw new Error("فشل في تحليل بيانات الذكاء الاصطناعي.");
-        }
-      } else {
-        throw new Error("فشل في قراءة بيانات التحليل المستلمة.");
-      }
+    if (!resultData) {
+      throw new Error(`AI Analysis failed after ${maxRetries} attempts: ${lastError?.message}`);
     }
     
     let signal = (resultData.signal || "neutral").toLowerCase().replace(/\s+/g, '_');
-    const validSignals = ["strong_buy", "buy", "neutral", "sell", "strong_sell", "no_entry"];
     
-    if (!validSignals.includes(signal)) {
-      if (signal.includes('strong') && signal.includes('buy')) signal = "strong_buy";
-      else if (signal.includes('strong') && signal.includes('sell')) signal = "strong_sell";
-      else if (signal.includes('buy')) signal = "buy";
-      else if (signal.includes('sell')) signal = "sell";
-      else signal = "neutral";
-    }
-
     return {
       symbol: resultData.symbol || symbol,
       type,
