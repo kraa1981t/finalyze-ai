@@ -89,17 +89,22 @@ export async function analyzeMarket(params: {
       - "buy"/"sell": Good setup, but maybe slight timeframe conflict or average momentum. Confidence 60-84%.
       - "neutral"/"no_entry": ONLY use this if the market is completely flat, zero momentum, and unpredictable.
 
-      Return ONLY a VALID JSON object. IMPORTANT: The "summary" and "historicalMatch" fields MUST be written in ${lang === 'ar' ? 'Arabic (اللغة العربية)' : 'English'} to match the website's UI language.
+      **FINAL AND MOST IMPORTANT RULE REGARDING LANGUAGE**:
+      The user's interface is currently in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. 
+      You MUST write the "summary" and "historicalMatch" fields entirely in ${lang === 'ar' ? 'ARABIC (اللغة العربية)' : 'ENGLISH'}.
+      If you output the wrong language, the system will crash. Do not mix languages.
+
+      Return ONLY a VALID JSON object:
       {
         "symbol": "${symbol}",
         "signal": "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" | "no_entry",
         "confidence": number,
-        "summary": "${lang === 'ar' ? 'تقرير مفصل باللغة العربية يشرح أسباب التحليل والزخم وتطابق الفريمات...' : 'Detailed report explaining the analysis reasons, momentum, and timeframe alignment...'}",
+        "summary": "${lang === 'ar' ? 'اكتب تقرير التحليل هنا باللغة العربية فقط...' : 'Write the analysis report here in English only...'}",
         "technicalScore": number,
         "sentimentScore": number,
         "trendMaturity": "infancy" | "youth" | "aging",
         "trendAge": number,
-        "historicalMatch": "${lang === 'ar' ? 'وصف للنمط التاريخي باللغة العربية' : 'Historical pattern description'}"
+        "historicalMatch": "${lang === 'ar' ? 'اكتب النمط التاريخي هنا باللغة العربية...' : 'Write historical pattern here in English...'}"
       }
     `;
 
