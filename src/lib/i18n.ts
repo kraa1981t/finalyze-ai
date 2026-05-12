@@ -161,6 +161,9 @@ export const translations: Record<Language, Translations> = {
     searchSymbol: "Search all symbols...",
     addSymbol: "Add Symbol",
     popularSymbols: "Popular Symbols",
+    topSignals: "High-Confidence Signals",
+    signalExpired: "Signal Expired",
+    delete: "Delete"
   },
   ar: {
     title: "Finalyze AI",
@@ -189,7 +192,7 @@ export const translations: Record<Language, Translations> = {
     strong_buy: "شراء قوي",
     strong_sell: "بيع قوي",
     neutral: "حيادي",
-    no_entry: "تجنب الدخول",
+    no_entry: "لا توجد نقطة دخول",
     allRightsReserved: "جميع الحقوق محفوظة",
     privacyPolicy: "سياسة الخصوصية",
     termsOfUse: "شروط الاستخدام",
@@ -241,6 +244,9 @@ export const translations: Record<Language, Translations> = {
     searchSymbol: "البحث في جميع الرموز...",
     addSymbol: "إضافة الرمز",
     popularSymbols: "الرموز المشهورة",
+    topSignals: "توصيات عالية الثقة",
+    signalExpired: "انتهت صلاحية التوصية",
+    delete: "حذف"
   },
   es: {
     title: "Finalyze AI",

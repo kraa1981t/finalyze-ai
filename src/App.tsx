@@ -10,6 +10,7 @@ import AnalysisResultView from './components/AnalysisResultView';
 import ConnectionStatus from './components/ConnectionStatus';
 import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
+import TopSignals from './components/TopSignals';
 import { AnalysisResult, StrategySettings } from './types';
 import { DEFAULT_STRATEGY_SETTINGS } from './constants';
 import { Language, translations } from './lib/i18n';
@@ -24,6 +25,61 @@ export default function App() {
   const [isDark, setIsDark] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<StrategySettings>(DEFAULT_STRATEGY_SETTINGS);
+  
+  const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
+    const saved = localStorage.getItem('top_signals');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.filter((s: AnalysisResult) => {
+          const age = Date.now() - new Date(s.timestamp).getTime();
+          return age < 2 * 60 * 60 * 1000;
+        });
+      } catch (e) { return []; }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('top_signals', JSON.stringify(topSignals));
+  }, [topSignals]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTopSignals(prev => prev.filter(s => {
+        const age = Date.now() - new Date(s.timestamp).getTime();
+        return age < 2 * 60 * 60 * 1000;
+      }));
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const updateTopSignals = (newResults: AnalysisResult[]) => {
+    setTopSignals(prev => {
+      let updated = [...prev];
+      newResults.forEach(res => {
+        if (res.confidence >= 80 && res.signal !== 'no_entry' && res.signal !== 'neutral') {
+          const index = updated.findIndex(s => s.symbol === res.symbol);
+          if (index !== -1) {
+            updated[index] = res;
+          } else {
+            updated.unshift(res);
+          }
+        } else {
+          updated = updated.filter(s => s.symbol !== res.symbol);
+        }
+      });
+      return updated.slice(0, 12);
+    });
+  };
+
+  const removeSignal = (symbol: string) => {
+    setTopSignals(prev => prev.filter(s => s.symbol !== symbol));
+  };
+  
+  const handleSelectSignal = (result: AnalysisResult) => {
+    setAnalysisResults([result]);
+  };
 
   useEffect(() => {
     // Apply theme
@@ -118,6 +174,12 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="max-w-7xl mx-auto px-4 py-8"
             >
+              <TopSignals 
+                signals={topSignals} 
+                onRemove={removeSignal} 
+                onSelect={handleSelectSignal} 
+                lang={lang} 
+              />
               <AnalysisForm 
                  user={user} 
                  lang={lang}
@@ -128,6 +190,7 @@ export default function App() {
                    setAnalysisResults(results);
                    setIsAnalyzing(false);
                    setProgress(null);
+                   updateTopSignals(results);
                  }} 
                  onError={() => {
                    setIsAnalyzing(false);
