@@ -54,16 +54,16 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
       </div>
 
       {/* 2. List Section: Structured Rankings */}
-      <div className="space-y-6 max-w-md mx-auto">
-        <div className={cn("flex items-center justify-between px-4", isRTL ? "flex-row" : "flex-row-reverse")}>
+      <div className="space-y-8 max-w-2xl mx-auto">
+        <div className={cn("flex items-center justify-between px-6", isRTL ? "flex-row" : "flex-row-reverse")}>
           <span className="text-xs font-bold text-brand-muted font-mono">Analyzed: {results.length}</span>
-          <h3 className="text-xl font-black text-brand-text flex items-center gap-2">
-            <Zap size={20} className="text-secondary fill-secondary" />
+          <h3 className="text-2xl font-black text-brand-text flex items-center gap-3">
+            <Zap size={24} className="text-secondary fill-secondary" />
             {t.finalDecision}
           </h3>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           {sortedResults.map((res, idx) => {
             const resConfig = SIGNAL_CONFIG[res.signal] || SIGNAL_CONFIG[SignalType.NEUTRAL];
             const ResIcon = resConfig.icon;
@@ -81,32 +81,32 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
               >
                 <div 
                   className={cn(
-                    "relative overflow-hidden rounded-[2rem] border-2 transition-all cursor-pointer group",
+                    "relative overflow-hidden rounded-[2.5rem] border-2 transition-all cursor-pointer group",
                     isSelected 
-                      ? "border-primary bg-brand-alt shadow-2xl ring-4 ring-primary/5" 
-                      : "border-brand-text/5 bg-brand-alt hover:border-brand-text/10"
+                      ? "border-primary bg-brand-alt shadow-[0_0_50px_rgba(16,185,129,0.1)] ring-4 ring-primary/10" 
+                      : "border-brand-text/10 bg-brand-alt hover:border-brand-text/20"
                   )}
                   onClick={() => setSelectedIndex(idx)}
                 >
-                  <div className="flex flex-col items-center p-6 text-center gap-4">
-                    {/* Symbol & Confidence */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-center gap-3">
+                  <div className="flex flex-col items-center p-10 text-center gap-8">
+                    {/* Header: Symbol & Rank */}
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="flex items-center gap-4">
                         <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-                          isSelected ? "bg-primary text-white" : "bg-brand-text/10 text-brand-muted"
+                          "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl",
+                          isSelected ? "bg-primary text-white scale-110" : "bg-brand-text/10 text-brand-muted"
                         )}>
-                          <span className="text-sm font-black">{idx + 1}</span>
+                          <span className="text-lg font-black">{idx + 1}</span>
                         </div>
-                        <span className="text-2xl font-black text-brand-text tracking-tighter font-display italic">{res.symbol}</span>
+                        <span className="text-4xl font-black text-brand-text tracking-tighter font-display italic">{res.symbol}</span>
                       </div>
                       
-                      <div className="w-40 mx-auto">
-                        <div className="flex justify-between text-[9px] font-black text-brand-muted mb-1">
+                      <div className="w-64 mx-auto space-y-2">
+                        <div className="flex justify-between text-[11px] font-black text-brand-muted">
                           <span>{t.confidence}</span>
                           <span style={{ color: signalColor }}>{res.confidence}%</span>
                         </div>
-                        <div className="h-1.5 bg-brand-bg/40 rounded-full overflow-hidden">
+                        <div className="h-2 bg-brand-bg/40 rounded-full overflow-hidden">
                            <motion.div 
                              initial={{ width: 0 }}
                              animate={{ width: `${res.confidence}%` }}
@@ -117,45 +117,56 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
                       </div>
                     </div>
 
-                    {/* Final Decision */}
-                    <div className="flex flex-col items-center gap-1">
-                      <div className={cn("p-2.5 rounded-xl shadow-inner mb-1", resConfig.bg)}>
-                         <ResIcon size={20} style={{ color: signalColor }} />
+                    {/* Decision Center */}
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-muted mb-2">{t.finalDecision}</div>
+                      <div className={cn("p-4 rounded-3xl shadow-inner mb-2", resConfig.bg)}>
+                         <ResIcon size={32} style={{ color: signalColor }} />
                       </div>
-                      <span className="text-xl font-black" style={{ color: signalColor }}>
+                      <span className="text-3xl font-black" style={{ color: signalColor }}>
                         {t[res.signal as keyof typeof t]}
                       </span>
                       <button 
                         onClick={(e) => { e.stopPropagation(); setShowDetail(true); }}
-                        className="flex items-center gap-1 text-[9px] font-black text-primary hover:underline"
+                        className="mt-2 flex items-center gap-2 text-xs font-black text-primary hover:underline hover:translate-x-1 transition-all"
                       >
-                         {t.readMore} <ChevronRight size={12} />
+                         {t.readMore} <ChevronRight size={16} />
                       </button>
                     </div>
 
-                    {/* Quick Reasons */}
-                    <div className="w-full">
-                      <p className="text-xs font-medium text-brand-text line-clamp-2 leading-relaxed italic px-2">
-                        {res.summary}
-                      </p>
-                      
-                      <div className="mt-4 flex items-center justify-center gap-6 opacity-80">
-                         <div className="flex items-center gap-1.5">
-                            <BarChart2 size={12} className="text-primary" />
-                            <span className="text-[9px] font-black text-brand-text">{res.technicalScore}%</span>
+                    {/* Detailed Analysis Content */}
+                    <div className="w-full space-y-6">
+                      <div className="space-y-3">
+                        <div className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-muted">{t.reasons}</div>
+                        <p className="text-sm font-medium text-brand-text leading-relaxed italic px-4 border-l-2 border-primary/20 bg-primary/5 py-4 rounded-2xl">
+                          {res.summary}
+                        </p>
+                      </div>
+
+                      {/* Badges and Scores */}
+                      <div className="flex flex-wrap items-center justify-center gap-6 pt-4 border-t border-brand-text/5">
+                         <div className="flex items-center gap-2">
+                            <BarChart2 size={16} className="text-primary" />
+                            <span className="text-xs font-black text-brand-text">{res.technicalScore}%</span>
                          </div>
-                         <div className="flex items-center gap-1.5">
-                            <MessageSquare size={12} className="text-secondary" />
-                            <span className="text-[9px] font-black text-brand-text">{res.sentimentScore}%</span>
+                         <div className="flex items-center gap-2">
+                            <MessageSquare size={16} className="text-secondary" />
+                            <span className="text-xs font-black text-brand-text">{res.sentimentScore}%</span>
                          </div>
+                         {res.historicalMatch && (
+                           <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                              <History size={14} className="text-emerald-400" />
+                              <span className="text-[10px] font-black text-emerald-400">MATCH</span>
+                           </div>
+                         )}
                          {res.trendMaturity && (
                            <div className={cn(
-                             "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[8px] font-black uppercase",
+                             "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest",
                              res.trendMaturity === 'youth' ? "bg-emerald-500/20 text-emerald-400" : 
                              res.trendMaturity === 'infancy' ? "bg-blue-500/20 text-blue-400" : 
                              "bg-orange-500/20 text-orange-400"
                            )}>
-                              <Zap size={8} />
+                              <Zap size={12} />
                               {t[res.trendMaturity as keyof typeof t] || res.trendMaturity}
                            </div>
                          )}
@@ -168,6 +179,7 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
           })}
         </div>
       </div>
+
 
 
       {/* Detail Modal */}
