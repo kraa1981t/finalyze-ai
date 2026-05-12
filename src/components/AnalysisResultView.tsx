@@ -54,7 +54,7 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
       </div>
 
       {/* 2. List Section: Structured Rankings */}
-      <div className="space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6">
         <div className={cn("flex items-center justify-between px-4", isRTL ? "flex-row" : "flex-row-reverse")}>
           <span className="text-xs font-bold text-brand-muted font-mono">Analyzed: {results.length}</span>
           <h3 className="text-2xl font-black text-brand-text flex items-center gap-3">
@@ -88,9 +88,9 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
                   )}
                   onClick={() => setSelectedIndex(idx)}
                 >
-                  <div className={cn("flex flex-col lg:flex-row items-stretch min-h-[140px]", isRTL ? "lg:flex-row" : "lg:flex-row-reverse")}>
+                  <div className="flex flex-col items-stretch min-h-[140px]">
                     {/* Symbol & Intensity */}
-                    <div className="w-full lg:w-[280px] p-8 bg-brand-bg/40 border-b lg:border-b-0 border-brand-text/10 flex flex-col justify-center gap-3">
+                    <div className="w-full p-6 bg-brand-bg/40 border-b border-brand-text/10 flex flex-col justify-center gap-3">
                       <div className="flex items-center gap-4">
                         <div className={cn(
                           "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl",
@@ -117,32 +117,32 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
                     </div>
 
                     {/* Final Decision with Read More */}
-                    <div className="w-full lg:w-[320px] p-8 flex flex-col justify-center items-center lg:items-start gap-2 border-b lg:border-b-0 border-brand-text/10">
+                    <div className="w-full p-6 flex flex-col justify-center items-center gap-2 border-b border-brand-text/10 bg-brand-bg/20">
                       <div className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-text">{t.finalDecision}</div>
                       <div className="flex items-center gap-4 py-2">
                         <div className={cn("p-3 rounded-2xl shadow-inner", resConfig.bg)}>
                            <ResIcon size={24} style={{ color: signalColor }} />
                         </div>
-                        <span className="text-2xl font-black" style={{ color: signalColor }}>
+                        <span className="text-3xl font-black" style={{ color: signalColor }}>
                           {t[res.signal as keyof typeof t]}
                         </span>
                       </div>
                       <button 
                         onClick={(e) => { e.stopPropagation(); setShowDetail(true); }}
-                        className="mt-2 flex items-center gap-2 text-[10px] font-black text-primary hover:underline group-hover:translate-x-1 transition-all"
+                        className="mt-2 px-6 py-2 bg-primary/10 text-primary rounded-full flex items-center gap-2 text-xs font-black hover:bg-primary/20 hover:scale-105 transition-all"
                       >
                          {t.readMore} <ChevronRight size={14} />
                       </button>
                     </div>
 
                     {/* Quick Reasons Summary */}
-                    <div className="flex-1 p-8 flex flex-col justify-center relative">
+                    <div className="w-full p-6 flex flex-col justify-center relative text-center">
                       <div className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-text mb-2">{t.reasons}</div>
                       <p className="text-sm font-medium text-brand-text line-clamp-2 leading-relaxed italic">
                         {res.summary.substring(0, 150)}...
                       </p>
                       
-                      <div className="mt-6 flex items-center gap-8 opacity-80 group-hover:opacity-100 transition-opacity">
+                      <div className="mt-6 flex flex-wrap justify-center items-center gap-6 opacity-80 group-hover:opacity-100 transition-opacity">
                          <div className="flex items-center gap-2">
                             <BarChart2 size={14} className="text-primary" />
                             <span className="text-[10px] font-black text-brand-text">{res.technicalScore}%</span>
