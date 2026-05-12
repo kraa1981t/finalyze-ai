@@ -27,11 +27,10 @@ async function fetchTimeframeData(symbol: string, timeframe: string): Promise<st
   return `\n      === LIVE MARKET DATA (${timeframe}) ===\n      Data unavailable.`;
 }
 
-// Deterministic Trend Calculation (Dual EMA Crossover Logic)
+// Deterministic Trend Calculation (Responsive EMA Logic)
 function calculateTrendMaturity(closes: number[]): { maturity: 'infancy' | 'youth' | 'aging', age: number, direction: 'up' | 'down' | 'flat', reason?: string } {
-  if (closes.length < 25) return { maturity: 'infancy', age: 1, direction: 'flat', reason: 'بيانات غير كافية لحساب الاتجاه' };
+  if (closes.length < 10) return { maturity: 'infancy', age: 1, direction: 'flat', reason: 'بيانات غير كافية' };
   
-  // Calculate EMA 9 and EMA 21
   const ema = (data: number[], period: number) => {
     const k = 2 / (period + 1);
     let val = data[0];
@@ -40,22 +39,22 @@ function calculateTrendMaturity(closes: number[]): { maturity: 'infancy' | 'yout
   };
 
   const getEMAAt = (data: number[], period: number, index: number) => {
-    const k = 2 / (period + 1);
-    let val = data[0];
     const subset = data.slice(0, index + 1);
+    if (subset.length === 0) return data[0];
+    const k = 2 / (period + 1);
+    let val = subset[0];
     for (let i = 1; i < subset.length; i++) val = subset[i] * k + val * (1 - k);
     return val;
   };
 
-  const currentEMA9 = ema(closes, 9);
-  const currentEMA21 = ema(closes, 21);
-  const direction = currentEMA9 > currentEMA21 ? 'up' : 'down';
+  const currentPrice = closes[closes.length - 1];
+  const currentEMA = ema(closes, 10);
+  const direction = currentPrice > currentEMA ? 'up' : 'down';
   
   let age = 0;
   for (let i = closes.length - 1; i >= 0; i--) {
-    const e9 = getEMAAt(closes, 9, i);
-    const e21 = getEMAAt(closes, 21, i);
-    const d = e9 > e21 ? 'up' : 'down';
+    const e = getEMAAt(closes, 10, i);
+    const d = closes[i] > e ? 'up' : 'down';
     if (d === direction) {
       age++;
     } else {
@@ -66,12 +65,12 @@ function calculateTrendMaturity(closes: number[]): { maturity: 'infancy' | 'yout
   let maturity: 'infancy' | 'youth' | 'aging' = 'youth';
   let reason = '';
 
-  if (age <= 3) {
+  if (age <= 2) {
     maturity = 'infancy';
-    reason = 'الاتجاه لا يزال في بدايته (مرحلة طفولة) - خطر الدخول الكاذب.';
-  } else if (age >= 30) {
+    reason = `الاتجاه لا يزال في المهد (عمره ${age} شموع فقط) - انتظر تأكيداً أقوى.`;
+  } else if (age >= 60) {
     maturity = 'aging';
-    reason = 'الاتجاه استُنزف تماماً (مرحلة شيخوخة) - خطر الانعكاس الوشيك.';
+    reason = `الاتجاه في مرحلة تشبع شديد (عمره ${age} شموع) - مخاطرة الانعكاس عالية جداً.`;
   }
 
   return { maturity, age, direction, reason };
@@ -104,16 +103,16 @@ export async function analyzeMarket(params: {
     const trend = calculateTrendMaturity(closeArray);
     
     const technicalPrompt = `
-      Deep Financial Analysis for: ${symbol}
-      Market Fact: Trend is ${trend.direction.toUpperCase()}, Age ${trend.age} candles, Stage ${trend.maturity.toUpperCase()}.
+      Deep Analysis: ${symbol} (${type})
+      FACTS: Trend is ${trend.direction.toUpperCase()}, Age: ${trend.age} candles, Stage: ${trend.maturity.toUpperCase()}.
       
       ${fetchedData.join('\n')}
 
-      **STRICT CONSTITUTION**:
-      1. INFANCY (1-3 candles): Return "no_entry". Reason: Early trend.
-      2. AGING (30+ candles): Return "no_entry". Reason: Exhausted trend.
-      3. PEAK YOUTH (4-15 candles): "strong_buy/sell" allowed if technicals and ${macro1} alignment are 90%+.
-      4. MATURE YOUTH (16-29 candles): Only "buy/sell" allowed. No strong signals.
+      **MANDATORY LOGIC**:
+      - Stage INFANCY (<=2): Return "no_entry".
+      - Stage AGING (>=60): Return "no_entry".
+      - Stage YOUTH (3-15): Allow "strong_buy/sell" if setup is perfect.
+      - Stage YOUTH (16-59): Allow "buy/sell" only.
       
       Return JSON:
       {
@@ -123,14 +122,14 @@ export async function analyzeMarket(params: {
         "summary": "Report in ${lang === 'ar' ? 'Arabic' : 'English'}...",
         "technicalScore": number,
         "sentimentScore": number,
-        "historicalMatch": "Pattern in ${lang === 'ar' ? 'Arabic' : 'English'}..."
+        "historicalMatch": "Pattern..."
       }
     `;
 
     const response = await fetch('/api/ai-analysis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: technicalPrompt, temperature: 0.05 })
+      body: JSON.stringify({ prompt: technicalPrompt, temperature: 0.02 })
     });
 
     const resultData = response.ok ? await response.json().then(d => JSON.parse(d.choices[0].message.content)) : null;
@@ -141,8 +140,12 @@ export async function analyzeMarket(params: {
 
     if (trend.maturity === 'infancy' || trend.maturity === 'aging') {
       finalSignal = "no_entry";
-      finalSummary = lang === 'ar' ? trend.reason : `Trend is in ${trend.maturity} stage. Safe entry is not available.`;
+      finalSummary = (lang === 'ar' ? trend.reason : `Trend Stage: ${trend.maturity}. No safe entry.`) + "\n\n" + resultData.summary;
     }
+    
+    // Add Trend Age info to summary for transparency
+    const ageSuffix = lang === 'ar' ? `\n\n[عمر الاتجاه الحالي: ${trend.age} شمعة]` : `\n\n[Current Trend Age: ${trend.age} candles]`;
+    finalSummary += ageSuffix;
 
     return {
       symbol: resultData.symbol || symbol,
