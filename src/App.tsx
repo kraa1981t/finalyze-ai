@@ -30,11 +30,7 @@ export default function App() {
     const saved = localStorage.getItem('top_signals');
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        return parsed.filter((s: AnalysisResult) => {
-          const age = Date.now() - new Date(s.timestamp).getTime();
-          return age < 2 * 60 * 60 * 1000;
-        });
+        return JSON.parse(saved);
       } catch (e) { return []; }
     }
     return [];
@@ -44,21 +40,12 @@ export default function App() {
     localStorage.setItem('top_signals', JSON.stringify(topSignals));
   }, [topSignals]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTopSignals(prev => prev.filter(s => {
-        const age = Date.now() - new Date(s.timestamp).getTime();
-        return age < 2 * 60 * 60 * 1000;
-      }));
-    }, 60000);
-    return () => clearInterval(timer);
-  }, []);
-
   const updateTopSignals = (newResults: AnalysisResult[]) => {
     setTopSignals(prev => {
       let updated = [...prev];
       newResults.forEach(res => {
-        if (res.confidence >= 80 && res.signal !== 'no_entry' && res.signal !== 'neutral') {
+        // Keep if confidence >= 80 AND trend is NOT aging
+        if (res.confidence >= 80 && res.trendMaturity !== 'aging' && res.signal !== 'no_entry' && res.signal !== 'neutral') {
           const index = updated.findIndex(s => s.symbol === res.symbol);
           if (index !== -1) {
             updated[index] = res;
@@ -66,10 +53,11 @@ export default function App() {
             updated.unshift(res);
           }
         } else {
+          // If a symbol is re-analyzed and no longer fits, remove it
           updated = updated.filter(s => s.symbol !== res.symbol);
         }
       });
-      return updated.slice(0, 12);
+      return updated.slice(0, 12); // Keep top 12
     });
   };
 
