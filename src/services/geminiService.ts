@@ -89,15 +89,11 @@ export async function analyzeMarket(params: {
          - Consider the general market sentiment (Fear & Greed).
          - If sentiment aligns with your technical setup, boost the confidence score.
 
-      **FINAL SIGNAL LOGIC**:
-      - "strong_buy"/"strong_sell": Clear trend, strong momentum candles, and alignment with ${macro1}. Confidence ${settings.minStrongConfidence}-100%.
-      - "buy"/"sell": Good setup, but maybe slight timeframe conflict or average momentum. Confidence 60-${settings.minStrongConfidence - 1}%.
-      - "neutral"/"no_entry": ONLY use this if the market is completely flat, zero momentum, and unpredictable.
-
-      **FINAL AND MOST IMPORTANT RULE REGARDING LANGUAGE**:
-      The user's interface is currently in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. 
-      You MUST write the "summary" and "historicalMatch" fields entirely in ${lang === 'ar' ? 'ARABIC (اللغة العربية)' : 'ENGLISH'}.
-      If you output the wrong language, the system will crash. Do not mix languages.
+      **MANDATORY SIGNAL TRUTH TABLE (STABILITY PROTOCOL)**:
+      - If Trend Age is 1 to 5 (Infancy): You MUST return "no_entry". NO EXCEPTIONS.
+      - If Trend Age is 16 or more (Aging): You MUST return "no_entry". NO EXCEPTIONS.
+      - If Trend Age is 6 to 10 (Peak Youth/Manhood): You may return "strong_buy" or "strong_sell" if confidence >= ${settings.minStrongConfidence}%.
+      - If Trend Age is 11 to 15 (Late Youth/Exhausted): You may only return "buy" or "sell". Do NOT return "strong" signals here.
 
       Return ONLY a VALID JSON object:
       {
@@ -126,7 +122,8 @@ export async function analyzeMarket(params: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            prompt: technicalPrompt
+            prompt: technicalPrompt,
+            temperature: 0.1 // Force stability
           })
         });
 
@@ -157,13 +154,29 @@ export async function analyzeMarket(params: {
       throw new Error(`AI Analysis failed after ${maxRetries} attempts: ${lastError?.message}`);
     }
     
-    let signal = (resultData.signal || "neutral").toLowerCase().replace(/\s+/g, '_');
+    // === MANDATORY POST-PROCESSING SAFETY GATE ===
+    let age = Number(resultData.trendAge) || 0;
+    let finalSignal = (resultData.signal || "neutral").toLowerCase().replace(/\s+/g, '_');
+
+    // Rule 1: Infancy & Aging -> No Entry
+    if (age <= 5 || age >= 16) {
+      finalSignal = "no_entry";
+    } 
+    // Rule 2: Late Youth -> Downgrade Strong to Regular
+    else if (age >= 11 && age <= 15) {
+      if (finalSignal === "strong_buy") finalSignal = "buy";
+      if (finalSignal === "strong_sell") finalSignal = "sell";
+    }
+    // Rule 3: Confidence Check
+    if (finalSignal !== "no_entry" && finalSignal !== "neutral") {
+        if (resultData.confidence < settings.minConfidence) finalSignal = "no_entry";
+    }
     
     return {
       symbol: resultData.symbol || symbol,
       type,
       timeframe,
-      signal: signal as SignalType,
+      signal: finalSignal as SignalType,
       confidence: resultData.confidence || 50,
       summary: resultData.summary || "فشل التحليل.",
       technicalScore: resultData.technicalScore || 50,
