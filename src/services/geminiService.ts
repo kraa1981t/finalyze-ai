@@ -83,17 +83,17 @@ export async function analyzeMarket(params: {
       - "buy"/"sell": Good setup, but maybe slight timeframe conflict or average momentum. Confidence 60-84%.
       - "neutral"/"no_entry": ONLY use this if the market is completely flat, zero momentum, and unpredictable.
 
-      Return ONLY a VALID JSON object:
+      Return ONLY a VALID JSON object. IMPORTANT: The "summary" and "historicalMatch" fields MUST be written in Arabic (اللغة العربية) to match the website's UI.
       {
         "symbol": "${symbol}",
         "signal": "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" | "no_entry",
         "confidence": number,
-        "summary": "Report explaining how mandatory candle size (${settings.minCandleSizePx}) and alignment with ${macro1} were verified...",
+        "summary": "تقرير مفصل باللغة العربية يشرح أسباب التحليل والزخم وتطابق الفريمات...",
         "technicalScore": number,
         "sentimentScore": number,
         "trendMaturity": "infancy" | "youth" | "aging",
         "trendAge": number,
-        "historicalMatch": "Pattern description"
+        "historicalMatch": "وصف للنمط التاريخي باللغة العربية"
       }
     `;
 
