@@ -69,20 +69,25 @@ export async function analyzeMarket(params: {
       ${marketDataContext}
 
       **TECHNICAL ANALYSIS GUIDELINES**:
-      1. MARKET TREND: Analyze the Open, High, Low, Close of the last 50 candles on ${timeframe} to determine the current trend direction.
-      2. MOMENTUM (CANDLE SIZE): The user prefers trades with strong momentum. Evaluate the size of the recent candles. Strong directional candles increase confidence.
+      1. MARKET TREND & MATURITY: 
+         - Determine the current trend direction using the last 50 candles.
+         - Calculate "Trend Age" (how many candles this specific trend has lasted). 
+         - Classify "Trend Maturity": "infancy" (1-5 candles, newly forming), "youth" (6-15 candles, strong and safe to enter), "aging" (16+ candles, nearing exhaustion/reversal). We strongly prefer "youth" trends.
+      2. MOMENTUM (CANDLE SIZE): Evaluate the size of the recent candles. Strong directional candles increase confidence.
       3. TIMEFRAME ALIGNMENT: 
          - Check the next higher timeframe (${macro1}) to see the broader trend.
          - If ${timeframe} aligns with ${macro1}, confidence is HIGH.
-         - If they conflict, you can still suggest a trade (like a scalp or pullback), but lower the confidence score.
-      4. PIVOT POINTS & LEVELS: Identify nearby support/resistance levels.
-      5. PRIMARY DIRECTIVE: Do your best to find a valid trading opportunity. We want actionable signals. Avoid returning "neutral" or "no_entry" unless the market is completely dead and flat (e.g., extremely low volatility, consecutive dojis).
-      6. NEWS & GEOPOLITICS (MACRO EVENTS): 
+         - If they conflict, you can still suggest a trade, but lower the confidence score.
+      4. SUPPLY & DEMAND ZONES (SMC): 
+         - Identify strong structural Support/Resistance or Supply/Demand zones. 
+         - If the price is reacting strongly off a fresh Supply/Demand zone, boost the confidence score significantly. Trading away from these zones is preferred.
+      5. PRIMARY DIRECTIVE: Do your best to find a valid trading opportunity. Avoid returning "neutral" or "no_entry" unless the market is completely dead and flat (e.g., extremely low volatility, consecutive dojis).
+      6. NEWS & GEOPOLITICS: 
          - Explicitly consider current global Economic/Political News, Wars, and Natural Disasters. 
-         - If a major geopolitical event or disaster is causing extreme volatility against the technical trend, lower the confidence or signal "neutral" to avoid risk.
+         - If a major event is causing extreme volatility against the technical trend, lower the confidence or signal "neutral".
       7. SENTIMENT & VOTING: 
-         - Consider the general market sentiment (Fear & Greed) and trader voting consensus.
-         - If community voting and sentiment align with your technical setup, boost the confidence score. If they strongly oppose the technical setup, lower the confidence score.
+         - Consider the general market sentiment (Fear & Greed).
+         - If sentiment aligns with your technical setup, boost the confidence score.
 
       **FINAL SIGNAL LOGIC**:
       - "strong_buy"/"strong_sell": Clear trend, strong momentum candles, and alignment with ${macro1}. Confidence 85-100%.
