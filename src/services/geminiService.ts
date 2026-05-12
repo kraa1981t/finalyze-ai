@@ -68,24 +68,20 @@ export async function analyzeMarket(params: {
 
       ${marketDataContext}
 
-      **STRICT TECHNICAL MANDATES (MANDATORY CONDITIONS)**:
-      1. DATA VERIFICATION: Look at the provided prices for ${timeframe}. Identify the color of the last 5 candles.
-      2. CONSECUTIVE CANDLES: The user requires exactly "${settings.consecutiveCandles}" consecutive candles of the same color leading into the current state.
-         - If you do not see ${settings.consecutiveCandles} consecutive candles of the same color, you CANNOT return "strong_buy" or "strong_sell".
-      3. MANDATORY CANDLE SIZE IN PIXELS (HARD BLOCKER): Calculate the body size (Open vs Close) of the current or most recent closed candle on ${timeframe} and convert it to "Pixels" using this standard chart scaling formula:
-         - For Forex pairs (prices like 1.0850): 1 Pip (0.0001) = 10 Pixels. Calculate the pip difference and multiply by 10.
-         - For Crypto/Stocks (prices like 60000 or 150): $1 difference = 1 Pixel.
-         - If the calculated body size is LESS than ${settings.minCandleSizePx} Pixels, you MUST return "no_entry" or "neutral" immediately. No trade is allowed on candles smaller than ${settings.minCandleSizePx} Pixels. This is a MANDATORY mathematical requirement.
-      4. SIMPLIFIED TIMEFRAME ALIGNMENT: 
-         - Compare the trend of ${timeframe} with the NEXT higher timeframe (${macro1}).
-         - If ${timeframe} is Bullish but ${macro1} is Bearish (or vice versa), you MUST return "no_entry". They must both match direction.
-      5. PIVOT POINTS: Use levels (PP, R1, S1) only for finding the entry price after rules 2, 3, and 4 are confirmed.
-      6. SECONDARY FACTORS: News and Sentiment can only be used to boost an already perfect technical setup. They cannot override any technical failure.
+      **TECHNICAL ANALYSIS GUIDELINES**:
+      1. MARKET TREND: Analyze the Open, High, Low, Close of the last 50 candles on ${timeframe} to determine the current trend direction.
+      2. MOMENTUM (CANDLE SIZE): The user prefers trades with strong momentum. Evaluate the size of the recent candles. Strong directional candles increase confidence.
+      3. TIMEFRAME ALIGNMENT: 
+         - Check the next higher timeframe (${macro1}) to see the broader trend.
+         - If ${timeframe} aligns with ${macro1}, confidence is HIGH.
+         - If they conflict, you can still suggest a trade (like a scalp or pullback), but lower the confidence score.
+      4. PIVOT POINTS & LEVELS: Identify nearby support/resistance levels.
+      5. PRIMARY DIRECTIVE: Do your best to find a valid trading opportunity. We want actionable signals. Avoid returning "neutral" or "no_entry" unless the market is completely dead and flat (e.g., extremely low volatility, consecutive dojis).
 
       **FINAL SIGNAL LOGIC**:
-      - "strong_buy"/"strong_sell": Rules 2, 3, and 4 are perfectly satisfied. Confidence >= 85%.
-      - "buy"/"sell": Rules 3 and 4 are satisfied, but Rule 2 is slightly weaker. Confidence ${settings.minConfidence}% - 84%.
-      - "no_entry"/"neutral": Any failure of Rule 3 (Mandatory Size), any conflict in Rule 4 (Alignment), or low confidence.
+      - "strong_buy"/"strong_sell": Clear trend, strong momentum candles, and alignment with ${macro1}. Confidence 85-100%.
+      - "buy"/"sell": Good setup, but maybe slight timeframe conflict or average momentum. Confidence 60-84%.
+      - "neutral"/"no_entry": ONLY use this if the market is completely flat, zero momentum, and unpredictable.
 
       Return ONLY a VALID JSON object:
       {
