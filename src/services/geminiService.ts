@@ -27,11 +27,12 @@ async function fetchTimeframeData(symbol: string, timeframe: string): Promise<st
   return `\n      === LIVE MARKET DATA (${timeframe}) ===\n      Data unavailable.`;
 }
 
-// Deterministic Trend Calculation (Responsive EMA Logic)
+// Deterministic Trend Calculation (Dual EMA Crossover Logic)
 function calculateTrendMaturity(closes: number[]): { maturity: 'infancy' | 'youth' | 'aging', age: number, direction: 'up' | 'down' | 'flat', reason?: string } {
-  if (closes.length < 10) return { maturity: 'infancy', age: 1, direction: 'flat', reason: 'بيانات غير كافية' };
+  if (closes.length < 25) return { maturity: 'infancy', age: 1, direction: 'flat', reason: 'بيانات غير كافية لحساب الاتجاه' };
   
-  const ema = (data: number[], period: number) => {
+  // EMA Helper
+  const getEMA = (data: number[], period: number) => {
     const k = 2 / (period + 1);
     let val = data[0];
     for (let i = 1; i < data.length; i++) val = data[i] * k + val * (1 - k);
@@ -39,23 +40,21 @@ function calculateTrendMaturity(closes: number[]): { maturity: 'infancy' | 'yout
   };
 
   const getEMAAt = (data: number[], period: number, index: number) => {
-    const subset = data.slice(0, index + 1);
-    if (subset.length === 0) return data[0];
     const k = 2 / (period + 1);
-    let val = subset[0];
-    for (let i = 1; i < subset.length; i++) val = subset[i] * k + val * (1 - k);
+    let val = data[0];
+    for (let i = 1; i <= index; i++) val = data[i] * k + val * (1 - k);
     return val;
   };
 
-  const currentPrice = closes[closes.length - 1];
-  const currentEMA = ema(closes, 10);
-  const direction = currentPrice > currentEMA ? 'up' : 'down';
+  const currentEMA9 = getEMA(closes, 9);
+  const currentEMA21 = getEMA(closes, 21);
+  const direction = currentEMA9 > currentEMA21 ? 'up' : 'down';
   
   let age = 0;
   for (let i = closes.length - 1; i >= 0; i--) {
-    const e = getEMAAt(closes, 10, i);
-    const d = closes[i] > e ? 'up' : 'down';
-    if (d === direction) {
+    const e9 = getEMAAt(closes, 9, i);
+    const e21 = getEMAAt(closes, 21, i);
+    if ((e9 > e21 ? 'up' : 'down') === direction) {
       age++;
     } else {
       break;
@@ -67,10 +66,10 @@ function calculateTrendMaturity(closes: number[]): { maturity: 'infancy' | 'yout
 
   if (age <= 2) {
     maturity = 'infancy';
-    reason = `الاتجاه لا يزال في المهد (عمره ${age} شموع فقط) - انتظر تأكيداً أقوى.`;
-  } else if (age >= 60) {
+    reason = `عمر الاتجاه (${age}) شمعة - مرحلة طفولة مبكرة جداً وغير مؤكدة.`;
+  } else if (age >= 50) {
     maturity = 'aging';
-    reason = `الاتجاه في مرحلة تشبع شديد (عمره ${age} شموع) - مخاطرة الانعكاس عالية جداً.`;
+    reason = `عمر الاتجاه (${age}) شمعة - مرحلة شيخوخة متأخرة، السعر مُرهق جداً للدخول.`;
   }
 
   return { maturity, age, direction, reason };
@@ -95,41 +94,41 @@ export async function analyzeMarket(params: {
     const timeframesToFetch = Array.from(new Set([microTF, timeframe, macro1]));
     const fetchedData = await Promise.all(timeframesToFetch.map(tf => fetchTimeframeData(symbol, tf)));
     
-    // Extract closes
-    const mainTFContent = fetchedData.find(d => d.includes(`(${timeframe} - Last 50 Candles)`)) || "";
-    const closeMatch = mainTFContent.match(/Close: \[([\d\.,\s]+)\]/);
+    // Deterministic Extraction
+    const mainContent = fetchedData.find(d => d.includes(`(${timeframe} - Last 50 Candles)`)) || "";
+    const closeMatch = mainContent.match(/Close: \[([\d\.,\s]+)\]/);
     const closeArray = closeMatch ? closeMatch[1].split(',').map(Number) : [];
     
     const trend = calculateTrendMaturity(closeArray);
     
     const technicalPrompt = `
-      Deep Analysis: ${symbol} (${type})
-      FACTS: Trend is ${trend.direction.toUpperCase()}, Age: ${trend.age} candles, Stage: ${trend.maturity.toUpperCase()}.
+      AI Analyst Command for: ${symbol}
+      Real-Time Fact: Direction is ${trend.direction.toUpperCase()}, Age is ${trend.age}, Stage is ${trend.maturity.toUpperCase()}.
       
       ${fetchedData.join('\n')}
 
-      **MANDATORY LOGIC**:
-      - Stage INFANCY (<=2): Return "no_entry".
-      - Stage AGING (>=60): Return "no_entry".
-      - Stage YOUTH (3-15): Allow "strong_buy/sell" if setup is perfect.
-      - Stage YOUTH (16-59): Allow "buy/sell" only.
+      **STRICT CONSTITUTION**:
+      1. INFANCY (1-2 candles): Return "no_entry".
+      2. AGING (50+ candles): Return "no_entry".
+      3. YOUTH (3-15 candles): Peak Manhood. Suggest "strong_buy/sell" if confidence >= ${settings.minStrongConfidence}%.
+      4. MATURE YOUTH (16-49 candles): Valid trend. Suggest "buy/sell" only.
       
       Return JSON:
       {
         "symbol": "${symbol}",
         "signal": "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" | "no_entry",
         "confidence": number,
-        "summary": "Report in ${lang === 'ar' ? 'Arabic' : 'English'}...",
+        "summary": "Arabic Analysis Report...",
         "technicalScore": number,
         "sentimentScore": number,
-        "historicalMatch": "Pattern..."
+        "historicalMatch": "Historical Note..."
       }
     `;
 
     const response = await fetch('/api/ai-analysis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: technicalPrompt, temperature: 0.02 })
+      body: JSON.stringify({ prompt: technicalPrompt, temperature: 0 })
     });
 
     const resultData = response.ok ? await response.json().then(d => JSON.parse(d.choices[0].message.content)) : null;
@@ -140,12 +139,8 @@ export async function analyzeMarket(params: {
 
     if (trend.maturity === 'infancy' || trend.maturity === 'aging') {
       finalSignal = "no_entry";
-      finalSummary = (lang === 'ar' ? trend.reason : `Trend Stage: ${trend.maturity}. No safe entry.`) + "\n\n" + resultData.summary;
+      finalSummary = (lang === 'ar' ? trend.reason : `Trend too ${trend.maturity} (${trend.age} candles). Safe entry blocked.`) + "\n\n" + resultData.summary;
     }
-    
-    // Add Trend Age info to summary for transparency
-    const ageSuffix = lang === 'ar' ? `\n\n[عمر الاتجاه الحالي: ${trend.age} شمعة]` : `\n\n[Current Trend Age: ${trend.age} candles]`;
-    finalSummary += ageSuffix;
 
     return {
       symbol: resultData.symbol || symbol,
