@@ -54,7 +54,7 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
       </div>
 
       {/* 2. List Section: Structured Rankings */}
-      <div className="space-y-3 max-w-2xl mx-auto">
+      <div className="space-y-4 max-w-6xl mx-auto">
         <div className={cn("flex items-center justify-between px-4", isRTL ? "flex-row" : "flex-row-reverse")}>
           <span className="text-[10px] font-bold text-brand-muted font-mono uppercase tracking-widest">Analyzed: {results.length}</span>
           <h3 className="text-sm font-black text-brand-text flex items-center gap-2 uppercase tracking-[0.2em]">
@@ -63,7 +63,7 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
           </h3>
         </div>
 
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {sortedResults.map((res, idx) => {
             const resConfig = SIGNAL_CONFIG[res.signal] || SIGNAL_CONFIG[SignalType.NEUTRAL];
             const ResIcon = resConfig.icon;
@@ -81,7 +81,7 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
               >
                 <div 
                   className={cn(
-                    "relative overflow-hidden h-10 rounded-xl border transition-all cursor-pointer group flex items-center px-4 gap-4",
+                    "relative overflow-hidden h-[50px] rounded-xl border transition-all cursor-pointer group flex items-center px-3 gap-2",
                     isSelected 
                       ? "border-primary bg-brand-alt shadow-lg ring-2 ring-primary/10" 
                       : "border-brand-text/5 bg-brand-alt/50 hover:border-brand-text/10"
@@ -97,43 +97,20 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
                   </div>
 
                   {/* Symbol */}
-                  <span className="text-sm font-black text-brand-text tracking-tighter italic shrink-0 w-20">{res.symbol}</span>
+                  <span className="text-sm font-black text-brand-text tracking-tighter italic shrink-0 w-16 truncate">{res.symbol}</span>
 
-                  {/* Signal */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className={cn("p-1 rounded-md", resConfig.bg)}>
-                       <ResIcon size={12} style={{ color: signalColor }} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: signalColor }}>
-                      {t[res.signal as keyof typeof t]}
-                    </span>
+                  {/* Signal Badge */}
+                  <div className={cn("px-2 py-1 rounded-md flex items-center gap-1.5 shrink-0", resConfig.bg)}>
+                     <ResIcon size={12} style={{ color: signalColor }} />
+                     <span className="text-[9px] font-black uppercase" style={{ color: signalColor }}>
+                       {t[res.signal as keyof typeof t]}
+                     </span>
                   </div>
 
-                  {/* Confidence Bar */}
-                  <div className="flex-grow flex items-center gap-3 min-w-[100px]">
-                    <div className="h-1 flex-grow bg-brand-bg/40 rounded-full overflow-hidden">
-                       <motion.div 
-                         initial={{ width: 0 }}
-                         animate={{ width: `${res.confidence}%` }}
-                         className="h-full"
-                         style={{ backgroundColor: signalColor }}
-                       />
-                    </div>
-                    <span className="text-[10px] font-black tabular-nums" style={{ color: signalColor }}>{res.confidence}%</span>
+                  {/* Confidence % */}
+                  <div className="flex-grow text-right">
+                    <span className="text-[11px] font-black tabular-nums" style={{ color: signalColor }}>{res.confidence}%</span>
                   </div>
-
-                  {/* Trend Maturity Badge (Icon only for space) */}
-                  {res.trendMaturity && (
-                    <div className={cn(
-                      "flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase shrink-0",
-                      res.trendMaturity === 'youth' ? "bg-emerald-500/10 text-emerald-400" : 
-                      res.trendMaturity === 'infancy' ? "bg-blue-500/10 text-blue-400" : 
-                      "bg-orange-500/10 text-orange-400"
-                    )}>
-                       <Zap size={8} />
-                       {isRTL ? '' : res.trendMaturity}
-                    </div>
-                  )}
 
                   {/* Read More Icon */}
                   <button 
@@ -142,12 +119,23 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
                   >
                      <ChevronRight size={14} />
                   </button>
+
+                  {/* Integrated Bottom Confidence Bar */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-bg/40">
+                     <motion.div 
+                       initial={{ width: 0 }}
+                       animate={{ width: `${res.confidence}%` }}
+                       className="h-full"
+                       style={{ backgroundColor: signalColor }}
+                     />
+                  </div>
                 </div>
               </motion.div>
             );
           })}
         </div>
       </div>
+
 
 
 
