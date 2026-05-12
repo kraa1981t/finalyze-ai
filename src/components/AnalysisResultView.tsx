@@ -54,16 +54,16 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
       </div>
 
       {/* 2. List Section: Structured Rankings */}
-      <div className="space-y-8 max-w-2xl mx-auto">
-        <div className={cn("flex items-center justify-between px-6", isRTL ? "flex-row" : "flex-row-reverse")}>
-          <span className="text-xs font-bold text-brand-muted font-mono">Analyzed: {results.length}</span>
-          <h3 className="text-2xl font-black text-brand-text flex items-center gap-3">
-            <Zap size={24} className="text-secondary fill-secondary" />
+      <div className="space-y-3 max-w-2xl mx-auto">
+        <div className={cn("flex items-center justify-between px-4", isRTL ? "flex-row" : "flex-row-reverse")}>
+          <span className="text-[10px] font-bold text-brand-muted font-mono uppercase tracking-widest">Analyzed: {results.length}</span>
+          <h3 className="text-sm font-black text-brand-text flex items-center gap-2 uppercase tracking-[0.2em]">
+            <Zap size={14} className="text-secondary fill-secondary" />
             {t.finalDecision}
           </h3>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-2">
           {sortedResults.map((res, idx) => {
             const resConfig = SIGNAL_CONFIG[res.signal] || SIGNAL_CONFIG[SignalType.NEUTRAL];
             const ResIcon = resConfig.icon;
@@ -75,104 +75,73 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
             return (
               <motion.div
                 key={res.symbol + idx}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
               >
                 <div 
                   className={cn(
-                    "relative overflow-hidden rounded-[2.5rem] border-2 transition-all cursor-pointer group",
+                    "relative overflow-hidden h-10 rounded-xl border transition-all cursor-pointer group flex items-center px-4 gap-4",
                     isSelected 
-                      ? "border-primary bg-brand-alt shadow-[0_0_50px_rgba(16,185,129,0.1)] ring-4 ring-primary/10" 
-                      : "border-brand-text/10 bg-brand-alt hover:border-brand-text/20"
+                      ? "border-primary bg-brand-alt shadow-lg ring-2 ring-primary/10" 
+                      : "border-brand-text/5 bg-brand-alt/50 hover:border-brand-text/10"
                   )}
                   onClick={() => setSelectedIndex(idx)}
                 >
-                  <div className="flex flex-col items-center p-10 text-center gap-8">
-                    {/* Header: Symbol & Rank */}
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className={cn(
-                          "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl",
-                          isSelected ? "bg-primary text-white scale-110" : "bg-brand-text/10 text-brand-muted"
-                        )}>
-                          <span className="text-lg font-black">{idx + 1}</span>
-                        </div>
-                        <span className="text-4xl font-black text-brand-text tracking-tighter font-display italic">{res.symbol}</span>
-                      </div>
-                      
-                      <div className="w-64 mx-auto space-y-2">
-                        <div className="flex justify-between text-[11px] font-black text-brand-muted">
-                          <span>{t.confidence}</span>
-                          <span style={{ color: signalColor }}>{res.confidence}%</span>
-                        </div>
-                        <div className="h-2 bg-brand-bg/40 rounded-full overflow-hidden">
-                           <motion.div 
-                             initial={{ width: 0 }}
-                             animate={{ width: `${res.confidence}%` }}
-                             className="h-full"
-                             style={{ backgroundColor: signalColor }}
-                           />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Decision Center */}
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-muted mb-2">{t.finalDecision}</div>
-                      <div className={cn("p-4 rounded-3xl shadow-inner mb-2", resConfig.bg)}>
-                         <ResIcon size={32} style={{ color: signalColor }} />
-                      </div>
-                      <span className="text-3xl font-black" style={{ color: signalColor }}>
-                        {t[res.signal as keyof typeof t]}
-                      </span>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setShowDetail(true); }}
-                        className="mt-2 flex items-center gap-2 text-xs font-black text-primary hover:underline hover:translate-x-1 transition-all"
-                      >
-                         {t.readMore} <ChevronRight size={16} />
-                      </button>
-                    </div>
-
-                    {/* Detailed Analysis Content */}
-                    <div className="w-full space-y-6">
-                      <div className="space-y-3">
-                        <div className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-muted">{t.reasons}</div>
-                        <p className="text-sm font-medium text-brand-text leading-relaxed italic px-4 border-l-2 border-primary/20 bg-primary/5 py-4 rounded-2xl">
-                          {res.summary}
-                        </p>
-                      </div>
-
-                      {/* Badges and Scores */}
-                      <div className="flex flex-wrap items-center justify-center gap-6 pt-4 border-t border-brand-text/5">
-                         <div className="flex items-center gap-2">
-                            <BarChart2 size={16} className="text-primary" />
-                            <span className="text-xs font-black text-brand-text">{res.technicalScore}%</span>
-                         </div>
-                         <div className="flex items-center gap-2">
-                            <MessageSquare size={16} className="text-secondary" />
-                            <span className="text-xs font-black text-brand-text">{res.sentimentScore}%</span>
-                         </div>
-                         {res.historicalMatch && (
-                           <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-full border border-emerald-500/20">
-                              <History size={14} className="text-emerald-400" />
-                              <span className="text-[10px] font-black text-emerald-400">MATCH</span>
-                           </div>
-                         )}
-                         {res.trendMaturity && (
-                           <div className={cn(
-                             "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest",
-                             res.trendMaturity === 'youth' ? "bg-emerald-500/20 text-emerald-400" : 
-                             res.trendMaturity === 'infancy' ? "bg-blue-500/20 text-blue-400" : 
-                             "bg-orange-500/20 text-orange-400"
-                           )}>
-                              <Zap size={12} />
-                              {t[res.trendMaturity as keyof typeof t] || res.trendMaturity}
-                           </div>
-                         )}
-                      </div>
-                    </div>
+                  {/* Rank */}
+                  <div className={cn(
+                    "w-6 h-6 shrink-0 rounded-md flex items-center justify-center text-[10px] font-black",
+                    isSelected ? "bg-primary text-white" : "bg-brand-text/10 text-brand-muted"
+                  )}>
+                    {idx + 1}
                   </div>
+
+                  {/* Symbol */}
+                  <span className="text-sm font-black text-brand-text tracking-tighter italic shrink-0 w-20">{res.symbol}</span>
+
+                  {/* Signal */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className={cn("p-1 rounded-md", resConfig.bg)}>
+                       <ResIcon size={12} style={{ color: signalColor }} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: signalColor }}>
+                      {t[res.signal as keyof typeof t]}
+                    </span>
+                  </div>
+
+                  {/* Confidence Bar */}
+                  <div className="flex-grow flex items-center gap-3 min-w-[100px]">
+                    <div className="h-1 flex-grow bg-brand-bg/40 rounded-full overflow-hidden">
+                       <motion.div 
+                         initial={{ width: 0 }}
+                         animate={{ width: `${res.confidence}%` }}
+                         className="h-full"
+                         style={{ backgroundColor: signalColor }}
+                       />
+                    </div>
+                    <span className="text-[10px] font-black tabular-nums" style={{ color: signalColor }}>{res.confidence}%</span>
+                  </div>
+
+                  {/* Trend Maturity Badge (Icon only for space) */}
+                  {res.trendMaturity && (
+                    <div className={cn(
+                      "flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase shrink-0",
+                      res.trendMaturity === 'youth' ? "bg-emerald-500/10 text-emerald-400" : 
+                      res.trendMaturity === 'infancy' ? "bg-blue-500/10 text-blue-400" : 
+                      "bg-orange-500/10 text-orange-400"
+                    )}>
+                       <Zap size={8} />
+                       {isRTL ? '' : res.trendMaturity}
+                    </div>
+                  )}
+
+                  {/* Read More Icon */}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setShowDetail(true); }}
+                    className="p-1 hover:bg-brand-text/10 rounded-md text-primary transition-colors shrink-0"
+                  >
+                     <ChevronRight size={14} />
+                  </button>
                 </div>
               </motion.div>
             );
