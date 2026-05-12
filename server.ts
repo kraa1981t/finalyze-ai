@@ -56,7 +56,7 @@ async function startServer() {
       else if (timeframe === '5m') { interval = '5m'; range = '1d'; }
       else if (timeframe === '15m') { interval = '15m'; range = '5d'; }
       else if (timeframe === '1h') { interval = '60m'; range = '10d'; }
-      else if (timeframe === '4h') { interval = '60m'; range = '1mo'; } 
+      else if (timeframe === '4h') { interval = '90m'; range = '1mo'; } 
       else if (timeframe === '1d') { interval = '1d'; range = '1mo'; }
       else if (timeframe === '1w') { interval = '1wk'; range = '1y'; }
       else if (timeframe === '1M') { interval = '1mo'; range = '5y'; }
