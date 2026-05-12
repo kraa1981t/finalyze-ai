@@ -77,6 +77,12 @@ export async function analyzeMarket(params: {
          - If they conflict, you can still suggest a trade (like a scalp or pullback), but lower the confidence score.
       4. PIVOT POINTS & LEVELS: Identify nearby support/resistance levels.
       5. PRIMARY DIRECTIVE: Do your best to find a valid trading opportunity. We want actionable signals. Avoid returning "neutral" or "no_entry" unless the market is completely dead and flat (e.g., extremely low volatility, consecutive dojis).
+      6. NEWS & GEOPOLITICS (MACRO EVENTS): 
+         - Explicitly consider current global Economic/Political News, Wars, and Natural Disasters. 
+         - If a major geopolitical event or disaster is causing extreme volatility against the technical trend, lower the confidence or signal "neutral" to avoid risk.
+      7. SENTIMENT & VOTING: 
+         - Consider the general market sentiment (Fear & Greed) and trader voting consensus.
+         - If community voting and sentiment align with your technical setup, boost the confidence score. If they strongly oppose the technical setup, lower the confidence score.
 
       **FINAL SIGNAL LOGIC**:
       - "strong_buy"/"strong_sell": Clear trend, strong momentum candles, and alignment with ${macro1}. Confidence 85-100%.
