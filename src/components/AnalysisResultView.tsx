@@ -54,11 +54,11 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
       </div>
 
       {/* 2. List Section: Structured Rankings */}
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="space-y-6 max-w-md mx-auto">
         <div className={cn("flex items-center justify-between px-4", isRTL ? "flex-row" : "flex-row-reverse")}>
           <span className="text-xs font-bold text-brand-muted font-mono">Analyzed: {results.length}</span>
-          <h3 className="text-2xl font-black text-brand-text flex items-center gap-3">
-            <Zap size={28} className="text-secondary fill-secondary" />
+          <h3 className="text-xl font-black text-brand-text flex items-center gap-2">
+            <Zap size={20} className="text-secondary fill-secondary" />
             {t.finalDecision}
           </h3>
         </div>
@@ -81,90 +81,81 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
               >
                 <div 
                   className={cn(
-                    "relative overflow-hidden rounded-[2.5rem] border-2 transition-all cursor-pointer group",
+                    "relative overflow-hidden rounded-[2rem] border-2 transition-all cursor-pointer group",
                     isSelected 
-                      ? "border-primary bg-brand-alt shadow-2xl ring-8 ring-primary/5" 
+                      ? "border-primary bg-brand-alt shadow-2xl ring-4 ring-primary/5" 
                       : "border-brand-text/5 bg-brand-alt hover:border-brand-text/10"
                   )}
                   onClick={() => setSelectedIndex(idx)}
                 >
-                  <div className="flex flex-col items-stretch min-h-[140px]">
-                    {/* Symbol & Intensity */}
-                    <div className="w-full p-6 bg-brand-bg/40 border-b border-brand-text/10 flex flex-col justify-center gap-3">
-                      <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-center p-6 text-center gap-4">
+                    {/* Symbol & Confidence */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-center gap-3">
                         <div className={cn(
-                          "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl",
-                          isSelected ? "bg-primary text-white scale-110 rotate-3" : "bg-brand-text/10 text-brand-muted"
+                          "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
+                          isSelected ? "bg-primary text-white" : "bg-brand-text/10 text-brand-muted"
                         )}>
-                          <span className="text-lg font-black">{idx + 1}</span>
+                          <span className="text-sm font-black">{idx + 1}</span>
                         </div>
-                        <span className="text-3xl font-black text-brand-text tracking-tighter font-display italic">{res.symbol}</span>
+                        <span className="text-2xl font-black text-brand-text tracking-tighter font-display italic">{res.symbol}</span>
                       </div>
-                      <div className="space-y-1">
-                         <div className="flex justify-between text-[10px] font-black text-brand-muted mb-1">
-                           <span>{t.confidence}</span>
-                           <span style={{ color: signalColor }}>{res.confidence}%</span>
-                         </div>
-                         <div className="h-2 bg-brand-bg/40 rounded-full overflow-hidden">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${res.confidence}%` }}
-                              className="h-full"
-                              style={{ backgroundColor: signalColor }}
-                            />
-                         </div>
+                      
+                      <div className="w-40 mx-auto">
+                        <div className="flex justify-between text-[9px] font-black text-brand-muted mb-1">
+                          <span>{t.confidence}</span>
+                          <span style={{ color: signalColor }}>{res.confidence}%</span>
+                        </div>
+                        <div className="h-1.5 bg-brand-bg/40 rounded-full overflow-hidden">
+                           <motion.div 
+                             initial={{ width: 0 }}
+                             animate={{ width: `${res.confidence}%` }}
+                             className="h-full"
+                             style={{ backgroundColor: signalColor }}
+                           />
+                        </div>
                       </div>
                     </div>
 
-                    {/* Final Decision with Read More */}
-                    <div className="w-full p-6 flex flex-col justify-center items-center gap-2 border-b border-brand-text/10 bg-brand-bg/20">
-                      <div className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-text">{t.finalDecision}</div>
-                      <div className="flex items-center gap-4 py-2">
-                        <div className={cn("p-3 rounded-2xl shadow-inner", resConfig.bg)}>
-                           <ResIcon size={24} style={{ color: signalColor }} />
-                        </div>
-                        <span className="text-3xl font-black" style={{ color: signalColor }}>
-                          {t[res.signal as keyof typeof t]}
-                        </span>
+                    {/* Final Decision */}
+                    <div className="flex flex-col items-center gap-1">
+                      <div className={cn("p-2.5 rounded-xl shadow-inner mb-1", resConfig.bg)}>
+                         <ResIcon size={20} style={{ color: signalColor }} />
                       </div>
+                      <span className="text-xl font-black" style={{ color: signalColor }}>
+                        {t[res.signal as keyof typeof t]}
+                      </span>
                       <button 
                         onClick={(e) => { e.stopPropagation(); setShowDetail(true); }}
-                        className="mt-2 px-6 py-2 bg-primary/10 text-primary rounded-full flex items-center gap-2 text-xs font-black hover:bg-primary/20 hover:scale-105 transition-all"
+                        className="flex items-center gap-1 text-[9px] font-black text-primary hover:underline"
                       >
-                         {t.readMore} <ChevronRight size={14} />
+                         {t.readMore} <ChevronRight size={12} />
                       </button>
                     </div>
 
-                    {/* Quick Reasons Summary */}
-                    <div className="w-full p-6 flex flex-col justify-center relative text-center">
-                      <div className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-text mb-2">{t.reasons}</div>
-                      <p className="text-sm font-medium text-brand-text line-clamp-2 leading-relaxed italic">
-                        {res.summary.substring(0, 150)}...
+                    {/* Quick Reasons */}
+                    <div className="w-full">
+                      <p className="text-xs font-medium text-brand-text line-clamp-2 leading-relaxed italic px-2">
+                        {res.summary}
                       </p>
                       
-                      <div className="mt-6 flex flex-wrap justify-center items-center gap-6 opacity-80 group-hover:opacity-100 transition-opacity">
-                         <div className="flex items-center gap-2">
-                            <BarChart2 size={14} className="text-primary" />
-                            <span className="text-[10px] font-black text-brand-text">{res.technicalScore}%</span>
+                      <div className="mt-4 flex items-center justify-center gap-6 opacity-80">
+                         <div className="flex items-center gap-1.5">
+                            <BarChart2 size={12} className="text-primary" />
+                            <span className="text-[9px] font-black text-brand-text">{res.technicalScore}%</span>
                          </div>
-                         <div className="flex items-center gap-2">
-                            <MessageSquare size={14} className="text-secondary" />
-                            <span className="text-[10px] font-black text-brand-text">{res.sentimentScore}%</span>
+                         <div className="flex items-center gap-1.5">
+                            <MessageSquare size={12} className="text-secondary" />
+                            <span className="text-[9px] font-black text-brand-text">{res.sentimentScore}%</span>
                          </div>
-                         {res.historicalMatch && (
-                           <div className="flex items-center gap-2">
-                              <History size={14} className="text-emerald-400" />
-                              <span className="text-[10px] font-black text-brand-text">MATCH</span>
-                           </div>
-                         )}
                          {res.trendMaturity && (
                            <div className={cn(
-                             "flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black uppercase",
+                             "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[8px] font-black uppercase",
                              res.trendMaturity === 'youth' ? "bg-emerald-500/20 text-emerald-400" : 
                              res.trendMaturity === 'infancy' ? "bg-blue-500/20 text-blue-400" : 
                              "bg-orange-500/20 text-orange-400"
                            )}>
-                              <Zap size={10} />
+                              <Zap size={8} />
                               {t[res.trendMaturity as keyof typeof t] || res.trendMaturity}
                            </div>
                          )}
@@ -177,6 +168,7 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
           })}
         </div>
       </div>
+
 
       {/* Detail Modal */}
       <AnimatePresence>
