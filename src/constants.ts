@@ -10,6 +10,7 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   useNewsGuard: true,
   useIndicators: true,
   minConfidence: 55,
+  minStrongConfidence: 80,
 };
 
 export const MARKET_CATEGORIES = [

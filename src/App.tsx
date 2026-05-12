@@ -44,8 +44,8 @@ export default function App() {
     setTopSignals(prev => {
       let updated = [...prev];
       newResults.forEach(res => {
-        // Keep if confidence >= 80 AND trend is NOT aging
-        if (res.confidence >= 80 && res.trendMaturity !== 'aging' && res.signal !== 'no_entry' && res.signal !== 'neutral') {
+        // Keep if confidence >= settings.minStrongConfidence AND trend is NOT aging
+        if (res.confidence >= settings.minStrongConfidence && res.trendMaturity !== 'aging' && res.signal !== 'no_entry' && res.signal !== 'neutral') {
           const index = updated.findIndex(s => s.symbol === res.symbol);
           if (index !== -1) {
             updated[index] = res;

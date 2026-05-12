@@ -127,6 +127,20 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                   />
                   <p className="text-xs text-brand-text/40 mt-1">مدى صرامة الذكاء الاصطناعي في مطابقة وتأكيد المناطق القوية.</p>
                 </div>
+
+                <div className="pt-4 border-t border-white/5">
+                  <div className="flex justify-between mb-2">
+                    <label className="text-sm font-semibold text-brand-text text-secondary">عتبة "القرار القوي" والتوصيات (%)</label>
+                    <span className="text-secondary font-mono text-sm">{settings.minStrongConfidence}%</span>
+                  </div>
+                  <input 
+                    type="range" min="70" max="95" step="1"
+                    value={settings.minStrongConfidence}
+                    onChange={(e) => handleChange('minStrongConfidence', Number(e.target.value))}
+                    className="w-full accent-secondary"
+                  />
+                  <p className="text-xs text-brand-text/40 mt-1">النسبة التي يبدأ عندها البوت بإعطاء (بيع/شراء قوي) وتثبيت الرمز في الصفحة الرئيسية.</p>
+                </div>
               </div>
             </div>
 

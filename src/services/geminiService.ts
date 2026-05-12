@@ -90,8 +90,8 @@ export async function analyzeMarket(params: {
          - If sentiment aligns with your technical setup, boost the confidence score.
 
       **FINAL SIGNAL LOGIC**:
-      - "strong_buy"/"strong_sell": Clear trend, strong momentum candles, and alignment with ${macro1}. Confidence 85-100%.
-      - "buy"/"sell": Good setup, but maybe slight timeframe conflict or average momentum. Confidence 60-84%.
+      - "strong_buy"/"strong_sell": Clear trend, strong momentum candles, and alignment with ${macro1}. Confidence ${settings.minStrongConfidence}-100%.
+      - "buy"/"sell": Good setup, but maybe slight timeframe conflict or average momentum. Confidence 60-${settings.minStrongConfidence - 1}%.
       - "neutral"/"no_entry": ONLY use this if the market is completely flat, zero momentum, and unpredictable.
 
       **FINAL AND MOST IMPORTANT RULE REGARDING LANGUAGE**:

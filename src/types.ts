@@ -53,4 +53,5 @@ export interface StrategySettings {
   useNewsGuard: boolean;
   useIndicators: boolean;
   minConfidence: number;
+  minStrongConfidence: number;
 }
