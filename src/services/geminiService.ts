@@ -27,6 +27,34 @@ async function fetchTimeframeData(symbol: string, timeframe: string): Promise<st
   return `\n      === LIVE MARKET DATA (${timeframe}) ===\n      Data unavailable.`;
 }
 
+// Deterministic Trend Calculation
+function calculateTrendMaturity(closes: number[]): { maturity: 'infancy' | 'youth' | 'aging', age: number, direction: 'up' | 'down' | 'flat' } {
+  if (closes.length < 20) return { maturity: 'infancy', age: 1, direction: 'flat' };
+  
+  const lastPrice = closes[closes.length - 1];
+  // Simple Moving Average (20)
+  const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+  const direction = lastPrice > sma20 ? 'up' : 'down';
+  
+  let age = 0;
+  for (let i = closes.length - 1; i >= 0; i--) {
+    const p = closes[i];
+    const s = closes.slice(Math.max(0, i - 19), i + 1).reduce((a, b) => a + b, 0) / (Math.min(i + 1, 20));
+    const d = p > s ? 'up' : 'down';
+    if (d === direction) {
+      age++;
+    } else {
+      break;
+    }
+  }
+
+  let maturity: 'infancy' | 'youth' | 'aging' = 'youth';
+  if (age <= 5) maturity = 'infancy';
+  else if (age >= 16) maturity = 'aging';
+
+  return { maturity, age, direction };
+}
+
 export async function analyzeMarket(params: {
   symbol: string;
   type: MarketType;
@@ -55,123 +83,70 @@ export async function analyzeMarket(params: {
     const dataPromises = timeframesToFetch.map(tf => fetchTimeframeData(symbol, tf));
     const fetchedData = await Promise.all(dataPromises);
     
+    // Extract closes for deterministic calculation
+    const mainTFData = fetchedData.find(d => d.includes(`(${timeframe} - Last 50 Candles)`)) || "";
+    const closeMatch = mainTFData.match(/Close: \[([\d\.,\s]+)\]/);
+    const closeArray = closeMatch ? closeMatch[1].split(',').map(Number) : [];
+    
+    const trendInfo = calculateTrendMaturity(closeArray);
+    
     const marketDataContext = `
       ${fetchedData.join('\n')}
-      Note: You MUST use these exact prices to calculate candle sizes and verify momentum.
+      === DETERMINISTIC TREND ANALYSIS (FACTS) ===
+      Calculated Trend Direction: ${trendInfo.direction.toUpperCase()}
+      Calculated Trend Age: ${trendInfo.age} candles
+      Current Stage: ${trendInfo.maturity.toUpperCase()}
+      Note: These facts are NON-NEGOTIABLE. Use them for your analysis.
     `;
 
     const technicalPrompt = `
       Perform a professional financial analysis for: ${symbol}
-      Market Type: ${type}
       Primary Timeframe: ${timeframe}
-      Trading Strategy Style: ${tradingStyle}
+      Stage: ${trendInfo.maturity} (${trendInfo.age} candles)
 
       ${marketDataContext}
 
-      **TECHNICAL ANALYSIS GUIDELINES**:
-      1. MARKET TREND & MATURITY: 
-         - Determine the current trend direction using the last 50 candles.
-         - Calculate "Trend Age" (how many candles this specific trend has lasted). 
-         - Classify "Trend Maturity": "infancy" (1-5 candles, newly forming), "youth" (6-15 candles, strong and safe to enter), "aging" (16+ candles, nearing exhaustion/reversal). We strongly prefer "youth" trends.
-      2. MOMENTUM (CANDLE SIZE): Evaluate the size of the recent candles. Strong directional candles increase confidence.
-      3. TIMEFRAME ALIGNMENT: 
-         - Check the next higher timeframe (${macro1}) to see the broader trend.
-         - If ${timeframe} aligns with ${macro1}, confidence is HIGH.
-         - If they conflict, you can still suggest a trade, but lower the confidence score.
-      4. SUPPLY & DEMAND ZONES (SMC): 
-         - Identify strong structural Support/Resistance or Supply/Demand zones. 
-         - If the price is reacting strongly off a fresh Supply/Demand zone, boost the confidence score significantly. Trading away from these zones is preferred.
-      5. PRIMARY DIRECTIVE: Do your best to find a valid trading opportunity. Avoid returning "neutral" or "no_entry" unless the market is completely dead and flat (e.g., extremely low volatility, consecutive dojis).
-      6. NEWS & GEOPOLITICS: 
-         - Explicitly consider current global Economic/Political News, Wars, and Natural Disasters. 
-         - If a major event is causing extreme volatility against the technical trend, lower the confidence or signal "neutral".
-      7. SENTIMENT & VOTING: 
-         - Consider the general market sentiment (Fear & Greed).
-         - If sentiment aligns with your technical setup, boost the confidence score.
-
-      **MANDATORY SIGNAL TRUTH TABLE (STABILITY PROTOCOL)**:
-      - If Trend Age is 1 to 5 (Infancy): You MUST return "no_entry". NO EXCEPTIONS.
-      - If Trend Age is 16 or more (Aging): You MUST return "no_entry". NO EXCEPTIONS.
-      - If Trend Age is 6 to 10 (Peak Youth/Manhood): You may return "strong_buy" or "strong_sell" if confidence >= ${settings.minStrongConfidence}%.
-      - If Trend Age is 11 to 15 (Late Youth/Exhausted): You may only return "buy" or "sell". Do NOT return "strong" signals here.
-
+      **MANDATORY SIGNAL TRUTH TABLE**:
+      1. If Stage is INFANCY or AGING: You MUST return "no_entry".
+      2. If Stage is YOUTH (6-10 candles): Suggest "strong_buy" or "strong_sell" if technicals are perfect.
+      3. If Stage is YOUTH (11-15 candles): Suggest only "buy" or "sell".
+      
       Return ONLY a VALID JSON object:
       {
         "symbol": "${symbol}",
         "signal": "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" | "no_entry",
         "confidence": number,
-        "summary": "${lang === 'ar' ? 'اكتب تقرير التحليل هنا باللغة العربية فقط...' : 'Write the analysis report here in English only...'}",
+        "summary": "Report in ${lang === 'ar' ? 'Arabic' : 'English'}...",
         "technicalScore": number,
         "sentimentScore": number,
-        "trendMaturity": "infancy" | "youth" | "aging",
-        "trendAge": number,
-        "historicalMatch": "${lang === 'ar' ? 'اكتب النمط التاريخي هنا باللغة العربية...' : 'Write historical pattern here in English...'}"
+        "historicalMatch": "Pattern in ${lang === 'ar' ? 'Arabic' : 'English'}..."
       }
     `;
 
-    let attempt = 0;
-    const maxRetries = 3;
-    let lastError: any = null;
     let resultData: any = null;
+    const response = await fetch('/api/ai-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: technicalPrompt,
+        temperature: 0 // ABSOLUTE STABILITY
+      })
+    });
 
-    while (attempt <= maxRetries) {
-      try {
-        const response = await fetch('/api/ai-analysis', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            prompt: technicalPrompt,
-            temperature: 0.1 // Force stability
-          })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Server Error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const rawText = data.choices[0]?.message?.content;
-        
-        if (!rawText) throw new Error("Empty response from AI engine.");
-        
-        resultData = JSON.parse(rawText);
-        break; // Success
-      } catch (err: any) {
-        lastError = err;
-        attempt++;
-        if (attempt <= maxRetries) {
-          const waitTime = attempt * 2000;
-          console.warn(`[AI Proxy Retry] Attempt ${attempt} failed: ${err.message}. Retrying in ${waitTime}ms...`);
-          await new Promise(r => setTimeout(r, waitTime));
-        }
-      }
+    if (response.ok) {
+      const data = await response.json();
+      const rawText = data.choices[0]?.message?.content;
+      resultData = JSON.parse(rawText);
     }
 
-    if (!resultData) {
-      throw new Error(`AI Analysis failed after ${maxRetries} attempts: ${lastError?.message}`);
-    }
-    
-    // === MANDATORY POST-PROCESSING SAFETY GATE ===
-    let age = Number(resultData.trendAge) || 0;
-    let finalSignal = (resultData.signal || "neutral").toLowerCase().replace(/\s+/g, '_');
+    if (!resultData) throw new Error("AI Analysis failed.");
 
-    // Rule 1: Infancy & Aging -> No Entry
-    if (age <= 5 || age >= 16) {
+    // Final Logic Enforcement (Safety Gate)
+    let finalSignal = (resultData.signal || "neutral").toLowerCase();
+    if (trendInfo.maturity === 'infancy' || trendInfo.maturity === 'aging') {
       finalSignal = "no_entry";
-    } 
-    // Rule 2: Late Youth -> Downgrade Strong to Regular
-    else if (age >= 11 && age <= 15) {
-      if (finalSignal === "strong_buy") finalSignal = "buy";
-      if (finalSignal === "strong_sell") finalSignal = "sell";
     }
-    // Rule 3: Confidence Check
-    if (finalSignal !== "no_entry" && finalSignal !== "neutral") {
-        if (resultData.confidence < settings.minConfidence) finalSignal = "no_entry";
-    }
-    
+
     return {
       symbol: resultData.symbol || symbol,
       type,
@@ -181,8 +156,8 @@ export async function analyzeMarket(params: {
       summary: resultData.summary || "فشل التحليل.",
       technicalScore: resultData.technicalScore || 50,
       sentimentScore: resultData.sentimentScore || 50,
-      trendMaturity: resultData.trendMaturity || 'unknown',
-      trendAge: resultData.trendAge || 0,
+      trendMaturity: trendInfo.maturity,
+      trendAge: trendInfo.age,
       historicalMatch: resultData.historicalMatch || "",
       timestamp: new Date().toISOString(),
       userId: "", 
