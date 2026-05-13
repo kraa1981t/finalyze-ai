@@ -1,49 +1,60 @@
-import { MarketType, AnalysisResult, TradingStyle, SignalType, StrategySettings } from "../types";
-import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 
 /**
- * HARDCODED TECHNICAL ENGINE
- * These functions perform pure mathematical analysis to ensure 100% stability.
+ * REFINED TECHNICAL ENGINE
+ * Balances strictness with market reality (allows minor pullbacks).
  */
 function calculateTechnicalMetrics(closes: number[], highs: number[], lows: number[]) {
-  if (closes.length < 20) return null;
+  if (closes.length < 25) return null;
 
-  // 1. Trend Direction (using Higher Highs/Lows logic)
+  // 1. Trend Direction (using a weighted window)
   let upScore = 0;
   let downScore = 0;
-  for (let i = 1; i < 15; i++) {
+  const windowSize = 20;
+  for (let i = 1; i < windowSize; i++) {
     const idx = closes.length - 1 - i;
-    if (highs[idx + 1] > highs[idx]) upScore++;
-    if (lows[idx + 1] > lows[idx]) upScore++;
-    if (highs[idx + 1] < highs[idx]) downScore++;
-    if (lows[idx + 1] < lows[idx]) downScore++;
+    if (idx < 0) break;
+    if (closes[idx + 1] > closes[idx]) upScore++; else downScore++;
+    if (highs[idx + 1] > highs[idx]) upScore++; else downScore++;
   }
 
   let direction: 'uptrend' | 'downtrend' | 'sideways' = 'sideways';
-  if (upScore > downScore + 5) direction = 'uptrend';
-  else if (downScore > upScore + 5) direction = 'downtrend';
+  const threshold = 8; // More flexible than before
+  if (upScore > downScore + threshold) direction = 'uptrend';
+  else if (downScore > upScore + threshold) direction = 'downtrend';
 
-  // 2. Trend Age (Exact counting)
+  // 2. Trend Age (Robust counting - allows 2 pullback candles)
   let age = 0;
-  for (let i = 0; i < closes.length - 1; i++) {
-    const idx = closes.length - 1 - i;
-    const isUp = closes[idx] > closes[idx - 1];
-    if (direction === 'uptrend' && isUp) age++;
-    else if (direction === 'downtrend' && !isUp) age++;
-    else break;
+  let pullbacks = 0;
+  const maxPullbacks = 2;
+  
+  for (let i = 1; i < closes.length; i++) {
+    const idx = closes.length - i;
+    const isUpCandle = closes[idx] > closes[idx - 1];
+    
+    if (direction === 'uptrend') {
+      if (isUpCandle) {
+        age++;
+      } else if (pullbacks < maxPullbacks) {
+        pullbacks++; // Allow minor pause
+      } else break;
+    } else if (direction === 'downtrend') {
+      if (!isUpCandle) {
+        age++;
+      } else if (pullbacks < maxPullbacks) {
+        pullbacks++;
+      } else break;
+    } else break;
   }
 
-  // 3. Momentum (Body vs Wick ratio of last 3 candles)
-  const last3 = closes.slice(-3);
-  const last3Highs = highs.slice(-3);
-  const last3Lows = lows.slice(-3);
-  let totalMomentum = 0;
-  for(let i=0; i<3; i++) {
-    const body = Math.abs(closes[closes.length-1-i] - (i === 0 ? closes[closes.length-2] : closes[closes.length-1-i])); // simplified
-    const range = last3Highs[i] - last3Lows[i] || 0.0001;
-    totalMomentum += (body / range);
+  // 3. Momentum (Volume-weighted body size)
+  const last5 = closes.slice(-5);
+  let totalRange = 0;
+  let totalBody = 0;
+  for (let i = 1; i < last5.length; i++) {
+    totalBody += Math.abs(last5[i] - last5[i-1]);
+    totalRange += (highs[highs.length-1-(last5.length-1-i)] - lows[lows.length-1-(last5.length-1-i)]) || 0.0001;
   }
-  const momentumScore = Math.min(100, (totalMomentum / 3) * 100);
+  const momentumScore = Math.min(100, (totalBody / totalRange) * 100);
 
   return { direction, age, momentumScore };
 }
@@ -67,57 +78,43 @@ export async function analyzeMarket(params: {
     const rawData = await fetch(`/api/market-data?symbol=${symbol}&timeframe=${timeframe}`).then(r => r.json());
     const quotes = rawData.chart?.result?.[0]?.indicators?.quote?.[0];
     
-    if (!quotes || !quotes.close || quotes.close.length < 20) {
-      throw new Error("Insufficient market data available for stable analysis.");
+    if (!quotes || !quotes.close || quotes.close.length < 25) {
+      throw new Error("Insufficient market data for deep stability check.");
     }
 
     const closes = quotes.close.filter((c: any) => c != null);
     const highs = quotes.high.filter((c: any) => c != null);
     const lows = quotes.low.filter((c: any) => c != null);
 
-    // ══════════════════════════════════════════════
-    // PHASE 1: MATHEMATICAL VALIDATION (NO AI YET)
-    // ══════════════════════════════════════════════
     const metrics = calculateTechnicalMetrics(closes, highs, lows);
     
+    // ══════════════════════════════════════════════
+    // PHASE 1: HARD STABILITY CHECK
+    // ══════════════════════════════════════════════
     if (!metrics || metrics.direction === 'sideways') {
       return {
-        symbol, type, timeframe, signal: SignalType.NO_ENTRY, confidence: 40,
-        summary: lang === 'ar' ? "السوق في حالة تذبذب عرضي ولا توجد فرصة دخول آمنة حالياً." : "Market is in sideways consolidation. No safe entry detected.",
-        technicalScore: 40, sentimentScore: 50, trendMaturity: 'unknown', trendAge: 0,
+        symbol, type, timeframe, signal: SignalType.NO_ENTRY, confidence: 25,
+        summary: lang === 'ar' ? "السوق في اتجاه عرضي ممل أو متذبذب جداً. لا توجد قوة دفع واضحة حالياً." : "Market is in sideways consolidation or extreme volatility. No clear momentum detected.",
+        technicalScore: 20, sentimentScore: 20, trendMaturity: 'unknown', trendAge: 0,
         historicalMatch: "", timestamp: new Date().toISOString(), userId: ""
       };
     }
 
     // ══════════════════════════════════════════════
-    // PHASE 2: AI ANALYSIS (ONLY FOR CONTEXT & SMC)
+    // PHASE 2: AI REASONING
     // ══════════════════════════════════════════════
     const technicalPrompt = `
-You are a high-level market analyst. I have already calculated the technical facts. 
-Your job is to synthesize them with SMC zones and Sentiment.
-
-FACTS FOR ${symbol} (${timeframe}):
-- TREND: ${metrics.direction.toUpperCase()}
-- TREND AGE: ${metrics.age} candles
-- MOMENTUM SCORE: ${metrics.momentumScore.toFixed(1)}%
-- MACRO TF: ${macro1}
-
-STRICT SIGNAL RULES:
-1. If AGE is 1-5 (Infancy): Signal MUST be "no_entry".
-2. If AGE is 6-12 (Youth): Signal can be "buy" or "sell". (Max confidence 82%).
-3. If AGE is 13-25 (Prime): Signal can be "strong_buy" or "strong_sell" (If confidence >= ${settings.minStrongConfidence}%).
-4. If AGE is 26+ (Aging): Signal MUST be "no_entry".
-
-Based on these facts, evaluate SMC (Supply/Demand) and News. 
-If the trend is ${metrics.direction} and age is good, should we enter?
+You are a master technical analyst.
+FACTS: Symbol ${symbol}, ${metrics.direction.toUpperCase()}, Age ${metrics.age} candles, Momentum ${metrics.momentumScore.toFixed(1)}%.
+Rules: Age 1-5 is infancy (no_entry), 6-25 is tradeable (Youth), 26+ is aging (no_entry).
+Evaluate SMC zones and return a professional decision.
 
 Return ONLY JSON:
 {
   "signal": "strong_buy" | "buy" | "no_entry" | "sell" | "strong_sell",
   "confidence": number,
-  "smc_zone": "string",
-  "summary": "string in ${lang === 'ar' ? 'Arabic' : 'English'}",
-  "historicalMatch": "string"
+  "summary": "Detailed analysis in ${lang === 'ar' ? 'Arabic' : 'English'}",
+  "historicalMatch": "Pattern description"
 }
 `;
 
@@ -129,28 +126,29 @@ Return ONLY JSON:
 
     const rawText = aiResponse.choices[0]?.message?.content;
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("AI Protocol Error");
+    if (!jsonMatch) throw new Error("AI Synthesis Error");
     const resultData = JSON.parse(jsonMatch[0]);
 
     // ══════════════════════════════════════════════
-    // PHASE 3: FINAL ENFORCEMENT (THE JUDGE)
+    // PHASE 3: FINAL ENFORCEMENT
     // ══════════════════════════════════════════════
     let finalSignal = resultData.signal as SignalType;
     let finalConfidence = resultData.confidence || 50;
 
-    // Hardcoded logic to prevent AI "flipping"
-    if (metrics.direction === 'uptrend' && (finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL)) {
-       finalSignal = SignalType.NO_ENTRY; // AI tried to sell in a proven uptrend
-    }
-    if (metrics.direction === 'downtrend' && (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY)) {
-       finalSignal = SignalType.NO_ENTRY; // AI tried to buy in a proven downtrend
+    // Force age boundaries
+    if (metrics.age <= 5 || metrics.age >= 26) {
+      finalSignal = SignalType.NO_ENTRY;
+      finalConfidence = Math.min(finalConfidence, 35);
     }
 
-    // Force age rules again just in case AI ignored them
-    if (metrics.age <= 5 || metrics.age >= 26) finalSignal = SignalType.NO_ENTRY;
-    if (metrics.age >= 6 && metrics.age <= 12) {
-      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
-      if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
+    // Trend alignment check
+    if (metrics.direction === 'uptrend' && (finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL)) {
+       finalSignal = SignalType.NO_ENTRY;
+       finalConfidence = 40;
+    }
+    if (metrics.direction === 'downtrend' && (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY)) {
+       finalSignal = SignalType.NO_ENTRY;
+       finalConfidence = 40;
     }
 
     return {
@@ -160,15 +158,15 @@ Return ONLY JSON:
       summary: resultData.summary,
       technicalScore: metrics.momentumScore,
       sentimentScore: finalConfidence,
-      trendMaturity: metrics.age <= 5 ? 'infancy' : (metrics.age <= 12 ? 'youth' : (metrics.age <= 25 ? 'youth' : 'aging')),
+      trendMaturity: metrics.age <= 5 ? 'infancy' : (metrics.age <= 25 ? 'youth' : 'aging'),
       trendAge: metrics.age,
-      historicalMatch: resultData.historicalMatch || resultData.smc_zone || "",
+      historicalMatch: resultData.historicalMatch || "",
       timestamp: new Date().toISOString(),
       userId: ""
     };
 
   } catch (error: any) {
-    console.error("[Iron Engine Error]:", error);
-    throw new Error(error.message || "Analysis stabilization failure.");
+    console.error("[Engine Error]:", error);
+    throw new Error(error.message || "Stability logic error.");
   }
 }
