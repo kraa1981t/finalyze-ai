@@ -114,7 +114,19 @@ export default function App() {
     };
 
     const interval = setInterval(checkAndRun, 5 * 60 * 1000); // Check every 5 mins
-    checkAndRun(); // Initial check
+    
+    // RADICAL FIX: Session-based First Launch Detection
+    const runOncePerSession = () => {
+      const hasAnalyzedInSession = sessionStorage.getItem('auto_analyzed_this_session');
+      if (!hasAnalyzedInSession && settings.isAutoAnalysisEnabled) {
+        console.log("[Auto Analysis]: First launch of session. Starting now...");
+        runAutoAnalysis();
+        sessionStorage.setItem('auto_analyzed_this_session', 'true');
+      }
+    };
+
+    runOncePerSession(); // Run on mount (if session is fresh)
+    checkAndRun(); // Also check the hourly timer
 
     return () => clearInterval(interval);
   }, [settings.isAutoAnalysisEnabled, lang]);
