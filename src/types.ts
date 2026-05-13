@@ -54,4 +54,6 @@ export interface StrategySettings {
   useIndicators: boolean;
   minConfidence: number;
   minStrongConfidence: number;
+  isAutoAnalysisEnabled: boolean;
+  autoAnalysisCategory: 'all' | 'forex' | 'crypto' | 'stocks';
 }

@@ -9,8 +9,10 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   useVolumeAnalysis: true,
   useNewsGuard: true,
   useIndicators: true,
-  minConfidence: 55,
+  minConfidence: 65,
   minStrongConfidence: 80,
+  isAutoAnalysisEnabled: false,
+  autoAnalysisCategory: 'all',
 };
 
 export const MARKET_CATEGORIES = [

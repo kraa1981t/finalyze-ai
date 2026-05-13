@@ -11,9 +11,10 @@ import ConnectionStatus from './components/ConnectionStatus';
 import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
 import TopSignals from './components/TopSignals';
-import { AnalysisResult, StrategySettings } from './types';
-import { DEFAULT_STRATEGY_SETTINGS } from './constants';
+import { AnalysisResult, StrategySettings, MarketType } from './types';
+import { DEFAULT_STRATEGY_SETTINGS, MARKET_SYMBOLS } from './constants';
 import { Language, translations } from './lib/i18n';
+import { analyzeMarket } from './services/geminiService';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -43,6 +44,80 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('strategy_settings', JSON.stringify(settings));
   }, [settings]);
+
+  // ══════════════════════════════════════════════
+  // AUTO ANALYSIS ENGINE (BACKGROUND SCANNER)
+  // ══════════════════════════════════════════════
+  const [isAutoScanning, setIsAutoScanning] = useState(false);
+
+  const runAutoAnalysis = async () => {
+    if (isAutoScanning || !settings.isAutoAnalysisEnabled) return;
+    
+    setIsAutoScanning(true);
+    console.log("[Auto Analysis]: Starting sequential scan...");
+
+    const categories = settings.autoAnalysisCategory === 'all' 
+      ? Object.keys(MARKET_SYMBOLS) 
+      : [settings.autoAnalysisCategory];
+
+    const allSymbols: { symbol: string, type: MarketType }[] = [];
+    categories.forEach(cat => {
+      const type = cat as MarketType;
+      MARKET_SYMBOLS[type]?.forEach(sym => {
+        allSymbols.push({ symbol: sym, type });
+      });
+    });
+
+    // Shuffle to vary start point
+    const shuffled = [...allSymbols].sort(() => Math.random() - 0.5);
+
+    for (const item of shuffled) {
+      if (!settings.isAutoAnalysisEnabled) break; // Stop if disabled during scan
+      
+      try {
+        const result = await analyzeMarket(
+          item.symbol, 
+          item.type, 
+          '1h', // Default timeframe for auto analysis
+          'day_trading', // Default style
+          lang
+        );
+
+        if (result.confidence >= settings.minStrongConfidence && result.signal.includes('strong')) {
+          updateTopSignals([result]);
+          console.log(`[Auto Analysis]: Found Strong Signal for ${item.symbol}`);
+        }
+        
+        // Wait 2 seconds between symbols to be polite to the API/Engine
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(`[Auto Analysis Error] for ${item.symbol}:`, error);
+      }
+    }
+
+    setIsAutoScanning(false);
+    localStorage.setItem('last_auto_analysis', Date.now().toString());
+    console.log("[Auto Analysis]: Scan completed.");
+  };
+
+  useEffect(() => {
+    if (!settings.isAutoAnalysisEnabled) return;
+
+    const checkAndRun = () => {
+      const lastRun = localStorage.getItem('last_auto_analysis');
+      const now = Date.now();
+      const oneHour = 60 * 60 * 1000;
+
+      if (!lastRun || now - parseInt(lastRun) >= oneHour) {
+        runAutoAnalysis();
+      }
+    };
+
+    const interval = setInterval(checkAndRun, 5 * 60 * 1000); // Check every 5 mins
+    checkAndRun(); // Initial check
+
+    return () => clearInterval(interval);
+  }, [settings.isAutoAnalysisEnabled, lang]);
   
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
     const saved = localStorage.getItem('top_signals');

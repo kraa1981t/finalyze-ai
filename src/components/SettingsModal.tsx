@@ -173,6 +173,38 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                   <input type="checkbox" className="hidden" checked={settings.useNewsGuard} onChange={(e) => handleChange('useNewsGuard', e.target.checked)} />
                 </label>
               </div>
+
+              {/* NEW: Auto Analysis Logic */}
+              <div className="p-4 bg-secondary/5 border border-secondary/20 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-secondary flex items-center gap-2">
+                      <Zap size={16} /> نظام المسح والتحليل الآلي
+                    </h4>
+                    <p className="text-xs text-brand-text/40 mt-0.5">يقوم البوت بالتحليل في الخلفية كل ساعة وعرض "الفرص القوية" فقط.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={settings.isAutoAnalysisEnabled} onChange={(e) => handleChange('isAutoAnalysisEnabled', e.target.checked)} />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                  </label>
+                </div>
+
+                {settings.isAutoAnalysisEnabled && (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label className="block text-xs font-bold text-brand-text/60 mb-2 uppercase tracking-tighter">الفئات المراد مراقبتها آلياً</label>
+                    <select 
+                      value={settings.autoAnalysisCategory}
+                      onChange={(e) => handleChange('autoAnalysisCategory', e.target.value)}
+                      className="w-full bg-brand-bg/50 border border-white/10 rounded-xl px-3 py-2 text-sm text-brand-text outline-none focus:border-secondary transition-colors"
+                    >
+                      <option value="all">جميع الفئات المتوفرة</option>
+                      <option value="forex">سوق العملات (Forex)</option>
+                      <option value="crypto">سوق الكريبتو (Crypto)</option>
+                      <option value="stocks">سوق الأسهم (Stocks)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
 
           </div>
