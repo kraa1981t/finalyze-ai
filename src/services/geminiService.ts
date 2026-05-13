@@ -90,6 +90,8 @@ export async function analyzeMarket(params: {
       throw new Error(`Insufficient data for ${symbol} (${closes.length} candles). Need at least 15.`);
     }
 
+    const metrics = calculateTechnicalMetrics(closes, highs, lows);
+
     if (!metrics || metrics.direction === 'sideways') {
       return {
         symbol, type, timeframe, signal: SignalType.NO_ENTRY, confidence: 25,
