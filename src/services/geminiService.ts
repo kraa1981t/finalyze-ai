@@ -1,32 +1,50 @@
-import { MarketType, AnalysisResult, TradingStyle, SignalType, StrategySettings } from "../types";
-import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 
-async function fetchTimeframeData(symbol: string, timeframe: string): Promise<string> {
-  try {
-    const response = await fetch(`/api/market-data?symbol=${symbol}&timeframe=${timeframe}`);
-    if (response.ok) {
-      const data = await response.json();
-      const quotes = data.chart?.result?.[0]?.indicators?.quote?.[0];
-      if (quotes && quotes.close && quotes.close.length > 0) {
-         const closes = quotes.close.slice(-50).map((n: number) => n?.toFixed(4)).join(", ");
-         const opens = quotes.open.slice(-50).map((n: number) => n?.toFixed(4)).join(", ");
-         const highs = quotes.high.slice(-50).map((n: number) => n?.toFixed(4)).join(", ");
-         const lows = quotes.low.slice(-50).map((n: number) => n?.toFixed(4)).join(", ");
-         
-         return `
-      === LIVE MARKET DATA (${timeframe} - Last 50 Candles) ===
-      Open:  [${opens}]
-      High:  [${highs}]
-      Low:   [${lows}]
-      Close: [${closes}]`;
-      }
-    }
-  } catch (e) {
-    console.warn(`Could not fetch live market data for ${timeframe}`, e);
+/**
+ * HARDCODED TECHNICAL ENGINE
+ * These functions perform pure mathematical analysis to ensure 100% stability.
+ */
+function calculateTechnicalMetrics(closes: number[], highs: number[], lows: number[]) {
+  if (closes.length < 20) return null;
+
+  // 1. Trend Direction (using Higher Highs/Lows logic)
+  let upScore = 0;
+  let downScore = 0;
+  for (let i = 1; i < 15; i++) {
+    const idx = closes.length - 1 - i;
+    if (highs[idx + 1] > highs[idx]) upScore++;
+    if (lows[idx + 1] > lows[idx]) upScore++;
+    if (highs[idx + 1] < highs[idx]) downScore++;
+    if (lows[idx + 1] < lows[idx]) downScore++;
   }
-  return `\n      === LIVE MARKET DATA (${timeframe}) ===\n      Data unavailable.`;
-}
 
+  let direction: 'uptrend' | 'downtrend' | 'sideways' = 'sideways';
+  if (upScore > downScore + 5) direction = 'uptrend';
+  else if (downScore > upScore + 5) direction = 'downtrend';
+
+  // 2. Trend Age (Exact counting)
+  let age = 0;
+  for (let i = 0; i < closes.length - 1; i++) {
+    const idx = closes.length - 1 - i;
+    const isUp = closes[idx] > closes[idx - 1];
+    if (direction === 'uptrend' && isUp) age++;
+    else if (direction === 'downtrend' && !isUp) age++;
+    else break;
+  }
+
+  // 3. Momentum (Body vs Wick ratio of last 3 candles)
+  const last3 = closes.slice(-3);
+  const last3Highs = highs.slice(-3);
+  const last3Lows = lows.slice(-3);
+  let totalMomentum = 0;
+  for(let i=0; i<3; i++) {
+    const body = Math.abs(closes[closes.length-1-i] - (i === 0 ? closes[closes.length-2] : closes[closes.length-1-i])); // simplified
+    const range = last3Highs[i] - last3Lows[i] || 0.0001;
+    totalMomentum += (body / range);
+  }
+  const momentumScore = Math.min(100, (totalMomentum / 3) * 100);
+
+  return { direction, age, momentumScore };
+}
 
 export async function analyzeMarket(params: {
   symbol: string;
@@ -39,205 +57,116 @@ export async function analyzeMarket(params: {
   const { symbol, type, timeframe, tradingStyle, settings = DEFAULT_STRATEGY_SETTINGS, lang = 'en' } = params;
 
   try {
-    console.log(`[Qwen AI] Deep analysis for ${symbol}...`);
-    
     const TF_PROGRESSION = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M', '1Y'];
     const currentIndex = TF_PROGRESSION.indexOf(timeframe);
+    const macro1 = TF_PROGRESSION[Math.min(currentIndex + 1, TF_PROGRESSION.length - 1)];
     
-    let microTF = '1h';
-    let macro1 = '1d';
+    // Fetch Data
+    const rawData = await fetch(`/api/market-data?symbol=${symbol}&timeframe=${timeframe}`).then(r => r.json());
+    const quotes = rawData.chart?.result?.[0]?.indicators?.quote?.[0];
     
-    if (currentIndex !== -1) {
-       microTF = TF_PROGRESSION[Math.max(currentIndex - 1, 0)];
-       macro1 = TF_PROGRESSION[Math.min(currentIndex + 1, TF_PROGRESSION.length - 1)];
+    if (!quotes || !quotes.close || quotes.close.length < 20) {
+      throw new Error("Insufficient market data available for stable analysis.");
     }
-    
-    const timeframesToFetch = Array.from(new Set([microTF, timeframe, macro1]));
-    const dataPromises = timeframesToFetch.map(tf => fetchTimeframeData(symbol, tf));
-    const fetchedData = await Promise.all(dataPromises);
-    
-    // Check if we actually got real data
-    const hasRealData = fetchedData.some(d => !d.includes('Data unavailable'));
-    const dataQualityNote = hasRealData 
-      ? 'REAL LIVE DATA IS PROVIDED. Base your entire analysis on these exact numbers.'
-      : 'WARNING: Live data unavailable. State this clearly and return no_entry.';
-    
-    const marketDataContext = `
-      ${fetchedData.join('\n')}
-      ${dataQualityNote}
-    `;
 
+    const closes = quotes.close.filter((c: any) => c != null);
+    const highs = quotes.high.filter((c: any) => c != null);
+    const lows = quotes.low.filter((c: any) => c != null);
+
+    // ══════════════════════════════════════════════
+    // PHASE 1: MATHEMATICAL VALIDATION (NO AI YET)
+    // ══════════════════════════════════════════════
+    const metrics = calculateTechnicalMetrics(closes, highs, lows);
+    
+    if (!metrics || metrics.direction === 'sideways') {
+      return {
+        symbol, type, timeframe, signal: SignalType.NO_ENTRY, confidence: 40,
+        summary: lang === 'ar' ? "السوق في حالة تذبذب عرضي ولا توجد فرصة دخول آمنة حالياً." : "Market is in sideways consolidation. No safe entry detected.",
+        technicalScore: 40, sentimentScore: 50, trendMaturity: 'unknown', trendAge: 0,
+        historicalMatch: "", timestamp: new Date().toISOString(), userId: ""
+      };
+    }
+
+    // ══════════════════════════════════════════════
+    // PHASE 2: AI ANALYSIS (ONLY FOR CONTEXT & SMC)
+    // ══════════════════════════════════════════════
     const technicalPrompt = `
-You are a strict, rule-based quantitative trading system. You do NOT have opinions or hunches. 
-You ONLY follow mathematical rules applied to the provided price data.
+You are a high-level market analyst. I have already calculated the technical facts. 
+Your job is to synthesize them with SMC zones and Sentiment.
 
-SYMBOL: ${symbol} | MARKET: ${type} | TIMEFRAME: ${timeframe} | STYLE: ${tradingStyle}
+FACTS FOR ${symbol} (${timeframe}):
+- TREND: ${metrics.direction.toUpperCase()}
+- TREND AGE: ${metrics.age} candles
+- MOMENTUM SCORE: ${metrics.momentumScore.toFixed(1)}%
+- MACRO TF: ${macro1}
 
-${marketDataContext}
+STRICT SIGNAL RULES:
+1. If AGE is 1-5 (Infancy): Signal MUST be "no_entry".
+2. If AGE is 6-12 (Youth): Signal can be "buy" or "sell". (Max confidence 82%).
+3. If AGE is 13-25 (Prime): Signal can be "strong_buy" or "strong_sell" (If confidence >= ${settings.minStrongConfidence}%).
+4. If AGE is 26+ (Aging): Signal MUST be "no_entry".
 
-══════════════════════════════════════════════
-MANDATORY IRON-CLAD RULES — NO EXCEPTIONS EVER
-══════════════════════════════════════════════
+Based on these facts, evaluate SMC (Supply/Demand) and News. 
+If the trend is ${metrics.direction} and age is good, should we enter?
 
-STEP 1 — TREND DIRECTION:
-Look at the last 50 close prices provided. Determine:
-a) Is price making Higher Highs + Higher Lows? → UPTREND
-b) Is price making Lower Highs + Lower Lows? → DOWNTREND  
-c) Neither clearly? → SIDEWAYS (must return no_entry)
-
-STEP 2 — TREND AGE (Count exactly):
-Count how many consecutive candles have maintained the current trend direction (continuous HH+HL or LH+LL chain).
-This is your "trendAge" number.
-
-STEP 3 — PHASE CLASSIFICATION (STRICT, CANNOT BE OVERRIDDEN):
-- Phase "infancy":  trendAge 1 to 5 candles   → Signal MUST be "no_entry". No exceptions.
-- Phase "youth":    trendAge 6 to 12 candles   → Signal MUST be "buy" or "sell". NEVER strong.
-- Phase "prime":    trendAge 13 to 25 candles  → Signal MUST be "strong_buy" or "strong_sell". ONLY if momentum confirms.
-- Phase "aging":    trendAge 26+ candles       → Signal MUST be "no_entry". No exceptions.
-
-CRITICAL: If trendMaturity is "infancy" or "aging", the signal field MUST be "no_entry". Period.
-CRITICAL: If trendMaturity is "youth", the signal MUST be "buy" or "sell" (NOT strong).
-CRITICAL: If trendMaturity is "prime", and momentum is strong, signal is "strong_buy" or "strong_sell".
-
-STEP 4 — CONFIDENCE CALCULATION (only for youth/prime phases):
-Base score starts at 50. Add points for each condition met:
-+15 if macro timeframe (${macro1}) trend aligns with primary trend.
-+10 if price is bouncing from a clear Supply/Demand zone.
-+10 if the last 3 candles are strong directional candles (bodies > 60% of total range).
-+10 if no major conflicting news/geopolitical risk.
-+5  if market sentiment aligns with direction.
-Maximum possible: 100. Minimum for any trade signal: 55.
-If total confidence < 55, return "no_entry" regardless of phase.
-
-STEP 5 — TIMEFRAME ALIGNMENT (${macro1}):
-If primary trend OPPOSES the macro timeframe trend, reduce confidence by 20 points.
-
-STRONG SIGNAL THRESHOLD: ${settings.minStrongConfidence}% (for "prime" phase only)
-
-══════════════════════════════════════════════
-LANGUAGE RULE — ABSOLUTE
-══════════════════════════════════════════════
-Write "summary" and "historicalMatch" ENTIRELY in ${lang === 'ar' ? 'ARABIC (العربية)' : 'ENGLISH'}.
-Mixing languages = system failure.
-
-══════════════════════════════════════════════
-OUTPUT FORMAT — RETURN ONLY THIS JSON OBJECT
-══════════════════════════════════════════════
+Return ONLY JSON:
 {
-  "symbol": "${symbol}",
-  "trendDirection": "uptrend" | "downtrend" | "sideways",
-  "trendAge": <exact integer count of candles in current trend>,
-  "trendMaturity": "infancy" | "youth" | "prime" | "aging",
   "signal": "strong_buy" | "buy" | "no_entry" | "sell" | "strong_sell",
-  "confidence": <integer 0-100>,
-  "technicalScore": <integer 0-100>,
-  "sentimentScore": <integer 0-100>,
-  "summary": "<analysis in ${lang === 'ar' ? 'Arabic' : 'English'} only>",
-  "historicalMatch": "<historical pattern in ${lang === 'ar' ? 'Arabic' : 'English'} only>"
+  "confidence": number,
+  "smc_zone": "string",
+  "summary": "string in ${lang === 'ar' ? 'Arabic' : 'English'}",
+  "historicalMatch": "string"
 }
 `;
 
-    let attempt = 0;
-    const maxRetries = 2;
-    let lastError: any = null;
-    let resultData: any = null;
+    const aiResponse = await fetch('/api/ai-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: technicalPrompt })
+    }).then(r => r.json());
 
-    while (attempt <= maxRetries) {
-      try {
-        const response = await fetch('/api/ai-analysis', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: technicalPrompt })
-        });
+    const rawText = aiResponse.choices[0]?.message?.content;
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("AI Protocol Error");
+    const resultData = JSON.parse(jsonMatch[0]);
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Server Error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const rawText = data.choices[0]?.message?.content;
-        
-        if (!rawText) throw new Error("Empty response from AI engine.");
-        
-        // Extract JSON from response (handle markdown code blocks)
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("No valid JSON found in AI response.");
-        
-        resultData = JSON.parse(jsonMatch[0]);
-        break;
-      } catch (err: any) {
-        lastError = err;
-        attempt++;
-        if (attempt <= maxRetries) {
-          await new Promise(r => setTimeout(r, attempt * 1500));
-        }
-      }
-    }
-
-    if (!resultData) {
-      throw new Error(`AI Analysis failed: ${lastError?.message}`);
-    }
-    
     // ══════════════════════════════════════════════
-    // CODE-LEVEL JUDGE — ENFORCES PHASE RULES
-    // This overrides any AI output that violates the phase rules
+    // PHASE 3: FINAL ENFORCEMENT (THE JUDGE)
     // ══════════════════════════════════════════════
-    const trendAge = resultData.trendAge || 0;
-    const trendMaturity = resultData.trendMaturity || 'infancy';
-    let signal = (resultData.signal || 'no_entry').toLowerCase().replace(/\s+/g, '_') as SignalType;
-    let confidence = Math.min(100, Math.max(0, resultData.confidence || 0));
+    let finalSignal = resultData.signal as SignalType;
+    let finalConfidence = resultData.confidence || 50;
 
-    // RULE 1: Infancy → FORCE no_entry
-    if (trendMaturity === 'infancy' || trendAge <= 5) {
-      signal = SignalType.NO_ENTRY;
-      confidence = Math.min(confidence, 45);
+    // Hardcoded logic to prevent AI "flipping"
+    if (metrics.direction === 'uptrend' && (finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL)) {
+       finalSignal = SignalType.NO_ENTRY; // AI tried to sell in a proven uptrend
     }
-    // RULE 2: Aging → FORCE no_entry  
-    else if (trendMaturity === 'aging' || trendAge >= 26) {
-      signal = SignalType.NO_ENTRY;
-      confidence = Math.min(confidence, 45);
-    }
-    // RULE 3: Youth → FORBID strong signals
-    else if (trendMaturity === 'youth' || (trendAge >= 6 && trendAge <= 12)) {
-      if (signal === SignalType.STRONG_BUY) signal = SignalType.BUY;
-      if (signal === SignalType.STRONG_SELL) signal = SignalType.SELL;
-    }
-    // RULE 4: Prime → Only allow strong if confidence >= minStrongConfidence
-    else if (trendMaturity === 'prime' || (trendAge >= 13 && trendAge <= 25)) {
-      if (signal === SignalType.STRONG_BUY && confidence < settings.minStrongConfidence) signal = SignalType.BUY;
-      if (signal === SignalType.STRONG_SELL && confidence < settings.minStrongConfidence) signal = SignalType.SELL;
+    if (metrics.direction === 'downtrend' && (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY)) {
+       finalSignal = SignalType.NO_ENTRY; // AI tried to buy in a proven downtrend
     }
 
-    // RULE 5: No_entry if confidence too low
-    if (confidence < 55 && signal !== SignalType.NO_ENTRY) {
-      signal = SignalType.NO_ENTRY;
+    // Force age rules again just in case AI ignored them
+    if (metrics.age <= 5 || metrics.age >= 26) finalSignal = SignalType.NO_ENTRY;
+    if (metrics.age >= 6 && metrics.age <= 12) {
+      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
+      if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
     }
-
-    // RULE 6: Sideways market → always no_entry
-    if (resultData.trendDirection === 'sideways') {
-      signal = SignalType.NO_ENTRY;
-    }
-    // Map 'prime' back to closest display value for UI
-    const displayMaturity = trendMaturity === 'prime' ? 'youth' : trendMaturity;
 
     return {
-      symbol: resultData.symbol || symbol,
-      type,
-      timeframe,
-      signal,
-      confidence,
-      summary: resultData.summary || (lang === 'ar' ? 'البيانات غير متاحة' : 'Data unavailable'),
-      technicalScore: resultData.technicalScore || 50,
-      sentimentScore: resultData.sentimentScore || 50,
-      trendMaturity: displayMaturity as any,
-      trendAge,
-      historicalMatch: resultData.historicalMatch || '',
+      symbol, type, timeframe,
+      signal: finalSignal,
+      confidence: finalConfidence,
+      summary: resultData.summary,
+      technicalScore: metrics.momentumScore,
+      sentimentScore: finalConfidence,
+      trendMaturity: metrics.age <= 5 ? 'infancy' : (metrics.age <= 12 ? 'youth' : (metrics.age <= 25 ? 'youth' : 'aging')),
+      trendAge: metrics.age,
+      historicalMatch: resultData.historicalMatch || resultData.smc_zone || "",
       timestamp: new Date().toISOString(),
-      userId: '',
+      userId: ""
     };
+
   } catch (error: any) {
-    console.error("[AI Error]:", error);
-    throw new Error(error.message || "AI analysis failed.");
+    console.error("[Iron Engine Error]:", error);
+    throw new Error(error.message || "Analysis stabilization failure.");
   }
 }
