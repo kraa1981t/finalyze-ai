@@ -79,7 +79,14 @@ export default function App() {
         if (!isSubscribed || !autoSettings.isEnabled || isAnalyzing) break;
         
         try {
-          const result = await analyzeMarket(symbol, MarketType.FOREX, autoSettings.timeframe, lang, settings);
+          const result = await analyzeMarket({
+            symbol,
+            type: MarketType.FOREX,
+            timeframe: autoSettings.timeframe,
+            tradingStyle: autoSettings.tradingStyle,
+            settings,
+            lang
+          });
           if (result && isSubscribed) {
              updateTopSignals([result]);
           }

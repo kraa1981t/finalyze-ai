@@ -3,7 +3,8 @@ import { User } from 'firebase/auth';
 import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, Settings as SettingsIcon, ArrowLeft, Zap, ChevronDown, Clock, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/i18n';
-import { AutoAnalysisSettings } from '../types';
+import { AutoAnalysisSettings, TradingStyle } from '../types';
+import { TRADING_STYLES } from '../constants';
 
 interface HeaderProps {
   user: User | null;
@@ -116,6 +117,22 @@ export default function Header({
                     <option value="forex">{t.forex}</option>
                     <option value="crypto">{t.crypto}</option>
                     <option value="stocks">{t.stocks}</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-brand-text/60 mb-1">
+                    <TrendingUp size={14} />
+                    <span className="text-xs font-bold uppercase tracking-tighter">{t.tradingStyle}</span>
+                  </div>
+                  <select 
+                    value={autoSettings.tradingStyle}
+                    onChange={(e) => onAutoSettingsChange({ ...autoSettings, tradingStyle: e.target.value as any })}
+                    className="w-full bg-brand-bg border border-brand-text/10 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-text focus:border-primary outline-none transition-all"
+                  >
+                    {TRADING_STYLES.map(style => (
+                      <option key={style.id} value={style.id}>{t[style.label as keyof typeof t]}</option>
+                    ))}
                   </select>
                 </div>
 

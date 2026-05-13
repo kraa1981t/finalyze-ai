@@ -61,4 +61,5 @@ export interface AutoAnalysisSettings {
   interval: number; // in minutes
   timeframe: string;
   category: 'all' | 'forex' | 'crypto' | 'stocks';
+  tradingStyle: TradingStyle;
 }

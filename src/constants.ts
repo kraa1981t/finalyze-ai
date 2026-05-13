@@ -1,4 +1,4 @@
-import { StrategySettings, MarketType } from "./types";
+import { StrategySettings, MarketType, TradingStyle } from "./types";
 
 export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   minCandleSizePx: 200,
@@ -18,6 +18,7 @@ export const DEFAULT_AUTO_SETTINGS = {
   interval: 15,
   timeframe: '1h',
   category: 'all',
+  tradingStyle: TradingStyle.SWING_TRADING,
 };
 
 export const SYMBOL_CATEGORIES = {
