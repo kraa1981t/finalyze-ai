@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Settings2, Activity, LayoutTemplate, Layers } from 'lucide-react';
+import { X, Settings2, Activity, LayoutTemplate, Layers, Zap } from 'lucide-react';
 import { StrategySettings } from '../types';
 import { DEFAULT_STRATEGY_SETTINGS } from '../constants';
 
@@ -107,6 +107,45 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
               </div>
             </div>
 
+            {/* RADAR SECTION (PROMINENT - SECOND SECTION) */}
+            <div className="space-y-4 p-5 bg-secondary/10 border border-secondary/30 rounded-2xl shadow-lg shadow-secondary/5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 bg-secondary/10 blur-3xl -z-10 rounded-full" />
+              <h3 className="text-sm font-bold text-secondary uppercase tracking-wider flex items-center gap-2">
+                <Zap size={18} className="animate-pulse" /> رادار المسح والتحليل التلقائي
+              </h3>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-bold text-brand-text">تفعيل الرادار الآلي</div>
+                    <p className="text-xs text-brand-text/40 mt-0.5">سيقوم البوت بمسح السوق في الخلفية واصطياد الفرص القوية.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={settings.isAutoAnalysisEnabled} onChange={(e) => handleChange('isAutoAnalysisEnabled', e.target.checked)} />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                  </label>
+                </div>
+
+                {settings.isAutoAnalysisEnabled && (
+                  <div className="space-y-3 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div>
+                      <label className="block text-[10px] font-bold text-brand-text/60 mb-1.5 uppercase tracking-widest">الفئة المستهدفة للمسح</label>
+                      <select 
+                        value={settings.autoAnalysisCategory}
+                        onChange={(e) => handleChange('autoAnalysisCategory', e.target.value as any)}
+                        className="w-full bg-brand-bg/80 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-brand-text outline-none focus:border-secondary transition-colors cursor-pointer"
+                      >
+                        <option value="all">جميع فئات السوق (Forex, Crypto, Stocks)</option>
+                        <option value="forex">سوق العملات الأجنبية (Forex)</option>
+                        <option value="crypto">سوق العملات الرقمية (Crypto)</option>
+                        <option value="stocks">سوق الأسهم العالمية (Stocks)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Section 2: Supply & Demand */}
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-brand-text/50 uppercase tracking-wider flex items-center gap-2">
@@ -174,47 +213,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 </label>
               </div>
             </div>
-
-            {/* Section 4: Auto Analysis (RADAR) */}
-            <div className="space-y-4 pt-6 border-t border-white/10">
-              <h3 className="text-sm font-bold text-secondary uppercase tracking-wider flex items-center gap-2">
-                <Zap size={16} /> رادار المسح والتحليل التلقائي
-              </h3>
-              
-              <div className="p-4 bg-secondary/5 border border-secondary/20 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-bold text-brand-text">تفعيل الرادار الآلي</div>
-                    <p className="text-xs text-brand-text/40 mt-0.5">سيقوم البوت بمسح السوق في الخلفية واصطياد الفرص القوية.</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" checked={settings.isAutoAnalysisEnabled} onChange={(e) => handleChange('isAutoAnalysisEnabled', e.target.checked)} />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
-                  </label>
-                </div>
-
-                {settings.isAutoAnalysisEnabled && (
-                  <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div>
-                      <label className="block text-[10px] font-bold text-brand-text/60 mb-1.5 uppercase tracking-widest">الفئة المستهدفة للمسح</label>
-                      <select 
-                        value={settings.autoAnalysisCategory}
-                        onChange={(e) => handleChange('autoAnalysisCategory', e.target.value as any)}
-                        className="w-full bg-brand-bg/50 border border-white/10 rounded-xl px-3 py-2 text-sm text-brand-text outline-none focus:border-secondary transition-colors cursor-pointer"
-                      >
-                        <option value="all">جميع فئات السوق (Forex, Crypto, Stocks)</option>
-                        <option value="forex">سوق العملات الأجنبية (Forex)</option>
-                        <option value="crypto">سوق العملات الرقمية (Crypto)</option>
-                        <option value="stocks">سوق الأسهم العالمية (Stocks)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-          </div>
-
           </div>
 
           {/* Footer */}
