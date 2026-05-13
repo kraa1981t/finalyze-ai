@@ -21,10 +21,28 @@ export default function App() {
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progress, setProgress] = useState<{ current: string, total: number, index: number } | null>(null);
-  const [lang, setLang] = useState<Language>('en');
-  const [isDark, setIsDark] = useState(true);
+  const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'en');
+  const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState<StrategySettings>(DEFAULT_STRATEGY_SETTINGS);
+  const [settings, setSettings] = useState<StrategySettings>(() => {
+    const saved = localStorage.getItem('strategy_settings');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return DEFAULT_STRATEGY_SETTINGS; }
+    }
+    return DEFAULT_STRATEGY_SETTINGS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('language', lang);
+  }, [lang]);
+
+  useEffect(() => {
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
+
+  useEffect(() => {
+    localStorage.setItem('strategy_settings', JSON.stringify(settings));
+  }, [settings]);
   
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
     const saved = localStorage.getItem('top_signals');
