@@ -46,7 +46,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 <Settings2 size={24} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-brand-text">إعدادات التحليل الذكي</h2>
+                <h2 className="text-xl font-bold text-brand-text">إعدادات الرادار والتحليل التلقائي</h2>
                 <p className="text-sm text-brand-text/50">قم بضبط معايير الذكاء الاصطناعي بدقة</p>
               </div>
             </div>
