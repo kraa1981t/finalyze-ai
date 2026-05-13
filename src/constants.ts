@@ -9,10 +9,21 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   useVolumeAnalysis: true,
   useNewsGuard: true,
   useIndicators: true,
-  minConfidence: 65,
+  minConfidence: 55,
   minStrongConfidence: 80,
-  isAutoAnalysisEnabled: false,
-  autoAnalysisCategory: 'all',
+};
+
+export const DEFAULT_AUTO_SETTINGS = {
+  isEnabled: false,
+  interval: 15,
+  timeframe: '1h',
+  category: 'all',
+};
+
+export const SYMBOL_CATEGORIES = {
+  forex: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF'],
+  crypto: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD'],
+  stocks: ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'GOOGL']
 };
 
 export const MARKET_CATEGORIES = [

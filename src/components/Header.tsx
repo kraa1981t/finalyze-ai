@@ -1,8 +1,9 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, Settings as SettingsIcon, ArrowLeft, Zap } from 'lucide-react';
-import { motion } from 'motion/react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, Settings as SettingsIcon, ArrowLeft, Zap, ChevronDown, Clock, Layers } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/i18n';
+import { AutoAnalysisSettings } from '../types';
 
 interface HeaderProps {
   user: User | null;
@@ -15,11 +16,8 @@ interface HeaderProps {
   onOpenSettings: () => void;
   showBack?: boolean;
   onBack?: () => void;
-  // Radar Props
-  isAutoEnabled: boolean;
-  onToggleAuto: () => void;
-  autoCategory: string;
-  onCategoryChange: (c: any) => void;
+  autoSettings: AutoAnalysisSettings;
+  onAutoSettingsChange: (s: AutoAnalysisSettings) => void;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -41,10 +39,8 @@ export default function Header({
   onOpenSettings, 
   showBack, 
   onBack,
-  isAutoEnabled,
-  onToggleAuto,
-  autoCategory,
-  onCategoryChange
+  autoSettings,
+  onAutoSettingsChange
 }: HeaderProps) {
   const t = translations[lang];
 
@@ -70,32 +66,83 @@ export default function Header({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 md:gap-6">
-          {/* RADAR CONTROL QUICK ACCESS */}
-          <div className={`flex items-center gap-1 border rounded-full px-3 py-1.5 transition-all ${isAutoEnabled ? 'bg-secondary/10 border-secondary/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-white/5 border-white/10'}`}>
+        <div className="flex items-center gap-2 md:gap-4">
+          {/* Auto Analysis Scanner */}
+          <div className="relative group">
             <button 
-              onClick={onToggleAuto}
-              className={`flex items-center gap-2 transition-all ${isAutoEnabled ? 'text-secondary animate-pulse' : 'text-brand-text/30'}`}
-              title="تفعيل/تعطيل الرادار الآلي"
+              onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border ${
+                autoSettings.isEnabled 
+                  ? 'bg-primary/10 border-primary text-primary shadow-lg shadow-primary/20' 
+                  : 'bg-brand-alt border-brand-text/10 text-brand-text/60 hover:text-brand-text'
+              }`}
             >
-              <Zap size={16} fill={isAutoEnabled ? "currentColor" : "none"} />
-              <span className="text-[10px] font-black tracking-tighter">RADAR</span>
+              <div className="relative">
+                <Zap size={16} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
+                {autoSettings.isEnabled && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-ping" />
+                )}
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider hidden sm:inline">
+                {autoSettings.isEnabled ? t.autoAnalysis : t.autoScan}
+              </span>
+              <ChevronDown size={12} className="opacity-40" />
             </button>
-            
-            {isAutoEnabled && (
-              <select 
-                value={autoCategory}
-                onChange={(e) => onCategoryChange(e.target.value)}
-                className="bg-transparent border-none text-[10px] font-bold text-secondary outline-none cursor-pointer pl-1 border-l border-white/10 ml-1"
-              >
-                <option value="all">ALL</option>
-                <option value="forex">FRX</option>
-                <option value="crypto">CRP</option>
-                <option value="stocks">STK</option>
-              </select>
-            )}
-          </div>
 
+            {/* Auto Settings Dropdown */}
+            <div className="absolute right-0 top-full mt-2 w-56 bg-brand-alt border border-brand-text/10 rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-widest text-brand-text/40">{t.autoSettings}</span>
+                <div 
+                  className={`w-8 h-4 rounded-full relative transition-colors cursor-pointer ${autoSettings.isEnabled ? 'bg-primary' : 'bg-brand-text/20'}`}
+                  onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
+                >
+                  <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${autoSettings.isEnabled ? 'left-4.5' : 'left-0.5'}`} />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-brand-text/60 mb-1">
+                    <Layers size={12} />
+                    <span className="text-[10px] font-bold uppercase tracking-tighter">{t.selectMarket}</span>
+                  </div>
+                  <select 
+                    value={autoSettings.category}
+                    onChange={(e) => onAutoSettingsChange({ ...autoSettings, category: e.target.value as any })}
+                    className="w-full bg-brand-bg border border-brand-text/10 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-text focus:border-primary outline-none"
+                  >
+                    <option value="all">{t.allCategories}</option>
+                    <option value="forex">{t.forex}</option>
+                    <option value="crypto">{t.crypto}</option>
+                    <option value="stocks">{t.stocks}</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-brand-text/60 mb-1">
+                    <Clock size={12} />
+                    <span className="text-[10px] font-bold uppercase tracking-tighter">{t.timeframe}</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {['15m', '1h', '4h', '1d'].map((tf) => (
+                      <button
+                        key={tf}
+                        onClick={() => onAutoSettingsChange({ ...autoSettings, timeframe: tf })}
+                        className={`py-1 text-[9px] font-black rounded-md border transition-all ${
+                          autoSettings.timeframe === tf 
+                            ? 'bg-primary border-primary text-white' 
+                            : 'border-brand-text/10 text-brand-text/60 hover:border-primary/40'
+                        }`}
+                      >
+                        {tf}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           {/* Language Selector */}
           <div className="relative group">
             <button className="flex items-center gap-1 p-2 text-brand-text/70 hover:text-primary transition-colors">
@@ -132,29 +179,32 @@ export default function Header({
           </button>
 
           {user ? (
-            <div className="hidden md:flex items-center gap-3 pl-6 border-l border-brand-alt/50">
-              <div className="text-right">
-                <p className="text-sm font-bold text-brand-text leading-none">{user.displayName || 'Trader'}</p>
-                <p className="text-[10px] text-brand-text/40 font-medium">Institutional Account</p>
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:flex flex-col items-end text-right">
+                <span className="text-xs font-semibold text-brand-text">{user.displayName}</span>
+                <span className="text-[10px] text-brand-text/50 uppercase tracking-widest font-mono">Trader</span>
               </div>
               <button 
                 onClick={onLogout}
-                className="w-10 h-10 rounded-xl bg-brand-alt border border-brand-text/10 flex items-center justify-center text-brand-text/70 hover:text-red-500 hover:border-red-500/30 transition-all"
+                className="p-2 text-brand-text/40 hover:text-red-500 transition-colors"
               >
-                <LogOut size={18} />
+                <LogOut size={20} />
               </button>
             </div>
           ) : (
-            <button 
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={onLogin}
-              className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-95"
+              className="flex items-center gap-2 px-4 py-2 bg-brand-text text-brand-bg rounded-full text-sm font-semibold hover:bg-primary hover:text-white transition-colors"
             >
               <LogIn size={18} />
-              <span>Login</span>
-            </button>
+              <span className="hidden sm:inline">{t.login}</span>
+            </motion.button>
           )}
         </div>
       </div>
+      <div className="h-0.5 w-full gradient-line opacity-20" />
     </header>
   );
 }

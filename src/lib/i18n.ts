@@ -79,6 +79,12 @@ export interface Translations {
   searchSymbol: string;
   addSymbol: string;
   popularSymbols: string;
+  autoAnalysis: string;
+  autoSettings: string;
+  autoScan: string;
+  allCategories: string;
+  every: string;
+  minutes: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -163,7 +169,13 @@ export const translations: Record<Language, Translations> = {
     popularSymbols: "Popular Symbols",
     topSignals: "High-Confidence Signals",
     signalExpired: "Signal Expired",
-    delete: "Delete"
+    delete: "Delete",
+    autoAnalysis: "Auto-Scanner",
+    autoSettings: "Scanner Settings",
+    autoScan: "Start Scan",
+    allCategories: "All Markets",
+    every: "Every",
+    minutes: "min"
   },
   ar: {
     title: "Finalyze AI",
@@ -246,7 +258,13 @@ export const translations: Record<Language, Translations> = {
     popularSymbols: "الرموز المشهورة",
     topSignals: "توصيات عالية الثقة",
     signalExpired: "انتهت صلاحية التوصية",
-    delete: "حذف"
+    delete: "حذف",
+    autoAnalysis: "الرادار الآلي",
+    autoSettings: "إعدادات الرادار",
+    autoScan: "بدء المسح",
+    allCategories: "كل الأسواق",
+    every: "كل",
+    minutes: "دقيقة"
   },
   es: {
     title: "Finalyze AI",

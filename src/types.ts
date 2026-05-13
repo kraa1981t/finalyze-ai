@@ -54,6 +54,11 @@ export interface StrategySettings {
   useIndicators: boolean;
   minConfidence: number;
   minStrongConfidence: number;
-  isAutoAnalysisEnabled: boolean;
-  autoAnalysisCategory: 'all' | 'forex' | 'crypto' | 'stocks';
+}
+
+export interface AutoAnalysisSettings {
+  isEnabled: boolean;
+  interval: number; // in minutes
+  timeframe: string;
+  category: 'all' | 'forex' | 'crypto' | 'stocks';
 }
