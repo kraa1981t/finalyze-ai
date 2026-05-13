@@ -1,3 +1,5 @@
+import { MarketType, AnalysisResult, TradingStyle, SignalType, StrategySettings } from "../types";
+import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 
 /**
  * HARDCODED TECHNICAL ENGINE
