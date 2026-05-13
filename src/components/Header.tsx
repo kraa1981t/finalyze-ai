@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, Settings as SettingsIcon, ArrowLeft } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, Settings as SettingsIcon, ArrowLeft, Zap } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Language, translations } from '../lib/i18n';
 
@@ -15,6 +15,11 @@ interface HeaderProps {
   onOpenSettings: () => void;
   showBack?: boolean;
   onBack?: () => void;
+  // Radar Props
+  isAutoEnabled: boolean;
+  onToggleAuto: () => void;
+  autoCategory: string;
+  onCategoryChange: (c: any) => void;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -35,7 +40,11 @@ export default function Header({
   onLangChange, 
   onOpenSettings, 
   showBack, 
-  onBack 
+  onBack,
+  isAutoEnabled,
+  onToggleAuto,
+  autoCategory,
+  onCategoryChange
 }: HeaderProps) {
   const t = translations[lang];
 
@@ -62,6 +71,30 @@ export default function Header({
         </div>
 
         <div className="flex items-center gap-3 md:gap-6">
+          {/* RADAR CONTROL QUICK ACCESS */}
+          <div className="flex items-center gap-1 bg-white/5 border border-white/5 rounded-full px-2 py-1">
+            <button 
+              onClick={onToggleAuto}
+              className={`p-2 rounded-full transition-all duration-500 ${isAutoEnabled ? 'bg-secondary/20 text-secondary shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse' : 'text-brand-text/30'}`}
+              title="تفعيل/تعطيل الرادار الآلي"
+            >
+              <Zap size={18} fill={isAutoEnabled ? "currentColor" : "none"} />
+            </button>
+            
+            {isAutoEnabled && (
+              <select 
+                value={autoCategory}
+                onChange={(e) => onCategoryChange(e.target.value)}
+                className="bg-transparent border-none text-[10px] font-bold text-secondary outline-none cursor-pointer pr-2 border-r border-white/10"
+              >
+                <option value="all">ALL</option>
+                <option value="forex">FRX</option>
+                <option value="crypto">CRP</option>
+                <option value="stocks">STK</option>
+              </select>
+            )}
+          </div>
+
           {/* Language Selector */}
           <div className="relative group">
             <button className="flex items-center gap-1 p-2 text-brand-text/70 hover:text-primary transition-colors">
@@ -98,32 +131,29 @@ export default function Header({
           </button>
 
           {user ? (
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:flex flex-col items-end text-right">
-                <span className="text-xs font-semibold text-brand-text">{user.displayName}</span>
-                <span className="text-[10px] text-brand-text/50 uppercase tracking-widest font-mono">Trader</span>
+            <div className="hidden md:flex items-center gap-3 pl-6 border-l border-brand-alt/50">
+              <div className="text-right">
+                <p className="text-sm font-bold text-brand-text leading-none">{user.displayName || 'Trader'}</p>
+                <p className="text-[10px] text-brand-text/40 font-medium">Institutional Account</p>
               </div>
               <button 
                 onClick={onLogout}
-                className="p-2 text-brand-text/40 hover:text-red-500 transition-colors"
+                className="w-10 h-10 rounded-xl bg-brand-alt border border-brand-text/10 flex items-center justify-center text-brand-text/70 hover:text-red-500 hover:border-red-500/30 transition-all"
               >
-                <LogOut size={20} />
+                <LogOut size={18} />
               </button>
             </div>
           ) : (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <button 
               onClick={onLogin}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-text text-brand-bg rounded-full text-sm font-semibold hover:bg-primary hover:text-white transition-colors"
+              className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-95"
             >
               <LogIn size={18} />
-              <span className="hidden sm:inline">{t.login}</span>
-            </motion.button>
+              <span>Login</span>
+            </button>
           )}
         </div>
       </div>
-      <div className="h-0.5 w-full gradient-line opacity-20" />
     </header>
   );
 }

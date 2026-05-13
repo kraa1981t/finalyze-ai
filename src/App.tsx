@@ -255,6 +255,10 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         showBack={!!analysisResults}
         onBack={() => setAnalysisResults(null)}
+        isAutoEnabled={settings.isAutoAnalysisEnabled}
+        onToggleAuto={() => setSettings(prev => ({ ...prev, isAutoAnalysisEnabled: !prev.isAutoAnalysisEnabled }))}
+        autoCategory={settings.autoAnalysisCategory}
+        onCategoryChange={(c) => setSettings(prev => ({ ...prev, autoAnalysisCategory: c }))}
       />
       
       <main className="flex-grow">
