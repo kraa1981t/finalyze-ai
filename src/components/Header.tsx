@@ -117,6 +117,7 @@ export default function Header({
                     <option value="forex">{t.forex}</option>
                     <option value="crypto">{t.crypto}</option>
                     <option value="stocks">{t.stocks}</option>
+                    <option value="metals">{t.metals}</option>
                   </select>
                 </div>
 

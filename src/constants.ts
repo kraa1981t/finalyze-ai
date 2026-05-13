@@ -24,7 +24,8 @@ export const DEFAULT_AUTO_SETTINGS = {
 export const SYMBOL_CATEGORIES = {
   forex: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF'],
   crypto: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD'],
-  stocks: ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'GOOGL']
+  stocks: ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'GOOGL'],
+  metals: ['XAUUSD=X', 'XAGUSD=X', 'PA=F', 'PL=F']
 };
 
 export const MARKET_CATEGORIES = [

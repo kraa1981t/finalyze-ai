@@ -60,6 +60,6 @@ export interface AutoAnalysisSettings {
   isEnabled: boolean;
   interval: number; // in minutes
   timeframe: string;
-  category: 'all' | 'forex' | 'crypto' | 'stocks';
+  category: 'all' | 'forex' | 'crypto' | 'stocks' | 'metals';
   tradingStyle: TradingStyle;
 }
