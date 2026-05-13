@@ -90,27 +90,27 @@ export default function Header({
             </button>
 
             {/* Auto Settings Dropdown */}
-            <div className="absolute right-0 top-full mt-2 w-56 bg-brand-alt border border-brand-text/10 rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 p-4 space-y-4">
+            <div className="absolute right-0 top-full mt-2 w-72 bg-brand-alt border border-brand-text/10 rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-widest text-brand-text/40">{t.autoSettings}</span>
+                <span className="text-sm font-black uppercase tracking-widest text-brand-text/40">{t.autoSettings}</span>
                 <div 
-                  className={`w-8 h-4 rounded-full relative transition-colors cursor-pointer ${autoSettings.isEnabled ? 'bg-primary' : 'bg-brand-text/20'}`}
+                  className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${autoSettings.isEnabled ? 'bg-primary' : 'bg-brand-text/20'}`}
                   onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
                 >
-                  <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${autoSettings.isEnabled ? 'left-4.5' : 'left-0.5'}`} />
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${autoSettings.isEnabled ? 'left-5.5' : 'left-0.5'}`} />
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="space-y-1">
+              <div className="space-y-4">
+                <div className="space-y-2">
                   <div className="flex items-center gap-2 text-brand-text/60 mb-1">
-                    <Layers size={12} />
-                    <span className="text-[10px] font-bold uppercase tracking-tighter">{t.selectMarket}</span>
+                    <Layers size={14} />
+                    <span className="text-xs font-bold uppercase tracking-tighter">{t.selectMarket}</span>
                   </div>
                   <select 
                     value={autoSettings.category}
                     onChange={(e) => onAutoSettingsChange({ ...autoSettings, category: e.target.value as any })}
-                    className="w-full bg-brand-bg border border-brand-text/10 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-text focus:border-primary outline-none"
+                    className="w-full bg-brand-bg border border-brand-text/10 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-text focus:border-primary outline-none transition-all"
                   >
                     <option value="all">{t.allCategories}</option>
                     <option value="forex">{t.forex}</option>
@@ -119,19 +119,19 @@ export default function Header({
                   </select>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <div className="flex items-center gap-2 text-brand-text/60 mb-1">
-                    <Clock size={12} />
-                    <span className="text-[10px] font-bold uppercase tracking-tighter">{t.timeframe}</span>
+                    <Clock size={14} />
+                    <span className="text-xs font-bold uppercase tracking-tighter">{t.timeframe}</span>
                   </div>
-                  <div className="grid grid-cols-4 gap-1">
-                    {['15m', '1h', '4h', '1d'].map((tf) => (
+                  <div className="grid grid-cols-4 gap-2">
+                    {['15m', '1h', '4h', '1d', '1w', '1M', '1Y'].map((tf) => (
                       <button
                         key={tf}
                         onClick={() => onAutoSettingsChange({ ...autoSettings, timeframe: tf })}
-                        className={`py-1 text-[9px] font-black rounded-md border transition-all ${
+                        className={`py-2 text-[10px] font-black rounded-lg border transition-all ${
                           autoSettings.timeframe === tf 
-                            ? 'bg-primary border-primary text-white' 
+                            ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
                             : 'border-brand-text/10 text-brand-text/60 hover:border-primary/40'
                         }`}
                       >

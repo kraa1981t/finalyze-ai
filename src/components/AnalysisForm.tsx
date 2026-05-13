@@ -571,17 +571,17 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
 
           <div className="space-y-4">
             <label className="text-base font-black text-brand-text opacity-100 uppercase tracking-widest pl-2">{t.timeframe}</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {TIMEFRAMES.map((tf) => (
                 <button
                   key={tf.id}
                   type="button"
                   onClick={() => setValue("timeframe", tf.id)}
                   className={cn(
-                    "p-4 rounded-2xl border-2 text-sm font-black transition-all",
+                    "p-5 rounded-2xl border-2 transition-all text-base font-black uppercase",
                     selectedTimeframe === tf.id 
-                      ? "border-secondary bg-secondary/20 text-brand-text shadow-xl" 
-                      : "border-brand-text/10 bg-brand-alt text-brand-muted hover:border-brand-text/20"
+                      ? "border-primary bg-primary/30 text-brand-text shadow-lg" 
+                      : "border-brand-text/10 bg-brand-alt text-brand-text/60 hover:border-brand-text/20 hover:text-brand-text"
                   )}
                 >
                   {tf.label}
