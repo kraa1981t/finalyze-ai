@@ -16,10 +16,11 @@
           }
         });
       }
-      // Clear cache on version change detection (simple version)
-      if (localStorage.getItem('app_version') !== '2.1') {
+      // Clear cache on version change detection
+      if (localStorage.getItem('app_version') !== '3.0') {
         localStorage.clear();
-        localStorage.setItem('app_version', '2.1');
+        localStorage.setItem('app_version', '3.0');
+        alert("Finalyze AI Updated to V3 - Radar Active!");
         window.location.reload(true);
       }
       // Radical fix for persistent white screens: unregister all service workers

@@ -72,20 +72,21 @@ export default function Header({
 
         <div className="flex items-center gap-3 md:gap-6">
           {/* RADAR CONTROL QUICK ACCESS */}
-          <div className="flex items-center gap-1 bg-white/5 border border-white/5 rounded-full px-2 py-1">
+          <div className={`flex items-center gap-1 border rounded-full px-3 py-1.5 transition-all ${isAutoEnabled ? 'bg-secondary/10 border-secondary/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-white/5 border-white/10'}`}>
             <button 
               onClick={onToggleAuto}
-              className={`p-2 rounded-full transition-all duration-500 ${isAutoEnabled ? 'bg-secondary/20 text-secondary shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse' : 'text-brand-text/30'}`}
+              className={`flex items-center gap-2 transition-all ${isAutoEnabled ? 'text-secondary animate-pulse' : 'text-brand-text/30'}`}
               title="تفعيل/تعطيل الرادار الآلي"
             >
-              <Zap size={18} fill={isAutoEnabled ? "currentColor" : "none"} />
+              <Zap size={16} fill={isAutoEnabled ? "currentColor" : "none"} />
+              <span className="text-[10px] font-black tracking-tighter">RADAR</span>
             </button>
             
             {isAutoEnabled && (
               <select 
                 value={autoCategory}
                 onChange={(e) => onCategoryChange(e.target.value)}
-                className="bg-transparent border-none text-[10px] font-bold text-secondary outline-none cursor-pointer pr-2 border-r border-white/10"
+                className="bg-transparent border-none text-[10px] font-bold text-secondary outline-none cursor-pointer pl-1 border-l border-white/10 ml-1"
               >
                 <option value="all">ALL</option>
                 <option value="forex">FRX</option>
