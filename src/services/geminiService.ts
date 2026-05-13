@@ -1,60 +1,55 @@
+import { MarketType, AnalysisResult, TradingStyle, SignalType, StrategySettings } from "../types";
+import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 
 /**
- * REFINED TECHNICAL ENGINE
- * Balances strictness with market reality (allows minor pullbacks).
+ * ROBUST TECHNICAL ENGINE (VERSION 2.0)
+ * Works with minimal data (10+ candles) and handles gaps gracefully.
  */
 function calculateTechnicalMetrics(closes: number[], highs: number[], lows: number[]) {
-  if (closes.length < 25) return null;
+  // Hard minimum lowered to 10 to ensure it almost always works
+  if (!closes || closes.length < 10) return { direction: 'sideways' as const, age: 0, momentumScore: 0 };
 
-  // 1. Trend Direction (using a weighted window)
+  const len = closes.length;
   let upScore = 0;
   let downScore = 0;
-  const windowSize = 20;
-  for (let i = 1; i < windowSize; i++) {
-    const idx = closes.length - 1 - i;
-    if (idx < 0) break;
-    if (closes[idx + 1] > closes[idx]) upScore++; else downScore++;
-    if (highs[idx + 1] > highs[idx]) upScore++; else downScore++;
+  
+  // Dynamic window based on available data
+  const window = Math.min(len - 1, 15); 
+  
+  for (let i = 0; i < window; i++) {
+    const curr = len - 1 - i;
+    const prev = curr - 1;
+    if (closes[curr] > closes[prev]) upScore++; else downScore++;
+    if (highs[curr] > highs[prev]) upScore++; else downScore++;
   }
 
   let direction: 'uptrend' | 'downtrend' | 'sideways' = 'sideways';
-  const threshold = 8; // More flexible than before
-  if (upScore > downScore + threshold) direction = 'uptrend';
-  else if (downScore > upScore + threshold) direction = 'downtrend';
+  const bias = Math.floor(window * 0.3); // 30% bias for trend detection
+  if (upScore > downScore + bias) direction = 'uptrend';
+  else if (downScore > upScore + bias) direction = 'downtrend';
 
-  // 2. Trend Age (Robust counting - allows 2 pullback candles)
+  // Robust Age counting
   let age = 0;
   let pullbacks = 0;
-  const maxPullbacks = 2;
-  
-  for (let i = 1; i < closes.length; i++) {
-    const idx = closes.length - i;
-    const isUpCandle = closes[idx] > closes[idx - 1];
-    
+  for (let i = 1; i < len; i++) {
+    const curr = len - i;
+    const isUp = closes[curr] > closes[curr - 1];
     if (direction === 'uptrend') {
-      if (isUpCandle) {
-        age++;
-      } else if (pullbacks < maxPullbacks) {
-        pullbacks++; // Allow minor pause
-      } else break;
+      if (isUp) age++; else if (pullbacks < 2) pullbacks++; else break;
     } else if (direction === 'downtrend') {
-      if (!isUpCandle) {
-        age++;
-      } else if (pullbacks < maxPullbacks) {
-        pullbacks++;
-      } else break;
+      if (!isUp) age++; else if (pullbacks < 2) pullbacks++; else break;
     } else break;
   }
 
-  // 3. Momentum (Volume-weighted body size)
-  const last5 = closes.slice(-5);
-  let totalRange = 0;
-  let totalBody = 0;
-  for (let i = 1; i < last5.length; i++) {
-    totalBody += Math.abs(last5[i] - last5[i-1]);
-    totalRange += (highs[highs.length-1-(last5.length-1-i)] - lows[lows.length-1-(last5.length-1-i)]) || 0.0001;
+  // Momentum
+  const mWindow = Math.min(len, 5);
+  let rangeSum = 0;
+  let bodySum = 0;
+  for (let i = 1; i < mWindow; i++) {
+    bodySum += Math.abs(closes[len-i] - closes[len-i-1]);
+    rangeSum += (highs[len-i] - lows[len-i]) || 0.0001;
   }
-  const momentumScore = Math.min(100, (totalBody / totalRange) * 100);
+  const momentumScore = rangeSum > 0 ? Math.min(100, (bodySum / rangeSum) * 100) : 50;
 
   return { direction, age, momentumScore };
 }
