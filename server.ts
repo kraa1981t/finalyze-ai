@@ -53,14 +53,14 @@ async function startServer() {
       let interval = '1d';
       let range = '14d';
       if (timeframe === '1m') { interval = '1m'; range = '1d'; }
-      else if (timeframe === '5m') { interval = '5m'; range = '1d'; }
+      else if (timeframe === '5m') { interval = '5m'; range = '5d'; }
       else if (timeframe === '15m') { interval = '15m'; range = '5d'; }
-      else if (timeframe === '1h') { interval = '60m'; range = '10d'; }
-      else if (timeframe === '4h') { interval = '90m'; range = '1mo'; } 
-      else if (timeframe === '1d') { interval = '1d'; range = '1mo'; }
-      else if (timeframe === '1w') { interval = '1wk'; range = '1y'; }
-      else if (timeframe === '1M') { interval = '1mo'; range = '5y'; }
-      else if (timeframe === '1Y') { interval = '3mo'; range = '10y'; }
+      else if (timeframe === '1h') { interval = '60m'; range = '1mo'; }
+      else if (timeframe === '4h') { interval = '1h'; range = '3mo'; } 
+      else if (timeframe === '1d') { interval = '1d'; range = '6mo'; }
+      else if (timeframe === '1w') { interval = '1wk'; range = '2y'; }
+      else if (timeframe === '1M') { interval = '1mo'; range = 'max'; }
+      else if (timeframe === '1Y') { interval = '3mo'; range = 'max'; }
       
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?range=${range}&interval=${interval}`;
       const response = await fetch(url);

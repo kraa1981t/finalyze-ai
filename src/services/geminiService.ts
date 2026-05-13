@@ -78,19 +78,18 @@ export async function analyzeMarket(params: {
     const rawData = await fetch(`/api/market-data?symbol=${symbol}&timeframe=${timeframe}`).then(r => r.json());
     const quotes = rawData.chart?.result?.[0]?.indicators?.quote?.[0];
     
-    if (!quotes || !quotes.close || quotes.close.length < 25) {
-      throw new Error("Insufficient market data for deep stability check.");
+    if (!quotes || !quotes.close) {
+      throw new Error("Market data currently unavailable from the source.");
     }
 
     const closes = quotes.close.filter((c: any) => c != null);
     const highs = quotes.high.filter((c: any) => c != null);
     const lows = quotes.low.filter((c: any) => c != null);
 
-    const metrics = calculateTechnicalMetrics(closes, highs, lows);
-    
-    // ══════════════════════════════════════════════
-    // PHASE 1: HARD STABILITY CHECK
-    // ══════════════════════════════════════════════
+    if (closes.length < 15) {
+      throw new Error(`Insufficient data for ${symbol} (${closes.length} candles). Need at least 15.`);
+    }
+
     if (!metrics || metrics.direction === 'sideways') {
       return {
         symbol, type, timeframe, signal: SignalType.NO_ENTRY, confidence: 25,
