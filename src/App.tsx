@@ -87,7 +87,13 @@ export default function App() {
             settings,
             lang
           });
+          
           if (result && isSubscribed) {
+             // If it's a strong signal, play sound
+             if (result.confidence >= settings.minStrongConfidence && result.signal !== 'no_entry') {
+               const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+               audio.play().catch(e => console.log("Audio play blocked by browser:", e));
+             }
              updateTopSignals([result]);
           }
           // Small delay between symbols to avoid rate limits
