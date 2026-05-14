@@ -129,8 +129,10 @@ export default function App() {
 
       if (isSubscribed) {
         const finishedAt = Date.now();
-        if (!foundInThisCycle) {
-          // Clear Digital Notice
+        const hasVisibleSignals = foundInThisCycle || (autoSettings.showAllSignals && topSignals.length > 0);
+
+        if (!hasVisibleSignals) {
+          // No signals sound
           const failAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
           failAudio.volume = autoSettings.volume;
           failAudio.play().catch(() => {});
@@ -138,7 +140,7 @@ export default function App() {
         }
         
         setIsScanningFinished(true);
-        setFoundAnyStrong(foundInThisCycle);
+        setFoundAnyStrong(hasVisibleSignals);
         
         // Use functional update to ensure we use latest state
         setAutoSettings(prev => ({ ...prev, lastFinishedAt: finishedAt }));
@@ -148,8 +150,22 @@ export default function App() {
       }
     };
 
-    // Force immediate start (2s delay) on every fresh open/refresh as requested
-    const initialDelay = 2000;
+    // Session Intelligence: Distinguish between Refresh and Fresh Open
+    const isRefresh = sessionStorage.getItem('radar_session_active') === 'true';
+    let initialDelay = 2000;
+
+    if (isRefresh && autoSettings.lastFinishedAt) {
+      const elapsed = Date.now() - autoSettings.lastFinishedAt;
+      const totalWait = autoSettings.interval * 60000;
+      if (elapsed < totalWait) {
+        initialDelay = totalWait - elapsed;
+        setIsScanningFinished(true);
+      }
+    } else {
+      // Fresh open: Start now and mark session as active
+      sessionStorage.setItem('radar_session_active', 'true');
+    }
+
     timeoutId = setTimeout(runAutoScan, initialDelay);
     return () => { isSubscribed = false; clearTimeout(timeoutId); };
   }, [autoSettings.isEnabled, autoSettings.category, autoSettings.timeframe, autoSettings.interval, isAnalyzing]);
