@@ -19,6 +19,7 @@ interface HeaderProps {
   onBack?: () => void;
   autoSettings: AutoAnalysisSettings;
   onAutoSettingsChange: (s: AutoAnalysisSettings) => void;
+  isWaiting?: boolean;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -41,7 +42,8 @@ export default function Header({
   showBack, 
   onBack,
   autoSettings,
-  onAutoSettingsChange
+  onAutoSettingsChange,
+  isWaiting
 }: HeaderProps) {
   const t = translations[lang];
 
@@ -74,14 +76,19 @@ export default function Header({
               onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border ${
                 autoSettings.isEnabled 
-                  ? 'bg-primary/10 border-primary text-primary shadow-lg shadow-primary/20' 
+                  ? (isWaiting 
+                    ? 'bg-red-500/10 border-red-500 text-red-500 shadow-lg shadow-red-500/20' 
+                    : 'bg-primary/10 border-primary text-primary shadow-lg shadow-primary/20')
                   : 'bg-brand-alt border-brand-text/10 text-brand-text/60 hover:text-brand-text'
               }`}
             >
               <div className="relative">
                 <Zap size={16} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
-                {autoSettings.isEnabled && (
+                {autoSettings.isEnabled && !isWaiting && (
                   <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-ping" />
+                )}
+                {autoSettings.isEnabled && isWaiting && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                 )}
               </div>
               <span className="text-[10px] font-black uppercase tracking-wider hidden sm:inline">

@@ -257,6 +257,7 @@ export default function App() {
         onBack={() => setAnalysisResults(null)}
         autoSettings={autoSettings}
         onAutoSettingsChange={setAutoSettings}
+        isWaiting={isScanningFinished}
       />
 
       <AnimatePresence>
