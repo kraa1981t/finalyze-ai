@@ -50,6 +50,14 @@ export default function Header({
   const t = translations[lang];
   const [isAutoMenuOpen, setIsAutoMenuOpen] = React.useState(false);
 
+  // Close menu on click outside
+  React.useEffect(() => {
+    if (!isAutoMenuOpen) return;
+    const handleClickOutside = () => setIsAutoMenuOpen(false);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [isAutoMenuOpen]);
+
   return (
     <header className="sticky top-0 z-50 bg-brand-bg/80 backdrop-blur-md border-b border-brand-alt/50">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -74,16 +82,17 @@ export default function Header({
 
         <div className="flex items-center gap-2 md:gap-4">
           {/* Auto Analysis Scanner */}
-          <div className="relative">
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
             <button 
               onClick={() => setIsAutoMenuOpen(!isAutoMenuOpen)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border ${
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border",
                 autoSettings.isEnabled 
                   ? (isWaiting 
                     ? 'bg-red-500/10 border-red-500 text-red-500 shadow-lg shadow-red-500/20' 
                     : 'bg-primary/10 border-primary text-primary shadow-lg shadow-primary/20')
                   : 'bg-brand-alt border-brand-text/10 text-brand-text/60 hover:text-brand-text'
-              }`}
+              )}
             >
               <div className="relative">
                 <Zap size={16} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
@@ -100,154 +109,182 @@ export default function Header({
               <ChevronDown size={12} className={cn("transition-transform duration-300", isAutoMenuOpen && "rotate-180")} />
             </button>
 
-            {/* Auto Settings Dropdown */}
             <AnimatePresence>
               {isAutoMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsAutoMenuOpen(false)} />
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 top-full mt-2 w-72 bg-brand-alt border border-brand-text/10 rounded-2xl shadow-2xl z-50 p-6 space-y-6"
-                  >
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 top-full mt-2 w-80 bg-brand-alt border border-brand-text/10 rounded-2xl shadow-2xl z-50 p-6 space-y-6 overflow-hidden"
+                >
+                  {/* Header & Toggle */}
+                  <div className="flex items-center justify-between pb-4 border-b border-brand-text/5">
+                    <span className="text-xs font-black uppercase tracking-widest text-brand-text/40">{t.autoSettings}</span>
+                    <button 
+                      onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
+                      className={cn(
+                        "relative w-12 h-6 rounded-full transition-all",
+                        autoSettings.isEnabled ? "bg-primary" : "bg-brand-text/20"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-md",
+                        autoSettings.isEnabled ? "right-1" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-5">
+                    {/* All Signals Toggle */}
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-black uppercase tracking-widest text-brand-text/40">{t.autoSettings}</span>
-                      <div 
-                        className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${autoSettings.isEnabled ? 'bg-primary' : 'bg-brand-text/20'}`}
-                        onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
-                      >
-                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${autoSettings.isEnabled ? 'left-5.5' : 'left-0.5'}`} />
+                      <div className="flex items-center gap-2">
+                        <ListFilter size={16} className="text-primary" />
+                        <span className="text-xs font-black uppercase tracking-tight text-brand-text/80">Show All Signals</span>
                       </div>
+                      <button 
+                        onClick={() => onAutoSettingsChange({ ...autoSettings, showAllSignals: !autoSettings.showAllSignals })}
+                        className={cn(
+                          "relative w-10 h-5 rounded-full transition-all",
+                          autoSettings.showAllSignals ? "bg-primary" : "bg-brand-text/20"
+                        )}
+                      >
+                        <div className={cn(
+                          "absolute top-1 w-3 h-3 bg-white rounded-full transition-all",
+                          autoSettings.showAllSignals ? "right-1" : "left-1"
+                        )} />
+                      </button>
                     </div>
 
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-brand-text/60 mb-1">
-                          <div className="flex items-center gap-2">
-                            <ListFilter size={14} />
-                            <span className="text-xs font-bold uppercase tracking-tighter">Show All Signals</span>
-                          </div>
-                          <div 
-                            className={`w-8 h-4 rounded-full relative transition-colors cursor-pointer ${autoSettings.showAllSignals ? 'bg-primary' : 'bg-brand-text/20'}`}
-                            onClick={() => onAutoSettingsChange({ ...autoSettings, showAllSignals: !autoSettings.showAllSignals })}
+                    {/* Market Category */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-brand-text/50">
+                        <Layers size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{t.selectMarket}</span>
+                      </div>
+                      <select 
+                        value={autoSettings.category}
+                        onChange={(e) => onAutoSettingsChange({ ...autoSettings, category: e.target.value as any })}
+                        className="w-full bg-brand-bg border border-brand-text/10 rounded-xl px-4 py-3 text-sm font-bold text-brand-text focus:border-primary outline-none appearance-none cursor-pointer"
+                      >
+                        <option value="all">{t.allCategories}</option>
+                        <option value="forex">{t.forex}</option>
+                        <option value="crypto">{t.crypto}</option>
+                        <option value="stocks">{t.stocks}</option>
+                        <option value="metals">{t.metals}</option>
+                      </select>
+                    </div>
+
+                    {/* Trading Style (NEW) */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-brand-text/50">
+                        <TrendingUp size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{t.tradingStyle}</span>
+                      </div>
+                      <select 
+                        value={autoSettings.tradingStyle}
+                        onChange={(e) => onAutoSettingsChange({ ...autoSettings, tradingStyle: e.target.value as any })}
+                        className="w-full bg-brand-bg border border-brand-text/10 rounded-xl px-4 py-3 text-sm font-bold text-brand-text focus:border-primary outline-none appearance-none cursor-pointer"
+                      >
+                        {TRADING_STYLES.map(style => (
+                          <option key={style.id} value={style.id}>{t[style.label as keyof typeof t]}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Timeframe */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-brand-text/50">
+                        <Clock size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{t.timeframe}</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {['15m', '1h', '4h', '1d', '1w', '1M', '1Y'].map((tf) => (
+                          <button
+                            key={tf}
+                            onClick={() => onAutoSettingsChange({ ...autoSettings, timeframe: tf })}
+                            className={cn(
+                              "py-2.5 text-[10px] font-black rounded-lg border transition-all",
+                              autoSettings.timeframe === tf 
+                                ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
+                                : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
+                            )}
                           >
-                            <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${autoSettings.showAllSignals ? 'left-4.5' : 'left-0.5'}`} />
-                          </div>
-                        </div>
+                            {tf}
+                          </button>
+                        ))}
                       </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-brand-text/60 mb-1">
-                          <Layers size={14} />
-                          <span className="text-xs font-bold uppercase tracking-tighter">{t.selectMarket}</span>
-                        </div>
-                        <select 
-                          value={autoSettings.category}
-                          onChange={(e) => onAutoSettingsChange({ ...autoSettings, category: e.target.value as any })}
-                          className="w-full bg-brand-bg border border-brand-text/10 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-text focus:border-primary outline-none transition-all"
-                        >
-                          <option value="all">{t.allCategories}</option>
-                          <option value="forex">{t.forex}</option>
-                          <option value="crypto">{t.crypto}</option>
-                          <option value="stocks">{t.stocks}</option>
-                          <option value="metals">{t.metals}</option>
-                        </select>
-                      </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-brand-text/60 mb-1">
-                    <TrendingUp size={14} />
-                    <span className="text-xs font-bold uppercase tracking-tighter">{t.tradingStyle}</span>
-                  </div>
-                  <select 
-                    value={autoSettings.tradingStyle}
-                    onChange={(e) => onAutoSettingsChange({ ...autoSettings, tradingStyle: e.target.value as any })}
-                    className="w-full bg-brand-bg border border-brand-text/10 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-text focus:border-primary outline-none transition-all"
-                  >
-                    {TRADING_STYLES.map(style => (
-                      <option key={style.id} value={style.id}>{t[style.label as keyof typeof t]}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-brand-text/60 mb-1">
-                    <Clock size={14} />
-                    <span className="text-xs font-bold uppercase tracking-tighter">{t.timeframe}</span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {['15m', '1h', '4h', '1d', '1w', '1M', '1Y'].map((tf) => (
-                      <button
-                        key={tf}
-                        onClick={() => onAutoSettingsChange({ ...autoSettings, timeframe: tf })}
-                        className={`py-2 text-[10px] font-black rounded-lg border transition-all ${
-                          autoSettings.timeframe === tf 
-                            ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
-                            : 'border-brand-text/10 text-brand-text/60 hover:border-primary/40'
-                        }`}
-                      >
-                        {tf}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-brand-text/60 mb-1">
-                    <Zap size={14} />
-                    <span className="text-xs font-bold uppercase tracking-tighter">{t.autoScan} ({t.every})</span>
-                  </div>
-                  <div className="grid grid-cols-5 gap-1">
-                    {[1, 5, 15, 30, 60].map((min) => (
-                      <button
-                        key={min}
-                        onClick={() => onAutoSettingsChange({ ...autoSettings, interval: min })}
-                        className={`py-1.5 text-[9px] font-black rounded-lg border transition-all ${
-                          autoSettings.interval === min 
-                            ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
-                            : 'border-brand-text/10 text-brand-text/60 hover:border-primary/40'
-                        }`}
-                      >
-                        {min}{t.minutes}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2 pt-2 border-t border-brand-text/5">
-                  <div className="flex items-center justify-between text-brand-text/60 mb-2">
-                    <div className="flex items-center gap-2">
-                      <Volume2 size={14} />
-                      <span className="text-xs font-bold uppercase tracking-tighter">Volume</span>
                     </div>
-                    <span className="text-[10px] font-mono">{Math.round(autoSettings.volume * 100)}%</span>
+
+                    {/* Interval */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-brand-text/50">
+                        <Zap size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{t.autoScan} ({t.every})</span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {[1, 5, 15, 30, 60].map((min) => (
+                          <button
+                            key={min}
+                            onClick={() => onAutoSettingsChange({ ...autoSettings, interval: min })}
+                            className={cn(
+                              "py-2 text-[9px] font-black rounded-lg border transition-all",
+                              autoSettings.interval === min 
+                                ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
+                                : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
+                            )}
+                          >
+                            {min}m
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Volume */}
+                    <div className="space-y-2 pt-2 border-t border-brand-text/5">
+                      <div className="flex items-center justify-between text-brand-text/50">
+                        <div className="flex items-center gap-2">
+                          <Volume2 size={14} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Alert Volume</span>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold text-primary">{Math.round(autoSettings.volume * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={autoSettings.volume}
+                        onChange={(e) => onAutoSettingsChange({ ...autoSettings, volume: parseFloat(e.target.value) })}
+                        className="w-full h-1.5 bg-brand-bg rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                    </div>
                   </div>
-                  <input 
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={autoSettings.volume}
-                    onChange={(e) => onAutoSettingsChange({ ...autoSettings, volume: parseFloat(e.target.value) })}
-                    className="w-full h-1.5 bg-brand-bg rounded-lg appearance-none cursor-pointer accent-primary"
-                  />
-                </div>
-              </div>
-            </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          {/* Language Selector */}
+
+          <button 
+            onClick={toggleTheme}
+            className="p-2.5 rounded-xl bg-brand-alt border border-brand-text/5 text-brand-text/70 hover:text-primary transition-all hover:shadow-lg"
+          >
+            {isDark ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+
           <div className="relative group">
-            <button className="flex items-center gap-1 p-2 text-brand-text/70 hover:text-primary transition-colors">
+            <button className="flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-alt border border-brand-text/5 text-brand-text/70 hover:text-primary transition-all">
               <Globe size={18} />
-              <span className="text-[10px] uppercase font-black font-mono hidden sm:inline">{lang}</span>
+              <span className="text-xs font-black uppercase tracking-widest hidden md:inline">{lang}</span>
             </button>
-            <div className="absolute right-0 top-full mt-2 w-32 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+            <div className="absolute right-0 top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
               {LANGUAGES.map((l) => (
                 <button
                   key={l.code}
                   onClick={() => onLangChange(l.code)}
-                  className="w-full px-4 py-2 text-left text-xs font-semibold hover:bg-brand-text/5 text-brand-text transition-colors"
+                  className={cn(
+                    "w-full px-4 py-3 text-left text-xs font-bold transition-colors hover:bg-primary/10",
+                    lang === l.code ? "text-primary bg-primary/5" : "text-brand-text/60"
+                  )}
                 >
                   {l.label}
                 </button>
@@ -255,49 +292,33 @@ export default function Header({
             </div>
           </div>
 
-          {/* Settings Toggle */}
-          <button 
-            onClick={onOpenSettings}
-            className="p-2 text-brand-text/70 hover:text-primary transition-colors"
-          >
-            <SettingsIcon size={18} />
-          </button>
-
-          {/* Theme Toggle */}
-          <button 
-            onClick={toggleTheme}
-            className="p-2 text-brand-text/70 hover:text-primary transition-colors"
-          >
-            {isDark ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-
           {user ? (
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:flex flex-col items-end text-right">
-                <span className="text-xs font-semibold text-brand-text">{user.displayName}</span>
-                <span className="text-[10px] text-brand-text/50 uppercase tracking-widest font-mono">Trader</span>
+            <div className="flex items-center gap-3 pl-2 border-l border-brand-text/10">
+              <div className="w-9 h-9 rounded-xl bg-brand-alt border border-brand-text/5 flex items-center justify-center overflow-hidden shadow-inner">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="profile" className="w-full h-full object-cover" />
+                ) : (
+                  <TrendingUp size={18} className="text-primary" />
+                )}
               </div>
               <button 
                 onClick={onLogout}
-                className="p-2 text-brand-text/40 hover:text-red-500 transition-colors"
+                className="p-2.5 rounded-xl bg-brand-alt border border-brand-text/5 text-brand-text/70 hover:text-red-500 transition-all hover:bg-red-500/10"
               >
                 <LogOut size={20} />
               </button>
             </div>
           ) : (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <button 
               onClick={onLogin}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-text text-brand-bg rounded-full text-sm font-semibold hover:bg-primary hover:text-white transition-colors"
+              className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/30 hover:scale-105 active:scale-95 transition-all"
             >
               <LogIn size={18} />
               <span className="hidden sm:inline">{t.login}</span>
-            </motion.button>
+            </button>
           )}
         </div>
       </div>
-      <div className="h-0.5 w-full gradient-line opacity-20" />
     </header>
   );
 }
