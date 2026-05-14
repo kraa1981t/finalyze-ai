@@ -57,24 +57,32 @@ export default function App() {
     localStorage.setItem('auto_settings', JSON.stringify(autoSettings));
   }, [autoSettings]);
 
+  const [isScanningFinished, setIsScanningFinished] = useState(false);
+  const [foundAnyStrong, setFoundAnyStrong] = useState(false);
+
   // Background Auto-Scanner Engine
   useEffect(() => {
-    if (!autoSettings.isEnabled) return;
+    if (!autoSettings.isEnabled) {
+      setIsScanningFinished(false);
+      return;
+    }
 
     let isSubscribed = true;
     let timeoutId: NodeJS.Timeout;
 
     const runAutoScan = async () => {
       if (!isSubscribed || isAnalyzing) {
-        timeoutId = setTimeout(runAutoScan, 30000); // Wait if manual scan is active
+        timeoutId = setTimeout(runAutoScan, 10000);
         return;
       }
+
+      setIsScanningFinished(false);
+      let foundInThisCycle = false;
 
       const symbols = autoSettings.category === 'all' 
         ? Object.values(SYMBOL_CATEGORIES).flat() 
         : SYMBOL_CATEGORIES[autoSettings.category as keyof typeof SYMBOL_CATEGORIES];
 
-      // Sequential scan
       for (const symbol of symbols) {
         if (!isSubscribed || !autoSettings.isEnabled || isAnalyzing) break;
         
@@ -89,31 +97,32 @@ export default function App() {
           });
           
           if (result && isSubscribed) {
-             // If it's a strong signal, play sound
              if (result.confidence >= settings.minStrongConfidence && result.signal !== 'no_entry') {
+               foundInThisCycle = true;
                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-               audio.play().catch(e => console.log("Audio play blocked by browser:", e));
+               audio.play().catch(() => {});
              }
              updateTopSignals([result]);
           }
-          // Small delay between symbols to avoid rate limits
-          await new Promise(r => setTimeout(r, 5000));
+          await new Promise(r => setTimeout(r, 4000));
         } catch (e) {
-          console.error(`Auto-scan failed for ${symbol}:`, e);
+          console.error(`Auto-scan failed:`, e);
         }
       }
 
       if (isSubscribed) {
+        if (!foundInThisCycle) {
+          const failAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
+          failAudio.play().catch(() => {});
+        }
+        setIsScanningFinished(true);
+        setFoundAnyStrong(foundInThisCycle);
         timeoutId = setTimeout(runAutoScan, autoSettings.interval * 60000);
       }
     };
 
-    timeoutId = setTimeout(runAutoScan, 5000);
-
-    return () => {
-      isSubscribed = false;
-      clearTimeout(timeoutId);
-    };
+    timeoutId = setTimeout(runAutoScan, 2000);
+    return () => { isSubscribed = false; clearTimeout(timeoutId); };
   }, [autoSettings.isEnabled, autoSettings.category, autoSettings.timeframe, autoSettings.interval, isAnalyzing]);
   
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
@@ -243,6 +252,22 @@ export default function App() {
         autoSettings={autoSettings}
         onAutoSettingsChange={setAutoSettings}
       />
+
+      <AnimatePresence>
+        {isScanningFinished && !foundAnyStrong && autoSettings.isEnabled && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -20, height: 0 }}
+            className="w-full bg-brand-alt border-b border-red-500/20 py-2 px-4 flex items-center justify-center gap-2 overflow-hidden"
+          >
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            <span className="text-red-500 text-[10px] font-black uppercase tracking-[0.2em]">
+              {lang === 'ar' ? 'لا توجد إشارة قوية حالياً' : 'No strong signals currently'}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       <main className="flex-grow">
         <AnimatePresence mode="wait">
