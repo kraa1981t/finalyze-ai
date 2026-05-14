@@ -125,22 +125,36 @@ export default function App() {
       }
 
       if (isSubscribed) {
+        const finishedAt = Date.now();
         if (!foundInThisCycle) {
-          // No signals sound
           const failAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
           failAudio.volume = autoSettings.volume;
-          failAudio.play().catch(() => console.log("Audio play deferred"));
+          failAudio.play().catch(() => {});
         }
+        
         setIsScanningFinished(true);
         setFoundAnyStrong(foundInThisCycle);
         
-        // Schedule next scan based on user interval
+        // Persist finished time to prevent restart on refresh
+        onAutoSettingsChange({ ...autoSettings, lastFinishedAt: finishedAt });
+        
         const nextScanDelay = autoSettings.interval * 60000;
         timeoutId = setTimeout(runAutoScan, nextScanDelay);
       }
     };
 
-    timeoutId = setTimeout(runAutoScan, 2000);
+    // Initial Delay Logic: Check if we should wait or start now
+    let initialDelay = 2000;
+    if (autoSettings.lastFinishedAt) {
+      const elapsed = Date.now() - autoSettings.lastFinishedAt;
+      const totalWait = autoSettings.interval * 60000;
+      if (elapsed < totalWait) {
+        initialDelay = totalWait - elapsed;
+        setIsScanningFinished(true); // Show red status
+      }
+    }
+
+    timeoutId = setTimeout(runAutoScan, initialDelay);
     return () => { isSubscribed = false; clearTimeout(timeoutId); };
   }, [autoSettings.isEnabled, autoSettings.category, autoSettings.timeframe, autoSettings.interval, isAnalyzing]);
   

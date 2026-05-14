@@ -221,22 +221,22 @@ export default function Header({
                         <Zap size={14} />
                         <span className="text-[10px] font-bold uppercase tracking-widest">{t.autoScan} ({t.every})</span>
                       </div>
-                      <div className="grid grid-cols-5 gap-1.5">
-                        {[1, 5, 15, 30, 60].map((min) => (
-                          <button
-                            key={min}
-                            onClick={() => onAutoSettingsChange({ ...autoSettings, interval: min })}
-                            className={cn(
-                              "py-2 text-[9px] font-black rounded-lg border transition-all",
-                              autoSettings.interval === min 
-                                ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
-                                : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
-                            )}
-                          >
-                            {min}m
-                          </button>
-                        ))}
-                      </div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[1, 5, 15, 60, 240, 1440].map((min) => (
+                        <button
+                          key={min}
+                          onClick={() => onAutoSettingsChange({ ...autoSettings, interval: min })}
+                          className={cn(
+                            "py-2 text-[9px] font-black rounded-lg border transition-all",
+                            autoSettings.interval === min 
+                              ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
+                              : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
+                          )}
+                        >
+                          {min < 60 ? `${min}m` : min === 60 ? '1h' : min === 240 ? '4h' : '1d'}
+                        </button>
+                      ))}
+                    </div>
                     </div>
 
                     {/* Volume */}

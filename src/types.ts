@@ -64,4 +64,5 @@ export interface AutoAnalysisSettings {
   tradingStyle: TradingStyle;
   volume: number; // 0 to 1
   showAllSignals: boolean;
+  lastFinishedAt?: number;
 }
