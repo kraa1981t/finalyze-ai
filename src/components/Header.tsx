@@ -1,10 +1,12 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, Settings as SettingsIcon, ArrowLeft, Zap, ChevronDown, Clock, Layers, Volume2 } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, Settings as SettingsIcon, ArrowLeft, Zap, ChevronDown, Clock, Layers, Volume2, ListFilter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings, TradingStyle } from '../types';
 import { TRADING_STYLES } from '../constants';
+
+const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
 interface HeaderProps {
   user: User | null;
