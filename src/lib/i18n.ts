@@ -85,6 +85,10 @@ export interface Translations {
   allCategories: string;
   every: string;
   minutes: string;
+  successSound: string;
+  failSound: string;
+  uploadCustom: string;
+  startManualNow: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -175,7 +179,11 @@ export const translations: Record<Language, Translations> = {
     autoScan: "Start Scan",
     allCategories: "All Markets",
     every: "Every",
-    minutes: "min"
+    minutes: "min",
+    successSound: "Success Alert",
+    failSound: "Cycle End Alert",
+    uploadCustom: "Upload Custom Audio",
+    startManualNow: "Start Manual Analysis Now"
   },
   ar: {
     title: "Finalyze AI",
@@ -264,7 +272,11 @@ export const translations: Record<Language, Translations> = {
     autoScan: "بدء المسح",
     allCategories: "كل الأسواق",
     every: "كل",
-    minutes: "دقيقة"
+    minutes: "دقيقة",
+    successSound: "تنبيه العثور على فرصة",
+    failSound: "تنبيه انتهاء الدورة",
+    uploadCustom: "تحميل صوت مخصص",
+    startManualNow: "ابدأ التحليل اليدوي الآن"
   },
   es: {
     title: "Finalyze AI",

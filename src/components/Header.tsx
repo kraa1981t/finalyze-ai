@@ -1,10 +1,10 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, Settings as SettingsIcon, ArrowLeft, Zap, ChevronDown, Clock, Layers, Volume2, ListFilter } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Zap, ChevronDown, Clock, Layers, Volume2, ListFilter, Upload, Music } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/i18n';
-import { AutoAnalysisSettings, TradingStyle } from '../types';
-import { TRADING_STYLES } from '../constants';
+import { AutoAnalysisSettings } from '../types';
+import { TRADING_STYLES, DEFAULT_SUCCESS_SOUNDS, DEFAULT_FAIL_SOUNDS } from '../constants';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
@@ -40,7 +40,6 @@ export default function Header({
   toggleTheme, 
   lang, 
   onLangChange, 
-  onOpenSettings, 
   showBack, 
   onBack,
   autoSettings,
@@ -49,6 +48,23 @@ export default function Header({
 }: HeaderProps) {
   const t = translations[lang];
   const [isAutoMenuOpen, setIsAutoMenuOpen] = React.useState(false);
+  const successFileRef = React.useRef<HTMLInputElement>(null);
+  const failFileRef = React.useRef<HTMLInputElement>(null);
+
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'success' | 'fail') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        onAutoSettingsChange({
+          ...autoSettings,
+          [type === 'success' ? 'successSound' : 'failSound']: base64
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Close menu on click outside
   React.useEffect(() => {
@@ -134,7 +150,7 @@ export default function Header({
                     </button>
                   </div>
 
-                  <div className="space-y-5">
+                  <div className="space-y-5 max-h-[450px] overflow-y-auto custom-scrollbar pr-2">
                     {/* All Signals Toggle */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -155,8 +171,70 @@ export default function Header({
                       </button>
                     </div>
 
+                    <div className="space-y-4 pt-4 border-t border-brand-text/5">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-brand-text/50">
+                          <div className="flex items-center gap-2">
+                            <Music size={14} className="text-primary" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">{t.successSound}</span>
+                          </div>
+                          <button onClick={() => successFileRef.current?.click()} className="text-primary hover:text-primary/80 transition-colors">
+                            <Upload size={14} />
+                          </button>
+                          <input type="file" ref={successFileRef} onChange={(e) => handleAudioUpload(e, 'success')} accept="audio/*" className="hidden" />
+                        </div>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {DEFAULT_SUCCESS_SOUNDS.map(s => (
+                            <button
+                              key={s.id}
+                              onClick={() => onAutoSettingsChange({ ...autoSettings, successSound: s.url })}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border transition-all",
+                                (autoSettings.successSound || DEFAULT_SUCCESS_SOUNDS[0].url) === s.url 
+                                  ? 'bg-primary/20 border-primary text-primary shadow-lg' 
+                                  : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
+                              )}
+                            >
+                              <div className={cn("w-1.5 h-1.5 rounded-full", (autoSettings.successSound || DEFAULT_SUCCESS_SOUNDS[0].url) === s.url ? "bg-primary" : "bg-brand-text/20")} />
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-brand-text/50">
+                          <div className="flex items-center gap-2">
+                            <Music size={14} className="text-secondary" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">{t.failSound}</span>
+                          </div>
+                          <button onClick={() => failFileRef.current?.click()} className="text-secondary hover:text-secondary/80 transition-colors">
+                            <Upload size={14} />
+                          </button>
+                          <input type="file" ref={failFileRef} onChange={(e) => handleAudioUpload(e, 'fail')} accept="audio/*" className="hidden" />
+                        </div>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {DEFAULT_FAIL_SOUNDS.map(s => (
+                            <button
+                              key={s.id}
+                              onClick={() => onAutoSettingsChange({ ...autoSettings, failSound: s.url })}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border transition-all",
+                                (autoSettings.failSound || DEFAULT_FAIL_SOUNDS[0].url) === s.url 
+                                  ? 'bg-secondary/20 border-secondary text-secondary shadow-lg' 
+                                  : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-secondary/30'
+                              )}
+                            >
+                              <div className={cn("w-1.5 h-1.5 rounded-full", (autoSettings.failSound || DEFAULT_FAIL_SOUNDS[0].url) === s.url ? "bg-secondary" : "bg-brand-text/20")} />
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Market Category */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 pt-4 border-t border-brand-text/5">
                       <div className="flex items-center gap-2 text-brand-text/50">
                         <Layers size={14} />
                         <span className="text-[10px] font-bold uppercase tracking-widest">{t.selectMarket}</span>
@@ -174,7 +252,7 @@ export default function Header({
                       </select>
                     </div>
 
-                    {/* Trading Style (NEW) */}
+                    {/* Trading Style */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-brand-text/50">
                         <TrendingUp size={14} />
@@ -221,22 +299,22 @@ export default function Header({
                         <Zap size={14} />
                         <span className="text-[10px] font-bold uppercase tracking-widest">{t.autoScan} ({t.every})</span>
                       </div>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {[1, 5, 15, 60, 240, 1440].map((min) => (
-                        <button
-                          key={min}
-                          onClick={() => onAutoSettingsChange({ ...autoSettings, interval: min })}
-                          className={cn(
-                            "py-2 text-[9px] font-black rounded-lg border transition-all",
-                            autoSettings.interval === min 
-                              ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
-                              : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
-                          )}
-                        >
-                          {min < 60 ? `${min}m` : min === 60 ? '1h' : min === 240 ? '4h' : '1d'}
-                        </button>
-                      ))}
-                    </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[1, 5, 15, 60, 240, 1440].map((min) => (
+                          <button
+                            key={min}
+                            onClick={() => onAutoSettingsChange({ ...autoSettings, interval: min })}
+                            className={cn(
+                              "py-2 text-[9px] font-black rounded-lg border transition-all",
+                              autoSettings.interval === min 
+                                ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
+                                : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
+                            )}
+                          >
+                            {min < 60 ? `${min}m` : min === 60 ? '1h' : min === 240 ? '4h' : '1d'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Volume */}

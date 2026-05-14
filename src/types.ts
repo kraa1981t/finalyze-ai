@@ -65,4 +65,6 @@ export interface AutoAnalysisSettings {
   volume: number; // 0 to 1
   showAllSignals: boolean;
   lastFinishedAt?: number;
+  successSound?: string;
+  failSound?: string;
 }

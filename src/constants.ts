@@ -35,10 +35,22 @@ export const SYMBOL_CATEGORIES = {
 };
 
 export const MARKET_CATEGORIES = [
-  { id: MarketType.FOREX, icon: 'DollarSign', label: 'forex' },
-  { id: MarketType.CRYPTO, icon: 'Bitcoin', label: 'crypto' },
-  { id: MarketType.STOCKS, icon: 'TrendingUp', label: 'stocks' },
-  { id: MarketType.METALS, icon: 'Gem', label: 'metals' },
+  { id: 'forex', icon: 'DollarSign' },
+  { id: 'crypto', icon: 'Bitcoin' },
+  { id: 'stocks', icon: 'TrendingUp' },
+  { id: 'metals', icon: 'Gem' }
+];
+
+export const DEFAULT_SUCCESS_SOUNDS = [
+  { id: 'sharp_bell', url: 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3', label: 'Sharp Bell' },
+  { id: 'digital_ring', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', label: 'Digital Ring' },
+  { id: 'digital_notice', url: 'https://assets.mixkit.co/active_storage/sfx/938/938-preview.mp3', label: 'Digital Notice' }
+];
+
+export const DEFAULT_FAIL_SOUNDS = [
+  { id: 'clear_notice', url: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3', label: 'Clear Notice' },
+  { id: 'soft_notice', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3', label: 'Soft Notice' },
+  { id: 'alert', url: 'https://assets.mixkit.co/active_storage/sfx/431/431-preview.mp3', label: 'Alert' }
 ];
 
 export const TIMEFRAMES = [

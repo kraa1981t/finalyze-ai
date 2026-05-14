@@ -607,7 +607,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             ) : (
               <>
                 <Zap size={28} className="fill-secondary text-secondary group-hover:fill-white group-hover:text-brand-text transition-colors" />
-                <span>{t.startAnalysis}</span>
+                <span>{t.startManualNow}</span>
               </>
             )}
           </motion.button>
@@ -615,5 +615,4 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
       </form>
     </div>
   );
-}
 

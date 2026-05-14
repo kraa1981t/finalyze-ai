@@ -110,7 +110,8 @@ export default function App() {
 
                if (isStrong) {
                  foundInThisCycle = true;
-                 const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3');
+                 // Dynamic Success Sound
+                 const audio = new Audio(autoSettings.successSound || 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3');
                  audio.volume = autoSettings.volume;
                  audio.play().catch(() => {});
                  setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 2000);
@@ -132,8 +133,8 @@ export default function App() {
         const hasVisibleSignals = foundInThisCycle || (autoSettings.showAllSignals && topSignals.length > 0);
 
         if (!hasVisibleSignals) {
-          // No signals sound
-          const failAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+          // Dynamic Fail Sound
+          const failAudio = new Audio(autoSettings.failSound || 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
           failAudio.volume = autoSettings.volume;
           failAudio.play().catch(() => {});
           setTimeout(() => { failAudio.pause(); failAudio.currentTime = 0; }, 2000);
