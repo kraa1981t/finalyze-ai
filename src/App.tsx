@@ -135,8 +135,8 @@ export default function App() {
         setIsScanningFinished(true);
         setFoundAnyStrong(foundInThisCycle);
         
-        // Persist finished time to prevent restart on refresh
-        onAutoSettingsChange({ ...autoSettings, lastFinishedAt: finishedAt });
+        // Use functional update to ensure we use latest state
+        setAutoSettings(prev => ({ ...prev, lastFinishedAt: finishedAt }));
         
         const nextScanDelay = autoSettings.interval * 60000;
         timeoutId = setTimeout(runAutoScan, nextScanDelay);
