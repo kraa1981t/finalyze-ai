@@ -47,10 +47,12 @@ export default function App() {
 
   const [autoSettings, setAutoSettings] = useState<AutoAnalysisSettings>(() => {
     const saved = localStorage.getItem('auto_settings');
+    let settings = DEFAULT_AUTO_SETTINGS;
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return DEFAULT_AUTO_SETTINGS; }
+      try { settings = JSON.parse(saved); } catch (e) { settings = DEFAULT_AUTO_SETTINGS; }
     }
-    return DEFAULT_AUTO_SETTINGS;
+    // Always force enable on startup as requested
+    return { ...settings, isEnabled: true };
   });
 
   useEffect(() => {
