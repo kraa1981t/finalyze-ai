@@ -148,17 +148,8 @@ export default function App() {
       }
     };
 
-    // Initial Delay Logic: Check if we should wait or start now
-    let initialDelay = 2000;
-    if (autoSettings.lastFinishedAt) {
-      const elapsed = Date.now() - autoSettings.lastFinishedAt;
-      const totalWait = autoSettings.interval * 60000;
-      if (elapsed < totalWait) {
-        initialDelay = totalWait - elapsed;
-        setIsScanningFinished(true); // Show red status
-      }
-    }
-
+    // Force immediate start (2s delay) on every fresh open/refresh as requested
+    const initialDelay = 2000;
     timeoutId = setTimeout(runAutoScan, initialDelay);
     return () => { isSubscribed = false; clearTimeout(timeoutId); };
   }, [autoSettings.isEnabled, autoSettings.category, autoSettings.timeframe, autoSettings.interval, isAnalyzing]);
