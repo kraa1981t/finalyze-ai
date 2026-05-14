@@ -168,7 +168,16 @@ export default function App() {
 
     timeoutId = setTimeout(runAutoScan, initialDelay);
     return () => { isSubscribed = false; clearTimeout(timeoutId); };
-  }, [autoSettings.isEnabled, autoSettings.category, autoSettings.timeframe, autoSettings.interval, isAnalyzing]);
+  }, [
+    autoSettings.isEnabled, 
+    autoSettings.category, 
+    autoSettings.timeframe, 
+    autoSettings.interval, 
+    autoSettings.showAllSignals,
+    autoSettings.tradingStyle,
+    isAnalyzing,
+    settings.minStrongConfidence
+  ]);
   
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
     const saved = localStorage.getItem('top_signals');
