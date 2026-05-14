@@ -158,24 +158,27 @@ export default function App() {
     localStorage.setItem('top_signals', JSON.stringify(topSignals));
   }, [topSignals]);
 
-  const updateTopSignals = (newResults: AnalysisResult[]) => {
+  const updateTopSignals = (results: AnalysisResult[]) => {
     setTopSignals(prev => {
       let updated = [...prev];
-      newResults.forEach(res => {
-        // Keep if confidence >= settings.minStrongConfidence AND trend is NOT aging
-        if (res.confidence >= settings.minStrongConfidence && res.trendMaturity !== 'aging' && res.signal !== 'no_entry' && res.signal !== 'neutral') {
+      results.forEach(res => {
+        const isActionable = res.signal !== 'no_entry' && res.signal !== 'neutral';
+        const isStrong = res.confidence >= settings.minStrongConfidence;
+        
+        // Show if it's strong OR if user wants to see everything actionable
+        if (isStrong || (autoSettings.showAllSignals && isActionable)) {
           const index = updated.findIndex(s => s.symbol === res.symbol);
-          if (index !== -1) {
+          if (index >= 0) {
             updated[index] = res;
           } else {
             updated.unshift(res);
           }
         } else {
-          // If a symbol is re-analyzed and no longer fits, remove it
+          // If it's no longer strong/actionable and we are filtering, remove it
           updated = updated.filter(s => s.symbol !== res.symbol);
         }
       });
-      return updated.slice(0, 12); // Keep top 12
+      return updated.slice(0, 15); // Show up to 15 top opportunities
     });
   };
 
