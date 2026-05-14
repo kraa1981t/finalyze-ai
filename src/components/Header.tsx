@@ -158,6 +158,28 @@ export default function Header({
                     ))}
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-brand-text/60 mb-1">
+                    <Zap size={14} />
+                    <span className="text-xs font-bold uppercase tracking-tighter">{t.autoScan} ({t.every})</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1">
+                    {[1, 5, 15, 30, 60].map((min) => (
+                      <button
+                        key={min}
+                        onClick={() => onAutoSettingsChange({ ...autoSettings, interval: min })}
+                        className={`py-1.5 text-[9px] font-black rounded-lg border transition-all ${
+                          autoSettings.interval === min 
+                            ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
+                            : 'border-brand-text/10 text-brand-text/60 hover:border-primary/40'
+                        }`}
+                      >
+                        {min}{t.minutes}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

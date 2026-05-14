@@ -112,12 +112,17 @@ export default function App() {
 
       if (isSubscribed) {
         if (!foundInThisCycle) {
-          const failAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
-          failAudio.play().catch(() => {});
+          // No signals sound
+          const failAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
+          failAudio.volume = 0.5;
+          failAudio.play().catch(() => console.log("Audio play deferred"));
         }
         setIsScanningFinished(true);
         setFoundAnyStrong(foundInThisCycle);
-        timeoutId = setTimeout(runAutoScan, autoSettings.interval * 60000);
+        
+        // Schedule next scan based on user interval
+        const nextScanDelay = autoSettings.interval * 60000;
+        timeoutId = setTimeout(runAutoScan, nextScanDelay);
       }
     };
 
