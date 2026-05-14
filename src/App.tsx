@@ -108,9 +108,10 @@ export default function App() {
 
                if (isStrong) {
                  foundInThisCycle = true;
-                 const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                 const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3');
                  audio.volume = autoSettings.volume;
                  audio.play().catch(() => {});
+                 setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 2000);
                  updateTopSignals([result]);
                } else if (autoSettings.showAllSignals && isAnySignal) {
                  updateTopSignals([result]);
@@ -127,9 +128,11 @@ export default function App() {
       if (isSubscribed) {
         const finishedAt = Date.now();
         if (!foundInThisCycle) {
-          const failAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
+          // Clear Digital Notice
+          const failAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
           failAudio.volume = autoSettings.volume;
           failAudio.play().catch(() => {});
+          setTimeout(() => { failAudio.pause(); failAudio.currentTime = 0; }, 2000);
         }
         
         setIsScanningFinished(true);
