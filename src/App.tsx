@@ -103,13 +103,18 @@ export default function App() {
             });
             
             if (result && isSubscribed) {
-               if (result.confidence >= settings.minStrongConfidence && result.signal !== 'no_entry') {
+               const isStrong = result.confidence >= settings.minStrongConfidence && result.signal !== 'no_entry';
+               const isAnySignal = result.signal !== 'no_entry' && result.signal !== 'neutral';
+
+               if (isStrong) {
                  foundInThisCycle = true;
                  const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
                  audio.volume = autoSettings.volume;
                  audio.play().catch(() => {});
+                 updateTopSignals([result]);
+               } else if (autoSettings.showAllSignals && isAnySignal) {
+                 updateTopSignals([result]);
                }
-               updateTopSignals([result]);
             }
             await new Promise(r => setTimeout(r, 4000));
           } catch (e) {

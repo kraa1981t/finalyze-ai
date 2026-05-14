@@ -46,6 +46,7 @@ export default function Header({
   isWaiting
 }: HeaderProps) {
   const t = translations[lang];
+  const [isAutoMenuOpen, setIsAutoMenuOpen] = React.useState(false);
 
   return (
     <header className="sticky top-0 z-50 bg-brand-bg/80 backdrop-blur-md border-b border-brand-alt/50">
@@ -71,9 +72,9 @@ export default function Header({
 
         <div className="flex items-center gap-2 md:gap-4">
           {/* Auto Analysis Scanner */}
-          <div className="relative group">
+          <div className="relative">
             <button 
-              onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
+              onClick={() => setIsAutoMenuOpen(!isAutoMenuOpen)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border ${
                 autoSettings.isEnabled 
                   ? (isWaiting 
@@ -94,39 +95,63 @@ export default function Header({
               <span className="text-[10px] font-black uppercase tracking-wider hidden sm:inline">
                 {autoSettings.isEnabled ? t.autoAnalysis : t.autoScan}
               </span>
-              <ChevronDown size={12} className="opacity-40" />
+              <ChevronDown size={12} className={cn("transition-transform duration-300", isAutoMenuOpen && "rotate-180")} />
             </button>
 
             {/* Auto Settings Dropdown */}
-            <div className="absolute right-0 top-full mt-2 w-72 bg-brand-alt border border-brand-text/10 rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-black uppercase tracking-widest text-brand-text/40">{t.autoSettings}</span>
-                <div 
-                  className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${autoSettings.isEnabled ? 'bg-primary' : 'bg-brand-text/20'}`}
-                  onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${autoSettings.isEnabled ? 'left-5.5' : 'left-0.5'}`} />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-brand-text/60 mb-1">
-                    <Layers size={14} />
-                    <span className="text-xs font-bold uppercase tracking-tighter">{t.selectMarket}</span>
-                  </div>
-                  <select 
-                    value={autoSettings.category}
-                    onChange={(e) => onAutoSettingsChange({ ...autoSettings, category: e.target.value as any })}
-                    className="w-full bg-brand-bg border border-brand-text/10 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-text focus:border-primary outline-none transition-all"
+            <AnimatePresence>
+              {isAutoMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsAutoMenuOpen(false)} />
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 top-full mt-2 w-72 bg-brand-alt border border-brand-text/10 rounded-2xl shadow-2xl z-50 p-6 space-y-6"
                   >
-                    <option value="all">{t.allCategories}</option>
-                    <option value="forex">{t.forex}</option>
-                    <option value="crypto">{t.crypto}</option>
-                    <option value="stocks">{t.stocks}</option>
-                    <option value="metals">{t.metals}</option>
-                  </select>
-                </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black uppercase tracking-widest text-brand-text/40">{t.autoSettings}</span>
+                      <div 
+                        className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${autoSettings.isEnabled ? 'bg-primary' : 'bg-brand-text/20'}`}
+                        onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${autoSettings.isEnabled ? 'left-5.5' : 'left-0.5'}`} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-brand-text/60 mb-1">
+                          <div className="flex items-center gap-2">
+                            <ListFilter size={14} />
+                            <span className="text-xs font-bold uppercase tracking-tighter">Show All Signals</span>
+                          </div>
+                          <div 
+                            className={`w-8 h-4 rounded-full relative transition-colors cursor-pointer ${autoSettings.showAllSignals ? 'bg-primary' : 'bg-brand-text/20'}`}
+                            onClick={() => onAutoSettingsChange({ ...autoSettings, showAllSignals: !autoSettings.showAllSignals })}
+                          >
+                            <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${autoSettings.showAllSignals ? 'left-4.5' : 'left-0.5'}`} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-brand-text/60 mb-1">
+                          <Layers size={14} />
+                          <span className="text-xs font-bold uppercase tracking-tighter">{t.selectMarket}</span>
+                        </div>
+                        <select 
+                          value={autoSettings.category}
+                          onChange={(e) => onAutoSettingsChange({ ...autoSettings, category: e.target.value as any })}
+                          className="w-full bg-brand-bg border border-brand-text/10 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-text focus:border-primary outline-none transition-all"
+                        >
+                          <option value="all">{t.allCategories}</option>
+                          <option value="forex">{t.forex}</option>
+                          <option value="crypto">{t.crypto}</option>
+                          <option value="stocks">{t.stocks}</option>
+                          <option value="metals">{t.metals}</option>
+                        </select>
+                      </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-brand-text/60 mb-1">

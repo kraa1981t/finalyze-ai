@@ -20,13 +20,18 @@ export const DEFAULT_AUTO_SETTINGS = {
   category: 'all',
   tradingStyle: TradingStyle.SWING_TRADING,
   volume: 0.8,
+  showAllSignals: false,
 };
 
 export const SYMBOL_CATEGORIES = {
-  forex: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF'],
-  crypto: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD'],
-  stocks: ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'GOOGL'],
-  metals: ['XAUUSD=X', 'XAGUSD=X', 'PA=F', 'PL=F']
+  forex: [
+    'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD',
+    'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'EURAUD', 'EURCAD', 'GBPAUD',
+    'GBPCAD', 'AUDCAD', 'AUDNZD', 'NZDJPY', 'CADJPY', 'CHFJPY', 'EURNZD'
+  ],
+  crypto: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD', 'DOTUSD', 'AVAXUSD', 'LINKUSD', 'MATICUSD'],
+  stocks: ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'GOOGL', 'META', 'NFLX', 'AMD', 'BABA'],
+  metals: ['XAUUSD=X', 'XAGUSD=X', 'PA=F', 'PL=F', 'HG=F']
 };
 
 export const MARKET_CATEGORIES = [
