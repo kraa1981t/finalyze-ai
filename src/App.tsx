@@ -100,6 +100,7 @@ export default function App() {
              if (result.confidence >= settings.minStrongConfidence && result.signal !== 'no_entry') {
                foundInThisCycle = true;
                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+               audio.volume = autoSettings.volume;
                audio.play().catch(() => {});
              }
              updateTopSignals([result]);
@@ -114,7 +115,7 @@ export default function App() {
         if (!foundInThisCycle) {
           // No signals sound
           const failAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
-          failAudio.volume = 0.5;
+          failAudio.volume = autoSettings.volume;
           failAudio.play().catch(() => console.log("Audio play deferred"));
         }
         setIsScanningFinished(true);

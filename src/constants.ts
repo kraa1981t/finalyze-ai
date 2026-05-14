@@ -19,6 +19,7 @@ export const DEFAULT_AUTO_SETTINGS = {
   timeframe: '1h',
   category: 'all',
   tradingStyle: TradingStyle.SWING_TRADING,
+  volume: 0.8,
 };
 
 export const SYMBOL_CATEGORIES = {

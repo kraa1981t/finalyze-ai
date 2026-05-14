@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, Settings as SettingsIcon, ArrowLeft, Zap, ChevronDown, Clock, Layers } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, Settings as SettingsIcon, ArrowLeft, Zap, ChevronDown, Clock, Layers, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings, TradingStyle } from '../types';
@@ -179,6 +179,25 @@ export default function Header({
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-brand-text/5">
+                  <div className="flex items-center justify-between text-brand-text/60 mb-2">
+                    <div className="flex items-center gap-2">
+                      <Volume2 size={14} />
+                      <span className="text-xs font-bold uppercase tracking-tighter">Volume</span>
+                    </div>
+                    <span className="text-[10px] font-mono">{Math.round(autoSettings.volume * 100)}%</span>
+                  </div>
+                  <input 
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={autoSettings.volume}
+                    onChange={(e) => onAutoSettingsChange({ ...autoSettings, volume: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-brand-bg rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
                 </div>
               </div>
             </div>

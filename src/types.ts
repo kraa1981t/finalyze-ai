@@ -62,4 +62,5 @@ export interface AutoAnalysisSettings {
   timeframe: string;
   category: 'all' | 'forex' | 'crypto' | 'stocks' | 'metals';
   tradingStyle: TradingStyle;
+  volume: number; // 0 to 1
 }
