@@ -79,36 +79,44 @@ export default function App() {
       setIsScanningFinished(false);
       let foundInThisCycle = false;
 
-      const symbols = autoSettings.category === 'all' 
-        ? Object.values(SYMBOL_CATEGORIES).flat() 
-        : SYMBOL_CATEGORIES[autoSettings.category as keyof typeof SYMBOL_CATEGORIES];
+      const categories = autoSettings.category === 'all' 
+        ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
+        : [autoSettings.category as keyof typeof SYMBOL_CATEGORIES];
 
-      for (const symbol of symbols) {
-        if (!isSubscribed || !autoSettings.isEnabled || isAnalyzing) break;
-        
-        try {
-          const result = await analyzeMarket({
-            symbol,
-            type: MarketType.FOREX,
-            timeframe: autoSettings.timeframe,
-            tradingStyle: autoSettings.tradingStyle,
-            settings,
-            lang
-          });
+      for (const cat of categories) {
+        const symbols = SYMBOL_CATEGORIES[cat];
+        const mType = cat === 'crypto' ? MarketType.CRYPTO : 
+                      cat === 'stocks' ? MarketType.STOCKS :
+                      cat === 'metals' ? MarketType.METALS : MarketType.FOREX;
+
+        for (const symbol of symbols) {
+          if (!isSubscribed || !autoSettings.isEnabled || isAnalyzing) break;
           
-          if (result && isSubscribed) {
-             if (result.confidence >= settings.minStrongConfidence && result.signal !== 'no_entry') {
-               foundInThisCycle = true;
-               const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-               audio.volume = autoSettings.volume;
-               audio.play().catch(() => {});
-             }
-             updateTopSignals([result]);
+          try {
+            const result = await analyzeMarket({
+              symbol,
+              type: mType,
+              timeframe: autoSettings.timeframe,
+              tradingStyle: autoSettings.tradingStyle,
+              settings,
+              lang
+            });
+            
+            if (result && isSubscribed) {
+               if (result.confidence >= settings.minStrongConfidence && result.signal !== 'no_entry') {
+                 foundInThisCycle = true;
+                 const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                 audio.volume = autoSettings.volume;
+                 audio.play().catch(() => {});
+               }
+               updateTopSignals([result]);
+            }
+            await new Promise(r => setTimeout(r, 4000));
+          } catch (e) {
+            console.error(`Auto-scan failed:`, e);
           }
-          await new Promise(r => setTimeout(r, 4000));
-        } catch (e) {
-          console.error(`Auto-scan failed:`, e);
         }
+        if (!isSubscribed || !autoSettings.isEnabled || isAnalyzing) break;
       }
 
       if (isSubscribed) {
