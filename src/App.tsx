@@ -11,7 +11,7 @@ import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
 import TopSignals from './components/TopSignals';
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType } from './types';
-import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES } from './constants';
+import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from './constants';
 import { Language, translations } from './lib/i18n';
 import { analyzeMarket } from './services/geminiService';
 
@@ -44,6 +44,11 @@ export default function App() {
     }
     return { ...base, isEnabled: true };
   });
+
+  const autoSettingsRef = useRef(autoSettings);
+  useEffect(() => {
+    autoSettingsRef.current = autoSettings;
+  }, [autoSettings]);
 
   const [isRadarUnlocked, setIsRadarUnlocked] = useState(false);
 
@@ -216,7 +221,6 @@ export default function App() {
           const filtered = prev.filter(s => {
             const sym = s.symbol.toUpperCase();
             // Expanded check: includes all cryptos in our DB plus any -USD format
-            const { ALL_SYMBOLS_DB } = require('./constants');
             const allCryptos = ALL_SYMBOLS_DB.crypto || [];
             return allCryptos.includes(sym) || sym.includes('-USD') || sym.endsWith('USD');
           });
@@ -419,7 +423,6 @@ export default function App() {
                  onResult={(results) => {
                    // Comprehensive Crypto Check for results
                    const day = new Date().getDay();
-                   const { ALL_SYMBOLS_DB } = require('./constants');
                    const allCryptos = ALL_SYMBOLS_DB.crypto || [];
                    
                    const filtered = (day === 0 || day === 6) 
