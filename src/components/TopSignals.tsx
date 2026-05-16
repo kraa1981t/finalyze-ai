@@ -1,7 +1,7 @@
 import React from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Zap, TrendingUp, TrendingDown, Minus, ShieldAlert, X, ChevronRight, Trash2 } from 'lucide-react';
+import { Zap, TrendingUp, TrendingDown, Minus, ShieldAlert, X, ChevronRight, Trash2, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 

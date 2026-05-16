@@ -108,12 +108,12 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
                   className={cn(
                     "relative overflow-hidden p-6 rounded-[2rem] border-2 transition-all cursor-pointer group shadow-lg",
                     isSelected 
-                      ? "border-black bg-white shadow-2xl scale-[1.02]" 
-                      : "border-black/5 bg-white/50 hover:border-black/20 hover:bg-white"
+                      ? "border-primary bg-brand-alt shadow-[0_0_30px_rgba(16,185,129,0.15)] scale-[1.02]" 
+                      : "border-brand-text/5 bg-brand-alt/40 hover:border-primary/30 hover:bg-brand-alt"
                   )}
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-xl font-black text-black tracking-tighter italic">{res.symbol}</span>
+                    <span className="text-xl font-black text-brand-text tracking-tighter italic">{res.symbol}</span>
                     <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shadow-inner", resConfig.bg)}>
                       <ResIcon size={20} style={{ color: signalColor }} />
                     </div>
@@ -122,13 +122,13 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
                   <div className="space-y-4">
                     <div className="flex items-end justify-between">
                       <div className="flex flex-col">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40 mb-1">Recommendation</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-brand-muted mb-1">Recommendation</span>
                         <span className="text-sm font-black uppercase tracking-wider" style={{ color: signalColor }}>
                           {t[res.signal as keyof typeof t]}
                         </span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40 mb-1 block">Certainty</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-brand-muted mb-1 block">Certainty</span>
                         <span className="text-2xl font-black italic tracking-tighter" style={{ color: signalColor }}>
                           {res.confidence}%
                         </span>
@@ -136,7 +136,7 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="h-2 bg-black/5 rounded-full overflow-hidden">
+                    <div className="h-2 bg-brand-bg/50 rounded-full overflow-hidden">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${res.confidence}%` }}
@@ -147,7 +147,7 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
                   </div>
 
                   {/* Absolute subtle number */}
-                  <span className="absolute top-4 right-6 text-[40px] font-black text-black/5 select-none -z-10">#{idx + 1}</span>
+                  <span className="absolute top-4 right-6 text-[40px] font-black text-brand-text/5 select-none -z-10">#{idx + 1}</span>
                 </motion.div>
               );
             })}
