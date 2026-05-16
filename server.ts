@@ -12,11 +12,16 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = 5000;
+
+  // Global request logger
+  app.use((req, res, next) => {
+    console.log(`[Request] ${req.method} ${req.url}`);
+    next();
+  });
 
   app.use(express.json());
-
-  console.log("[Server] Checking environment...");
+  console.log("[Server] Initializing Finalyze Engine...");
 
   // API Route: Health check
   app.get("/api/health", (req, res) => {
@@ -40,33 +45,71 @@ async function startServer() {
       }
 
       let yahooSymbol = symbol.toUpperCase().replace(/ /g, '');
-      if (yahooSymbol.includes('USD') && yahooSymbol.length >= 6) {
-         if (yahooSymbol.startsWith('BTC') || yahooSymbol.startsWith('ETH') || yahooSymbol.startsWith('SOL')) {
-             yahooSymbol = yahooSymbol.replace('USD', '-USD');
-         } else {
-             if (!yahooSymbol.includes('=')) yahooSymbol += '=X';
-         }
-      } else if (!yahooSymbol.includes('=') && !yahooSymbol.includes('-')) {
-         if (yahooSymbol.length === 6) yahooSymbol += '=X';
+      
+      const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
+        try {
+          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${rangeStr}&interval=${intervalStr}`;
+          const response = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+              'Accept': 'application/json',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Origin': 'https://finance.yahoo.com',
+              'Referer': 'https://finance.yahoo.com/'
+            }
+          });
+          if (!response.ok) return null;
+          const data = await response.json();
+          if (data.chart?.result?.[0]) return data;
+          return null;
+        } catch (e) {
+          return null;
+        }
+      };
+
+      // Try multiple variations for the symbol
+      let attempts = [];
+      if (yahooSymbol.length >= 6 && (yahooSymbol.includes('USD') || yahooSymbol.includes('EUR') || yahooSymbol.includes('JPY'))) {
+        const base = yahooSymbol.replace('USD', '').replace('-USD', '').replace('=X', '');
+        attempts = [
+          `${base}-USD`, // Direct Crypto
+          `${yahooSymbol}=X`, // Direct Forex
+          `${base}USD=X`, // Combined
+          yahooSymbol, // Raw
+          `${base}=F`, // Futures (Metals)
+          `${base}USD`, // Simple
+        ];
+      } else {
+        attempts = [yahooSymbol, `${yahooSymbol}=X`, `${yahooSymbol}-USD`].filter(Boolean);
       }
 
-      let interval = '1d';
-      let range = '14d';
-      if (timeframe === '1m') { interval = '1m'; range = '1d'; }
-      else if (timeframe === '5m') { interval = '5m'; range = '5d'; }
-      else if (timeframe === '15m') { interval = '15m'; range = '5d'; }
-      else if (timeframe === '1h') { interval = '60m'; range = '1mo'; }
-      else if (timeframe === '4h') { interval = '1h'; range = '3mo'; } 
-      else if (timeframe === '1d') { interval = '1d'; range = '6mo'; }
-      else if (timeframe === '1w') { interval = '1wk'; range = '2y'; }
-      else if (timeframe === '1M') { interval = '1mo'; range = 'max'; }
-      else if (timeframe === '1Y') { interval = '3mo'; range = 'max'; }
+      // De-duplicate attempts
+      const uniqueAttempts = Array.from(new Set(attempts));
       
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?range=${range}&interval=${interval}`;
-      const response = await fetch(url);
-      const data = await response.json();
+      let finalData = null;
+      const intervalsToTry = [interval, '5m', '15m', '60m', '1d'];
       
-      res.json(data);
+      outer: for (const attempt of uniqueAttempts) {
+        for (const intv of intervalsToTry) {
+          // If the interval requested is already in the list, start from there or skip smaller ones
+          finalData = await fetchMarketData(attempt, range, intv);
+          if (finalData) break outer;
+        }
+      }
+
+      if (!finalData) {
+        // Absolute last resort: Max range, Daily interval
+        for (const attempt of uniqueAttempts) {
+          finalData = await fetchMarketData(attempt, '1mo', '1d');
+          if (finalData) break;
+        }
+      }
+
+      if (!finalData) {
+        return res.status(404).json({ error: `Symbol ${symbol} not found after multiple attempts.` });
+      }
+      
+      res.json(finalData);
     } catch (error: any) {
       console.error("Market data error:", error);
       res.status(500).json({ error: "Failed to fetch market data" });
@@ -114,13 +157,13 @@ async function startServer() {
       res.status(500).json({ error: "Internal server error during AI analysis" });
     }
   });
-
+  
   const distPath = path.resolve(process.cwd(), "dist");
   const isProd = process.env.NODE_ENV === "production";
 
   if (isProd && fs.existsSync(distPath)) {
-    console.log("[Server] Production mode: Serving static files");
-    app.use(express.static(distPath));
+    console.log("[Server] Production mode: Serving static files from /dist");
+    app.use(express.static(distPath, { etag: false })); // Disable Etag to force refresh
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
@@ -134,11 +177,11 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
+    console.log(`🚀 Finalyze AI is LIVE at: http://localhost:${PORT}`);
   });
 }
 
 startServer().catch(err => {
-  console.error("Failed to start server:", err);
+  console.error("Critical Server Crash:", err);
   process.exit(1);
 });

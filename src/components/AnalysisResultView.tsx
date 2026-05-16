@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, TrendingDown, Minus, ShieldAlert, Zap, Globe, MessageSquare, BarChart2, ChevronRight, X, History, Scale } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, ShieldAlert, Zap, Globe, MessageSquare, BarChart2, ChevronRight, X, History, Scale, AlertCircle, Clock } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
 import { cn } from '../lib/utils';
 import Markdown from 'react-markdown';
@@ -26,259 +26,191 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
   
-  const sortedResults = [...results].sort((a, b) => {
-    const aIsAction = a.signal !== 'no_entry' && a.signal !== 'neutral' ? 1 : 0;
-    const bIsAction = b.signal !== 'no_entry' && b.signal !== 'neutral' ? 1 : 0;
-    if (aIsAction !== bIsAction) return bIsAction - aIsAction;
-    return b.confidence - a.confidence;
-  });
-  
+  const sortedResults = [...results].sort((a, b) => b.confidence - a.confidence);
   const selectedResult = sortedResults[selectedIndex] || sortedResults[0];
-  if (!selectedResult) return null;
 
   const isRTL = lang === 'ar';
+  const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
+  const isCrypto = selectedResult?.type === 'crypto' || selectedResult?.symbol.includes('USD-') || (selectedResult && ['BTC','ETH','SOL','BNB','XRP','ADA','DOT','AVAX','LINK','MATIC','DOGE','SHIB'].some(c => selectedResult.symbol.startsWith(c)));
 
   return (
-    <div className="space-y-8 pb-20">
-      {/* 1. Top Section: Interactive Chart */}
-      <div className="w-full max-w-4xl mx-auto">
-        <div className="h-[300px] md:h-[400px] bg-brand-bg rounded-[2.5rem] overflow-hidden shadow-2xl border border-brand-text/5 relative">
-          <TradingViewWidget symbol={selectedResult.symbol} />
-          <div className="absolute top-8 left-8 z-10 flex items-center gap-3">
-             <div className="px-5 py-2.5 bg-brand-bg/80 backdrop-blur-2xl rounded-full border border-brand-text/20 text-brand-text text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-3 shadow-2xl">
-               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_15px_rgba(16,185,129,1)]" />
-               <span className="text-brand-text">LIVE MARKET: {selectedResult.symbol}</span>
-             </div>
+    <div className="space-y-10 pb-20 px-4">
+      {/* 1. Market Status Large Indicator - Only show if weekend AND not looking at crypto */}
+      {isWeekend && !isCrypto && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-4xl mx-auto py-16 bg-white/5 border-2 border-dashed border-red-500/30 rounded-[3rem] flex flex-col items-center justify-center gap-6 text-center shadow-2xl backdrop-blur-md mb-10"
+        >
+          <div className="w-24 h-24 bg-red-500/20 rounded-full flex items-center justify-center text-red-500 shadow-[0_0_50px_rgba(239,68,68,0.3)]">
+            <Clock size={48} className="animate-spin-slow" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-4xl md:text-5xl font-black text-black tracking-tighter uppercase italic drop-shadow-lg">
+              {lang === 'ar' ? 'الأسواق مغلقة الآن' : 'MARKETS CLOSED NOW'}
+            </h2>
+            <p className="text-black/60 font-black text-xs uppercase tracking-[0.4em]">
+              {lang === 'ar' ? 'الرادار يراقب العملات الرقمية فقط (24/7)' : 'RADAR MONITORING CRYPTO ONLY (24/7)'}
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* 2. Top Section: Interactive Chart (Only if we have results) */}
+      {selectedResult && (
+        <div className="w-full max-w-4xl mx-auto">
+          <div className="h-[350px] md:h-[450px] bg-brand-bg rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white/50 relative">
+            <TradingViewWidget symbol={selectedResult.symbol} />
+            <div className="absolute top-8 left-8 z-10 flex items-center gap-3">
+               <div className="px-6 py-3 bg-white/90 backdrop-blur-2xl rounded-2xl border border-black/10 text-black text-[12px] font-black uppercase tracking-[0.2em] flex items-center gap-3 shadow-2xl">
+                 <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_15px_rgba(16,185,129,1)]" />
+                 <span>{selectedResult.symbol} : {selectedResult.confidence}%</span>
+               </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* 2. List Section: Structured Rankings */}
-      <div className="space-y-4 max-w-6xl mx-auto">
-        <div className={cn("flex items-center justify-between px-4", isRTL ? "flex-row" : "flex-row-reverse")}>
-          <span className="text-[10px] font-bold text-brand-muted font-mono uppercase tracking-widest">Analyzed: {results.length}</span>
-          <h3 className="text-sm font-black text-brand-text flex items-center gap-2 uppercase tracking-[0.2em]">
-            <Zap size={14} className="text-secondary fill-secondary" />
+      {/* 3. Simplified List Section */}
+      <div className="space-y-6 max-w-6xl mx-auto">
+        <div className={cn("flex items-center justify-between px-6", isRTL ? "flex-row" : "flex-row-reverse")}>
+          <span className="text-[11px] font-black text-black/40 font-mono uppercase tracking-[0.3em]">Institutional Feed: {results.length}</span>
+          <h3 className="text-lg font-black text-black flex items-center gap-3 uppercase tracking-[0.25em] italic">
+            <Zap size={18} className="text-orange-500 fill-orange-500" />
             {t.finalDecision}
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {sortedResults.map((res, idx) => {
-            const resConfig = SIGNAL_CONFIG[res.signal] || SIGNAL_CONFIG[SignalType.NEUTRAL];
-            const ResIcon = resConfig.icon;
-            const isSelected = selectedIndex === idx;
-            const isBuy = res.signal.includes('buy');
-            const isSell = res.signal.includes('sell');
-            const signalColor = isBuy ? '#10B981' : isSell ? '#EF4444' : '#94A3B8';
+        {results.length === 0 ? (
+          <div className="text-center py-20 text-black/30 font-black uppercase tracking-[0.5em] text-xs">
+            {lang === 'ar' ? 'في انتظار إشارات قوية...' : 'AWAITING STRONG SIGNALS...'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sortedResults.map((res, idx) => {
+              const resConfig = SIGNAL_CONFIG[res.signal] || SIGNAL_CONFIG[SignalType.NEUTRAL];
+              const ResIcon = resConfig.icon;
+              const isSelected = selectedIndex === idx;
+              const isBuy = res.signal.includes('buy');
+              const isSell = res.signal.includes('sell');
+              const signalColor = isBuy ? '#10B981' : isSell ? '#EF4444' : '#64748B';
 
-            return (
-              <motion.div
-                key={res.symbol + idx}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-              >
-                <div 
+              return (
+                <motion.div
+                  key={res.symbol + idx}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  onClick={() => {
+                    setSelectedIndex(idx);
+                    setShowDetail(true);
+                  }}
                   className={cn(
-                    "relative overflow-hidden h-[50px] rounded-xl border transition-all cursor-pointer group flex items-center px-3 gap-2",
+                    "relative overflow-hidden p-6 rounded-[2rem] border-2 transition-all cursor-pointer group shadow-lg",
                     isSelected 
-                      ? "border-primary bg-brand-alt shadow-lg ring-2 ring-primary/10" 
-                      : "border-brand-text/5 bg-brand-alt/50 hover:border-brand-text/10"
+                      ? "border-black bg-white shadow-2xl scale-[1.02]" 
+                      : "border-black/5 bg-white/50 hover:border-black/20 hover:bg-white"
                   )}
-                  onClick={() => setSelectedIndex(idx)}
                 >
-                  {/* Rank */}
-                  <div className={cn(
-                    "w-6 h-6 shrink-0 rounded-md flex items-center justify-center text-[10px] font-black",
-                    isSelected ? "bg-primary text-white" : "bg-brand-text/10 text-brand-muted"
-                  )}>
-                    {idx + 1}
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xl font-black text-black tracking-tighter italic">{res.symbol}</span>
+                    <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shadow-inner", resConfig.bg)}>
+                      <ResIcon size={20} style={{ color: signalColor }} />
+                    </div>
                   </div>
 
-                  {/* Symbol */}
-                  <span className="text-sm font-black text-brand-text tracking-tighter italic shrink-0 w-16 truncate">{res.symbol}</span>
+                  <div className="space-y-4">
+                    <div className="flex items-end justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40 mb-1">Recommendation</span>
+                        <span className="text-sm font-black uppercase tracking-wider" style={{ color: signalColor }}>
+                          {t[res.signal as keyof typeof t]}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-black/40 mb-1 block">Certainty</span>
+                        <span className="text-2xl font-black italic tracking-tighter" style={{ color: signalColor }}>
+                          {res.confidence}%
+                        </span>
+                      </div>
+                    </div>
 
-                  {/* Signal Badge */}
-                  <div className={cn("px-2 py-1 rounded-md flex items-center gap-1.5 shrink-0", resConfig.bg)}>
-                     <ResIcon size={12} style={{ color: signalColor }} />
-                     <span className="text-[9px] font-black uppercase" style={{ color: signalColor }}>
-                       {t[res.signal as keyof typeof t]}
-                     </span>
+                    {/* Progress Bar */}
+                    <div className="h-2 bg-black/5 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${res.confidence}%` }}
+                        className="h-full"
+                        style={{ backgroundColor: signalColor }}
+                      />
+                    </div>
                   </div>
 
-                  {/* Confidence % */}
-                  <div className="flex-grow text-right">
-                    <span className="text-[11px] font-black tabular-nums" style={{ color: signalColor }}>{res.confidence}%</span>
-                  </div>
-
-                  {/* Read More Icon */}
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setShowDetail(true); }}
-                    className="p-1 hover:bg-brand-text/10 rounded-md text-primary transition-colors shrink-0"
-                  >
-                     <ChevronRight size={14} />
-                  </button>
-
-                  {/* Integrated Bottom Confidence Bar */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-bg/40">
-                     <motion.div 
-                       initial={{ width: 0 }}
-                       animate={{ width: `${res.confidence}%` }}
-                       className="h-full"
-                       style={{ backgroundColor: signalColor }}
-                     />
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
+                  {/* Absolute subtle number */}
+                  <span className="absolute top-4 right-6 text-[40px] font-black text-black/5 select-none -z-10">#{idx + 1}</span>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
-
-
-
 
       {/* Detail Modal */}
       <AnimatePresence>
-        {showDetail && (
+        {showDetail && selectedResult && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowDetail(false)}
-              className="absolute inset-0 bg-brand-bg/80 backdrop-blur-xl"
+              className="absolute inset-0 bg-white/60 backdrop-blur-2xl"
             />
             <motion.div
               layoutId="detail"
-              initial={{ scale: 0.9, y: 20 }}
+              initial={{ scale: 0.9, y: 50 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="relative w-full max-w-4xl bg-brand-bg border border-brand-text/10 rounded-[3rem] overflow-hidden shadow-2xl shadow-black/50 overflow-y-auto max-h-[90vh]"
+              exit={{ scale: 0.9, y: 50 }}
+              className="relative w-full max-w-2xl bg-white border-4 border-black rounded-[3rem] overflow-hidden shadow-2xl shadow-black/20 overflow-y-auto max-h-[85vh]"
             >
-              <div className="p-8 md:p-12 space-y-10">
-                {/* Header */}
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-brand-text/10 rounded-3xl flex items-center justify-center text-primary border border-brand-text/20">
-                      {selectedResult.symbol.includes('USD') ? <Globe size={32} /> : <Zap size={32} />}
-                    </div>
-                    <div>
-                      <h2 className="text-4xl font-black tracking-tight text-brand-text italic mb-1">{selectedResult.symbol}</h2>
-                      <div className="flex items-center gap-4">
-                         <span className="px-3 py-1 bg-primary text-white rounded-full text-[10px] font-black uppercase tracking-widest">
-                           {selectedResult.timeframe}
-                         </span>
-                         <span className="text-brand-muted font-mono text-[10px]">{new Date(selectedResult.timestamp).toLocaleString()}</span>
-                      </div>
-                    </div>
+              <div className="p-10 space-y-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-5xl font-black tracking-tighter text-black italic mb-2">{selectedResult.symbol}</h2>
+                    <span className="px-4 py-1.5 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-[0.3em]">
+                      INSTITUTIONAL GRADE • {selectedResult.confidence}%
+                    </span>
                   </div>
-                  <button 
-                    onClick={() => setShowDetail(false)}
-                    className="p-3 bg-brand-text/5 hover:bg-brand-text/10 rounded-2xl text-brand-muted transition-colors"
-                  >
-                    <X size={24} />
+                  <button onClick={() => setShowDetail(false)} className="p-4 bg-black/5 hover:bg-black text-black hover:text-white rounded-2xl transition-all">
+                    <X size={28} />
                   </button>
                 </div>
 
-                {/* Main Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                   {/* Left: Summary Analysis */}
-                   <div className="lg:col-span-2 space-y-8">
-                      <div className="p-8 bg-brand-alt border border-brand-text/5 rounded-[2rem] space-y-4">
-                         <div className="flex items-center gap-3 text-secondary">
-                           <MessageSquare size={20} />
-                           <h4 className="text-sm font-black uppercase tracking-widest">{t.reasons}</h4>
-                         </div>
-                         <div className="prose prose-invert prose-slate max-w-none text-brand-muted leading-relaxed text-lg">
-                            <Markdown>{selectedResult.summary}</Markdown>
-                         </div>
-                      </div>
+                <div className="p-8 bg-black text-white rounded-[2rem] space-y-6">
+                  <div className="flex items-center gap-3">
+                    <MessageSquare size={20} className="text-sky-400" />
+                    <h4 className="text-xs font-black uppercase tracking-[0.4em]">{t.reasons}</h4>
+                  </div>
+                  <div className="text-lg font-black leading-relaxed opacity-90 italic">
+                    <Markdown>{selectedResult.summary}</Markdown>
+                  </div>
+                </div>
 
-                      {selectedResult.historicalMatch && (
-                        <div className="p-8 bg-emerald-500/5 border border-emerald-500/20 rounded-[2rem] space-y-4">
-                           <div className="flex items-center gap-3 text-emerald-400">
-                             <History size={20} />
-                             <h4 className="text-sm font-black uppercase tracking-widest">{t.historicalMatch}</h4>
-                           </div>
-                           <p className="text-brand-muted italic">
-                             {selectedResult.historicalMatch}
-                           </p>
-                        </div>
-                      )}
-                   </div>
-
-                   {/* Right: Scores & Stats */}
-                   <div className="space-y-6">
-                      <div className="p-8 bg-brand-alt border border-brand-text/5 rounded-[2rem] flex flex-col items-center gap-6">
-                         <div className="text-center">
-                            <div className="text-[10px] font-black uppercase tracking-widest text-brand-muted mb-4">{t.confidence}</div>
-                            <div className="text-6xl font-black text-primary tracking-tighter italic">
-                              {selectedResult.confidence}%
-                            </div>
-                         </div>
-                         <div className="w-full space-y-4">
-                            <ScoreRow label={t.trendVitality} score={selectedResult.technicalScore} color="primary" />
-                            <ScoreRow label={t.momentum} score={selectedResult.sentimentScore} color="secondary" />
-                             
-                             {selectedResult.trendMaturity && (
-                               <div className="p-4 bg-brand-text/5 rounded-2xl border border-brand-text/10 space-y-2">
-                                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-brand-muted">
-                                    <span>{t.trendMaturity}</span>
-                                    <span className={cn(
-                                      selectedResult.trendMaturity === 'youth' ? "text-emerald-400" : 
-                                      selectedResult.trendMaturity === 'infancy' ? "text-blue-400" : 
-                                      "text-orange-400"
-                                    )}>
-                                      {t[selectedResult.trendMaturity as keyof typeof t] || selectedResult.trendMaturity}
-                                    </span>
-                                  </div>
-                                  {selectedResult.trendAge !== undefined && (
-                                    <div className="text-[10px] font-bold text-brand-muted">
-                                      {selectedResult.trendAge} {t.candles}
-                                    </div>
-                                  )}
-                               </div>
-                             )}
-
-                         </div>
-                      </div>
-
-                      <div className="p-8 bg-brand-bg/40 border border-brand-text/5 rounded-[2rem] space-y-4">
-                         <div className="flex items-center gap-3 text-brand-muted">
-                           <ShieldAlert size={18} />
-                           <h4 className="text-xs font-black uppercase tracking-widest">Risk Guard</h4>
-                         </div>
-                         <p className="text-[11px] text-brand-muted leading-relaxed">
-                            Analysis assumes standard institutional risk parameters. Stop-loss should align with nearest H4 liquidity zone.
-                         </p>
-                      </div>
-                   </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-6 bg-emerald-500/10 border-2 border-emerald-500/20 rounded-3xl text-center">
+                    <span className="text-[10px] font-black uppercase text-black/40 block mb-2">Trend Accuracy</span>
+                    <span className="text-3xl font-black text-emerald-600">{selectedResult.technicalScore}%</span>
+                  </div>
+                  <div className="p-6 bg-sky-500/10 border-2 border-sky-500/20 rounded-3xl text-center">
+                    <span className="text-[10px] font-black uppercase text-black/40 block mb-2">Market Pressure</span>
+                    <span className="text-3xl font-black text-sky-600">{selectedResult.sentimentScore}%</span>
+                  </div>
                 </div>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-function ScoreRow({ label, score, color }: { label: string, score: number, color: 'primary' | 'secondary' }) {
-  return (
-    <div className="w-full space-y-2">
-      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-brand-muted">
-        <span>{label}</span>
-        <span className={color === 'primary' ? "text-primary" : "text-secondary"}>{score}%</span>
-      </div>
-      <div className="h-1.5 bg-brand-text/5 rounded-full overflow-hidden">
-        <motion.div 
-          initial={{ width: 0 }}
-          animate={{ width: `${score}%` }}
-          className={cn("h-full", color === 'primary' ? "bg-primary" : "bg-secondary")}
-        />
-      </div>
     </div>
   );
 }

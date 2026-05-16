@@ -5,53 +5,59 @@ import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
  * ROBUST TECHNICAL ENGINE (VERSION 2.0)
  * Works with minimal data (10+ candles) and handles gaps gracefully.
  */
-function calculateTechnicalMetrics(closes: number[], highs: number[], lows: number[]) {
-  // Hard minimum lowered to 10 to ensure it almost always works
-  if (!closes || closes.length < 10) return { direction: 'sideways' as const, age: 0, momentumScore: 0 };
+function calculateTechnicalMetrics(closes: number[], highs: number[], lows: number[], volumes?: number[]) {
+  if (!closes || closes.length < 10) return null;
 
   const len = closes.length;
+  
+  // 1. RSI (14)
+  let avgGain = 0;
+  let avgLoss = 0;
+  for (let i = 1; i < Math.min(len, 15); i++) {
+    const diff = closes[len - i] - closes[len - i - 1];
+    if (diff >= 0) avgGain += diff; else avgLoss -= diff;
+  }
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+
+  // 2. EMA Cross (9 vs 21)
+  const ema9 = closes.slice(-9).reduce((a, b) => a + b, 0) / 9;
+  const ema21 = closes.slice(-21).reduce((a, b) => a + b, 0) / 21;
+  const emaCross = ema9 > ema21 ? 'bullish' : 'bearish';
+
+  // 3. Trend Direction
   let upScore = 0;
   let downScore = 0;
-  
-  // Dynamic window based on available data
   const window = Math.min(len - 1, 15); 
-  
   for (let i = 0; i < window; i++) {
     const curr = len - 1 - i;
     const prev = curr - 1;
     if (closes[curr] > closes[prev]) upScore++; else downScore++;
-    if (highs[curr] > highs[prev]) upScore++; else downScore++;
   }
 
   let direction: 'uptrend' | 'downtrend' | 'sideways' = 'sideways';
-  const bias = Math.floor(window * 0.3); // 30% bias for trend detection
-  if (upScore > downScore + bias) direction = 'uptrend';
-  else if (downScore > upScore + bias) direction = 'downtrend';
+  if (upScore > downScore + 2) direction = 'uptrend';
+  else if (downScore > upScore + 2) direction = 'downtrend';
 
-  // Robust Age counting
+  // 4. Age (Relaxed for Crypto)
   let age = 0;
-  let pullbacks = 0;
   for (let i = 1; i < len; i++) {
     const curr = len - i;
     const isUp = closes[curr] > closes[curr - 1];
-    if (direction === 'uptrend') {
-      if (isUp) age++; else if (pullbacks < 2) pullbacks++; else break;
-    } else if (direction === 'downtrend') {
-      if (!isUp) age++; else if (pullbacks < 2) pullbacks++; else break;
-    } else break;
+    if (direction === 'uptrend' && isUp) age++;
+    else if (direction === 'downtrend' && !isUp) age++;
+    else break;
   }
 
-  // Momentum
-  const mWindow = Math.min(len, 5);
-  let rangeSum = 0;
-  let bodySum = 0;
-  for (let i = 1; i < mWindow; i++) {
-    bodySum += Math.abs(closes[len-i] - closes[len-i-1]);
-    rangeSum += (highs[len-i] - lows[len-i]) || 0.0001;
+  // 5. Volume Surge
+  let volSurge = false;
+  if (volumes && volumes.length > 5) {
+    const lastVol = volumes[len - 1];
+    const avgVol = volumes.slice(-6, -1).reduce((a, b) => a + b, 0) / 5;
+    volSurge = lastVol > avgVol * 1.5;
   }
-  const momentumScore = rangeSum > 0 ? Math.min(100, (bodySum / rangeSum) * 100) : 50;
 
-  return { direction, age, momentumScore };
+  return { direction, age, rsi, emaCross, volSurge, momentumScore: upScore / (upScore + downScore) * 100 };
 }
 
 export async function analyzeMarket(params: {
@@ -80,37 +86,30 @@ export async function analyzeMarket(params: {
     const closes = quotes.close.filter((c: any) => c != null);
     const highs = quotes.high.filter((c: any) => c != null);
     const lows = quotes.low.filter((c: any) => c != null);
+    const volumes = quotes.volume?.filter((v: any) => v != null);
 
-    if (closes.length < 15) {
-      throw new Error(`Insufficient data for ${symbol} (${closes.length} candles). Need at least 15.`);
+    if (closes.length < 10) {
+      throw new Error(`Insufficient data for ${symbol}.`);
     }
 
-    const metrics = calculateTechnicalMetrics(closes, highs, lows);
+    const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes);
 
-    if (!metrics || metrics.direction === 'sideways') {
-      return {
-        symbol, type, timeframe, signal: SignalType.NO_ENTRY, confidence: 25,
-        summary: lang === 'ar' ? "السوق في اتجاه عرضي ممل أو متذبذب جداً. لا توجد قوة دفع واضحة حالياً." : "Market is in sideways consolidation or extreme volatility. No clear momentum detected.",
-        technicalScore: 20, sentimentScore: 20, trendMaturity: 'unknown', trendAge: 0,
-        historicalMatch: "", timestamp: new Date().toISOString(), userId: ""
-      };
-    }
-
-    // ══════════════════════════════════════════════
-    // PHASE 2: AI REASONING
-    // ══════════════════════════════════════════════
+    // AI PHASE (Always try AI, don't block sideways)
     const technicalPrompt = `
-You are a master technical analyst.
-FACTS: Symbol ${symbol}, ${metrics.direction.toUpperCase()}, Age ${metrics.age} candles, Momentum ${metrics.momentumScore.toFixed(1)}%.
-Rules: Age 1-5 is infancy (no_entry), 6-25 is tradeable (Youth), 26+ is aging (no_entry).
-Evaluate SMC zones and return a professional decision.
+You are an Elite Institutional Trader. Symbol: ${symbol} (${type}). Timeframe: ${timeframe}.
+DATA: RSI=${metrics?.rsi?.toFixed(1)}, Trend=${metrics?.direction}, EMA_Cross=${metrics?.emaCross}, VolSurge=${metrics?.volSurge}, Age=${metrics?.age}.
+INSTRUCTIONS: 
+- For Crypto: Be more aggressive with momentum breakouts. 
+- If Trending: Look for entry if Age is 2-50.
+- If Sideways: Look for 'Accumulation' or 'Volatility Expansion'.
+- Return strong_buy/strong_sell ONLY if indicators align.
 
 Return ONLY JSON:
 {
   "signal": "strong_buy" | "buy" | "no_entry" | "sell" | "strong_sell",
   "confidence": number,
-  "summary": "Detailed analysis in ${lang === 'ar' ? 'Arabic' : 'English'}",
-  "historicalMatch": "Pattern description"
+  "summary": "Professional analysis in ${lang === 'ar' ? 'Arabic' : 'English'}",
+  "historicalMatch": "SMC/ICT Pattern description"
 }
 `;
 
@@ -120,31 +119,39 @@ Return ONLY JSON:
       body: JSON.stringify({ prompt: technicalPrompt })
     }).then(r => r.json());
 
-    const rawText = aiResponse.choices[0]?.message?.content;
+    if (!aiResponse?.choices?.[0]?.message?.content) {
+      throw new Error("AI Synthesis Error: No response content.");
+    }
+
+    const rawText = aiResponse.choices[0].message.content;
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("AI Synthesis Error");
+    if (!jsonMatch) throw new Error("AI Synthesis Error: Invalid JSON structure.");
+    
     const resultData = JSON.parse(jsonMatch[0]);
 
     // ══════════════════════════════════════════════
-    // PHASE 3: FINAL ENFORCEMENT
+    // PHASE 3: FINAL ENFORCEMENT & NORMALIZATION
     // ══════════════════════════════════════════════
-    let finalSignal = resultData.signal as SignalType;
-    let finalConfidence = resultData.confidence || 50;
+    // Normalize signal: lowercase, replace spaces/underscores to match enum keys
+    let rawSignal = String(resultData.signal || 'no_entry').toLowerCase().trim().replace(/\s+/g, '_');
+    
+    // Direct mapping for common AI variations
+    if (rawSignal.includes('strong_buy') || rawSignal === 'strongbuy') rawSignal = 'strong_buy';
+    else if (rawSignal.includes('strong_sell') || rawSignal === 'strongsell') rawSignal = 'strong_sell';
+    else if (rawSignal.includes('buy')) rawSignal = 'buy';
+    else if (rawSignal.includes('sell')) rawSignal = 'sell';
+    else if (rawSignal.includes('neutral')) rawSignal = 'neutral';
+    else rawSignal = 'no_entry';
 
-    // Force age boundaries
-    if (metrics.age <= 5 || metrics.age >= 26) {
-      finalSignal = SignalType.NO_ENTRY;
-      finalConfidence = Math.min(finalConfidence, 35);
-    }
+    let finalSignal = rawSignal as SignalType;
+    let finalConfidence = Number(resultData.confidence) || 50;
 
-    // Trend alignment check
-    if (metrics.direction === 'uptrend' && (finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL)) {
-       finalSignal = SignalType.NO_ENTRY;
-       finalConfidence = 40;
-    }
-    if (metrics.direction === 'downtrend' && (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY)) {
-       finalSignal = SignalType.NO_ENTRY;
-       finalConfidence = 40;
+    // RELAXED ENFORCEMENT for Crypto & Live conditions
+    const age = metrics?.age || 0;
+    const isCrypto = type === MarketType.CRYPTO;
+
+    if (age < 2 || (isCrypto ? age > 60 : age > 35)) {
+      if (finalConfidence > 70) finalConfidence = 65; // Soft downgrade instead of hard block
     }
 
     return {
@@ -152,10 +159,10 @@ Return ONLY JSON:
       signal: finalSignal,
       confidence: finalConfidence,
       summary: resultData.summary,
-      technicalScore: metrics.momentumScore,
+      technicalScore: metrics?.momentumScore || 50,
       sentimentScore: finalConfidence,
-      trendMaturity: metrics.age <= 5 ? 'infancy' : (metrics.age <= 25 ? 'youth' : 'aging'),
-      trendAge: metrics.age,
+      trendMaturity: age <= 5 ? 'infancy' : (age <= 25 ? 'youth' : 'aging'),
+      trendAge: age,
       historicalMatch: resultData.historicalMatch || "",
       timestamp: new Date().toISOString(),
       userId: ""

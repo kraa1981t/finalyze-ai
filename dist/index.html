@@ -8,21 +8,21 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#10B981" />
     <script>
-      // Radical fix for persistent white screens: unregister all service workers
+      // Radical fix for persistent white screens: unregister all service workers that might be caching old bugs
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(registrations => {
           for (const registration of registrations) {
             registration.unregister();
-            console.log('Unregistered buggy service worker');
+            console.log('Unregistered service worker for clean start');
           }
         });
       }
     </script>
-    <script type="module" crossorigin src="/assets/index-DthcQn2X.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-iHDfaFdy.css">
+    <script type="module" crossorigin src="/assets/index-Bh6epiW5.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DNMtRytY.css">
   </head>
-  <body>
-    <div id="root"></div>
+  <body translate="no" class="notranslate">
+    <div id="root" translate="no" class="notranslate"></div>
   </body>
 </html>
 

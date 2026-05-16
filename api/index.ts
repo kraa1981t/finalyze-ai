@@ -1,17 +1,33 @@
 import express from "express";
 
 const app = express();
-
 app.use(express.json());
 
-// API Route: Health check (v3)
+// API Route: Health check
 app.get("/api/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
-    version: "3.0-PureAPI",
-    env: process.env.NODE_ENV || "unknown"
-  });
+  res.json({ status: "ok", version: "4.0-Institutional", node: process.version });
 });
+
+// Helper for Market Data Fetching
+const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${rangeStr}&interval=${intervalStr}`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Origin': 'https://finance.yahoo.com',
+        'Referer': 'https://finance.yahoo.com/'
+      }
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.chart?.result?.[0]) return data;
+    return null;
+  } catch (e) {
+    return null;
+  }
+};
 
 // API Route: Market Data
 app.get("/api/market-data", async (req, res) => {
@@ -21,34 +37,49 @@ app.get("/api/market-data", async (req, res) => {
     if (!symbol) return res.status(400).json({ error: "Symbol is required" });
 
     let yahooSymbol = symbol.toUpperCase().replace(/ /g, '');
-    if (yahooSymbol.includes('USD') && yahooSymbol.length >= 6) {
-       if (yahooSymbol.startsWith('BTC') || yahooSymbol.startsWith('ETH') || yahooSymbol.startsWith('SOL')) {
-           yahooSymbol = yahooSymbol.replace('USD', '-USD');
-       } else {
-           if (!yahooSymbol.includes('=')) yahooSymbol += '=X';
-       }
-    } else if (!yahooSymbol.includes('=') && !yahooSymbol.includes('-')) {
-       if (yahooSymbol.length === 6) yahooSymbol += '=X';
-    }
-
     let interval = '1d';
     let range = '14d';
-    if (timeframe === '1m') { interval = '1m'; range = '1d'; }
-    else if (timeframe === '5m') { interval = '5m'; range = '1d'; }
-    else if (timeframe === '15m') { interval = '15m'; range = '5d'; }
-    else if (timeframe === '1h') { interval = '60m'; range = '10d'; }
-    else if (timeframe === '4h') { interval = '60m'; range = '1mo'; } 
-    else if (timeframe === '1d') { interval = '1d'; range = '1mo'; }
-    else if (timeframe === '1w') { interval = '1wk'; range = '1y'; }
-    else if (timeframe === '1M') { interval = '1mo'; range = '5y'; }
-    else if (timeframe === '1Y') { interval = '3mo'; range = '10y'; }
     
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?range=${range}&interval=${interval}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    res.json(data);
+    // Timeframe Mapping
+    if (timeframe === '1m') { interval = '1m'; range = '1d'; }
+    else if (timeframe === '5m') { interval = '5m'; range = '5d'; }
+    else if (timeframe === '15m') { interval = '15m'; range = '5d'; }
+    else if (timeframe === '1h') { interval = '60m'; range = '1mo'; }
+    else if (timeframe === '4h') { interval = '1h'; range = '3mo'; } 
+    else if (timeframe === '1d') { interval = '1d'; range = '6mo'; }
+    else if (timeframe === '1w') { interval = '1wk'; range = '2y'; }
+
+    // Symbol Try-Loop
+    let attempts = [];
+    if (yahooSymbol.length >= 6 && (yahooSymbol.includes('USD') || yahooSymbol.includes('EUR') || yahooSymbol.includes('JPY'))) {
+      const base = yahooSymbol.replace('USD', '').replace('-USD', '').replace('=X', '');
+      attempts = [`${base}-USD`, `${yahooSymbol}=X`, `${base}USD=X`, yahooSymbol, `${base}=F`, `${base}USD`];
+    } else {
+      attempts = [yahooSymbol, `${yahooSymbol}=X`, `${yahooSymbol}-USD`].filter(Boolean);
+    }
+
+    const uniqueAttempts = Array.from(new Set(attempts));
+    let finalData = null;
+    const intervalsToTry = [interval, '5m', '15m', '60m', '1d'];
+
+    outer: for (const attempt of uniqueAttempts) {
+      for (const intv of intervalsToTry) {
+        finalData = await fetchMarketData(attempt, range, intv);
+        if (finalData) break outer;
+      }
+    }
+
+    if (!finalData) {
+      for (const attempt of uniqueAttempts) {
+        finalData = await fetchMarketData(attempt, '1mo', '1d');
+        if (finalData) break;
+      }
+    }
+
+    if (!finalData) return res.status(404).json({ error: "No data found" });
+    res.json(finalData);
   } catch (error: any) {
-    res.status(500).json({ error: "Failed to fetch market data" });
+    res.status(500).json({ error: "Server Error" });
   }
 });
 
@@ -59,9 +90,6 @@ app.post("/api/ai-analysis", async (req, res) => {
     const apiKey = process.env.VITE_QWEN_API_KEY;
     const apiUrl = process.env.VITE_QWEN_API_URL;
     const model = process.env.VITE_QWEN_MODEL || "qwen-plus";
-
-    if (!apiKey) return res.status(500).json({ error: "[DEBUG] API Key Missing in Vercel Env" });
-    if (!apiUrl) return res.status(500).json({ error: "[DEBUG] API URL Missing in Vercel Env" });
 
     const response = await fetch(`${apiUrl}/chat/completions`, {
       method: 'POST',
@@ -80,19 +108,11 @@ app.post("/api/ai-analysis", async (req, res) => {
       })
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return res.status(response.status).json({ 
-        error: `[QWEN_SERVER_ERROR] ${response.status}: ${JSON.stringify(errorData)}` 
-      });
-    }
-
     const data = await response.json();
     res.json(data);
   } catch (error: any) {
-    res.status(500).json({ error: `[SERVER_CRASH] ${error.message}` });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Export the app for Vercel serverless functions
 export default app;

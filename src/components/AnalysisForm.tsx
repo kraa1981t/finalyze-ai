@@ -114,10 +114,24 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
     setSelectedSymbols(prev => prev.filter(s => s !== sym));
   };
 
+  const isMarketOpen = (category: string) => {
+    if (category === 'crypto') return true;
+    const day = new Date().getDay();
+    if (day === 0 || day === 6) return false;
+    return true;
+  };
+
   const clearAll = () => setSelectedSymbols([]);
 
   const onSubmit = async (data: FormValues) => {
     setFormError(null);
+    
+    // Radical Market Blocking
+    if (!isMarketOpen(data.type)) {
+      setFormError(lang === 'ar' ? 'عفواً.. هذه الأسواق مغلقة حالياً ولا يمكن تحليلها' : 'Sorry.. These markets are currently closed and cannot be analyzed');
+      return;
+    }
+
     console.log("[Form] Submit clicked. Symbols:", selectedSymbols, "Manual:", data.symbol);
 
     if (!user) {
@@ -172,8 +186,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
           console.error(`[Analysis Error] ${currentSymbol}:`, symbolError);
           const msg = symbolError.message || "فشل التحليل بسبب خطأ غير معروف";
           setFormError(`${currentSymbol}: ${msg}`);
-          // Force error to be seen by the user
-          alert(`خطأ أثناء تحليل ${currentSymbol}:\n${msg}`);
+          // REMOVED: alert() popup as it is annoying for the user.
         }
 
         // Add 3-second delay between requests to prevent API Rate Limiting (429 errors)
@@ -615,4 +628,5 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
       </form>
     </div>
   );
+}
 

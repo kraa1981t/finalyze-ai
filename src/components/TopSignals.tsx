@@ -1,7 +1,7 @@
 import React from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Zap, TrendingUp, TrendingDown, Minus, ShieldAlert, X, ChevronRight } from 'lucide-react';
+import { Zap, TrendingUp, TrendingDown, Minus, ShieldAlert, X, ChevronRight, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 
@@ -9,6 +9,7 @@ interface TopSignalsProps {
   signals: AnalysisResult[];
   onRemove: (symbol: string) => void;
   onSelect: (result: AnalysisResult) => void;
+  onClearAll: () => void;
   lang: Language;
 }
 
@@ -21,7 +22,7 @@ const SIGNAL_CONFIG: Record<string, { color: string, bg: string, icon: any }> = 
     [SignalType.NO_ENTRY]: { color: "#64748B", bg: "bg-slate-500/10", icon: ShieldAlert },
 };
 
-export default function TopSignals({ signals, onRemove, onSelect, lang }: TopSignalsProps) {
+export default function TopSignals({ signals, onRemove, onSelect, onClearAll, lang }: TopSignalsProps) {
   const t = translations[lang];
   const isRTL = lang === 'ar';
 
@@ -30,7 +31,13 @@ export default function TopSignals({ signals, onRemove, onSelect, lang }: TopSig
   return (
     <div className="mb-12 space-y-4">
       <div className={cn("flex items-center justify-between px-4", isRTL ? "flex-row" : "flex-row-reverse")}>
-        <span className="text-[10px] font-bold text-brand-muted font-mono uppercase tracking-widest">Live Hot Signals</span>
+        <button 
+          onClick={onClearAll}
+          className="flex items-center gap-2 px-3 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-red-500 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+        >
+          <Trash2 size={12} />
+          {t.clearAllResults}
+        </button>
         <h3 className="text-sm font-black text-brand-text flex items-center gap-2 uppercase tracking-[0.2em]">
           <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
           {t.topSignals}
@@ -68,7 +75,15 @@ export default function TopSignals({ signals, onRemove, onSelect, lang }: TopSig
                   <span className="text-sm font-black text-brand-text tracking-tighter italic shrink-0 w-16 truncate">{res.symbol}</span>
 
                   {/* Signal Badge */}
-                  <div className={cn("px-2 py-1 rounded-md flex items-center gap-1.5 shrink-0", resConfig.bg)}>
+                  <div className={cn(
+                    "px-2 py-1 rounded-md flex items-center gap-1.5 shrink-0 transition-all", 
+                    resConfig.bg,
+                    (res.signal === SignalType.STRONG_BUY || res.signal === SignalType.STRONG_SELL) && 
+                      "shadow-[0_0_15px_rgba(250,204,21,0.3)] border border-yellow-400/30"
+                  )}>
+                     {(res.signal === SignalType.STRONG_BUY || res.signal === SignalType.STRONG_SELL) && (
+                       <Sparkles size={10} className="text-yellow-400 animate-pulse drop-shadow-[0_0_5px_rgba(250,204,21,0.8)]" />
+                     )}
                      <ResIcon size={12} style={{ color: signalColor }} />
                      <span className="text-[9px] font-black uppercase" style={{ color: signalColor }}>
                        {t[res.signal as keyof typeof t]}

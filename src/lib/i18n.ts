@@ -89,11 +89,12 @@ export interface Translations {
   failSound: string;
   uploadCustom: string;
   startManualNow: string;
+  clearAllResults: string;
 }
 
 export const translations: Record<Language, Translations> = {
   en: {
-    title: "Finalyze AI",
+    title: "Joseph.Trading",
     subtitle: "Advanced Institutional Market Analysis",
     startAnalysis: "Start New Analysis",
     analyzing: "AI Engine Analyzing...",
@@ -183,10 +184,11 @@ export const translations: Record<Language, Translations> = {
     successSound: "Success Alert",
     failSound: "Cycle End Alert",
     uploadCustom: "Upload Custom Audio",
-    startManualNow: "Start Manual Analysis Now"
+    startManualNow: "Start Manual Analysis Now",
+    clearAllResults: "Clear All Results"
   },
   ar: {
-    title: "Finalyze AI",
+    title: "Joseph.Trading",
     subtitle: "محرك التحليل المؤسسي المتقدم",
     startAnalysis: "بدء تحليل جديد",
     analyzing: "محرك الذكاء الاصطناعي يقوم بالتحليل...",
@@ -276,7 +278,8 @@ export const translations: Record<Language, Translations> = {
     successSound: "تنبيه العثور على فرصة",
     failSound: "تنبيه انتهاء الدورة",
     uploadCustom: "تحميل صوت مخصص",
-    startManualNow: "ابدأ التحليل اليدوي الآن"
+    startManualNow: "ابدأ التحليل اليدوي الآن",
+    clearAllResults: "مسح جميع النتائج"
   },
   es: {
     title: "Finalyze AI",
