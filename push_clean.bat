@@ -1,19 +1,19 @@
 @echo off
-SET GIT="C:\Program Files\Git\bin\git.exe"
-
-echo Removing temp scripts from tracking...
-%GIT% rm --cached create_repo.ps1 push_to_github.bat 2>nul
-
-echo Adding safe gitignore...
-echo create_repo.ps1 >> .gitignore
-echo push_to_github.bat >> .gitignore
-
-echo Committing clean state...
-%GIT% add .gitignore
-%GIT% commit -m "Remove scripts with secrets from tracking"
-
-echo Pushing clean commit...
-%GIT% push -u origin main
-
+echo ====================================================
+echo    FINALYZER AI - CLOUD DEPLOYMENT v4.0
+echo ====================================================
 echo.
-echo === PUSH COMPLETE ===
+echo Preparing latest updates (Crypto Accuracy + 24/7 Fixes)...
+git add .
+git commit -m "🚀 FINAL DEPLOY: Institutional v4.0 - High Precision & 24/7 Market Sync"
+echo.
+echo ----------------------------------------------------
+echo IMPORTANT: A GitHub login window may pop up now.
+echo Please SIGN IN to complete the update to v4.0.
+echo ----------------------------------------------------
+echo.
+git push -u origin main
+echo.
+echo === DEPLOYMENT COMPLETE ===
+echo Your site is now live at: https://finalyze-ai-sigma.vercel.app
+pause
