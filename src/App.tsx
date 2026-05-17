@@ -42,7 +42,7 @@ export default function App() {
     if (saved) {
       try { base = JSON.parse(saved); } catch (e) { base = DEFAULT_AUTO_SETTINGS; }
     }
-    return base;
+    return { ...base, isEnabled: false };
   });
 
   const autoSettingsRef = useRef(autoSettings);

@@ -146,38 +146,29 @@ export default function Header({
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isRadarUnlocked) {
-                        onUnlockRadar();
-                        if (!autoSettings.isEnabled) {
-                          onAutoSettingsChange({ ...autoSettings, isEnabled: true });
-                        }
+                      if (autoSettings.isEnabled) {
+                        onAutoSettingsChange({ ...autoSettings, isEnabled: false });
                       } else {
-                        if (isWaiting) {
-                          onAutoSettingsChange({ ...autoSettings, isEnabled: true, forceRestart: Date.now() });
-                        } else {
-                          setIsAutoMenuOpen(!isAutoMenuOpen);
-                        }
+                        onAutoSettingsChange({ ...autoSettings, isEnabled: true });
                       }
                     }}
                     className={cn(
                       "flex items-center gap-3 px-6 py-2.5 rounded-xl transition-all border-2 shadow-2xl",
-                      !isRadarUnlocked 
-                        ? 'bg-orange-500 border-orange-600 text-white animate-pulse shadow-orange-500/50'
-                        : (autoSettings.isEnabled 
-                          ? (isWaiting 
-                            ? 'bg-red-600 border-red-700 text-white shadow-red-500/40 hover:bg-red-700' 
-                            : 'bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/40')
-                          : 'bg-white border-black/10 text-black/60 hover:text-black')
+                      autoSettings.isEnabled 
+                        ? (isWaiting 
+                          ? 'bg-red-600 border-red-700 text-white shadow-red-500/40 hover:bg-red-700' 
+                          : 'bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/40')
+                        : 'bg-white border-black/10 text-black/60 hover:text-black'
                     )}
                   >
                     <div className="relative">
-                      <Zap size={22} fill={isRadarUnlocked && autoSettings.isEnabled ? "currentColor" : "none"} />
-                      {isRadarUnlocked && autoSettings.isEnabled && !isWaiting && (
+                      <Zap size={22} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
+                      {autoSettings.isEnabled && !isWaiting && (
                         <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-white rounded-full animate-ping shadow-[0_0_12px_white]" />
                       )}
                     </div>
                     <span className="text-[14px] font-black uppercase tracking-wider hidden md:inline">
-                      {!isRadarUnlocked ? 'Activate Radar' : (autoSettings.isEnabled ? (isWaiting ? 'Restart Radar' : 'Radar Active') : 'Radar Off')}
+                      {autoSettings.isEnabled ? (isWaiting ? 'Restart Radar' : 'Radar ON') : 'Radar OFF'}
                     </span>
                   </button>
 
@@ -189,7 +180,7 @@ export default function Header({
                     className="p-3 rounded-xl bg-white border border-black/10 text-black hover:bg-black/5 transition-all shadow-md"
                     title="Scanner Settings"
                   >
-                    <Activity size={22} className={cn(isRadarUnlocked && autoSettings.isEnabled && !isWaiting ? "animate-spin" : "")} />
+                    <Activity size={22} className={cn(autoSettings.isEnabled && !isWaiting ? "animate-spin" : "")} />
                   </button>
                 </div>
               </div>
