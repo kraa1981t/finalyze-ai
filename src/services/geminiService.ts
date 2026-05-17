@@ -92,14 +92,8 @@ export async function analyzeMarket(params: {
       throw new Error(`Insufficient data for ${symbol}.`);
     }
 
-    const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes);
-
-    // AI PHASE (Always try AI, don't block sideways)
-    const macro1 = TF_PROGRESSION[Math.min(currentIndex + 1, TF_PROGRESSION.length - 1)];
     const macro2 = TF_PROGRESSION[Math.min(currentIndex + 2, TF_PROGRESSION.length - 1)];
     const microTF = currentIndex > 0 ? TF_PROGRESSION[currentIndex - 1] : TF_PROGRESSION[0];
-
-    const technicalPrompt = `
       You are an Elite Institutional Trader and Quantitative Analyst (ICT/SMC Expert).
       Your task is to analyze the following asset and provide a definitive trading decision.
 
