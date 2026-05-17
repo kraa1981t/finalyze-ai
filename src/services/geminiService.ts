@@ -113,20 +113,17 @@ export async function analyzeMarket(params: {
       - Trend Age (Candles): ${metrics?.age}
 
       **USER STRATEGY SETTINGS (STRICTLY ENFORCED)**:
-      - Minimum Candle Size: ${settings.minCandleSizePx}px
-      - Required Consecutive Candles in Direction: ${settings.consecutiveCandles}
       - News & Volatility Guard: ${settings.useNewsGuard ? 'ENABLED' : 'DISABLED'}
       - Volume Confirmation: ${settings.useVolumeAnalysis ? 'ENABLED' : 'DISABLED'}
       - Higher Timeframe Trend Alignment: ${settings.useHigherTimeframe ? 'ENABLED' : 'DISABLED'}
       - Technical Indicator Alignment (EMA/RSI): ${settings.useIndicators ? 'ENABLED' : 'DISABLED'}
 
       **STRICT STRATEGY CONDITIONS**:
-      1. **CONSECUTIVE CANDLES & DIRECTION**: Since the user requested ${settings.consecutiveCandles} consecutive candle(s), the last ${settings.consecutiveCandles} candle(s) on the Primary Timeframe (${timeframe}) MUST be of the same color/direction as the proposed trade (e.g. for Buy, they must be bullish green). If they alternate colors, you must severely reduce your confidence.
-      2. **CANDLE SIZE FILTER**: The entry or breakout candles MUST represent a significant range (visually representing >= ${settings.minCandleSizePx}px relative to standard resolution). If they are weak or small dojis, reduce confidence.
-      3. **NEWS & VOLATILITY GUARD**: If News Guard is ENABLED, you must evaluate if the asset is currently experiencing or about to experience high-impact news releases (CPI, FOMC, NFP, interest rate decisions) or extreme abnormal volatility. If so, you MUST flag it as high-risk and either output "no_entry" or reduce confidence below the entry threshold.
-      4. **VOLUME ANALYSIS**: If Volume Confirmation is ENABLED, a valid order block mitigation or breakout MUST be accompanied by a volume surge or above-average volume. Breakouts or moves on low volume must be treated as fakeouts (No Entry).
-      5. **MACRO ALIGNMENT**: If Higher Timeframe Alignment is ENABLED, you must ensure the primary trend matches the macro trend on higher timeframes (e.g., H4 or D1). If it goes against the macro trend, reduce confidence or output "no_entry".
-      6. **TECHNICAL INDICATORS**: If Indicator Alignment is ENABLED, the EMA cross (9/21) and RSI must strictly favor the trade direction (RSI must not be overbought >70 for Buy, or oversold <30 for Sell. EMA 9 must be above 21 for Buy, and below 21 for Sell).
+      1. **CANDLE CONFIRMATION (RELIABILITY)**: The entry or breakout candle must show real body size and not be a tiny Doji.
+      2. **NEWS & VOLATILITY GUARD**: If News Guard is ENABLED, you must evaluate if the asset is currently experiencing or about to experience high-impact news releases (CPI, FOMC, NFP, interest rate decisions) or extreme abnormal volatility. If so, you MUST flag it as high-risk and either output "no_entry" or reduce confidence below the entry threshold.
+      3. **VOLUME ANALYSIS**: If Volume Confirmation is ENABLED, a valid order block mitigation or breakout MUST be accompanied by a volume surge or above-average volume. Breakouts or moves on low volume must be treated as fakeouts (No Entry).
+      4. **MACRO ALIGNMENT**: If Higher Timeframe Alignment is ENABLED, you must ensure the primary trend matches the macro trend on higher timeframes (e.g., H4 or D1). If it goes against the macro trend, reduce confidence or output "no_entry".
+      5. **TECHNICAL INDICATORS**: If Indicator Alignment is ENABLED, the EMA cross (9/21) and RSI must strictly favor the trade direction (RSI must not be overbought >70 for Buy, or oversold <30 for Sell. EMA 9 must be above 21 for Buy, and below 21 for Sell).
 
       **INSTITUTIONAL ANALYSIS INSTRUCTIONS**:
       1. MARKET STRUCTURE (SMC): Identify if there is a Break of Structure (BOS) or Change of Character (CHOCH) on the ${timeframe} timeframe.

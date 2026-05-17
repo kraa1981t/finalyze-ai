@@ -1,8 +1,6 @@
 import { StrategySettings, MarketType, TradingStyle } from "./types";
 
 export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
-  minCandleSizePx: 200,
-  consecutiveCandles: 1,
   momentumThreshold: 70,
   supplyDemandStrength: 80,
   useHigherTimeframe: true,

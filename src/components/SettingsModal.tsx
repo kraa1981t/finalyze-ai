@@ -61,37 +61,10 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             {/* Section 1: Candle Metrics */}
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-brand-text/50 uppercase tracking-wider flex items-center gap-2">
-                <LayoutTemplate size={16} /> الشموع والزخم
+                <LayoutTemplate size={16} /> الزخم والسيولة
               </h3>
               
               <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-6">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <label className="text-sm font-semibold text-brand-text">حجم الشمعة الأدنى (بكسل)</label>
-                    <span className="text-primary font-mono text-sm">{settings.minCandleSizePx}px</span>
-                  </div>
-                  <input 
-                    type="range" min="50" max="500" step="10"
-                    value={settings.minCandleSizePx}
-                    onChange={(e) => handleChange('minCandleSizePx', Number(e.target.value))}
-                    className="w-full accent-primary"
-                  />
-                  <p className="text-xs text-brand-text/40 mt-1">يحدد متى يتم اعتبار الشمعة ذات سيولة ضخمة.</p>
-                </div>
-
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <label className="text-sm font-semibold text-brand-text">عدد الشموع المتتالية المطلوبة</label>
-                    <span className="text-primary font-mono text-sm">{settings.consecutiveCandles} شموع</span>
-                  </div>
-                  <input 
-                    type="range" min="1" max="5" step="1"
-                    value={settings.consecutiveCandles}
-                    onChange={(e) => handleChange('consecutiveCandles', Number(e.target.value))}
-                    className="w-full accent-primary"
-                  />
-                </div>
-
                 <div>
                   <div className="flex justify-between mb-2">
                     <label className="text-sm font-semibold text-brand-text">نسبة قوة الزخم المطلوبة (%)</label>

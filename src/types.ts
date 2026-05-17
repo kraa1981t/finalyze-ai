@@ -44,8 +44,6 @@ export interface UserPreference {
 }
 
 export interface StrategySettings {
-  minCandleSizePx: number;
-  consecutiveCandles: number;
   momentumThreshold: number;
   supplyDemandStrength: number;
   useHigherTimeframe: boolean;
