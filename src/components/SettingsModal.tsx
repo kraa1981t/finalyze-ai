@@ -134,7 +134,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                     <span className="text-secondary font-mono text-sm">{settings.minStrongConfidence}%</span>
                   </div>
                   <input 
-                    type="range" min="70" max="95" step="1"
+                    type="range" min="50" max="100" step="1"
                     value={settings.minStrongConfidence}
                     onChange={(e) => handleChange('minStrongConfidence', Number(e.target.value))}
                     className="w-full accent-secondary"
