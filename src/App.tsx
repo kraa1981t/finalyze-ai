@@ -159,10 +159,9 @@ export default function App() {
     let updated = [...signalsRef.current];
 
     results.forEach(res => {
-      const isActionable = res.signal !== 'no_entry' && res.signal !== 'neutral';
-      const isStrong = res.confidence >= settings.minStrongConfidence;
+      const isStrong = res.confidence >= settings.minStrongConfidence && (res.signal === 'strong_buy' || res.signal === 'strong_sell');
       
-      if (isStrong || (autoSettings.showAllSignals && isActionable)) {
+      if (isStrong) {
         const index = updated.findIndex(s => s.symbol === res.symbol);
         if (index >= 0) {
           if (updated[index].timestamp !== res.timestamp) {
@@ -460,7 +459,7 @@ export default function App() {
             </motion.div>
           ) : (
             <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <AnalysisResultView results={analysisResults || []} lang={lang} />
+              <AnalysisResultView results={analysisResults || []} lang={lang} settings={settings} />
             </motion.div>
           )}
         </AnimatePresence>

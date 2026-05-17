@@ -10,6 +10,7 @@ import { Language, translations } from '../lib/i18n';
 interface AnalysisResultViewProps {
   results: AnalysisResult[];
   lang: Language;
+  settings?: StrategySettings;
 }
 
 const SIGNAL_CONFIG: Record<SignalType, { labelKey: keyof typeof translations.en, color: string, bg: string, icon: any }> = {
@@ -21,15 +22,16 @@ const SIGNAL_CONFIG: Record<SignalType, { labelKey: keyof typeof translations.en
     [SignalType.NO_ENTRY]: { labelKey: "no_entry" as any, color: "#64748B", bg: "bg-slate-500/10", icon: ShieldAlert },
 };
 
-export default function AnalysisResultView({ results, lang }: AnalysisResultViewProps) {
+export default function AnalysisResultView({ results, lang, settings }: AnalysisResultViewProps) {
   const t = translations[lang];
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
   
-  const sortedResults = [...results].sort((a, b) => {
-    const aIsAction = a.signal !== 'no_entry' && a.signal !== 'neutral' ? 1 : 0;
-    const bIsAction = b.signal !== 'no_entry' && b.signal !== 'neutral' ? 1 : 0;
-    if (aIsAction !== bIsAction) return bIsAction - aIsAction;
+  const sortedResults = [...results].filter(res => {
+    // FORCE STRONG SIGNALS ONLY
+    return (res.signal === SignalType.STRONG_BUY || res.signal === SignalType.STRONG_SELL) &&
+           res.confidence >= (settings?.minStrongConfidence || 80);
+  }).sort((a, b) => {
     return b.confidence - a.confidence;
   });
   
@@ -56,14 +58,14 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
       {/* 2. List Section: Structured Rankings */}
       <div className="space-y-6">
         <div className={cn("flex items-center justify-between px-4", isRTL ? "flex-row" : "flex-row-reverse")}>
-          <span className="text-xs font-bold text-brand-muted font-mono">Analyzed: {results.length}</span>
+          <span className="text-xs font-bold text-brand-muted font-mono">Strong Opportunities: {sortedResults.length}</span>
           <h3 className="text-2xl font-black text-brand-text flex items-center gap-3">
             <Zap size={28} className="text-secondary fill-secondary" />
             {t.finalDecision}
           </h3>
         </div>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {sortedResults.map((res, idx) => {
             const resConfig = SIGNAL_CONFIG[res.signal] || SIGNAL_CONFIG[SignalType.NEUTRAL];
             const ResIcon = resConfig.icon;
@@ -81,15 +83,12 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
               >
                 <div 
                   className={cn(
-                    "relative overflow-hidden h-[60px] rounded-2xl border transition-all cursor-pointer flex items-center px-4 gap-3 group",
+                    "relative overflow-hidden h-[60px] rounded-2xl border transition-all flex items-center px-4 gap-3 group",
                     isSelected 
                       ? "border-primary bg-primary/5 shadow-lg ring-1 ring-primary/20 scale-[1.02]" 
                       : "border-brand-text/10 bg-brand-alt/40 hover:border-primary/30 hover:bg-brand-alt/60"
                   )}
-                  onClick={() => {
-                    setSelectedIndex(idx);
-                    setShowDetail(true);
-                  }}
+                  onClick={() => setSelectedIndex(idx)}
                 >
                   {/* Rank */}
                   <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-[11px] font-black bg-brand-text/5 text-brand-muted border border-brand-text/5">
@@ -112,10 +111,13 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
                     <span className="text-sm font-black tabular-nums" style={{ color: signalColor }}>{res.confidence}%</span>
                     
                     {/* Read Details Icon/Text */}
-                    <div className="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setSelectedIndex(idx); setShowDetail(true); }}
+                      className="flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity cursor-pointer p-1"
+                    >
                       <span className="text-[9px] font-bold text-primary uppercase hidden sm:block">{t.readMore}</span>
                       <ChevronRight size={16} className="text-primary group-hover:translate-x-1 transition-transform" />
-                    </div>
+                    </button>
                   </div>
 
                   {/* Integrated Bottom Confidence Bar */}
