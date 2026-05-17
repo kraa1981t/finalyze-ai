@@ -42,7 +42,7 @@ export default function App() {
     if (saved) {
       try { base = JSON.parse(saved); } catch (e) { base = DEFAULT_AUTO_SETTINGS; }
     }
-    return { ...base, isEnabled: false };
+    return { ...base, isEnabled: true };
   });
 
   const autoSettingsRef = useRef(autoSettings);
@@ -317,7 +317,7 @@ export default function App() {
                 updateTopSignals([result]);
               }
             }
-            await new Promise(r => setTimeout(r, 4000));
+            await new Promise(r => setTimeout(r, 1000));
           } catch (e) { 
             console.error("Analysis Loop Error:", e);
             await new Promise(r => setTimeout(r, 5000));
