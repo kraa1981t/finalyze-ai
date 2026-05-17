@@ -112,15 +112,20 @@ export async function analyzeMarket(params: {
       - Volume Surge: ${metrics?.volSurge ? 'Yes' : 'No'}
       - Trend Age (Candles): ${metrics?.age}
 
-      **USER STRATEGY SETTINGS (GUIDELINES)**:
+      **USER STRATEGY SETTINGS**:
       - News & Volatility Guard: ${settings.useNewsGuard ? 'ENABLED' : 'DISABLED'}
       - Volume Confirmation: ${settings.useVolumeAnalysis ? 'ENABLED' : 'DISABLED'}
       - Higher Timeframe Trend Alignment: ${settings.useHigherTimeframe ? 'ENABLED' : 'DISABLED'}
       - Technical Indicator Alignment (EMA/RSI): ${settings.useIndicators ? 'ENABLED' : 'DISABLED'}
 
-      **STRATEGY EVALUATION GUIDELINES**:
-      1. **CANDLE CONFIRMATION**: Check if the entry or breakout candle has healthy body size and momentum (representing solid institutional participation).
-      2. **NEWS & VOLATILITY GUARD**: If News Guard is ENABLED, analyze the recent price action for extreme abnormal volatility, chaotic candle spikes, or highly unstable price action (which indicates high-impact news releases or market chaos). If the chart shows standard, healthy structure and stable trends, proceed normally. Only reduce confidence or output "no_entry" if the price action itself is extremely chaotic, dangerous, or highly volatile.
+      **STRATEGY EVALUATION & SUPPORTIVE WEIGHTS**:
+      1. **NEWS & VOLATILITY GUARD (Dynamic Support Factor)**:
+         * If News Guard is ENABLED, evaluate if the recent candles show high volatility or price expansion (indicating high-impact news breakouts). 
+         * If the price action is structured (e.g. an institutional news breakout that cleanly Breaks Structure - BOS), treat the news as **SUPPORTIVE momentum** and **ADD +5% to +10% to the confidence score** to reward the strong breakout.
+         * Only if the volatility is chaotic, extremely messy, or spread is too high, treat it as dangerous and reduce the confidence score or issue "no_entry".
+      2. **MARKET SENTIMENT CONSENSUS (تصويت الجمهور والمؤثرين)**:
+         * Calculate a "sentimentScore" (0-100) representing the collective consensus of institutional influencers, retail followers, and financial market sentiment.
+         * If the technical setup is highly bullish/bearish and this market consensus aligns with the setup, use it as a **SUPPORTIVE weight to boost the final confidence score**. High confluence between structure and sentiment is rewarded with a higher confidence rating!
       3. **VOLUME CONFIRMATION**: If Volume Confirmation is ENABLED, look for supportive volume. A breakout or strong reversal should ideally be backed by average or above-average volume.
       4. **MACRO ALIGNMENT**: If Higher Timeframe Alignment is ENABLED, ensure the trade aligns with the overall macro trend (e.g., higher timeframes are in a similar direction or consolidating support/resistance).
       5. **TECHNICAL INDICATORS**: If Indicator Alignment is ENABLED, verify that EMA cross (9/21) or RSI are supportive (e.g., not extremely overbought >75 for Buy, or oversold <25 for Sell).
