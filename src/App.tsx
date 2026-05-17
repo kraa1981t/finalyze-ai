@@ -361,12 +361,12 @@ export default function App() {
       {/* NATIVE AUDIO ELEMENTS - Hidden but present in DOM for perfect playback */}
       <audio 
         ref={successAudioRef} 
-        src={autoSettings.successSound || 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3'} 
+        src={autoSettings.successSound || 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg'} 
         preload="auto" 
       />
       <audio 
         ref={failAudioRef} 
-        src={autoSettings.failSound || 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'} 
+        src={autoSettings.failSound || 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'} 
         preload="auto" 
       />
 
