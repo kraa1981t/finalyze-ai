@@ -112,18 +112,18 @@ export async function analyzeMarket(params: {
       - Volume Surge: ${metrics?.volSurge ? 'Yes' : 'No'}
       - Trend Age (Candles): ${metrics?.age}
 
-      **USER STRATEGY SETTINGS (STRICTLY ENFORCED)**:
+      **USER STRATEGY SETTINGS (GUIDELINES)**:
       - News & Volatility Guard: ${settings.useNewsGuard ? 'ENABLED' : 'DISABLED'}
       - Volume Confirmation: ${settings.useVolumeAnalysis ? 'ENABLED' : 'DISABLED'}
       - Higher Timeframe Trend Alignment: ${settings.useHigherTimeframe ? 'ENABLED' : 'DISABLED'}
       - Technical Indicator Alignment (EMA/RSI): ${settings.useIndicators ? 'ENABLED' : 'DISABLED'}
 
-      **STRICT STRATEGY CONDITIONS**:
-      1. **CANDLE CONFIRMATION (RELIABILITY)**: The entry or breakout candle must show real body size and not be a tiny Doji.
-      2. **NEWS & VOLATILITY GUARD**: If News Guard is ENABLED, you must evaluate if the asset is currently experiencing or about to experience high-impact news releases (CPI, FOMC, NFP, interest rate decisions) or extreme abnormal volatility. If so, you MUST flag it as high-risk and either output "no_entry" or reduce confidence below the entry threshold.
-      3. **VOLUME ANALYSIS**: If Volume Confirmation is ENABLED, a valid order block mitigation or breakout MUST be accompanied by a volume surge or above-average volume. Breakouts or moves on low volume must be treated as fakeouts (No Entry).
-      4. **MACRO ALIGNMENT**: If Higher Timeframe Alignment is ENABLED, you must ensure the primary trend matches the macro trend on higher timeframes (e.g., H4 or D1). If it goes against the macro trend, reduce confidence or output "no_entry".
-      5. **TECHNICAL INDICATORS**: If Indicator Alignment is ENABLED, the EMA cross (9/21) and RSI must strictly favor the trade direction (RSI must not be overbought >70 for Buy, or oversold <30 for Sell. EMA 9 must be above 21 for Buy, and below 21 for Sell).
+      **STRATEGY EVALUATION GUIDELINES**:
+      1. **CANDLE CONFIRMATION**: Check if the entry or breakout candle has healthy body size and momentum (representing solid institutional participation).
+      2. **NEWS & VOLATILITY GUARD**: If News Guard is ENABLED, analyze the recent price action for extreme abnormal volatility, chaotic candle spikes, or highly unstable price action (which indicates high-impact news releases or market chaos). If the chart shows standard, healthy structure and stable trends, proceed normally. Only reduce confidence or output "no_entry" if the price action itself is extremely chaotic, dangerous, or highly volatile.
+      3. **VOLUME CONFIRMATION**: If Volume Confirmation is ENABLED, look for supportive volume. A breakout or strong reversal should ideally be backed by average or above-average volume.
+      4. **MACRO ALIGNMENT**: If Higher Timeframe Alignment is ENABLED, ensure the trade aligns with the overall macro trend (e.g., higher timeframes are in a similar direction or consolidating support/resistance).
+      5. **TECHNICAL INDICATORS**: If Indicator Alignment is ENABLED, verify that EMA cross (9/21) or RSI are supportive (e.g., not extremely overbought >75 for Buy, or oversold <25 for Sell).
 
       **INSTITUTIONAL ANALYSIS INSTRUCTIONS**:
       1. MARKET STRUCTURE (SMC): Identify if there is a Break of Structure (BOS) or Change of Character (CHOCH) on the ${timeframe} timeframe.
@@ -131,12 +131,12 @@ export async function analyzeMarket(params: {
       3. FAIR VALUE GAPS (FVG) / IMBALANCES: Are there unfilled FVGs acting as magnets for price?
       4. ORDER BLOCKS (OB): Is the price mitigating a valid Institutional Order Block?
       5. TREND MATURITY: Analyze the lifecycle (age=${metrics?.age}).
-         - INFANCY (1-5 candles): Just started. High risk of false breakout.
-         - YOUTH (6-25 candles): Optimal entry.
+         - INFANCY (1-5 candles): Just started. Moderate risk of false breakout.
+         - YOUTH (6-25 candles): Optimal entry window.
          - AGING (>25 candles): Exhaustion risk.
       
       **CONFIDENCE & SIGNAL RULES**:
-      Calculate a realistic final "confidence" percentage (0-100) based on how well the data met the conditions.
+      Calculate a realistic final "confidence" percentage (0-100) based on your analysis. Your goal is to find active setups:
       - Bullish + Confidence >= 80%: "strong_buy"
       - Bullish + Confidence 50-79%: "buy"
       - Bearish + Confidence >= 80%: "strong_sell"
