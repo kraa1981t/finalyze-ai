@@ -52,7 +52,9 @@ export default function App() {
 
   const [isRadarUnlocked, setIsRadarUnlocked] = useState(false);
 
-  // Load persistent custom audio from IndexedDB on startup
+  const [customAudioUrls, setCustomAudioUrls] = useState<{ success?: string, fail?: string }>({});
+
+  // Load persistent custom audio from IndexedDB
   useEffect(() => {
     const loadCustomAudio = async () => {
       try {
@@ -60,18 +62,16 @@ export default function App() {
         const successBlob = await getAudioBlob('custom_success');
         const failBlob = await getAudioBlob('custom_fail');
         
-        if (successBlob && successAudioRef.current) {
-          successAudioRef.current.src = URL.createObjectURL(successBlob);
-        }
-        if (failBlob && failAudioRef.current) {
-          failAudioRef.current.src = URL.createObjectURL(failBlob);
-        }
+        setCustomAudioUrls({
+          success: successBlob ? URL.createObjectURL(successBlob) : undefined,
+          fail: failBlob ? URL.createObjectURL(failBlob) : undefined
+        });
       } catch (e) {
         console.warn("Failed to load custom audio from DB", e);
       }
     };
     loadCustomAudio();
-  }, []);
+  }, [autoSettings.successSound, autoSettings.failSound]);
 
   const [progress, setProgress] = useState<{ current: string, total: number, index: number } | null>(null);
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
@@ -89,19 +89,9 @@ export default function App() {
   const playAudio = (type: 'success' | 'fail') => {
     if (!isRadarUnlocked) return; // Silent until unlocked
     
-    // Check if we should use custom blob or default URL
-    const isCustom = (type === 'success' ? autoSettings.successSound : autoSettings.failSound) === 'custom';
     const audioEl = type === 'success' ? successAudioRef.current : failAudioRef.current;
     
     if (audioEl) {
-      // If NOT custom, set the src from the settings URL
-      if (!isCustom) {
-        const url = type === 'success' ? autoSettings.successSound : autoSettings.failSound;
-        if (url && !url.startsWith('blob:')) {
-          audioEl.src = url;
-        }
-      }
-
       audioEl.volume = Math.max(0, Math.min(1, autoSettings.volume || 0.5));
       audioEl.currentTime = 0; // Force restart
       const playPromise = audioEl.play();
@@ -361,12 +351,12 @@ export default function App() {
       {/* NATIVE AUDIO ELEMENTS - Hidden but present in DOM for perfect playback */}
       <audio 
         ref={successAudioRef} 
-        src={autoSettings.successSound || 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg'} 
+        src={autoSettings.successSound === 'custom' ? customAudioUrls.success : (autoSettings.successSound || 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg')} 
         preload="auto" 
       />
       <audio 
         ref={failAudioRef} 
-        src={autoSettings.failSound || 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'} 
+        src={autoSettings.failSound === 'custom' ? customAudioUrls.fail : (autoSettings.failSound || 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg')} 
         preload="auto" 
       />
 
