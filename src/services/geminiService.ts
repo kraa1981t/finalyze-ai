@@ -95,23 +95,58 @@ export async function analyzeMarket(params: {
     const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes);
 
     // AI PHASE (Always try AI, don't block sideways)
-    const technicalPrompt = `
-You are an Elite Institutional Trader. Symbol: ${symbol} (${type}). Timeframe: ${timeframe}.
-DATA: RSI=${metrics?.rsi?.toFixed(1)}, Trend=${metrics?.direction}, EMA_Cross=${metrics?.emaCross}, VolSurge=${metrics?.volSurge}, Age=${metrics?.age}.
-INSTRUCTIONS: 
-- For Crypto: Be more aggressive with momentum breakouts. 
-- If Trending: Look for entry if Age is 2-50.
-- If Sideways: Look for 'Accumulation' or 'Volatility Expansion'.
-- Return strong_buy/strong_sell ONLY if indicators align.
+    const macro1 = TF_PROGRESSION[Math.min(currentIndex + 1, TF_PROGRESSION.length - 1)];
+    const macro2 = TF_PROGRESSION[Math.min(currentIndex + 2, TF_PROGRESSION.length - 1)];
+    const microTF = currentIndex > 0 ? TF_PROGRESSION[currentIndex - 1] : TF_PROGRESSION[0];
 
-Return ONLY JSON:
-{
-  "signal": "strong_buy" | "buy" | "no_entry" | "sell" | "strong_sell",
-  "confidence": number,
-  "summary": "Professional analysis in ${lang === 'ar' ? 'Arabic' : 'English'}",
-  "historicalMatch": "SMC/ICT Pattern description"
-}
-`;
+    const technicalPrompt = `
+      You are an Elite Institutional Trader and Quantitative Analyst (ICT/SMC Expert).
+      Your task is to analyze the following asset and provide a definitive trading decision.
+
+      **MARKET DATA**:
+      - Symbol: ${symbol}
+      - Market Type: ${type}
+      - Primary Timeframe: ${timeframe}
+      - Trading Style: ${tradingStyle}
+      - Calculated RSI: ${metrics?.rsi?.toFixed(1)}
+      - Current Trend: ${metrics?.direction}
+      - EMA Cross (9/21): ${metrics?.emaCross}
+      - Volume Surge: ${metrics?.volSurge ? 'Yes' : 'No'}
+      - Trend Age (Candles): ${metrics?.age}
+
+      **INSTITUTIONAL ANALYSIS INSTRUCTIONS**:
+      1. MARKET STRUCTURE (SMC): Identify if there is a Break of Structure (BOS) or Change of Character (CHOCH) on the ${timeframe} timeframe.
+      2. LIQUIDITY POOLS: Identify where retail stop-losses are resting (Buy Side/Sell Side Liquidity). Is the market currently sweeping liquidity or expanding away from it?
+      3. FAIR VALUE GAPS (FVG) / IMBALANCES: Are there unfilled FVGs acting as magnets for price?
+      4. ORDER BLOCKS (OB): Is the price mitigating a valid Institutional Order Block?
+      5. STRICT ALIGNMENT: If any macro timeframe contradicts the primary direction, reduce confidence.
+      6. TREND MATURITY: Analyze the lifecycle (age=${metrics?.age}).
+         - INFANCY (1-5 candles): Just started. High risk of false breakout.
+         - YOUTH (6-25 candles): Optimal entry.
+         - AGING (>25 candles): Exhaustion risk.
+      
+      **CONFIDENCE & SIGNAL RULES**:
+      Calculate a realistic final "confidence" percentage (0-100) based on how well the data met the conditions.
+      - Bullish + Confidence >= 80%: "strong_buy"
+      - Bullish + Confidence 50-79%: "buy"
+      - Bearish + Confidence >= 80%: "strong_sell"
+      - Bearish + Confidence 50-79%: "sell"
+      - Below 50% or conflicting: "no_entry"
+
+      **OUTPUT SPECIFICATIONS**:
+      - Provide a detailed summary STRICTLY IN ${lang === 'ar' ? 'ARABIC' : lang === 'fr' ? 'FRENCH' : 'ENGLISH'}.
+      - Maintain a professional financial tone.
+
+      Return ONLY a VALID JSON object:
+      {
+        "signal": "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" | "no_entry",
+        "confidence": number,
+        "summary": "Detailed report...",
+        "technicalScore": number,
+        "sentimentScore": number,
+        "historicalMatch": "Pattern description"
+      }
+    `;
 
     const aiResponse = await fetch('/api/ai-analysis', {
       method: 'POST',
