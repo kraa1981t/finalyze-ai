@@ -187,6 +187,13 @@ export async function analyzeMarket(params: {
       if (finalConfidence > 70) finalConfidence = 65; // Soft downgrade instead of hard block
     }
 
+    // Upgrade to Strong Signal if confidence exceeds the user's defined Strong Confidence threshold
+    const threshold = settings?.minStrongConfidence || 80;
+    if (finalConfidence >= threshold) {
+      if (finalSignal === 'buy') finalSignal = 'strong_buy' as any;
+      if (finalSignal === 'sell') finalSignal = 'strong_sell' as any;
+    }
+
     return {
       symbol, type, timeframe,
       signal: finalSignal,
