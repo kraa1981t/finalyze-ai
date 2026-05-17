@@ -218,7 +218,7 @@ export async function analyzeMarket(params: {
       summary: resultData.summary,
       technicalScore: metrics?.momentumScore || 50,
       sentimentScore: finalConfidence,
-      trendMaturity: age <= 5 ? 'infancy' : (age <= 25 ? 'youth' : 'aging'),
+      trendMaturity: age <= 8 ? 'infancy' : (age <= 30 ? 'youth' : 'aging'),
       trendAge: age,
       historicalMatch: resultData.historicalMatch || "",
       timestamp: new Date().toISOString(),
