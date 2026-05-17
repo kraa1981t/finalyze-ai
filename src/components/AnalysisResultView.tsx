@@ -75,101 +75,57 @@ export default function AnalysisResultView({ results, lang }: AnalysisResultView
             return (
               <motion.div
                 key={res.symbol + idx}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
               >
                 <div 
                   className={cn(
-                    "relative overflow-hidden rounded-[2.5rem] border-2 transition-all cursor-pointer group",
+                    "relative overflow-hidden h-[60px] rounded-2xl border transition-all cursor-pointer flex items-center px-4 gap-3 group",
                     isSelected 
-                      ? "border-primary bg-brand-alt shadow-2xl ring-8 ring-primary/5" 
-                      : "border-brand-text/5 bg-brand-alt hover:border-brand-text/10"
+                      ? "border-primary bg-primary/5 shadow-lg ring-1 ring-primary/20 scale-[1.02]" 
+                      : "border-brand-text/10 bg-brand-alt/40 hover:border-primary/30 hover:bg-brand-alt/60"
                   )}
-                  onClick={() => setSelectedIndex(idx)}
+                  onClick={() => {
+                    setSelectedIndex(idx);
+                    setShowDetail(true);
+                  }}
                 >
-                  <div className={cn("flex flex-col lg:flex-row items-stretch min-h-[140px]", isRTL ? "lg:flex-row" : "lg:flex-row-reverse")}>
-                    {/* Symbol & Intensity */}
-                    <div className="w-full lg:w-[280px] p-8 bg-brand-bg/40 border-b lg:border-b-0 border-brand-text/10 flex flex-col justify-center gap-3">
-                      <div className="flex items-center gap-4">
-                        <div className={cn(
-                          "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl",
-                          isSelected ? "bg-primary text-white scale-110 rotate-3" : "bg-brand-text/10 text-brand-muted"
-                        )}>
-                          <span className="text-lg font-black">{idx + 1}</span>
-                        </div>
-                        <span className="text-3xl font-black text-brand-text tracking-tighter font-display italic">{res.symbol}</span>
-                      </div>
-                      <div className="space-y-1">
-                         <div className="flex justify-between text-[10px] font-black text-brand-muted mb-1">
-                           <span>{t.confidence}</span>
-                           <span style={{ color: signalColor }}>{res.confidence}%</span>
-                         </div>
-                         <div className="h-2 bg-brand-bg/40 rounded-full overflow-hidden">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${res.confidence}%` }}
-                              className="h-full"
-                              style={{ backgroundColor: signalColor }}
-                            />
-                         </div>
-                      </div>
-                    </div>
+                  {/* Rank */}
+                  <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-[11px] font-black bg-brand-text/5 text-brand-muted border border-brand-text/5">
+                    {idx + 1}
+                  </div>
 
-                    {/* Final Decision with Read More */}
-                    <div className="w-full lg:w-[320px] p-8 flex flex-col justify-center items-center lg:items-start gap-2 border-b lg:border-b-0 border-brand-text/10">
-                      <div className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-text">{t.finalDecision}</div>
-                      <div className="flex items-center gap-4 py-2">
-                        <div className={cn("p-3 rounded-2xl shadow-inner", resConfig.bg)}>
-                           <ResIcon size={24} style={{ color: signalColor }} />
-                        </div>
-                        <span className="text-2xl font-black" style={{ color: signalColor }}>
-                          {t[res.signal as keyof typeof t]}
-                        </span>
-                      </div>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setShowDetail(true); }}
-                        className="mt-2 flex items-center gap-2 text-[10px] font-black text-primary hover:underline group-hover:translate-x-1 transition-all"
-                      >
-                         {t.readMore} <ChevronRight size={14} />
-                      </button>
-                    </div>
+                  {/* Symbol */}
+                  <span className="text-lg font-black text-brand-text tracking-tighter italic shrink-0 w-24 truncate">{res.symbol}</span>
 
-                    {/* Quick Reasons Summary */}
-                    <div className="flex-1 p-8 flex flex-col justify-center relative">
-                      <div className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-text mb-2">{t.reasons}</div>
-                      <p className="text-sm font-medium text-brand-text line-clamp-2 leading-relaxed italic">
-                        {res.summary.substring(0, 150)}...
-                      </p>
-                      
-                      <div className="mt-6 flex items-center gap-8 opacity-80 group-hover:opacity-100 transition-opacity">
-                         <div className="flex items-center gap-2">
-                            <BarChart2 size={14} className="text-primary" />
-                            <span className="text-[10px] font-black text-brand-text">{res.technicalScore}%</span>
-                         </div>
-                         <div className="flex items-center gap-2">
-                            <MessageSquare size={14} className="text-secondary" />
-                            <span className="text-[10px] font-black text-brand-text">{res.sentimentScore}%</span>
-                         </div>
-                         {res.historicalMatch && (
-                           <div className="flex items-center gap-2">
-                              <History size={14} className="text-emerald-400" />
-                              <span className="text-[10px] font-black text-brand-text">MATCH</span>
-                           </div>
-                         )}
-                         {res.trendMaturity && (
-                           <div className={cn(
-                             "flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black uppercase",
-                             res.trendMaturity === 'youth' ? "bg-emerald-500/20 text-emerald-400" : 
-                             res.trendMaturity === 'infancy' ? "bg-blue-500/20 text-blue-400" : 
-                             "bg-orange-500/20 text-orange-400"
-                           )}>
-                              <Zap size={10} />
-                              {t[res.trendMaturity as keyof typeof t] || res.trendMaturity}
-                           </div>
-                         )}
-                      </div>
+                  {/* Signal Badge */}
+                  <div className={cn("px-3 py-1.5 rounded-lg flex items-center gap-2 shrink-0 transition-all", resConfig.bg)}>
+                     <ResIcon size={14} style={{ color: signalColor }} />
+                     <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: signalColor }}>
+                       {t[res.signal as keyof typeof t]}
+                     </span>
+                  </div>
+
+                  {/* Confidence % */}
+                  <div className="flex-grow flex items-center justify-end gap-6">
+                    <span className="text-sm font-black tabular-nums" style={{ color: signalColor }}>{res.confidence}%</span>
+                    
+                    {/* Read Details Icon/Text */}
+                    <div className="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[9px] font-bold text-primary uppercase hidden sm:block">{t.readMore}</span>
+                      <ChevronRight size={16} className="text-primary group-hover:translate-x-1 transition-transform" />
                     </div>
+                  </div>
+
+                  {/* Integrated Bottom Confidence Bar */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-brand-bg/40">
+                     <motion.div 
+                       initial={{ width: 0 }}
+                       animate={{ width: `${res.confidence}%` }}
+                       className="h-full"
+                       style={{ backgroundColor: signalColor }}
+                     />
                   </div>
                 </div>
               </motion.div>
