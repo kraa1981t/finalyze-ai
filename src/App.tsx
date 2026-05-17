@@ -27,6 +27,7 @@ export default function App() {
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
+  const [autoProgress, setAutoProgress] = useState<{ symbol: string, current: number, total: number } | null>(null);
   
   const [settings, setSettings] = useState<StrategySettings>(() => {
     const saved = localStorage.getItem('strategy_settings');
@@ -306,14 +307,21 @@ export default function App() {
 
       // Check if any category is actually open
       const openCategories = categories.filter(isMarketOpen);
+      let totalSymbols = 0;
+      for (const cat of openCategories) {
+        totalSymbols += SYMBOL_CATEGORIES[cat].length;
+      }
+
       if (openCategories.length === 0) {
         setIsScanningFinished(true);
+        setAutoProgress(null);
         timeoutId = setTimeout(runAutoScan, 30000); // Check again in 30s
         return;
       }
 
       setIsScanningFinished(false);
 
+      let currentIdx = 1;
       for (const cat of openCategories) {
         const symbols = SYMBOL_CATEGORIES[cat];
         const mType = cat === 'crypto' ? MarketType.CRYPTO : 
@@ -322,6 +330,10 @@ export default function App() {
 
         for (const symbol of symbols) {
           if (!isSubscribed || !autoSettingsRef.current.isEnabled || isAnalyzing) break;
+          
+          // Update visual progress state for the header badge
+          setAutoProgress({ symbol, current: currentIdx++, total: totalSymbols });
+
           try {
             const result = await analyzeMarket({
               symbol, type: mType, timeframe: currentSettings.timeframe,
@@ -338,15 +350,16 @@ export default function App() {
                 updateTopSignals([result]);
               }
             }
-            await new Promise(r => setTimeout(r, 4000));
+            await new Promise(r => setTimeout(r, 1000)); // Optimized delay from 4s to 1s
           } catch (e) { 
             console.error("Analysis Loop Error:", e);
-            await new Promise(r => setTimeout(r, 5000));
+            await new Promise(r => setTimeout(r, 2000)); // Optimized error delay from 5s to 2s
           }
         }
       }
 
       if (isSubscribed) {
+        setAutoProgress(null); // Clear progress when finished
         const finishedAt = Date.now();
         const nextTime = finishedAt + ((autoSettingsRef.current.interval || 15) * 60000);
         localStorage.setItem('radar_next_scan_at', nextTime.toString());
@@ -373,7 +386,11 @@ export default function App() {
     }
 
     timeoutId = setTimeout(runAutoScan, initialDelay);
-    return () => { isSubscribed = false; clearTimeout(timeoutId); };
+    return () => { 
+      isSubscribed = false; 
+      clearTimeout(timeoutId); 
+      setAutoProgress(null); // Clear progress badge when disabled or refreshed
+    };
   }, [
     autoSettings.isEnabled, autoSettings.category, autoSettings.timeframe, 
     autoSettings.interval, autoSettings.showAllSignals, autoSettings.tradingStyle,
@@ -443,6 +460,7 @@ export default function App() {
         isWaiting={isScanningFinished}
         isRadarUnlocked={isRadarUnlocked}
         onUnlockRadar={handleUnlockRadar}
+        autoProgress={autoProgress}
       />
 
       <AnimatePresence>
