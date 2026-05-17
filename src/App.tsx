@@ -42,7 +42,7 @@ export default function App() {
     if (saved) {
       try { base = JSON.parse(saved); } catch (e) { base = DEFAULT_AUTO_SETTINGS; }
     }
-    return { ...base, isEnabled: true };
+    return { ...base, isEnabled: false };
   });
 
   const autoSettingsRef = useRef(autoSettings);
@@ -258,6 +258,12 @@ export default function App() {
 
   // ULTIMATE RADAR LOGIC
   const prevEnabledRef = useRef(false);
+  const prevConfigRef = useRef({
+    interval: autoSettings.interval,
+    timeframe: autoSettings.timeframe,
+    category: autoSettings.category,
+    tradingStyle: autoSettings.tradingStyle
+  });
 
   useEffect(() => {
     if (!autoSettings.isEnabled) {
@@ -270,7 +276,22 @@ export default function App() {
 
     // Detect if the user just clicked/toggled the Radar ON
     const justToggledOn = !prevEnabledRef.current;
+    
+    // Detect if any configuration settings changed
+    const configChanged = 
+      prevConfigRef.current.interval !== autoSettings.interval ||
+      prevConfigRef.current.timeframe !== autoSettings.timeframe ||
+      prevConfigRef.current.category !== autoSettings.category ||
+      prevConfigRef.current.tradingStyle !== autoSettings.tradingStyle;
+
+    // Update refs for next run
     prevEnabledRef.current = true;
+    prevConfigRef.current = {
+      interval: autoSettings.interval,
+      timeframe: autoSettings.timeframe,
+      category: autoSettings.category,
+      tradingStyle: autoSettings.tradingStyle
+    };
 
     const runAutoScan = async () => {
       if (!isSubscribed || isAnalyzing) {
@@ -317,7 +338,7 @@ export default function App() {
                 updateTopSignals([result]);
               }
             }
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 4000));
           } catch (e) { 
             console.error("Analysis Loop Error:", e);
             await new Promise(r => setTimeout(r, 5000));
@@ -339,8 +360,8 @@ export default function App() {
       }
     };
 
-    // If just toggled ON, force an immediate start (delay of 1000ms)
-    const nextScanAt = (justToggledOn || autoSettings.forceRestart) ? 0 : parseInt(localStorage.getItem('radar_next_scan_at') || '0');
+    // If just toggled ON or if configuration changed, force an immediate start (delay of 1000ms)
+    const nextScanAt = (justToggledOn || configChanged || autoSettings.forceRestart) ? 0 : parseInt(localStorage.getItem('radar_next_scan_at') || '0');
     const now = Date.now();
     let initialDelay = 1000;
 
