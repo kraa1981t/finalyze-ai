@@ -27,11 +27,10 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
   
-  const sortedResults = [...results].filter(res => {
-    // FORCE STRONG SIGNALS ONLY
-    return (res.signal === SignalType.STRONG_BUY || res.signal === SignalType.STRONG_SELL) &&
-           res.confidence >= (settings?.minStrongConfidence || 80);
-  }).sort((a, b) => {
+  const sortedResults = [...results].sort((a, b) => {
+    const aIsAction = a.signal !== 'no_entry' && a.signal !== 'neutral' ? 1 : 0;
+    const bIsAction = b.signal !== 'no_entry' && b.signal !== 'neutral' ? 1 : 0;
+    if (aIsAction !== bIsAction) return bIsAction - aIsAction;
     return b.confidence - a.confidence;
   });
   
@@ -75,7 +74,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
       {/* 2. List Section: Structured Rankings */}
       <div className="space-y-6">
         <div className={cn("flex items-center justify-between px-4", isRTL ? "flex-row" : "flex-row-reverse")}>
-          <span className="text-xs font-bold text-brand-muted font-mono">Strong Opportunities: {sortedResults.length}</span>
+          <span className="text-xs font-bold text-brand-muted font-mono">Analyzed: {results.length}</span>
           <h3 className="text-2xl font-black text-brand-text flex items-center gap-3">
             <Zap size={28} className="text-secondary fill-secondary" />
             {t.finalDecision}
