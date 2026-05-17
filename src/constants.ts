@@ -12,7 +12,7 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
 };
 
 export const DEFAULT_AUTO_SETTINGS = {
-  isEnabled: true,
+  isEnabled: false,
   interval: 15,
   timeframe: '1h',
   category: 'all',
