@@ -257,11 +257,20 @@ export default function App() {
   }, []);
 
   // ULTIMATE RADAR LOGIC
+  const prevEnabledRef = useRef(false);
+
   useEffect(() => {
-    if (!autoSettings.isEnabled) return;
+    if (!autoSettings.isEnabled) {
+      prevEnabledRef.current = false;
+      return;
+    }
 
     let isSubscribed = true;
     let timeoutId: NodeJS.Timeout;
+
+    // Detect if the user just clicked/toggled the Radar ON
+    const justToggledOn = !prevEnabledRef.current;
+    prevEnabledRef.current = true;
 
     const runAutoScan = async () => {
       if (!isSubscribed || isAnalyzing) {
@@ -330,13 +339,16 @@ export default function App() {
       }
     };
 
-    const nextScanAt = autoSettings.forceRestart ? 0 : parseInt(localStorage.getItem('radar_next_scan_at') || '0');
+    // If just toggled ON, force an immediate start (delay of 1000ms)
+    const nextScanAt = (justToggledOn || autoSettings.forceRestart) ? 0 : parseInt(localStorage.getItem('radar_next_scan_at') || '0');
     const now = Date.now();
     let initialDelay = 1000;
 
     if (now < nextScanAt) {
       initialDelay = nextScanAt - now;
       setIsScanningFinished(true);
+    } else {
+      setIsScanningFinished(false);
     }
 
     timeoutId = setTimeout(runAutoScan, initialDelay);
