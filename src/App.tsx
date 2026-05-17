@@ -86,9 +86,50 @@ export default function App() {
   const successAudioRef = useRef<HTMLAudioElement>(null);
   const failAudioRef = useRef<HTMLAudioElement>(null);
 
+  // Global automatic silent audio unlock on first user interaction (click/touch)
+  useEffect(() => {
+    const unlockAudio = () => {
+      const successAudio = successAudioRef.current;
+      const failAudio = failAudioRef.current;
+
+      if (successAudio) {
+        successAudio.play()
+          .then(() => {
+            successAudio.pause();
+            successAudio.currentTime = 0;
+          })
+          .catch(e => console.log("Success audio silent unlock failed:", e));
+      }
+
+      if (failAudio) {
+        failAudio.play()
+          .then(() => {
+            failAudio.pause();
+            failAudio.currentTime = 0;
+          })
+          .catch(e => console.log("Fail audio silent unlock failed:", e));
+      }
+
+      setIsRadarUnlocked(true);
+
+      // Clean up event listeners immediately after first user interaction
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('mousedown', unlockAudio);
+    };
+
+    window.addEventListener('click', unlockAudio, { passive: true });
+    window.addEventListener('touchstart', unlockAudio, { passive: true });
+    window.addEventListener('mousedown', unlockAudio, { passive: true });
+
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('mousedown', unlockAudio);
+    };
+  }, []);
+
   const playAudio = (type: 'success' | 'fail') => {
-    if (!isRadarUnlocked) return; // Silent until unlocked
-    
     const audioEl = type === 'success' ? successAudioRef.current : failAudioRef.current;
     
     if (audioEl) {
@@ -96,24 +137,14 @@ export default function App() {
       audioEl.currentTime = 0; // Force restart
       const playPromise = audioEl.play();
       if (playPromise !== undefined) {
-        playPromise.catch(e => console.warn(`Audio blocked (${type}):`, e));
+        playPromise.catch(e => console.warn(`Audio playback blocked/interrupted (${type}):`, e));
       }
     }
   };
 
   const handleUnlockRadar = () => {
-    if (successAudioRef.current) {
-      successAudioRef.current.play().then(() => {
-        successAudioRef.current?.pause();
-        if (successAudioRef.current) successAudioRef.current.currentTime = 0;
-        setIsRadarUnlocked(true);
-      }).catch(() => {
-        // Fallback if play fails immediately
-        setIsRadarUnlocked(true);
-      });
-    } else {
-      setIsRadarUnlocked(true);
-    }
+    // Legacy support for header trigger, but global unlock listener already guarantees freedom!
+    setIsRadarUnlocked(true);
   };
 
   // Track the most up-to-date signals instantly to avoid stale closures
