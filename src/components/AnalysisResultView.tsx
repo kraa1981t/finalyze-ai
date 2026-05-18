@@ -174,7 +174,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                 {/* Header */}
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-brand-text/10 rounded-3xl flex items-center justify-center text-primary border border-brand-text/20">
+                    <div className="w-16 h-16 bg-brand-text/10 rounded-3xl flex items-center justify-center border border-brand-text/20" style={{ color: '#d97706' }}>
                       {selectedResult.symbol.includes('USD') ? <Globe size={32} /> : <Zap size={32} />}
                     </div>
                     <div>
