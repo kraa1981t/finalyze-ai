@@ -211,7 +211,8 @@ export default function Header({
                       </button>
                     </div>
 
-                                         {/* AUDIO SECTION */}
+                    <div className="grid grid-cols-1 gap-8 max-h-[600px] overflow-y-auto custom-scrollbar pr-4">
+                      {/* AUDIO SECTION */}
                       <div className="space-y-6">
                         <div className="space-y-4">
                           <div className="flex items-center justify-between text-brand-text/50">
