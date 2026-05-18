@@ -180,9 +180,10 @@ export async function analyzeMarket(params: {
       - Bearish + Confidence 50-79%: "sell"
       - Below 50% or conflicting: "no_entry"
 
-      **OUTPUT SPECIFICATIONS**:
-      - Provide a detailed summary and microTrend description STRICTLY IN ${lang === 'ar' ? 'ARABIC' : lang === 'fr' ? 'FRENCH' : 'ENGLISH'}.
-      - Maintain a professional financial tone.
+      **OUTPUT SPECIFICATIONS & LANGUAGE RULE**:
+      - YOU MUST PROVIDE THE 'summary', 'historicalMatch', AND 'microTrend' FIELDS STRICTLY AND ONLY IN ${lang === 'ar' ? 'ARABIC (اللغة العربية)' : 'ENGLISH'}.
+      - DO NOT MIX LANGUAGES. If the requested language is Arabic, translate everything perfectly to Arabic with proper financial terms.
+      - Maintain a professional institutional tone.
 
       Return ONLY a VALID JSON object:
       {

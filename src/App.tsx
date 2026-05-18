@@ -505,22 +505,11 @@ export default function App() {
                  user={user} lang={lang} settings={settings}
                  onBegin={() => setIsAnalyzing(true)}
                  onProgress={(current, total, index) => setProgress({ current, total, index })}
-                 onResult={(results) => {
-                   // Comprehensive Crypto Check for results
-                   const day = new Date().getDay();
-                   const allCryptos = ALL_SYMBOLS_DB.crypto || [];
-                   
-                   const filtered = (day === 0 || day === 6) 
-                     ? results.filter(r => {
-                         const sym = r.symbol.toUpperCase();
-                         return allCryptos.includes(sym) || sym.includes('-USD') || sym.endsWith('USD');
-                       })
-                     : results;
-                   
-                   setAnalysisResults(filtered);
+                  onResult={(results) => {
+                   setAnalysisResults(results);
                    setIsAnalyzing(false);
                    setProgress(null);
-                   updateTopSignals(filtered);
+                   updateTopSignals(results);
                    playAudio('fail');
                  }} 
                  onError={() => { setIsAnalyzing(false); setProgress(null); }}
