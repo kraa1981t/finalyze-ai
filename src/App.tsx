@@ -129,15 +129,15 @@ export default function App() {
     };
   }, []);
 
-  const playAudio = (type: 'success' | 'fail') => {
-    const audioEl = type === 'success' ? successAudioRef.current : failAudioRef.current;
+  const playAudio = (type?: 'success' | 'fail') => {
+    const audioEl = successAudioRef.current;
     
     if (audioEl) {
       audioEl.volume = Math.max(0, Math.min(1, autoSettings.volume || 0.5));
       audioEl.currentTime = 0; // Force restart
       const playPromise = audioEl.play();
       if (playPromise !== undefined) {
-        playPromise.catch(e => console.warn(`Audio playback blocked/interrupted (${type}):`, e));
+        playPromise.catch(e => console.warn("Audio playback blocked/interrupted:", e));
       }
     }
   };
@@ -302,7 +302,7 @@ export default function App() {
       const currentSettings = autoSettingsRef.current;
       const categories = currentSettings.category === 'all' 
         ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
-        : [currentSettings.category as keyof typeof SYMBOL_CATEGORIES];
+        : (currentSettings.category || 'all').split(',') as (keyof typeof SYMBOL_CATEGORIES)[];
 
       // Check if any category is actually open
       const openCategories = categories.filter(isMarketOpen);
@@ -416,11 +416,6 @@ export default function App() {
       <audio 
         ref={successAudioRef} 
         src={autoSettings.successSound === 'custom' ? customAudioUrls.success : (autoSettings.successSound || 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg')} 
-        preload="auto" 
-      />
-      <audio 
-        ref={failAudioRef} 
-        src={autoSettings.failSound === 'custom' ? customAudioUrls.fail : (autoSettings.failSound || 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg')} 
         preload="auto" 
       />
 

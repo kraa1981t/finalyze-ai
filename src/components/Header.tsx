@@ -211,55 +211,56 @@ export default function Header({
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-8 max-h-[600px] overflow-y-auto custom-scrollbar pr-4">
-                      {/* AUDIO SECTION */}
+                                         {/* AUDIO SECTION */}
                       <div className="space-y-6">
                         <div className="space-y-4">
                           <div className="flex items-center justify-between text-brand-text/50">
                             <div className="flex items-center gap-3">
-                              <Music size={18} className="text-primary" />
-                              <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">{t.successSound}</span>
+                              <Music size={18} className="text-[#F59E0B]" />
+                              <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">
+                                {lang === 'ar' ? 'صوت التنبيه' : 'Alert Sound'}
+                              </span>
                             </div>
                             <button 
                               onClick={(e) => { e.stopPropagation(); successFileRef.current?.click(); }} 
-                              className="text-primary hover:text-primary/80 transition-colors p-2 bg-primary/10 rounded-xl"
+                              className="text-black hover:bg-[#d97706] transition-colors p-2 bg-[#F59E0B] rounded-xl shadow-md"
                             >
-                              <Upload size={20} />
+                              <Upload size={18} />
                             </button>
                             <input type="file" ref={successFileRef} onChange={(e) => handleAudioUpload(e, 'success')} onClick={(e) => e.stopPropagation()} accept="audio/*" className="hidden" />
                           </div>
+                          
                           <div className="grid grid-cols-1 gap-2">
-                            {[
-                              DEFAULT_SUCCESS_SOUNDS[0],
-                              DEFAULT_SUCCESS_SOUNDS[1],
-                              { 
-                                id: 'custom_success', 
-                                label: autoSettings.successSound === 'custom' ? (lang === 'ar' ? '✅ صوت مخصص (محفوظ)' : '✅ Custom Saved') : (lang === 'ar' ? 'صوت مخصص 3' : 'Custom Sound 3'), 
-                                url: autoSettings.successSound === 'custom' ? 'custom' : DEFAULT_SUCCESS_SOUNDS[2].url 
-                              }
-                            ].map((s, i) => (
-                              <button
-                                key={s.id || i}
-                                onClick={() => onAutoSettingsChange({ ...autoSettings, successSound: s.url })}
-                                className={cn(
-                                  "flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black border-2 transition-all",
-                                  autoSettings.successSound === s.url 
-                                    ? 'bg-primary/10 border-primary text-primary shadow-lg' 
-                                    : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
-                                )}
-                              >
-                                <div className={cn("w-2 h-2 rounded-full", autoSettings.successSound === s.url ? "bg-primary" : "bg-brand-text/20")} />
-                                {s.label}
-                                {s.id === 'custom_success' && autoSettings.successSound === 'custom' && (
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteCustomAudio('success'); }}
-                                    className="ml-auto p-1.5 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
-                              </button>
-                            ))}
+                            <button
+                              onClick={() => {
+                                if (autoSettings.successSound === 'custom') {
+                                  onAutoSettingsChange({ ...autoSettings, successSound: '' });
+                                } else {
+                                  onAutoSettingsChange({ ...autoSettings, successSound: 'custom' });
+                                }
+                              }}
+                              className={cn(
+                                "flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black border-2 transition-all w-full text-left",
+                                autoSettings.successSound === 'custom' 
+                                  ? 'bg-[#F59E0B]/10 border-[#F59E0B] text-[#F59E0B] shadow-lg font-black' 
+                                  : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-[#F59E0B]/30'
+                              )}
+                            >
+                              <div className={cn("w-2 h-2 rounded-full", autoSettings.successSound === 'custom' ? "bg-[#F59E0B]" : "bg-brand-text/20")} />
+                              <span>
+                                {autoSettings.successSound === 'custom' 
+                                  ? (lang === 'ar' ? '🔔 نغمة مخصصة مرفوعة (نشطة)' : '🔔 Custom Uploaded Sound (Active)') 
+                                  : (lang === 'ar' ? '🔔 النغمة الافتراضية (يرجى رفع نغمتك)' : '🔔 Default Notification Sound (Please upload custom)')}
+                              </span>
+                              {autoSettings.successSound === 'custom' && (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteCustomAudio('success'); }}
+                                  className="ml-auto p-1.5 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </button>
                           </div>
                         </div>
 
@@ -267,10 +268,12 @@ export default function Header({
                         <div className="space-y-3 py-4 bg-brand-text/5 rounded-3xl px-6 border border-brand-text/5">
                           <div className="flex items-center justify-between text-brand-text/50">
                             <div className="flex items-center gap-3">
-                              <Volume2 size={20} className="text-primary" />
-                              <span className="text-[11px] font-black uppercase tracking-widest text-brand-text/90">Alert Volume</span>
+                              <Volume2 size={20} className="text-[#F59E0B]" />
+                              <span className="text-[11px] font-black uppercase tracking-widest text-brand-text/90">
+                                {lang === 'ar' ? 'مستوى الصوت' : 'Alert Volume'}
+                              </span>
                             </div>
-                            <span className="text-[12px] font-mono font-black text-primary">{Math.round(autoSettings.volume * 100)}%</span>
+                            <span className="text-[12px] font-mono font-black text-[#F59E0B]">{Math.round(autoSettings.volume * 100)}%</span>
                           </div>
                           <input 
                             type="range"
@@ -279,84 +282,78 @@ export default function Header({
                             step="0.1"
                             value={autoSettings.volume}
                             onChange={(e) => onAutoSettingsChange({ ...autoSettings, volume: parseFloat(e.target.value) })}
-                            className="w-full h-2 bg-brand-bg rounded-lg appearance-none cursor-pointer accent-primary"
+                            className="w-full h-2 bg-brand-bg rounded-lg appearance-none cursor-pointer accent-[#F59E0B]"
                           />
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between text-brand-text/50">
-                            <div className="flex items-center gap-3">
-                              <Music size={18} className="text-secondary" />
-                              <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">{t.failSound}</span>
-                            </div>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); failFileRef.current?.click(); }} 
-                              className="text-secondary hover:text-secondary/80 transition-colors p-2 bg-secondary/10 rounded-xl"
-                            >
-                              <Upload size={20} />
-                            </button>
-                            <input type="file" ref={failFileRef} onChange={(e) => handleAudioUpload(e, 'fail')} onClick={(e) => e.stopPropagation()} accept="audio/*" className="hidden" />
-                          </div>
-                          <div className="grid grid-cols-1 gap-2">
-                            {[
-                              DEFAULT_FAIL_SOUNDS[0],
-                              DEFAULT_FAIL_SOUNDS[1],
-                              { 
-                                id: 'custom_fail', 
-                                label: autoSettings.failSound === 'custom' ? (lang === 'ar' ? '✅ صوت مخصص (محفوظ)' : '✅ Custom Saved') : (lang === 'ar' ? 'صوت مخصص 3' : 'Custom Sound 3'), 
-                                url: autoSettings.failSound === 'custom' ? 'custom' : DEFAULT_FAIL_SOUNDS[2].url 
-                              }
-                            ].map((s, i) => (
-                              <button
-                                key={s.id || i}
-                                onClick={() => onAutoSettingsChange({ ...autoSettings, failSound: s.url })}
-                                className={cn(
-                                  "flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black border-2 transition-all",
-                                  autoSettings.failSound === s.url 
-                                    ? 'bg-secondary/10 border-secondary text-secondary shadow-lg' 
-                                    : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-secondary/30'
-                                )}
-                              >
-                                <div className={cn("w-2 h-2 rounded-full", autoSettings.failSound === s.url ? "bg-secondary" : "bg-brand-text/20")} />
-                                {s.label}
-                                {s.id === 'custom_fail' && autoSettings.failSound === 'custom' && (
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteCustomAudio('fail'); }}
-                                    className="ml-auto p-1.5 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
-                              </button>
-                            ))}
-                          </div>
                         </div>
                       </div>
 
-                      {/* MARKET & TIMEFRAME */}
+                      {/* 1. SELECT MARKET (MULTI-SELECT) */}
+                      <div className="space-y-3 pt-6 border-t border-brand-text/5">
+                        <div className="flex items-center gap-3 text-brand-text/50">
+                          <Layers size={18} className="text-[#F59E0B]" />
+                          <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">
+                            {lang === 'ar' ? '1. اختر نوع السوق (فئة أو أكثر)' : '1. Select Market (One or More)'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { id: 'forex', label: lang === 'ar' ? 'فوركس (Forex)' : 'Forex' },
+                            { id: 'crypto', label: lang === 'ar' ? 'كريبتو (Crypto)' : 'Crypto' },
+                            { id: 'stocks', label: lang === 'ar' ? 'أسهم (Stocks)' : 'Stocks' },
+                            { id: 'metals', label: lang === 'ar' ? 'معادن (Metals)' : 'Metals' }
+                          ].map((cat) => {
+                            const selectedList = autoSettings.category === 'all' 
+                              ? ['forex', 'crypto', 'stocks', 'metals']
+                              : (autoSettings.category || 'all').split(',');
+                            
+                            const isSelected = selectedList.includes(cat.id);
+
+                            const handleToggle = () => {
+                              let newList = [...selectedList];
+                              if (isSelected) {
+                                if (newList.length > 1) {
+                                  newList = newList.filter(id => id !== cat.id);
+                                }
+                              } else {
+                                newList.push(cat.id);
+                              }
+                              
+                              const finalVal = newList.length === 4 ? 'all' : newList.join(',');
+                              onAutoSettingsChange({ ...autoSettings, category: finalVal as any });
+                            };
+
+                            return (
+                              <button
+                                key={cat.id}
+                                onClick={handleToggle}
+                                className={cn(
+                                  "flex items-center justify-between px-4 py-3.5 rounded-2xl text-[11px] font-black border-2 transition-all w-full",
+                                  isSelected 
+                                    ? 'bg-primary/10 border-primary text-primary shadow-lg' 
+                                    : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
+                                )}
+                              >
+                                <span>{cat.label}</span>
+                                <div className={cn(
+                                  "w-4 h-4 rounded-md border flex items-center justify-center transition-all",
+                                  isSelected ? "border-primary bg-primary text-white" : "border-brand-text/20 bg-brand-bg"
+                                )}>
+                                  {isSelected && <span className="text-[10px] leading-none font-bold">✓</span>}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* 2. SCAN EVERY & 3. TRADING STYLE */}
                       <div className="grid grid-cols-2 gap-6 pt-6 border-t border-brand-text/5">
                         <div className="space-y-3">
                           <div className="flex items-center gap-3 text-brand-text/50">
-                            <Layers size={18} />
-                            <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">{t.selectMarket}</span>
-                          </div>
-                          <select 
-                            value={autoSettings.category}
-                            onChange={(e) => onAutoSettingsChange({ ...autoSettings, category: e.target.value as any })}
-                            className="w-full bg-brand-bg border-2 border-brand-text/10 rounded-2xl px-5 py-4 text-sm font-black text-brand-text focus:border-primary outline-none appearance-none cursor-pointer shadow-sm"
-                          >
-                            <option value="all">{t.allCategories}</option>
-                            <option value="forex">{t.forex}</option>
-                            <option value="crypto">{t.crypto}</option>
-                            <option value="stocks">{t.stocks}</option>
-                            <option value="metals">{t.metals}</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-3 text-brand-text/50">
                             <Zap size={18} className="text-orange-500" />
-                            <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">Scan Every</span>
+                            <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">
+                              {lang === 'ar' ? '2. فحص كل' : '2. Scan Every'}
+                            </span>
                           </div>
                           <select 
                             value={autoSettings.interval}
@@ -367,16 +364,38 @@ export default function Header({
                             <option value="5">5 Minutes</option>
                             <option value="15">15 Minutes</option>
                             <option value="60">1 Hour</option>
+                            <option value="120">2 Hours</option>
                             <option value="240">4 Hours</option>
                             <option value="1440">1 Day</option>
                           </select>
                         </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3 text-brand-text/50">
+                            <Sparkles size={18} className="text-[#F59E0B]" />
+                            <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">
+                              {lang === 'ar' ? '3. الاستراتيجية' : '3. Strategy'}
+                            </span>
+                          </div>
+                          <select 
+                            value={autoSettings.tradingStyle}
+                            onChange={(e) => onAutoSettingsChange({ ...autoSettings, tradingStyle: e.target.value as any })}
+                            className="w-full bg-brand-bg border-2 border-brand-text/10 rounded-2xl px-5 py-4 text-sm font-black text-brand-text focus:border-primary outline-none appearance-none cursor-pointer shadow-sm"
+                          >
+                            <option value="scalping">{lang === 'ar' ? 'سكالبينج (Scalping)' : 'Scalping'}</option>
+                            <option value="day_trading">{lang === 'ar' ? 'تداول يومي (Day)' : 'Day Trading'}</option>
+                            <option value="swing_trading">{lang === 'ar' ? 'سوينغ (Swing)' : 'Swing Trading'}</option>
+                          </select>
+                        </div>
                       </div>
 
-                      <div className="space-y-4 pt-2">
+                      {/* 4. TIMEFRAME */}
+                      <div className="space-y-4 pt-6 border-t border-brand-text/5">
                         <div className="flex items-center gap-3 text-brand-text/50">
                           <Clock size={18} />
-                          <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">{t.timeframe}</span>
+                          <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">
+                            {lang === 'ar' ? '4. الإطار الزمني' : '4. Timeframe'}
+                          </span>
                         </div>
                         <div className="grid grid-cols-4 gap-3">
                           {['15m', '1h', '4h', '1d', '1w', '1M', '1Y'].map((tf) => (
@@ -388,6 +407,13 @@ export default function Header({
                                 autoSettings.timeframe === tf 
                                   ? 'bg-primary border-primary text-white shadow-xl shadow-primary/30' 
                                   : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
+                              )}
+                            >
+                              {tf}
+                            </button>
+                          ))}
+                        </div>
+                      </div>                                : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
                               )}
                             >
                               {tf}
