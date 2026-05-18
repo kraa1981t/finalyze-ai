@@ -413,13 +413,6 @@ export default function Header({
                             </button>
                           ))}
                         </div>
-                      </div>                                : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-primary/30'
-                              )}
-                            >
-                              {tf}
-                            </button>
-                          ))}
-                        </div>
                       </div>
                     </div>
                   </motion.div>
