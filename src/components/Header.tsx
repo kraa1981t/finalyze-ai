@@ -56,21 +56,31 @@ export default function Header({
   const [isAutoMenuOpen, setIsAutoMenuOpen] = React.useState(false);
   const successFileRef = React.useRef<HTMLInputElement>(null);
   const failFileRef = React.useRef<HTMLInputElement>(null);
+  const manualFileRef = React.useRef<HTMLInputElement>(null);
 
   const isMarketClosedToday = () => {
     const day = new Date().getDay();
     return day === 0 || day === 6; // Sunday or Saturday
   };
 
-  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'success' | 'fail') => {
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'success' | 'fail' | 'manual') => {
     e.stopPropagation();
     const file = e.target.files?.[0];
     if (file) {
       try {
-        await saveAudioBlob(type === 'success' ? 'custom_success' : 'custom_fail', file);
+        let dbKey = 'custom_success';
+        let settingKey = 'successSound';
+        if (type === 'manual') {
+          dbKey = 'custom_manual';
+          settingKey = 'manualSound';
+        } else if (type === 'fail') {
+          dbKey = 'custom_fail';
+          settingKey = 'failSound';
+        }
+        await saveAudioBlob(dbKey, file);
         onAutoSettingsChange({
           ...autoSettings,
-          [type === 'success' ? 'successSound' : 'failSound']: 'custom'
+          [settingKey]: 'custom'
         });
       } catch (err) {
         console.error("Failed to save audio to DB", err);
@@ -78,12 +88,21 @@ export default function Header({
     }
   };
 
-  const handleDeleteCustomAudio = async (type: 'success' | 'fail') => {
+  const handleDeleteCustomAudio = async (type: 'success' | 'fail' | 'manual') => {
     try {
-      await deleteAudioBlob(type === 'success' ? 'custom_success' : 'custom_fail');
+      let dbKey = 'custom_success';
+      let settingKey = 'successSound';
+      if (type === 'manual') {
+        dbKey = 'custom_manual';
+        settingKey = 'manualSound';
+      } else if (type === 'fail') {
+        dbKey = 'custom_fail';
+        settingKey = 'failSound';
+      }
+      await deleteAudioBlob(dbKey);
       onAutoSettingsChange({
         ...autoSettings,
-        [type === 'success' ? 'successSound' : 'failSound']: type === 'success' ? DEFAULT_SUCCESS_SOUNDS[0].url : DEFAULT_FAIL_SOUNDS[0].url
+        [settingKey]: ''
       });
     } catch (err) {
       console.error("Failed to delete audio from DB", err);
@@ -214,12 +233,13 @@ export default function Header({
                     <div className="grid grid-cols-1 gap-8 max-h-[600px] overflow-y-auto custom-scrollbar pr-4">
                       {/* AUDIO SECTION */}
                       <div className="space-y-6">
+                        {/* 1. AUTO SCAN ALERT SOUND */}
                         <div className="space-y-4">
                           <div className="flex items-center justify-between text-brand-text/50">
                             <div className="flex items-center gap-3">
                               <Music size={18} className="text-[#F59E0B]" />
                               <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">
-                                {lang === 'ar' ? 'صوت التنبيه' : 'Alert Sound'}
+                                {lang === 'ar' ? 'صوت التحليل التلقائي' : 'Auto Scan Alert'}
                               </span>
                             </div>
                             <button 
@@ -248,14 +268,66 @@ export default function Header({
                               )}
                             >
                               <div className={cn("w-2 h-2 rounded-full", autoSettings.successSound === 'custom' ? "bg-[#F59E0B]" : "bg-brand-text/20")} />
-                              <span>
+                              <span className="truncate max-w-[280px]">
                                 {autoSettings.successSound === 'custom' 
-                                  ? (lang === 'ar' ? '🔔 نغمة مخصصة مرفوعة (نشطة)' : '🔔 Custom Uploaded Sound (Active)') 
-                                  : (lang === 'ar' ? '🔔 النغمة الافتراضية (يرجى رفع نغمتك)' : '🔔 Default Notification Sound (Please upload custom)')}
+                                  ? (lang === 'ar' ? '🔔 نغمة تلقائية مخصصة (نشطة)' : '🔔 Custom Auto Sound (Active)') 
+                                  : (lang === 'ar' ? '🔔 النغمة التلقائية الافتراضية' : '🔔 Default Auto Sound')}
                               </span>
                               {autoSettings.successSound === 'custom' && (
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); handleDeleteCustomAudio('success'); }}
+                                  className="ml-auto p-1.5 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 2. MANUAL SCAN ALERT SOUND */}
+                        <div className="space-y-4 pt-4 border-t border-brand-text/5">
+                          <div className="flex items-center justify-between text-brand-text/50">
+                            <div className="flex items-center gap-3">
+                              <Music size={18} className="text-secondary" />
+                              <span className="text-[12px] font-black uppercase tracking-widest text-brand-text/90">
+                                {lang === 'ar' ? 'صوت التحليل اليدوي' : 'Manual Scan Alert'}
+                              </span>
+                            </div>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); manualFileRef.current?.click(); }} 
+                              className="text-white hover:bg-secondary/85 transition-colors p-2 bg-secondary rounded-xl shadow-md"
+                            >
+                              <Upload size={18} />
+                            </button>
+                            <input type="file" ref={manualFileRef} onChange={(e) => handleAudioUpload(e, 'manual')} onClick={(e) => e.stopPropagation()} accept="audio/*" className="hidden" />
+                          </div>
+                          
+                          <div className="grid grid-cols-1 gap-2">
+                            <button
+                              onClick={() => {
+                                if (autoSettings.manualSound === 'custom') {
+                                  onAutoSettingsChange({ ...autoSettings, manualSound: '' });
+                                } else {
+                                  onAutoSettingsChange({ ...autoSettings, manualSound: 'custom' });
+                                }
+                              }}
+                              className={cn(
+                                "flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black border-2 transition-all w-full text-left",
+                                autoSettings.manualSound === 'custom' 
+                                  ? 'bg-secondary/10 border-secondary text-secondary shadow-lg font-black' 
+                                  : 'bg-brand-bg border-brand-text/5 text-brand-text/40 hover:border-secondary/30'
+                              )}
+                            >
+                              <div className={cn("w-2 h-2 rounded-full", autoSettings.manualSound === 'custom' ? "bg-secondary" : "bg-brand-text/20")} />
+                              <span className="truncate max-w-[280px]">
+                                {autoSettings.manualSound === 'custom' 
+                                  ? (lang === 'ar' ? '🔔 نغمة يدوية مخصصة (نشطة)' : '🔔 Custom Manual Sound (Active)') 
+                                  : (lang === 'ar' ? '🔔 النغمة اليدوية الافتراضية' : '🔔 Default Manual Sound')}
+                              </span>
+                              {autoSettings.manualSound === 'custom' && (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteCustomAudio('manual'); }}
                                   className="ml-auto p-1.5 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors"
                                 >
                                   <Trash2 size={14} />

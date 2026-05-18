@@ -68,4 +68,5 @@ export interface AutoAnalysisSettings {
   lastFinishedAt?: number;
   successSound?: string;
   failSound?: string;
+  manualSound?: string;
 }

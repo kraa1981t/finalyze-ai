@@ -52,7 +52,7 @@ export default function App() {
 
   const [isRadarUnlocked, setIsRadarUnlocked] = useState(false);
 
-  const [customAudioUrls, setCustomAudioUrls] = useState<{ success?: string, fail?: string }>({});
+  const [customAudioUrls, setCustomAudioUrls] = useState<{ success?: string, manual?: string }>({});
 
   // Load persistent custom audio from IndexedDB
   useEffect(() => {
@@ -60,18 +60,18 @@ export default function App() {
       try {
         const { getAudioBlob } = await import('./lib/db');
         const successBlob = await getAudioBlob('custom_success');
-        const failBlob = await getAudioBlob('custom_fail');
+        const manualBlob = await getAudioBlob('custom_manual');
         
         setCustomAudioUrls({
           success: successBlob ? URL.createObjectURL(successBlob) : undefined,
-          fail: failBlob ? URL.createObjectURL(failBlob) : undefined
+          manual: manualBlob ? URL.createObjectURL(manualBlob) : undefined
         });
       } catch (e) {
         console.warn("Failed to load custom audio from DB", e);
       }
     };
     loadCustomAudio();
-  }, [autoSettings.successSound, autoSettings.failSound]);
+  }, [autoSettings.successSound, autoSettings.manualSound]);
 
   const [progress, setProgress] = useState<{ current: string, total: number, index: number } | null>(null);
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
@@ -84,13 +84,13 @@ export default function App() {
 
   // NATIVE AUDIO ENGINE (Bulletproof against browser blocks)
   const successAudioRef = useRef<HTMLAudioElement>(null);
-  const failAudioRef = useRef<HTMLAudioElement>(null);
+  const manualAudioRef = useRef<HTMLAudioElement>(null);
 
   // Global automatic silent audio unlock on first user interaction (click/touch)
   useEffect(() => {
     const unlockAudio = () => {
       const successAudio = successAudioRef.current;
-      const failAudio = failAudioRef.current;
+      const manualAudio = manualAudioRef.current;
 
       if (successAudio) {
         successAudio.play()
@@ -101,13 +101,13 @@ export default function App() {
           .catch(e => console.log("Success audio silent unlock failed:", e));
       }
 
-      if (failAudio) {
-        failAudio.play()
+      if (manualAudio) {
+        manualAudio.play()
           .then(() => {
-            failAudio.pause();
-            failAudio.currentTime = 0;
+            manualAudio.pause();
+            manualAudio.currentTime = 0;
           })
-          .catch(e => console.log("Fail audio silent unlock failed:", e));
+          .catch(e => console.log("Manual audio silent unlock failed:", e));
       }
 
       setIsRadarUnlocked(true);
@@ -129,15 +129,15 @@ export default function App() {
     };
   }, []);
 
-  const playAudio = (type?: 'success' | 'fail') => {
-    const audioEl = successAudioRef.current;
+  const playAudio = (type?: 'success' | 'fail' | 'manual') => {
+    const audioEl = type === 'manual' ? manualAudioRef.current : successAudioRef.current;
     
     if (audioEl) {
       audioEl.volume = Math.max(0, Math.min(1, autoSettings.volume || 0.5));
       audioEl.currentTime = 0; // Force restart
       const playPromise = audioEl.play();
       if (playPromise !== undefined) {
-        playPromise.catch(e => console.warn("Audio playback blocked/interrupted:", e));
+        playPromise.catch(e => console.warn(`Audio playback blocked/interrupted (${type}):`, e));
       }
     }
   };
@@ -418,6 +418,11 @@ export default function App() {
         src={autoSettings.successSound === 'custom' ? customAudioUrls.success : (autoSettings.successSound || 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg')} 
         preload="auto" 
       />
+      <audio 
+        ref={manualAudioRef} 
+        src={autoSettings.manualSound === 'custom' ? customAudioUrls.manual : (autoSettings.manualSound || 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg')} 
+        preload="auto" 
+      />
 
       <AnimatePresence>
         {!user && !loading && <LoginOverlay onLogin={handleLogin} lang={lang} />}
@@ -488,6 +493,7 @@ export default function App() {
                    setIsAnalyzing(false);
                    setProgress(null);
                    updateTopSignals(filtered);
+                   playAudio('manual');
                  }} 
                  onError={() => { setIsAnalyzing(false); setProgress(null); }}
               />
