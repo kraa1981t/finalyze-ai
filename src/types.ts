@@ -33,6 +33,9 @@ export interface AnalysisResult {
   historicalMatch?: string;
   trendMaturity?: 'infancy' | 'youth' | 'aging' | 'unknown';
   trendAge?: number; // Number of candles
+  microTF?: string;
+  microSignal?: 'pullback' | 'aligned' | 'unknown';
+  microTrend?: string;
   timestamp: string;
   userId: string;
 }

@@ -255,6 +255,30 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                                </div>
                              )}
 
+                             {selectedResult.microTrend && (
+                               <div className={cn(
+                                 "p-4 rounded-2xl border space-y-2 shadow-sm transition-all",
+                                 selectedResult.microSignal === 'aligned' 
+                                   ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
+                                   : selectedResult.microSignal === 'pullback'
+                                     ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                                     : "bg-brand-text/5 border-brand-text/10 text-brand-muted"
+                               )}>
+                                 <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest leading-none">
+                                   <span className="text-brand-muted">Micro Trigger ({selectedResult.microTF || 'N/A'})</span>
+                                   <span className={cn(
+                                     "px-2 py-0.5 rounded text-[8px] font-black tracking-widest uppercase",
+                                     selectedResult.microSignal === 'aligned' ? "bg-emerald-500 text-white animate-pulse" : "bg-amber-500 text-black"
+                                   )}>
+                                     {selectedResult.microSignal === 'aligned' ? (isRTL ? "تأكيد الدخول" : "ALIGNED") : (isRTL ? "انتظار التصحيح" : "PULLBACK")}
+                                   </span>
+                                 </div>
+                                 <div className="text-[12px] font-bold text-brand-text mt-1 leading-normal">
+                                   {selectedResult.microTrend}
+                                 </div>
+                               </div>
+                             )}
+
                          </div>
                       </div>
 

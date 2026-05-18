@@ -97,6 +97,22 @@ export async function analyzeMarket(params: {
     const macro2 = TF_PROGRESSION[Math.min(currentIndex + 2, TF_PROGRESSION.length - 1)];
     const microTF = currentIndex > 0 ? TF_PROGRESSION[currentIndex - 1] : TF_PROGRESSION[0];
     
+    // Fetch Lower Timeframe (Micro) Data for Wave Confirmation
+    let microCloses: number[] = [];
+    let microMetrics = null;
+    try {
+      const microData = await fetch(`/api/market-data?symbol=${symbol}&timeframe=${microTF}`).then(r => r.json());
+      const microQuotes = microData.chart?.result?.[0]?.indicators?.quote?.[0];
+      if (microQuotes && microQuotes.close) {
+        microCloses = microQuotes.close.filter((c: any) => c != null);
+        if (microCloses.length >= 10) {
+          microMetrics = calculateTechnicalMetrics(microCloses, [], [], []);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch micro timeframe data:", e);
+    }
+    
     const technicalPrompt = `
       You are an Elite Institutional Trader and Quantitative Analyst (ICT/SMC Expert).
       Your task is to analyze the following asset and provide a definitive trading decision.
@@ -104,19 +120,35 @@ export async function analyzeMarket(params: {
       **MARKET DATA**:
       - Symbol: ${symbol}
       - Market Type: ${type}
-      - Primary Timeframe: ${timeframe}
+      - Primary Timeframe (Macro): ${timeframe}
       - Trading Style: ${tradingStyle}
-      - Calculated RSI: ${metrics?.rsi?.toFixed(1)}
-      - Current Trend: ${metrics?.direction}
-      - EMA Cross (9/21): ${metrics?.emaCross}
+      - Macro RSI: ${metrics?.rsi?.toFixed(1)}
+      - Macro Trend Direction: ${metrics?.direction}
+      - Macro EMA Cross (9/21): ${metrics?.emaCross}
       - Volume Surge: ${metrics?.volSurge ? 'Yes' : 'No'}
       - Trend Age (Candles): ${metrics?.age}
+
+      **LOWER TIMEFRAME CONFIRMATION DATA (MICRO WAVE)**:
+      - Micro Timeframe: ${microTF}
+      - Micro Calculated RSI: ${microMetrics?.rsi ? microMetrics.rsi.toFixed(1) : 'N/A'}
+      - Micro Trend Direction: ${microMetrics?.direction || 'sideways'}
+      - Micro EMA Cross (9/21): ${microMetrics?.emaCross || 'unknown'}
 
       **USER STRATEGY SETTINGS**:
       - News & Volatility Guard: ${settings.useNewsGuard ? 'ENABLED' : 'DISABLED'}
       - Volume Confirmation: ${settings.useVolumeAnalysis ? 'ENABLED' : 'DISABLED'}
       - Higher Timeframe Trend Alignment: ${settings.useHigherTimeframe ? 'ENABLED' : 'DISABLED'}
       - Technical Indicator Alignment (EMA/RSI): ${settings.useIndicators ? 'ENABLED' : 'DISABLED'}
+
+      **TOP-DOWN WAVE CONFIRMATION RULES (DIRECT ENTRY OPTIMIZATION)**:
+      Your primary goal is to optimize entries to avoid initial drawdowns (e.g. buying at the peak of a bullish leg just as a local pullback starts).
+      - Analyze if the lower timeframe (${microTF}) is currently in a "pullback" state or an "aligned" state relative to the Primary Timeframe (${timeframe}):
+        * **PULLBACK State**: If the macro trend is "uptrend" but the micro trend (${microTF}) is "downtrend" or has a "bearish" EMA cross or RSI is falling, it means the price is currently correcting. The user should wait!
+        * **ALIGNED State**: If the macro trend is "uptrend" and the micro trend (${microTF}) has completed its pullback and is turning bullish (e.g., micro trend is "uptrend" or EMA cross is "bullish" or RSI is rebounding from oversold), it means the pullback is completed. It is the PERFECT moment for direct Market Order entry!
+      
+      - **Enforce Signal Strictness**:
+        * You should ONLY output a signal of "strong_buy" or "strong_sell" if the Micro Timeframe (${microTF}) is **fully ALIGNED** with the macro trend. This guarantees a safe direct Market Order entry for the user with minimal drawdown!
+        * If the macro trend is strong but the Micro Timeframe is still actively in a **PULLBACK** state, you MUST downgrade the signal to "buy" (with lower confidence) or "neutral", and clearly flag in "microSignal" that it is a "pullback".
 
       **STRATEGY EVALUATION & SUPPORTIVE WEIGHTS**:
       1. **NEWS & VOLATILITY GUARD (Dynamic Support Factor)**:
@@ -149,7 +181,7 @@ export async function analyzeMarket(params: {
       - Below 50% or conflicting: "no_entry"
 
       **OUTPUT SPECIFICATIONS**:
-      - Provide a detailed summary STRICTLY IN ${lang === 'ar' ? 'ARABIC' : lang === 'fr' ? 'FRENCH' : 'ENGLISH'}.
+      - Provide a detailed summary and microTrend description STRICTLY IN ${lang === 'ar' ? 'ARABIC' : lang === 'fr' ? 'FRENCH' : 'ENGLISH'}.
       - Maintain a professional financial tone.
 
       Return ONLY a VALID JSON object:
@@ -159,7 +191,9 @@ export async function analyzeMarket(params: {
         "summary": "Detailed report...",
         "technicalScore": number,
         "sentimentScore": number,
-        "historicalMatch": "Pattern description"
+        "historicalMatch": "Pattern description",
+        "microSignal": "pullback" | "aligned" | "unknown",
+        "microTrend": "Brief structural wave status (e.g. 'M15 Pullback Completed - Ready for Direct Entry' in Arabic or English)"
       }
     `;
 
@@ -220,6 +254,9 @@ export async function analyzeMarket(params: {
       sentimentScore: finalConfidence,
       trendMaturity: age <= 8 ? 'infancy' : (age <= 30 ? 'youth' : 'aging'),
       trendAge: age,
+      microTF,
+      microSignal: resultData.microSignal || 'unknown',
+      microTrend: resultData.microTrend || "",
       historicalMatch: resultData.historicalMatch || "",
       timestamp: new Date().toISOString(),
       userId: ""
