@@ -52,7 +52,7 @@ export default function App() {
 
   const [isRadarUnlocked, setIsRadarUnlocked] = useState(false);
 
-  const [customAudioUrls, setCustomAudioUrls] = useState<{ success?: string, manual?: string }>({});
+  const [customAudioUrls, setCustomAudioUrls] = useState<{ success?: string, fail?: string }>({});
 
   // Load persistent custom audio from IndexedDB
   useEffect(() => {
@@ -60,18 +60,18 @@ export default function App() {
       try {
         const { getAudioBlob } = await import('./lib/db');
         const successBlob = await getAudioBlob('custom_success');
-        const manualBlob = await getAudioBlob('custom_manual');
+        const failBlob = await getAudioBlob('custom_fail');
         
         setCustomAudioUrls({
           success: successBlob ? URL.createObjectURL(successBlob) : undefined,
-          manual: manualBlob ? URL.createObjectURL(manualBlob) : undefined
+          fail: failBlob ? URL.createObjectURL(failBlob) : undefined
         });
       } catch (e) {
         console.warn("Failed to load custom audio from DB", e);
       }
     };
     loadCustomAudio();
-  }, [autoSettings.successSound, autoSettings.manualSound]);
+  }, [autoSettings.successSound, autoSettings.failSound]);
 
   const [progress, setProgress] = useState<{ current: string, total: number, index: number } | null>(null);
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
@@ -84,13 +84,13 @@ export default function App() {
 
   // NATIVE AUDIO ENGINE (Bulletproof against browser blocks)
   const successAudioRef = useRef<HTMLAudioElement>(null);
-  const manualAudioRef = useRef<HTMLAudioElement>(null);
+  const failAudioRef = useRef<HTMLAudioElement>(null);
 
   // Global automatic silent audio unlock on first user interaction (click/touch)
   useEffect(() => {
     const unlockAudio = () => {
       const successAudio = successAudioRef.current;
-      const manualAudio = manualAudioRef.current;
+      const failAudio = failAudioRef.current;
 
       if (successAudio) {
         successAudio.play()
@@ -101,13 +101,13 @@ export default function App() {
           .catch(e => console.log("Success audio silent unlock failed:", e));
       }
 
-      if (manualAudio) {
-        manualAudio.play()
+      if (failAudio) {
+        failAudio.play()
           .then(() => {
-            manualAudio.pause();
-            manualAudio.currentTime = 0;
+            failAudio.pause();
+            failAudio.currentTime = 0;
           })
-          .catch(e => console.log("Manual audio silent unlock failed:", e));
+          .catch(e => console.log("Fail audio silent unlock failed:", e));
       }
 
       setIsRadarUnlocked(true);
@@ -129,8 +129,8 @@ export default function App() {
     };
   }, []);
 
-  const playAudio = (type?: 'success' | 'fail' | 'manual') => {
-    const audioEl = type === 'manual' ? manualAudioRef.current : successAudioRef.current;
+  const playAudio = (type?: 'success' | 'fail') => {
+    const audioEl = type === 'success' ? successAudioRef.current : failAudioRef.current;
     
     if (audioEl) {
       audioEl.volume = Math.max(0, Math.min(1, autoSettings.volume || 0.5));
@@ -419,8 +419,8 @@ export default function App() {
         preload="auto" 
       />
       <audio 
-        ref={manualAudioRef} 
-        src={autoSettings.manualSound === 'custom' ? customAudioUrls.manual : (autoSettings.manualSound || 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg')} 
+        ref={failAudioRef} 
+        src={autoSettings.failSound === 'custom' ? customAudioUrls.fail : (autoSettings.failSound || 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg')} 
         preload="auto" 
       />
 
@@ -493,7 +493,7 @@ export default function App() {
                    setIsAnalyzing(false);
                    setProgress(null);
                    updateTopSignals(filtered);
-                   playAudio('manual');
+                   playAudio('fail');
                  }} 
                  onError={() => { setIsAnalyzing(false); setProgress(null); }}
               />

@@ -238,11 +238,26 @@ export async function analyzeMarket(params: {
       if (finalConfidence > 70) finalConfidence = 65; // Soft downgrade instead of hard block
     }
 
-    // Upgrade to Strong Signal if confidence exceeds the user's defined Strong Confidence threshold
-    const threshold = settings?.minStrongConfidence || 80;
-    if (finalConfidence >= threshold) {
-      if (finalSignal === 'buy') finalSignal = 'strong_buy' as any;
-      if (finalSignal === 'sell') finalSignal = 'strong_sell' as any;
+    // STRICT MATHEMATICAL ENFORCEMENT OF SETTINGS
+    const minConf = settings?.minConfidence || 55;
+    const strongConf = settings?.minStrongConfidence || 80;
+
+    // Rule 1: Enforce minimum confidence threshold (Downgrade to neutral/no_entry if below minConfidence)
+    if (finalConfidence < minConf) {
+      finalSignal = SignalType.NEUTRAL;
+    } else {
+      // Rule 2: If signal is strong but confidence is below the minStrongConfidence threshold, downgrade it
+      if (finalSignal === SignalType.STRONG_BUY && finalConfidence < strongConf) {
+        finalSignal = SignalType.BUY;
+      } else if (finalSignal === SignalType.STRONG_SELL && finalConfidence < strongConf) {
+        finalSignal = SignalType.SELL;
+      }
+      // Rule 3: If signal is buy/sell but confidence meets or exceeds minStrongConfidence threshold, upgrade it
+      else if (finalSignal === SignalType.BUY && finalConfidence >= strongConf) {
+        finalSignal = SignalType.STRONG_BUY;
+      } else if (finalSignal === SignalType.SELL && finalConfidence >= strongConf) {
+        finalSignal = SignalType.STRONG_SELL;
+      }
     }
 
     return {
