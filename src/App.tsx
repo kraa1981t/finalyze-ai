@@ -54,24 +54,39 @@ export default function App() {
 
   const [customAudioUrls, setCustomAudioUrls] = useState<{ success?: string, fail?: string }>({});
 
-  // Load persistent custom audio from IndexedDB
-  useEffect(() => {
-    const loadCustomAudio = async () => {
-      try {
-        const { getAudioBlob } = await import('./lib/db');
-        const successBlob = await getAudioBlob('custom_success');
-        const failBlob = await getAudioBlob('custom_fail');
-        
-        setCustomAudioUrls({
+  const loadCustomAudio = async () => {
+    try {
+      const { getAudioBlob } = await import('./lib/db');
+      const successBlob = await getAudioBlob('custom_success');
+      const failBlob = await getAudioBlob('custom_fail');
+      
+      setCustomAudioUrls(prev => {
+        // Revoke old object URLs to avoid memory leaks
+        if (prev.success) URL.revokeObjectURL(prev.success);
+        if (prev.fail) URL.revokeObjectURL(prev.fail);
+        return {
           success: successBlob ? URL.createObjectURL(successBlob) : undefined,
           fail: failBlob ? URL.createObjectURL(failBlob) : undefined
-        });
-      } catch (e) {
-        console.warn("Failed to load custom audio from DB", e);
-      }
-    };
+        };
+      });
+    } catch (e) {
+      console.warn("Failed to load custom audio from DB", e);
+    }
+  };
+
+  // Load persistent custom audio from IndexedDB on startup or settings change
+  useEffect(() => {
     loadCustomAudio();
   }, [autoSettings.successSound, autoSettings.failSound]);
+
+  // Listen to custom audio update events for hot-reloading new uploads
+  useEffect(() => {
+    const handleAudioChange = () => {
+      loadCustomAudio();
+    };
+    window.addEventListener('custom-audio-updated', handleAudioChange);
+    return () => window.removeEventListener('custom-audio-updated', handleAudioChange);
+  }, []);
 
   const [progress, setProgress] = useState<{ current: string, total: number, index: number } | null>(null);
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
@@ -314,8 +329,19 @@ export default function App() {
 
       setIsScanningFinished(false);
 
+      // Respect user deleted/hidden symbols in all categories
+      let hiddenSymbols: string[] = [];
+      try {
+        const savedHidden = localStorage.getItem('finalyze_hidden_symbols');
+        hiddenSymbols = savedHidden ? JSON.parse(savedHidden) : [];
+      } catch (e) {
+        console.warn("Failed to load hidden symbols for auto scan:", e);
+      }
+
       for (const cat of openCategories) {
-        const symbols = SYMBOL_CATEGORIES[cat];
+        const allSymbols = SYMBOL_CATEGORIES[cat];
+        const symbols = allSymbols.filter(s => !hiddenSymbols.includes(s));
+        
         const mType = cat === 'crypto' ? MarketType.CRYPTO : 
                       cat === 'stocks' ? MarketType.STOCKS :
                       cat === 'metals' ? MarketType.METALS : MarketType.FOREX;

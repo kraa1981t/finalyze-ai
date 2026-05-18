@@ -72,6 +72,7 @@ export default function Header({
           ...autoSettings,
           [type === 'success' ? 'successSound' : 'failSound']: 'custom'
         });
+        window.dispatchEvent(new CustomEvent('custom-audio-updated', { detail: { type } }));
       } catch (err) {
         console.error("Failed to save audio to DB", err);
       }
@@ -85,6 +86,7 @@ export default function Header({
         ...autoSettings,
         [type === 'success' ? 'successSound' : 'failSound']: ''
       });
+      window.dispatchEvent(new CustomEvent('custom-audio-updated', { detail: { type } }));
     } catch (err) {
       console.error("Failed to delete audio from DB", err);
     }
