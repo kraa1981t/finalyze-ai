@@ -162,7 +162,7 @@ export default function Header({
                     )}
                   >
                     <div className="relative">
-                      <Zap size={22} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
+                      <Zap size={22} color="#d97706" fill={autoSettings.isEnabled ? "#d97706" : "none"} />
                       {autoSettings.isEnabled && !isWaiting && (
                         <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-white rounded-full animate-ping shadow-[0_0_12px_white]" />
                       )}
@@ -180,7 +180,7 @@ export default function Header({
                     className="p-3 rounded-xl bg-white border border-black/10 text-black hover:bg-black/5 transition-all shadow-md"
                     title="Scanner Settings"
                   >
-                    <Activity size={22} className={cn(autoSettings.isEnabled && !isWaiting ? "animate-spin" : "")} />
+                    <Activity size={22} color="#d97706" className={cn(autoSettings.isEnabled && !isWaiting ? "animate-spin" : "")} />
                   </button>
                 </div>
               </div>
@@ -407,7 +407,7 @@ export default function Header({
                 onClick={onOpenSettings}
                 className="p-3 rounded-xl bg-white border border-black/10 text-black hover:bg-black/5 transition-all shadow-md"
               >
-                <Settings size={22} />
+                <Settings size={22} color="#d97706" />
               </button>
             </div>
 
@@ -417,7 +417,7 @@ export default function Header({
                 onClick={toggleTheme}
                 className="p-3 rounded-xl bg-white border border-black/10 text-black hover:bg-black/5 transition-all shadow-md"
               >
-                {isDark ? <Sun size={22} /> : <Moon size={22} />}
+                {isDark ? <Sun size={22} color="#d97706" /> : <Moon size={22} color="#d97706" />}
               </button>
             </div>
 
@@ -425,7 +425,7 @@ export default function Header({
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Language</span>
               <div className="relative group">
                 <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white border border-black/10 text-black hover:bg-black/5 transition-all shadow-md">
-                  <Globe size={22} />
+                  <Globe size={22} color="#d97706" />
                   <span className="text-sm font-black uppercase tracking-widest hidden lg:inline">{lang}</span>
                 </button>
                 <div className="absolute right-0 top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">

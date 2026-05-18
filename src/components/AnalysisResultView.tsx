@@ -76,7 +76,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
         <div className={cn("flex items-center justify-between px-4", isRTL ? "flex-row" : "flex-row-reverse")}>
           <span className="text-xs font-bold text-brand-muted font-mono">Analyzed: {results.length}</span>
           <h3 className="text-2xl font-black text-brand-text flex items-center gap-3">
-            <Zap size={28} color="#d97706" fill="#d97706" />
+            <Zap size={28} className="text-secondary fill-secondary" />
             {t.finalDecision}
           </h3>
         </div>
@@ -174,8 +174,8 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                 {/* Header */}
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-brand-text/10 rounded-3xl flex items-center justify-center border border-brand-text/20">
-                      {selectedResult.symbol.includes('USD') ? <Globe size={32} color="#d97706" /> : <Zap size={32} color="#d97706" />}
+                    <div className="w-16 h-16 bg-brand-text/10 rounded-3xl flex items-center justify-center text-primary border border-brand-text/20">
+                      {selectedResult.symbol.includes('USD') ? <Globe size={32} /> : <Zap size={32} />}
                     </div>
                     <div>
                       <h2 className="text-4xl font-black tracking-tight text-brand-text italic mb-1">{selectedResult.symbol}</h2>
@@ -201,7 +201,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                    <div className="lg:col-span-2 space-y-8">
                       <div className="p-8 bg-brand-alt border border-brand-text/5 rounded-[2rem] space-y-4">
                          <div className="flex items-center gap-3 text-secondary">
-                           <MessageSquare size={20} color="#d97706" />
+                           <MessageSquare size={20} />
                            <h4 className="text-sm font-black uppercase tracking-widest">{t.reasons}</h4>
                          </div>
                          <div className="prose prose-invert prose-slate max-w-none text-brand-muted leading-relaxed text-lg">
@@ -260,7 +260,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
 
                       <div className="p-8 bg-brand-bg/40 border border-brand-text/5 rounded-[2rem] space-y-4">
                          <div className="flex items-center gap-3 text-brand-muted">
-                           <ShieldAlert size={18} color="#d97706" />
+                           <ShieldAlert size={18} />
                            <h4 className="text-xs font-black uppercase tracking-widest">Risk Guard</h4>
                          </div>
                          <p className="text-[11px] text-brand-muted leading-relaxed">
