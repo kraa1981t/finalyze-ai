@@ -25,7 +25,6 @@ interface HeaderProps {
   isWaiting?: boolean;
   isRadarUnlocked: boolean;
   onUnlockRadar: () => void;
-  autoProgress?: { symbol: string, current: number, total: number } | null;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -51,8 +50,7 @@ export default function Header({
   onAutoSettingsChange,
   isWaiting,
   isRadarUnlocked,
-  onUnlockRadar,
-  autoProgress
+  onUnlockRadar
 }: HeaderProps) {
   const t = translations[lang];
   const [isAutoMenuOpen, setIsAutoMenuOpen] = React.useState(false);
@@ -144,16 +142,6 @@ export default function Header({
             <div className="relative">
               <div className="flex flex-col items-center gap-1.5 px-4 py-3 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:shadow-md transition-shadow">
                 <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Radar System</span>
-                {autoProgress && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-950 border border-emerald-500/30 animate-pulse text-[11px] font-bold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                    <span>
-                      {lang === 'ar' 
-                        ? `جاري فحص ${autoProgress.symbol} (${autoProgress.current}/${autoProgress.total})` 
-                        : `Scanning ${autoProgress.symbol} (${autoProgress.current}/${autoProgress.total})`}
-                    </span>
-                  </div>
-                )}
                 <div className="flex items-center gap-4">
                   <button 
                     onClick={(e) => {
