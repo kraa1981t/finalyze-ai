@@ -137,12 +137,12 @@ export default function Header({
             </div>
           </div>
 
-          <div className="flex items-center gap-6 mb-2">
+          <div className="flex items-center gap-3 mb-2">
             {/* Auto Analysis Scanner */}
             <div className="relative">
-              <div className="flex flex-col items-center gap-1.5 px-4 py-3 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:shadow-md transition-shadow">
                 <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Radar System</span>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2.5">
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
@@ -153,7 +153,7 @@ export default function Header({
                       }
                     }}
                     className={cn(
-                      "flex items-center gap-3 px-6 py-2.5 rounded-xl transition-all border-2 shadow-2xl",
+                      "flex items-center gap-2 px-4 py-2 rounded-xl transition-all border-2 shadow-lg",
                       autoSettings.isEnabled 
                         ? (isWaiting 
                           ? 'bg-red-600 border-red-700 text-white shadow-red-500/40 hover:bg-red-700' 
@@ -162,13 +162,13 @@ export default function Header({
                     )}
                   >
                     <div className="relative">
-                      <Zap size={22} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
+                      <Zap size={18} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
                       {autoSettings.isEnabled && !isWaiting && (
-                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-white rounded-full animate-ping shadow-[0_0_12px_white]" />
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full animate-ping shadow-[0_0_12px_white]" />
                       )}
                     </div>
-                    <span className="text-[14px] font-black uppercase tracking-wider hidden md:inline">
-                      {autoSettings.isEnabled ? (isWaiting ? 'Restart Radar' : 'Radar ON') : 'Radar OFF'}
+                    <span className="text-[12px] font-black uppercase tracking-wider hidden md:inline">
+                      {autoSettings.isEnabled ? (isWaiting ? 'Restart' : 'Radar ON') : 'Radar OFF'}
                     </span>
                   </button>
 
@@ -177,10 +177,10 @@ export default function Header({
                       e.stopPropagation();
                       setIsAutoMenuOpen(!isAutoMenuOpen);
                     }}
-                    className="p-3 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
+                    className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
                     title="Scanner Settings"
                   >
-                    <Activity size={22} className={cn(autoSettings.isEnabled && !isWaiting ? "animate-spin" : "")} />
+                    <Activity size={18} className={cn(autoSettings.isEnabled && !isWaiting ? "animate-spin" : "")} />
                   </button>
                 </div>
               </div>
@@ -401,32 +401,32 @@ export default function Header({
               </AnimatePresence>
             </div>
 
-            <div className="flex flex-col items-center gap-1.5 px-4 py-3 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
+            <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Strategy</span>
               <button 
                 onClick={onOpenSettings}
-                className="p-3 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
+                className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
               >
-                <Settings size={22} />
+                <Settings size={18} />
               </button>
             </div>
 
-            <div className="flex flex-col items-center gap-1.5 px-4 py-3 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
+            <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Theme</span>
               <button 
                 onClick={toggleTheme}
-                className="p-3 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
+                className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
               >
-                {isDark ? <Sun size={22} /> : <Moon size={22} />}
+                {isDark ? <Sun size={18} /> : <Moon size={18} />}
               </button>
             </div>
 
-            <div className="flex flex-col items-center gap-1.5 px-4 py-3 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
+            <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Language</span>
               <div className="relative group">
-                <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md">
-                  <Globe size={22} />
-                  <span className="text-sm font-black uppercase tracking-widest hidden lg:inline">{lang}</span>
+                <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md">
+                  <Globe size={18} />
+                  <span className="text-xs font-black uppercase tracking-widest hidden lg:inline">{lang}</span>
                 </button>
                 <div className="absolute right-0 top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
                   {LANGUAGES.map((l) => (
@@ -446,34 +446,34 @@ export default function Header({
             </div>
 
             {user ? (
-              <div className="flex flex-col items-center gap-1.5 pl-6 border-l border-black/10">
+              <div className="flex flex-col items-center gap-1 pl-3 border-l border-black/10">
                 <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Profile</span>
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-2xl bg-white border border-black/10 flex items-center justify-center overflow-hidden shadow-md">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-[#F59E0B] border border-black/10 flex items-center justify-center overflow-hidden shadow-md">
                     {user.photoURL ? (
                       <img src={user.photoURL} alt="profile" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-sky-100 flex items-center justify-center text-sky-600">
-                        <span className="text-xl font-black">{user.email?.charAt(0).toUpperCase()}</span>
+                      <div className="w-full h-full bg-black/5 flex items-center justify-center text-black">
+                        <span className="text-sm font-black">{user.email?.charAt(0).toUpperCase()}</span>
                       </div>
                     )}
                   </div>
                   <button 
                     onClick={onLogout}
-                    className="p-3 rounded-xl bg-white border border-black/10 text-black hover:text-red-500 transition-all hover:bg-red-500/10 shadow-md"
+                    className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
                   >
-                    <LogOut size={22} />
+                    <LogOut size={18} />
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-1.5 pl-6 border-l border-black/10">
+              <div className="flex flex-col items-center gap-1 pl-3 border-l border-black/10">
                 <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Account</span>
                 <button 
                   onClick={onLogin}
-                  className="flex items-center gap-4 bg-black text-white px-8 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-2xl shadow-black/20 hover:scale-105 active:scale-95 transition-all"
+                  className="flex items-center gap-2 bg-[#F59E0B] text-black px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-md hover:bg-[#d97706] active:scale-95 transition-all"
                 >
-                  <LogIn size={22} />
+                  <LogIn size={18} />
                   <span className="hidden sm:inline">{t.login}</span>
                 </button>
               </div>
