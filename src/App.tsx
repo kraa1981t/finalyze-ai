@@ -440,11 +440,13 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-brand-bg relative">
       {/* NATIVE AUDIO ELEMENTS - Hidden but present in DOM for perfect playback */}
       <audio 
+        key={customAudioUrls.success || 'success_default'}
         ref={successAudioRef} 
         src={autoSettings.successSound === 'custom' ? customAudioUrls.success : (autoSettings.successSound || 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg')} 
         preload="auto" 
       />
       <audio 
+        key={customAudioUrls.fail || 'fail_default'}
         ref={failAudioRef} 
         src={autoSettings.failSound === 'custom' ? customAudioUrls.fail : (autoSettings.failSound || 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg')} 
         preload="auto" 

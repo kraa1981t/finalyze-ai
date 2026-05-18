@@ -23,13 +23,25 @@ export const DEFAULT_AUTO_SETTINGS = {
 
 export const SYMBOL_CATEGORIES = {
   forex: [
-    'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD',
-    'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'EURAUD', 'EURCAD', 'GBPAUD',
-    'GBPCAD', 'AUDCAD', 'AUDNZD', 'NZDJPY', 'CADJPY', 'CHFJPY', 'EURNZD'
+    'EURUSD', 'EURGBP', 'EURJPY', 'EURAUD', 'EURNZD', 'EURCAD', 'EURCHF',
+    'GBPUSD', 'AUDUSD', 'NZDUSD', 'USDCAD', 'USDCHF', 'USDJPY', 'USDMXN',
+    'GBPJPY', 'GBPAUD', 'GBPNZD', 'GBPCAD', 'GBPCHF',
+    'AUDJPY', 'AUDNZD', 'AUDCAD', 'AUDCHF', 'NZDJPY', 'NZDCAD', 'NZDCHF',
+    'CADJPY', 'CADCHF', 'CHFJPY'
   ],
-  crypto: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD', 'DOTUSD', 'AVAXUSD', 'LINKUSD', 'MATICUSD'],
-  stocks: ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'GOOGL', 'META', 'NFLX', 'AMD', 'BABA'],
-  metals: ['XAUUSD=X', 'XAGUSD=X', 'PA=F', 'PL=F', 'HG=F']
+  crypto: [
+    'BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD', 'AVAXUSD',
+    'DOGEUSD', 'SHIBUSD', 'PEPEUSD', 'WIFUSD', 'BONKUSD',
+    'DOTUSD', 'LINKUSD', 'MATICUSD', 'UNIUSD', 'LTCUSD', 'BCHUSD'
+  ],
+  stocks: [
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
+    'XOM', 'CVX', 'SHEL', 'TTE', 'BP',
+    'JPM', 'BAC', 'WFC', 'C', 'GS'
+  ],
+  metals: [
+    'XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD'
+  ]
 };
 
 export const MARKET_CATEGORIES = [
