@@ -37,6 +37,22 @@ app.get("/api/market-data", async (req, res) => {
     if (!symbol) return res.status(400).json({ error: "Symbol is required" });
 
     let yahooSymbol = symbol.toUpperCase().replace(/ /g, '');
+    
+    // Custom Yahoo Finance Mappings for Metals
+    const customMappings: Record<string, string> = {
+      'XPTUSD': 'PL=F', // Platinum
+      'XPDUSD': 'PA=F', // Palladium
+      'XCUUSD': 'HG=F', // Copper
+      'XALUSD': 'ALI=F', // Aluminum
+      'XZNUSD': 'ZNC=F', // Zinc
+      'XNIUSD': 'NIC=F', // Nickel
+      'XPBUSD': 'LED=F', // Lead
+    };
+    
+    if (customMappings[yahooSymbol]) {
+      yahooSymbol = customMappings[yahooSymbol];
+    }
+
     let interval = '1d';
     let range = '14d';
     
