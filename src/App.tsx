@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithRedirect, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -421,7 +421,6 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    setPersistence(auth, browserLocalPersistence).catch(console.error);
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
         setUser(u);
@@ -458,7 +457,7 @@ export default function App() {
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
-    try { await signInWithPopup(auth, provider); } catch (error) { console.error(error); }
+    try { await signInWithRedirect(auth, provider); } catch (error) { console.error(error); }
   };
 
   const handleLogout = async () => {
