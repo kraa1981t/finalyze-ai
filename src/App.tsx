@@ -11,7 +11,7 @@ import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
 import TopSignals from './components/TopSignals';
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType } from './types';
-import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from './constants';
+import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS } from './constants';
 import { Language, translations } from './lib/i18n';
 import { analyzeMarket } from './services/geminiService';
 
@@ -331,16 +331,25 @@ export default function App() {
 
       // Respect user deleted/hidden symbols in all categories
       let hiddenSymbols: string[] = [];
+      let customSymbols: string[] = [];
       try {
         const savedHidden = localStorage.getItem('finalyze_hidden_symbols');
         hiddenSymbols = savedHidden ? JSON.parse(savedHidden) : [];
+        const savedCustom = localStorage.getItem('finalyze_custom_symbols');
+        customSymbols = savedCustom ? JSON.parse(savedCustom) : [];
       } catch (e) {
-        console.warn("Failed to load hidden symbols for auto scan:", e);
+        console.warn("Failed to load symbols for auto scan:", e);
       }
 
       for (const cat of openCategories) {
-        const allSymbols = SYMBOL_CATEGORIES[cat];
-        const symbols = allSymbols.filter(s => !hiddenSymbols.includes(s));
+        // UNIFY LOGIC: Combine SYMBOL_GROUPS with customSymbols exactly like the manual AnalysisForm
+        const allGroupsSymbols = SYMBOL_GROUPS[cat]?.flatMap(g => g.symbols) || [];
+        const customForType = customSymbols.filter(s => 
+          (ALL_SYMBOLS_DB[cat] || []).includes(s) &&
+          !allGroupsSymbols.includes(s)
+        );
+        const allSymbolsCombined = [...allGroupsSymbols, ...customForType];
+        const symbols = allSymbolsCombined.filter(s => !hiddenSymbols.includes(s));
         
         const mType = cat === 'crypto' ? MarketType.CRYPTO : 
                       cat === 'stocks' ? MarketType.STOCKS :
