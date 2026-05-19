@@ -40,6 +40,8 @@ app.get("/api/market-data", async (req, res) => {
     
     // Custom Yahoo Finance Mappings for Metals
     const customMappings: Record<string, string> = {
+      'XAUUSD': 'GC=F', // Gold Futures
+      'XAGUSD': 'SI=F', // Silver Futures
       'XPTUSD': 'PL=F', // Platinum
       'XPDUSD': 'PA=F', // Palladium
       'XCUUSD': 'HG=F', // Copper
