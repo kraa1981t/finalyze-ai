@@ -448,8 +448,8 @@ export default function App() {
           }
         }
       } else {
-        setUser({ uid: 'developer', email: 'bachasalman69@gmail.com', displayName: 'Developer' } as any);
-        setHasApiKey(true);
+        setUser(null);
+        setHasApiKey(false);
       }
       setLoading(false);
     });
@@ -464,7 +464,7 @@ export default function App() {
   const handleLogout = async () => {
     await signOut(auth);
     localStorage.removeItem('finalyze_user_qwen_api_key');
-    setHasApiKey(true);
+    setHasApiKey(false);
     setAnalysisResults(null);
   };
 
