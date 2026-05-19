@@ -91,24 +91,44 @@ app.post("/api/ai-analysis", async (req, res) => {
     const apiUrl = process.env.VITE_QWEN_API_URL;
     const model = process.env.VITE_QWEN_MODEL || "qwen-plus";
 
-    const response = await fetch(`${apiUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: "system", content: "You are a professional financial analyst AI." },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.1,
-        response_format: { type: "json_object" }
-      })
-    });
+    let retries = 3;
+    let response;
+    let data;
 
-    const data = await response.json();
+    while (retries > 0) {
+      response = await fetch(`${apiUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: "system", content: "You are a professional financial analyst AI." },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.1,
+          response_format: { type: "json_object" }
+        })
+      });
+
+      if (response.status === 429) {
+        retries--;
+        if (retries === 0) break;
+        // Wait 5 seconds before retrying
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        continue;
+      }
+
+      data = await response.json();
+      break;
+    }
+
+    if (!data) {
+      data = await response?.json();
+    }
+
     res.json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
