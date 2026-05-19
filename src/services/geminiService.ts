@@ -67,10 +67,8 @@ export async function analyzeMarket(params: {
   tradingStyle: TradingStyle;
   settings?: StrategySettings;
   lang?: string;
-  userApiKey?: string;
-  userEmail?: string;
 }): Promise<AnalysisResult> {
-  const { symbol, type, timeframe, tradingStyle, settings = DEFAULT_STRATEGY_SETTINGS, lang = 'en', userApiKey, userEmail } = params;
+  const { symbol, type, timeframe, tradingStyle, settings = DEFAULT_STRATEGY_SETTINGS, lang = 'en' } = params;
 
   try {
     const TF_PROGRESSION = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M', '1Y'];
@@ -200,10 +198,11 @@ export async function analyzeMarket(params: {
       }
     `;
 
+    const userApiKey = localStorage.getItem('finalyze_user_qwen_api_key') || '';
     const aiResponse = await fetch('/api/ai-analysis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: technicalPrompt, userApiKey, userEmail })
+      body: JSON.stringify({ prompt: technicalPrompt, userApiKey })
     }).then(r => r.json());
 
     if (!aiResponse?.choices?.[0]?.message?.content) {

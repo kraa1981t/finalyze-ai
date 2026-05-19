@@ -11,22 +11,23 @@ import ConnectionStatus from './components/ConnectionStatus';
 import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
 import TopSignals from './components/TopSignals';
-import ApiKeyModal from './components/ApiKeyModal';
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType } from './types';
 import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS } from './constants';
 import { Language, translations } from './lib/i18n';
 import { analyzeMarket } from './services/geminiService';
+import ApiKeyModal from './components/ApiKeyModal';
 
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isApiKeyOpen, setIsApiKeyOpen] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_qwen_api_key'));
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isApiKeyOpen, setIsApiKeyOpen] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
@@ -361,14 +362,9 @@ export default function App() {
         for (const symbol of symbols) {
           if (!isSubscribed || !autoSettingsRef.current.isEnabled || isAnalyzing) break;
           try {
-            const userApiKey = user ? (localStorage.getItem(`qwen_api_key_${user.uid}`) || undefined) : undefined;
-            const userEmail = user?.email || undefined;
-
             const result = await analyzeMarket({
               symbol, type: mType, timeframe: currentSettings.timeframe,
-              tradingStyle: currentSettings.tradingStyle, settings, lang,
-              userApiKey,
-              userEmail
+              tradingStyle: currentSettings.tradingStyle, settings, lang
             });
             if (result && isSubscribed) {
               const sig = result.signal || '';
@@ -429,23 +425,31 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
         setUser(u);
-        // Check for custom API Key
-        const localKey = localStorage.getItem(`qwen_api_key_${u.uid}`);
-        if (!localKey) {
+        const localKey = localStorage.getItem('finalyze_user_qwen_api_key');
+        if (localKey) {
+          setHasApiKey(true);
+        } else {
           try {
             const userDoc = await getDoc(doc(db, 'users', u.uid));
-            if (userDoc.exists() && userDoc.data().qwenApiKey) {
-              localStorage.setItem(`qwen_api_key_${u.uid}`, userDoc.data().qwenApiKey);
+            if (userDoc.exists()) {
+              const data = userDoc.data();
+              if (data?.qwenApiKey) {
+                localStorage.setItem('finalyze_user_qwen_api_key', data.qwenApiKey);
+                setHasApiKey(true);
+              } else {
+                setHasApiKey(false);
+              }
             } else {
-              // Redirect/Open modal for new users with no API Key
-              setIsApiKeyOpen(true);
+              setHasApiKey(false);
             }
-          } catch (e) {
-            console.error("Failed to load user API key on login:", e);
+          } catch (err) {
+            console.error("Failed to load user API key from Firestore:", err);
+            setHasApiKey(false);
           }
         }
       } else {
         setUser({ uid: 'developer', email: 'bachasalman69@gmail.com', displayName: 'Developer' } as any);
+        setHasApiKey(true);
       }
       setLoading(false);
     });
@@ -459,6 +463,8 @@ export default function App() {
 
   const handleLogout = async () => {
     await signOut(auth);
+    localStorage.removeItem('finalyze_user_qwen_api_key');
+    setHasApiKey(true);
     setAnalysisResults(null);
   };
 
@@ -497,27 +503,30 @@ export default function App() {
         settings={settings} onSettingsChange={setSettings} 
       />
 
-      {user && (
-        <ApiKeyModal 
-          isOpen={isApiKeyOpen} 
-          onClose={() => setIsApiKeyOpen(false)} 
-          userId={user.uid} 
-          lang={lang}
-          onSaveSuccess={() => {}}
-        />
-      )}
+      <ApiKeyModal 
+        isOpen={isApiKeyOpen || (!!user && user.email !== 'bachasalman69@gmail.com' && !hasApiKey)}
+        onClose={() => setIsApiKeyOpen(false)}
+        isBlocking={!hasApiKey && user?.email !== 'bachasalman69@gmail.com'}
+        lang={lang}
+        user={user}
+        onSaved={(key) => {
+          setHasApiKey(true);
+          setIsApiKeyOpen(false);
+        }}
+      />
 
       <Header 
         user={user} onLogin={handleLogin} onLogout={handleLogout} 
         isDark={isDark} toggleTheme={() => setIsDark(!isDark)}
         lang={lang} onLangChange={setLang}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenApiKeyModal={() => setIsApiKeyOpen(true)}
         showBack={!!analysisResults} onBack={() => setAnalysisResults(null)}
         autoSettings={autoSettings} onAutoSettingsChange={setAutoSettings}
         isWaiting={isScanningFinished}
         isRadarUnlocked={isRadarUnlocked}
         onUnlockRadar={handleUnlockRadar}
+        hasApiKey={hasApiKey}
+        onOpenApiKey={() => setIsApiKeyOpen(true)}
       />
 
       <AnimatePresence>

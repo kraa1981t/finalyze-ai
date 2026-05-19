@@ -61,11 +61,12 @@ export interface AutoAnalysisSettings {
   isEnabled: boolean;
   interval: number; // in minutes
   timeframe: string;
-  category: 'all' | 'forex' | 'crypto' | 'stocks' | 'metals';
+  category: string;
   tradingStyle: TradingStyle;
   volume: number; // 0 to 1
   showAllSignals: boolean;
   lastFinishedAt?: number;
   successSound?: string;
   failSound?: string;
+  forceRestart?: boolean;
 }

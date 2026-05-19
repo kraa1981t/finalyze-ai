@@ -46,6 +46,35 @@ async function startServer() {
 
       let yahooSymbol = symbol.toUpperCase().replace(/ /g, '');
       
+      // Custom Yahoo Finance Mappings for Metals
+      const customMappings: Record<string, string> = {
+        'XAUUSD': 'GC=F', // Gold Futures
+        'XAGUSD': 'SI=F', // Silver Futures
+        'XPTUSD': 'PL=F', // Platinum
+        'XPDUSD': 'PA=F', // Palladium
+        'XCUUSD': 'HG=F', // Copper
+        'XALUSD': 'ALI=F', // Aluminum
+        'XZNUSD': 'ZNC=F', // Zinc
+        'XNIUSD': 'NIC=F', // Nickel
+        'XPBUSD': 'LED=F', // Lead
+      };
+      
+      if (customMappings[yahooSymbol]) {
+        yahooSymbol = customMappings[yahooSymbol];
+      }
+
+      let interval = '1d';
+      let range = '14d';
+      
+      // Timeframe Mapping
+      if (timeframe === '1m') { interval = '1m'; range = '1d'; }
+      else if (timeframe === '5m') { interval = '5m'; range = '5d'; }
+      else if (timeframe === '15m') { interval = '15m'; range = '5d'; }
+      else if (timeframe === '1h') { interval = '60m'; range = '1mo'; }
+      else if (timeframe === '4h') { interval = '1h'; range = '3mo'; } 
+      else if (timeframe === '1d') { interval = '1d'; range = '6mo'; }
+      else if (timeframe === '1w') { interval = '1wk'; range = '2y'; }
+
       const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
         try {
           const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${rangeStr}&interval=${intervalStr}`;
@@ -91,7 +120,6 @@ async function startServer() {
       
       outer: for (const attempt of uniqueAttempts) {
         for (const intv of intervalsToTry) {
-          // If the interval requested is already in the list, start from there or skip smaller ones
           finalData = await fetchMarketData(attempt, range, intv);
           if (finalData) break outer;
         }
@@ -119,42 +147,57 @@ async function startServer() {
   // API Route: AI Analysis Proxy (Resolves CORS issues)
   app.post("/api/ai-analysis", async (req, res) => {
     try {
-      const { prompt } = req.body;
-      const apiKey = process.env.VITE_QWEN_API_KEY;
+      const { prompt, userApiKey } = req.body;
+      const apiKey = userApiKey || process.env.VITE_QWEN_API_KEY;
       const apiUrl = process.env.VITE_QWEN_API_URL;
       const model = process.env.VITE_QWEN_MODEL || "qwen-plus";
 
-      if (!apiKey || !apiUrl) {
-        return res.status(500).json({ error: "AI API credentials not configured on server." });
+      if (!apiKey) {
+        return res.status(400).json({ error: "Qwen API Key is required. Please set your key in the top-right toolbar." });
       }
 
-      const response = await fetch(`${apiUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            { role: "system", content: "You are a professional financial analyst AI. You provide strict, math-based technical analysis." },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.1,
-          response_format: { type: "json_object" }
-        })
-      });
+      let retries = 3;
+      let response;
+      let data;
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return res.status(response.status).json({ error: errorData.error?.message || "AI Provider Error" });
+      while (retries > 0) {
+        response = await fetch(`${apiUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              { role: "system", content: "You are a professional financial analyst AI. You provide strict, math-based technical analysis." },
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.1,
+            response_format: { type: "json_object" }
+          })
+        });
+
+        if (response.status === 429) {
+          retries--;
+          if (retries === 0) break;
+          // Wait 5 seconds before retrying
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          continue;
+        }
+
+        data = await response.json();
+        break;
       }
 
-      const data = await response.json();
+      if (!data) {
+        data = await response?.json();
+      }
+
       res.json(data);
     } catch (error: any) {
       console.error("AI Proxy error:", error);
-      res.status(500).json({ error: "Internal server error during AI analysis" });
+      res.status(500).json({ error: error.message || "Internal server error during AI analysis" });
     }
   });
   

@@ -22,5 +22,13 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "old_view.tsx",
+    "old_view_final.tsx",
+    "view1.tsx",
+    "view2.tsx"
+  ]
 }

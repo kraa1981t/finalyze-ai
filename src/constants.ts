@@ -45,10 +45,10 @@ export const SYMBOL_CATEGORIES = {
 };
 
 export const MARKET_CATEGORIES = [
-  { id: 'forex', icon: 'DollarSign' },
-  { id: 'crypto', icon: 'Bitcoin' },
-  { id: 'stocks', icon: 'TrendingUp' },
-  { id: 'metals', icon: 'Gem' }
+  { id: MarketType.FOREX, icon: 'DollarSign' },
+  { id: MarketType.CRYPTO, icon: 'Bitcoin' },
+  { id: MarketType.STOCKS, icon: 'TrendingUp' },
+  { id: MarketType.METALS, icon: 'Gem' }
 ];
 
 export const DEFAULT_SUCCESS_SOUNDS = [

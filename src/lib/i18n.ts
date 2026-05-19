@@ -79,6 +79,9 @@ export interface Translations {
   searchSymbol: string;
   addSymbol: string;
   popularSymbols: string;
+  topSignals: string;
+  signalExpired: string;
+  delete: string;
   autoAnalysis: string;
   autoSettings: string;
   autoScan: string;
@@ -360,6 +363,20 @@ export const translations: Record<Language, Translations> = {
     searchSymbol: "Buscar todos los símbolos...",
     addSymbol: "Añadir símbolo",
     popularSymbols: "Símbolos populares",
+    topSignals: "Señales de Alta Confianza",
+    signalExpired: "Señal Expirada",
+    delete: "Eliminar",
+    autoAnalysis: "Auto-Escáner",
+    autoSettings: "Configuración del Escáner",
+    autoScan: "Iniciar Escaneo",
+    allCategories: "Todos los Mercados",
+    every: "Cada",
+    minutes: "min",
+    successSound: "Alerta de Éxito",
+    failSound: "Alerta de Fin de Ciclo",
+    uploadCustom: "Subir Audio Personalizado",
+    startManualNow: "Iniciar Análisis Manual Ahora",
+    clearAllResults: "Borrar Todos los Resultados",
   },
   ru: {
     title: "Finalyze AI",
@@ -440,6 +457,20 @@ export const translations: Record<Language, Translations> = {
     searchSymbol: "Поиск всех символов...",
     addSymbol: "Добавить символ",
     popularSymbols: "Популярные символы",
+    topSignals: "Высокоточные сигналы",
+    signalExpired: "Сигнал истек",
+    delete: "Удалить",
+    autoAnalysis: "Авто-сканер",
+    autoSettings: "Настройки сканера",
+    autoScan: "Запустить сканирование",
+    allCategories: "Все рынки",
+    every: "Каждые",
+    minutes: "мин",
+    successSound: "Сигнал успеха",
+    failSound: "Сигнал завершения цикла",
+    uploadCustom: "Загрузить свой звук",
+    startManualNow: "Запустить ручной анализ",
+    clearAllResults: "Очистить все результаты",
   },
   fr: {
     title: "Finalyze AI",
@@ -520,5 +551,19 @@ export const translations: Record<Language, Translations> = {
     searchSymbol: "Rechercher tous les symboles...",
     addSymbol: "Ajouter un symbole",
     popularSymbols: "Symboles populaires",
+    topSignals: "Signaux de Haute Confiance",
+    signalExpired: "Signal Expiré",
+    delete: "Supprimer",
+    autoAnalysis: "Auto-Scanner",
+    autoSettings: "Paramètres du Scanner",
+    autoScan: "Lancer le Scan",
+    allCategories: "Tous les Marchés",
+    every: "Chaque",
+    minutes: "min",
+    successSound: "Alerte de Succès",
+    failSound: "Alerte de Fin de Cycle",
+    uploadCustom: "Télécharger un Audio Personnalisé",
+    startManualNow: "Lancer l'Analyse Manuelle Maintenant",
+    clearAllResults: "Effacer Tous les Résultats",
   },
 };

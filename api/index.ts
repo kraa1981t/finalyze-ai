@@ -101,62 +101,17 @@ app.get("/api/market-data", async (req, res) => {
   }
 });
 
-// API Route: Verify User API Key
-app.post("/api/verify-key", async (req, res) => {
-  try {
-    const { userApiKey } = req.body;
-    if (!userApiKey) {
-      return res.status(400).json({ valid: false, error: "API Key is required" });
-    }
-
-    const apiUrl = process.env.VITE_QWEN_API_URL;
-    const model = process.env.VITE_QWEN_MODEL || "qwen-plus";
-
-    const response = await fetch(`${apiUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userApiKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: "user", content: "ping" }
-        ],
-        max_tokens: 5
-      })
-    });
-
-    if (response.status === 401) {
-      return res.status(401).json({ valid: false, error: "Unauthorized: Invalid API Key" });
-    }
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      return res.status(response.status).json({ valid: false, error: errData.error?.message || "Verification failed" });
-    }
-
-    res.json({ valid: true });
-  } catch (error: any) {
-    res.status(500).json({ valid: false, error: error.message });
-  }
-});
-
 // API Route: AI Analysis Proxy
 app.post("/api/ai-analysis", async (req, res) => {
   try {
-    const { prompt, userApiKey, userEmail } = req.body;
-    
-    // Protect the admin key: only allowed for developer/owner
-    const isAdmin = userEmail === 'bachasalman69@gmail.com' || userEmail === 'taybe.kraa@gmail.com' || userEmail === 'joseph.trading.2026@gmail.com'; 
-    const apiKey = userApiKey || (isAdmin ? process.env.VITE_QWEN_API_KEY : null);
-
-    if (!apiKey) {
-      return res.status(401).json({ error: "Missing Qwen API Key. Please configure your key in settings." });
-    }
-
+    const { prompt, userApiKey } = req.body;
+    const apiKey = userApiKey || process.env.VITE_QWEN_API_KEY;
     const apiUrl = process.env.VITE_QWEN_API_URL;
     const model = process.env.VITE_QWEN_MODEL || "qwen-plus";
+
+    if (!apiKey) {
+      return res.status(400).json({ error: "Qwen API Key is required. Please set your key in the top-right toolbar." });
+    }
 
     let retries = 3;
     let response;

@@ -18,7 +18,6 @@ interface HeaderProps {
   lang: Language;
   onLangChange: (l: Language) => void;
   onOpenSettings: () => void;
-  onOpenApiKeyModal: () => void;
   showBack?: boolean;
   onBack?: () => void;
   autoSettings: AutoAnalysisSettings;
@@ -26,6 +25,8 @@ interface HeaderProps {
   isWaiting?: boolean;
   isRadarUnlocked: boolean;
   onUnlockRadar: () => void;
+  hasApiKey: boolean;
+  onOpenApiKey: () => void;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -45,14 +46,15 @@ export default function Header({
   lang, 
   onLangChange, 
   onOpenSettings,
-  onOpenApiKeyModal,
   showBack, 
   onBack,
   autoSettings,
   onAutoSettingsChange,
   isWaiting,
   isRadarUnlocked,
-  onUnlockRadar
+  onUnlockRadar,
+  hasApiKey,
+  onOpenApiKey
 }: HeaderProps) {
   const t = translations[lang];
   const [isAutoMenuOpen, setIsAutoMenuOpen] = React.useState(false);
@@ -478,20 +480,21 @@ export default function Header({
               </AnimatePresence>
             </div>
 
-            {user && (
-              <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm animate-fade-in">
-                <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">
-                  {lang === 'ar' ? 'المفتاح' : 'API Key'}
-                </span>
-                <button 
-                  onClick={onOpenApiKeyModal}
-                  className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md active:scale-95"
-                  title="API Key Settings"
-                >
-                  <Key size={18} />
-                </button>
-              </div>
-            )}
+            <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm relative">
+              <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">
+                {lang === 'ar' ? 'المفتاح' : 'API Key'}
+              </span>
+              <button 
+                onClick={onOpenApiKey}
+                className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md relative flex items-center justify-center"
+                title={lang === 'ar' ? 'إعداد مفتاح API الخاص بك' : 'Configure API Key'}
+              >
+                <Key size={18} />
+                {!hasApiKey && user && user.email !== 'bachasalman69@gmail.com' && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-600 rounded-full border border-white animate-pulse" />
+                )}
+              </button>
+            </div>
 
             <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Strategy</span>

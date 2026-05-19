@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AnalysisResult, SignalType } from '../types';
+import { AnalysisResult, SignalType, StrategySettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { TrendingUp, TrendingDown, Minus, ShieldAlert, Zap, Globe, MessageSquare, BarChart2, ChevronRight, X, History, Scale } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
