@@ -1,15 +1,37 @@
-import React from 'react';
-import { ShieldCheck, Zap, Globe, BarChart3, ChevronRight } from 'lucide-react';
-import { motion } from 'motion/react';
+import React, { useState } from 'react';
+import { ShieldCheck, Zap, Globe, BarChart3, ChevronRight, AlertTriangle, ExternalLink, HelpCircle, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/i18n';
 
 interface LoginOverlayProps {
   onLogin: () => void;
   lang: Language;
+  loginError: string | null;
+  onClearError: () => void;
 }
 
-export default function LoginOverlay({ onLogin, lang }: LoginOverlayProps) {
+export default function LoginOverlay({ onLogin, lang, loginError, onClearError }: LoginOverlayProps) {
   const t = translations[lang];
+  const [showGuide, setShowGuide] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
+  const [copiedConfigPath, setCopiedConfigPath] = useState(false);
+
+  const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
+
+  const copyToClipboard = async (text: string, isConfig: boolean) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (isConfig) {
+        setCopiedConfigPath(true);
+        setTimeout(() => setCopiedConfigPath(false), 2000);
+      } else {
+        setCopiedDomain(true);
+        setTimeout(() => setCopiedDomain(false), 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-start p-4 bg-brand-bg overflow-y-auto pt-12 pb-8">
@@ -65,11 +87,11 @@ export default function LoginOverlay({ onLogin, lang }: LoginOverlayProps) {
                 { icon: <BarChart3 size={18} />, label: lang === 'ar' ? 'تحليل لحظي' : 'Real-time Analysis' },
                 { icon: <Globe size={18} />, label: lang === 'ar' ? 'تغطية عالمية' : 'Global Coverage' },
               ].map((item, i) => (
-                <div key={i} className="flex items-center gap-3 text-slate-300">
+                <div key={i} className="flex items-center gap-3 text-slate-300 justify-end">
+                  <span className="text-sm font-medium">{item.label}</span>
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-primary">
                     {item.icon}
                   </div>
-                  <span className="text-sm font-medium">{item.label}</span>
                 </div>
               ))}
             </div>
@@ -97,22 +119,58 @@ export default function LoginOverlay({ onLogin, lang }: LoginOverlayProps) {
               </h3>
             </div>
 
-            <div className="space-y-4 mb-10 relative z-10">
+            {/* Error Message Visual Callout */}
+            {loginError && (
+              <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/25 relative z-10">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={18} />
+                  <div className="flex-1 text-left text-xs text-red-200">
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="font-bold">
+                        {lang === 'ar' ? 'عذراً! حدث خطأ في المصادقة:' : 'Authentication Error:'}
+                      </p>
+                      <button 
+                        onClick={onClearError}
+                        className="text-slate-400 hover:text-white text-[10px] font-bold cursor-pointer"
+                      >
+                        ✕ {lang === 'ar' ? 'إغلاق' : 'Clear'}
+                      </button>
+                    </div>
+                    <p className="font-mono bg-red-950/40 p-2 rounded-lg border border-red-500/10 overflow-x-auto text-[10px] select-all mb-3 text-red-400">
+                      {loginError}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setShowGuide(true);
+                        setTimeout(() => {
+                          document.getElementById('firebase-guide-box')?.scrollIntoView({ behavior: 'smooth' });
+                        }, 100);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-primary hover:text-emerald-400 font-bold underline transition-colors cursor-pointer text-xs"
+                    >
+                      {lang === 'ar' ? 'كيف أحل هذه المشكلة فوراً؟ ←' : 'How do I solve this immediately? →'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4 mb-10 relative z-10 text-right">
               {[
                 lang === 'ar' ? 'وصول كامل لجميع المؤشرات' : 'Full access to all indicators',
                 lang === 'ar' ? 'تحديثات لحظية لكل العملات' : 'Real-time updates for all currencies',
                 lang === 'ar' ? 'تقارير ذكاء اصطناعي يومية' : 'Daily AI generated reports'
               ].map((feature, i) => (
-                <div key={i} className="flex items-center gap-3 text-slate-400 text-sm">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <div key={i} className="flex items-center gap-3 text-slate-400 text-sm justify-end">
                   <span>{feature}</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                 </div>
               ))}
             </div>
 
             <button
               onClick={onLogin}
-              className="w-full flex items-center justify-between bg-primary group hover:bg-emerald-500 text-brand-bg font-black px-8 py-5 rounded-2xl transition-all shadow-xl shadow-primary/20 hover:shadow-primary/40 active:scale-95"
+              className="w-full flex items-center justify-between bg-primary group hover:bg-emerald-500 text-brand-bg font-black px-8 py-5 rounded-2xl transition-all shadow-xl shadow-primary/20 hover:shadow-primary/40 active:scale-95 cursor-pointer"
             >
               <span className="text-lg">{lang === 'ar' ? 'تسجيل دخول واشتراك' : 'Login & Subscribe'}</span>
               <ChevronRight size={24} className="group-hover:translate-x-1 transition-transform" />
@@ -124,6 +182,179 @@ export default function LoginOverlay({ onLogin, lang }: LoginOverlayProps) {
           </motion.div>
         </div>
       </motion.div>
+
+      {/* Firebase Setup & Troubleshooting Guide */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        id="firebase-guide-box"
+        className="max-w-4xl w-full mt-12 relative z-10"
+      >
+        <div className="bg-brand-alt/45 backdrop-blur-xl p-6 md:p-8 rounded-[30px] border border-white/5 shadow-2xl">
+          <button
+            onClick={() => setShowGuide(!showGuide)}
+            className="w-full flex items-center justify-between text-left text-slate-300 hover:text-white transition-colors py-2 cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <HelpCircle size={20} />
+              </div>
+              <div className="text-right">
+                <h4 className="text-md font-bold">
+                  {lang === 'ar' ? '🔧 دليل حل أخطاء تسجيل الدخول وتهيئة رابط موقعك الخاص' : '🔧 Auth Troubleshooting & Domain Setup Guide'}
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {lang === 'ar' ? 'حل مشكلة إغلاق النافذة السريع وتعديل اسم العلامة التجارية لعملية تسجيل الدخول' : 'Solve quick popup close & display your custom branding on Google Sign-In'}
+                </p>
+              </div>
+            </div>
+            {showGuide ? <ChevronUp size={20} className="text-slate-500" /> : <ChevronDown size={20} className="text-slate-500" />}
+          </button>
+
+          <AnimatePresence>
+            {showGuide && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden mt-6 border-t border-white/5 pt-6 space-y-8"
+              >
+                {/* 1. Unauthorized Domain / Popup Closing Solution */}
+                <div className="space-y-4">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-500/10 text-red-400 text-[10px] font-black uppercase tracking-widest rounded-full border border-red-500/20">
+                    {lang === 'ar' ? 'المشكلة 1: اختفاء نافذة الحسابات فوراً أو الإغلاق التلقائي' : 'Issue 1: Auth Popup Closes Instantly'}
+                  </div>
+                  <p className="text-slate-400 text-sm leading-relaxed text-right">
+                    {lang === 'ar' 
+                      ? 'يحدث هذا عادةً بسبب عدم ترخيص نطاق موقعك الحالي في لوحة تحكم Firebase، أو لكون تسجيل الدخول بـ Google غير مفعل. اتبع الخطوات التالية لحلها:' 
+                      : 'This typically occurs because your website domain is not whitelisted in the Firebase project console or Google Auth is disabled. Follow these quick steps to resolve:'}
+                  </p>
+                  
+                  <div className="grid md:grid-cols-2 gap-4 text-sm text-slate-300">
+                    <div className="bg-brand-bg/60 p-5 rounded-2xl border border-white/5 space-y-3 text-right">
+                      <div className="font-bold text-primary flex items-center gap-2 justify-end">
+                        <span>{lang === 'ar' ? '1. فتح وحدة تحكم Firebase' : '1. Open Firebase Console'}</span>
+                        <span className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black">1</span>
+                      </div>
+                      <p className="text-slate-400 text-xs leading-relaxed">
+                        {lang === 'ar'
+                          ? 'ادخل إلى console.firebase.google.com وافتح مشروع Firebase المرتبط بالتطبيق.'
+                          : 'Go to console.firebase.google.com and open the corresponding Firebase project.'}
+                      </p>
+                      <a 
+                        href="https://console.firebase.google.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline justify-end w-full"
+                      >
+                        {lang === 'ar' ? 'فتح لوحة التحكم' : 'Open Console'} <ExternalLink size={12} />
+                      </a>
+                    </div>
+
+                    <div className="bg-brand-bg/60 p-5 rounded-2xl border border-white/5 space-y-3 text-right">
+                      <div className="font-bold text-primary flex items-center gap-2 justify-end">
+                        <span>{lang === 'ar' ? '2. إضافة هذا الرابط الحالي' : '2. Add Authorized Domain'}</span>
+                        <span className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black">2</span>
+                      </div>
+                      <p className="text-slate-400 text-xs leading-relaxed">
+                        {lang === 'ar'
+                          ? 'انتقل إلى Authentication > Settings > Authorized domains ثم انقر على Add domain وأضف هذا النطاق بدقة:'
+                          : 'Go to Authentication > Settings > Authorized domains, click Add domain, and input this domain:'}
+                      </p>
+                      <div className="flex items-center gap-2 bg-brand-alt/80 p-2.5 rounded-xl border border-white/5 mt-2 justify-end">
+                        <span className="font-mono text-xs text-white overflow-hidden text-ellipsis flex-1 select-all text-left">{currentDomain}</span>
+                        <button
+                          onClick={() => copyToClipboard(currentDomain, false)}
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                        >
+                          {copiedDomain ? <Check size={14} className="text-primary" /> : <Copy size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-brand-bg/40 p-4 rounded-xl border border-primary/10 text-xs text-slate-400 leading-relaxed text-right">
+                    💡 <strong>{lang === 'ar' ? 'خطوة تفعيل Google:' : 'Enable Google Provider:'}</strong>{' '}
+                    {lang === 'ar'
+                      ? 'تأكد أيضاً من الذهاب إلى علامة التبويب "Sign-in method" في نفس الصفحة، وانقر على Google وقم بتمكينها (Enabled) وحفظ التغييرات.'
+                      : 'Please also visit the "Sign-in method" tab in Firebase Auth, click on Google, and ensure it is toggled to Enabled.'}
+                  </div>
+                </div>
+
+                {/* 2. Brand Link Mismatch / Custom Firebase Solution */}
+                <div className="space-y-4 pt-6 border-t border-white/5">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full border border-primary/20">
+                    {lang === 'ar' ? 'المشكلة 2: ظهور رابط غير موقعي في نافذة تسجيل الدخول' : 'Issue 2: Displaying Custom Website Brand Name'}
+                  </div>
+                  <p className="text-slate-400 text-sm leading-relaxed text-right">
+                    {lang === 'ar'
+                      ? 'يظهر الرابط gen-lang-client-... لأن التطبيق مهيأ بمشروع Firebase الافتراضي. لكي يعرض محدد حساب Google اسم موقعك الاحترافي (مثل Finalyze.AI) بالكامل:'
+                      : 'The default gen-lang-client domain is displayed because the project currently uses a default configuration. To brand the Google Login Screen with your own brand name (e.g. Finalyze.AI):'}
+                  </p>
+
+                  <div className="space-y-3">
+                    {[
+                      {
+                        title: lang === 'ar' ? '1. إنشاء مشروع Firebase مخصص باسمك' : '1. Create custom Firebase Project',
+                        desc: lang === 'ar' 
+                          ? 'قم بإنشاء مشروع مجاني جديد بالكامل في لوحة تحكم Firebase وسمّه "finalyze-ai" ليتم تعيين نطاق authDomain خاص باسم موقعك.' 
+                          : 'Create a free project inside Firebase Console and name it "finalyze-ai" so your authDomain matches your website identity.'
+                      },
+                      {
+                        title: lang === 'ar' ? '2. تمكين تسجيل الدخول وترخيص النطاقات' : '2. Setup Authentication & Whitelist',
+                        desc: lang === 'ar' 
+                          ? 'في مشروعك الجديد، قم بتمكين موفر تسجيل دخول Google، وأضف رابط موقعك الحالي (مثلاً: finalyze-ai-sigma.vercel.app) إلى Authorized domains.' 
+                          : 'In your new Firebase project, enable Google Sign-in and add your website URL to the Authorized domains list.'
+                      },
+                      {
+                        title: lang === 'ar' ? '3. إضافة تطبيق ويب ونسخ التكوين' : '3. Register a Web App & Copy Config',
+                        desc: lang === 'ar' 
+                          ? 'من إعدادات المشروع (Project Settings)، قم بتسجيل تطبيق ويب جديد (Web App) للحصول على كود الإعدادات الخاص بك (Firebase Config).' 
+                          : 'Navigate to Project Settings, add a new Web App, and copy the credentials JSON (Firebase Config object).'
+                      },
+                      {
+                        title: lang === 'ar' ? '4. استبدال محتوى ملف الإعدادات في المشروع' : '4. Update firebase-applet-config.json',
+                        desc: lang === 'ar' 
+                          ? 'افتح الملف التالي في محرر الأكواد واستبدل كامل المحتوى ببيانات مشروعك الجديد:'
+                          : 'Open the following configuration file and drop your newly copied parameters into it:'
+                      }
+                    ].map((step, idx) => (
+                      <div key={idx} className="flex gap-4 items-start text-right justify-end">
+                        <div className="flex-1 space-y-1">
+                          <h5 className="font-bold text-white text-sm">{step.title}</h5>
+                          <p className="text-slate-400 text-xs leading-relaxed">{step.desc}</p>
+                          {idx === 3 && (
+                            <div className="flex items-center gap-2 bg-brand-bg/60 p-2.5 rounded-xl border border-white/5 mt-2 max-w-md ml-auto justify-end">
+                              <span className="font-mono text-xs text-white overflow-hidden text-ellipsis flex-1 text-left">firebase-applet-config.json</span>
+                              <button
+                                onClick={() => copyToClipboard('firebase-applet-config.json', true)}
+                                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                              >
+                                {copiedConfigPath ? <Check size={14} className="text-primary" /> : <Copy size={14} />}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 text-xs font-black font-mono mt-0.5">
+                          {idx + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="bg-brand-bg/40 p-4 rounded-xl border border-emerald-500/10 text-xs text-slate-400 leading-relaxed text-right">
+                    ✨ <strong>{lang === 'ar' ? 'الخطوة النهائية:' : 'Final Deployment Step:'}</strong>{' '}
+                    {lang === 'ar'
+                      ? 'بمجرد استبدال هذا الملف وحفظه، قم برفع التعديلات إلى المستودع (GitHub)، وسيتم تفعيل النطاق الجديد وعرض علامتك التجارية الاحترافية واسم موقعك مباشرة لكل المستخدمين!'
+                      : 'Once this file is updated and pushed to your repository (GitHub), Vercel will redeploy your app instantly, and the Google selector will display your brand name seamlessly!'}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
       
       {/* Footer minimal info */}
       <div className="mt-12 text-slate-600 text-[10px] font-medium tracking-widest uppercase">
@@ -132,3 +363,4 @@ export default function LoginOverlay({ onLogin, lang }: LoginOverlayProps) {
     </div>
   );
 }
+

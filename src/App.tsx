@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -21,6 +21,7 @@ import ApiKeyModal from './components/ApiKeyModal';
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [isApiKeyOpen, setIsApiKeyOpen] = useState(false);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_qwen_api_key'));
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
@@ -421,6 +422,19 @@ export default function App() {
   ]);
 
   useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          setUser(result.user);
+        }
+      })
+      .catch((error: any) => {
+        console.error("Redirect login failure on mount:", error);
+        setLoginError(error.code || error.message);
+      });
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
         setUser(u);
@@ -456,15 +470,20 @@ export default function App() {
   }, []);
 
   const handleLogin = async () => {
+    setLoginError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
     } catch (popupError: any) {
       console.warn("Popup blocked or failed, falling back to Redirect:", popupError);
+      if (popupError.code !== 'auth/popup-closed-by-user') {
+        setLoginError(popupError.code || popupError.message);
+      }
       try {
         await signInWithRedirect(auth, provider);
-      } catch (redirectError) {
+      } catch (redirectError: any) {
         console.error("Redirect sign-in also failed:", redirectError);
+        setLoginError(redirectError.code || redirectError.message);
       }
     }
   };
@@ -503,7 +522,14 @@ export default function App() {
       />
 
       <AnimatePresence>
-        {!user && !loading && <LoginOverlay onLogin={handleLogin} lang={lang} />}
+        {!user && !loading && (
+          <LoginOverlay 
+            onLogin={handleLogin} 
+            lang={lang} 
+            loginError={loginError}
+            onClearError={() => setLoginError(null)}
+          />
+        )}
       </AnimatePresence>
 
       <SettingsModal 
