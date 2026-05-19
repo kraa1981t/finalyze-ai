@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Zap, Clock, Layers, Volume2, ListFilter, Upload, Music, Sparkles, Settings, Activity, Trash2, AlertTriangle } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Zap, Clock, Layers, Volume2, ListFilter, Upload, Music, Sparkles, Settings, Activity, Trash2, AlertTriangle, Key } from 'lucide-react';
 import { saveAudioBlob, deleteAudioBlob } from '../lib/db';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/i18n';
@@ -18,6 +18,7 @@ interface HeaderProps {
   lang: Language;
   onLangChange: (l: Language) => void;
   onOpenSettings: () => void;
+  onOpenApiKeyModal: () => void;
   showBack?: boolean;
   onBack?: () => void;
   autoSettings: AutoAnalysisSettings;
@@ -44,6 +45,7 @@ export default function Header({
   lang, 
   onLangChange, 
   onOpenSettings,
+  onOpenApiKeyModal,
   showBack, 
   onBack,
   autoSettings,
@@ -475,6 +477,21 @@ export default function Header({
                 )}
               </AnimatePresence>
             </div>
+
+            {user && (
+              <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm animate-fade-in">
+                <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">
+                  {lang === 'ar' ? 'المفتاح' : 'API Key'}
+                </span>
+                <button 
+                  onClick={onOpenApiKeyModal}
+                  className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md active:scale-95"
+                  title="API Key Settings"
+                >
+                  <Key size={18} />
+                </button>
+              </div>
+            )}
 
             <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Strategy</span>

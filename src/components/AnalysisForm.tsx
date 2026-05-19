@@ -168,13 +168,18 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
         onProgress(currentSymbol, allSymbolsToAnalyze.length, i);
         
         try {
+          const userApiKey = localStorage.getItem(`qwen_api_key_${user.uid}`) || undefined;
+          const userEmail = user.email || undefined;
+
           const result = await analyzeMarket({
             symbol: currentSymbol,
             type: data.type,
             timeframe: data.timeframe,
             tradingStyle: data.tradingStyle,
             settings: settings,
-            lang: lang
+            lang: lang,
+            userApiKey,
+            userEmail
           });
           
           if (!result) throw new Error("Result is null");

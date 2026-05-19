@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { auth } from './lib/firebase';
+import { auth, db } from './lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { TrendingUp, Activity } from 'lucide-react';
 import Header from './components/Header';
@@ -10,6 +11,7 @@ import ConnectionStatus from './components/ConnectionStatus';
 import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
 import TopSignals from './components/TopSignals';
+import ApiKeyModal from './components/ApiKeyModal';
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType } from './types';
 import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS } from './constants';
 import { Language, translations } from './lib/i18n';
@@ -24,6 +26,7 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isApiKeyOpen, setIsApiKeyOpen] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
@@ -358,9 +361,14 @@ export default function App() {
         for (const symbol of symbols) {
           if (!isSubscribed || !autoSettingsRef.current.isEnabled || isAnalyzing) break;
           try {
+            const userApiKey = user ? (localStorage.getItem(`qwen_api_key_${user.uid}`) || undefined) : undefined;
+            const userEmail = user?.email || undefined;
+
             const result = await analyzeMarket({
               symbol, type: mType, timeframe: currentSettings.timeframe,
-              tradingStyle: currentSettings.tradingStyle, settings, lang
+              tradingStyle: currentSettings.tradingStyle, settings, lang,
+              userApiKey,
+              userEmail
             });
             if (result && isSubscribed) {
               const sig = result.signal || '';
@@ -418,8 +426,27 @@ export default function App() {
 
   useEffect(() => {
     setPersistence(auth, browserLocalPersistence).catch(console.error);
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u || { uid: 'developer', email: 'bachasalman69@gmail.com', displayName: 'Developer' } as any);
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        setUser(u);
+        // Check for custom API Key
+        const localKey = localStorage.getItem(`qwen_api_key_${u.uid}`);
+        if (!localKey) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', u.uid));
+            if (userDoc.exists() && userDoc.data().qwenApiKey) {
+              localStorage.setItem(`qwen_api_key_${u.uid}`, userDoc.data().qwenApiKey);
+            } else {
+              // Redirect/Open modal for new users with no API Key
+              setIsApiKeyOpen(true);
+            }
+          } catch (e) {
+            console.error("Failed to load user API key on login:", e);
+          }
+        }
+      } else {
+        setUser({ uid: 'developer', email: 'bachasalman69@gmail.com', displayName: 'Developer' } as any);
+      }
       setLoading(false);
     });
     return () => unsubscribe();
@@ -470,11 +497,22 @@ export default function App() {
         settings={settings} onSettingsChange={setSettings} 
       />
 
+      {user && (
+        <ApiKeyModal 
+          isOpen={isApiKeyOpen} 
+          onClose={() => setIsApiKeyOpen(false)} 
+          userId={user.uid} 
+          lang={lang}
+          onSaveSuccess={() => {}}
+        />
+      )}
+
       <Header 
         user={user} onLogin={handleLogin} onLogout={handleLogout} 
         isDark={isDark} toggleTheme={() => setIsDark(!isDark)}
         lang={lang} onLangChange={setLang}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenApiKeyModal={() => setIsApiKeyOpen(true)}
         showBack={!!analysisResults} onBack={() => setAnalysisResults(null)}
         autoSettings={autoSettings} onAutoSettingsChange={setAutoSettings}
         isWaiting={isScanningFinished}
