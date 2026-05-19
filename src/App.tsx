@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithRedirect, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -457,7 +457,16 @@ export default function App() {
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
-    try { await signInWithRedirect(auth, provider); } catch (error) { console.error(error); }
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (popupError: any) {
+      console.warn("Popup blocked or failed, falling back to Redirect:", popupError);
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (redirectError) {
+        console.error("Redirect sign-in also failed:", redirectError);
+      }
+    }
   };
 
   const handleLogout = async () => {

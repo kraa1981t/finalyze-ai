@@ -12,10 +12,27 @@ export default function LoginOverlay({ onLogin, lang }: LoginOverlayProps) {
   const t = translations[lang];
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-start p-4 bg-brand-bg md:justify-center overflow-y-auto pt-20 md:pt-4">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-start p-4 bg-brand-bg overflow-y-auto pt-12 pb-8">
       {/* Background decoration */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-64 bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
       
+      {/* Brand Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-4 mb-10 relative z-10"
+      >
+        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center overflow-hidden shadow-xl shadow-emerald-500/25 rotate-3 hover:rotate-0 transition-all border border-white/50">
+          <img src="/logo.png" alt="Finalyze AI Logo" className="w-full h-full object-cover scale-110" />
+        </div>
+        <div className="flex flex-col text-left">
+          <span className="text-3xl font-display font-black tracking-tighter text-white drop-shadow-sm leading-none">
+            Finalyze.<span className="text-primary italic">AI</span>
+          </span>
+          <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 mt-1">Institutional Engine</span>
+        </div>
+      </motion.div>
+
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

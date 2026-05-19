@@ -45,7 +45,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     step1Desc: isAr
       ? 'اضغط على الزر أدناه لفتح الصفحة الرسمية لعلي بابا، قم بالتسجيل بنفس البريد الإلكتروني الخاص بك، ثم قم بإنشاء مفتاح API جديد ونسخه.'
       : 'Click the button below to open the official Alibaba Cloud page. Sign up with your Gmail, create a new API Key and copy it.',
-    btnAlibaba: isAr ? 'الحصول على مفتاح API من علي بابا' : 'Get API Key from Alibaba Cloud',
+    btnAlibaba: isAr ? 'الحصول على مفتاح Qwen لـ Finalyze AI' : 'Get Qwen Key for Finalyze AI',
     step2: isAr ? '2. ضع المفتاح في الأسفل للتحقق منه' : '2. Paste Your API Key Below to Verify',
     placeholder: isAr ? 'ضع مفتاح الـ API الخاص بك هنا (sk-...)' : 'Paste your API key here (sk-...)',
     btnVerify: isAr ? 'التحقق والحفظ والبدء' : 'Verify, Save & Start',
@@ -170,7 +170,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           </p>
           
           <a
-            href="https://modelstudio.console.alibabacloud.com/eu-central-1?tab=globalset#/efm/api_key"
+            href="https://modelstudio.console.alibabacloud.com/eu-central-1?tab=globalset&source=finalyze-ai&ref=finalyze-ai#/efm/api_key"
             target="_blank"
             rel="noopener noreferrer"
             className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 text-brand-bg font-black px-6 py-4.5 rounded-xl transition-all shadow-lg shadow-sky-500/20 hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0 text-sm"
