@@ -94,9 +94,12 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
   };
 
   const selectAllInCategory = () => {
-    const baseSymbols = SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols) || [];
-    const categoryCustom = customSymbols.filter(s => (ALL_SYMBOLS_DB[selectedType] || []).includes(s) && !baseSymbols.includes(s));
-    const all = [...baseSymbols, ...categoryCustom].filter(s => !hiddenSymbols.includes(s));
+    const allGroupsSymbols = SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols) || [];
+    const customForType = customSymbols.filter(s => 
+      (ALL_SYMBOLS_DB[selectedType] || []).includes(s) &&
+      !allGroupsSymbols.includes(s)
+    );
+    const all = [...allGroupsSymbols, ...customForType].filter(s => !hiddenSymbols.includes(s));
     
     const areAllSelected = all.length > 0 && all.every(s => selectedSymbols.includes(s));
     
@@ -192,9 +195,9 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
           // REMOVED: alert() popup as it is annoying for the user.
         }
 
-        // Add 3-second delay between requests to prevent API Rate Limiting (429 errors)
+        // Add 4.5-second delay between requests to prevent API Rate Limiting (429 errors)
         if (i < allSymbolsToAnalyze.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          await new Promise(resolve => setTimeout(resolve, 4500));
         }
       }
 
@@ -426,11 +429,11 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                 
                 // Append custom symbols to the last group of the category
                 if (index === arr.length - 1) {
-                  const allGroupSymbolsForCategory = SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols) || [];
+                  const allGroupsSymbols = SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols) || [];
                   const customForType = customSymbols.filter(s => 
                     (ALL_SYMBOLS_DB[selectedType] || []).includes(s) &&
                     !hiddenSymbols.includes(s) &&
-                    !allGroupSymbolsForCategory.includes(s)
+                    !allGroupsSymbols.includes(s)
                   );
                   groupSymbols = [...groupSymbols, ...customForType];
                 }
