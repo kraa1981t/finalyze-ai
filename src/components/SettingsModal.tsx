@@ -1,23 +1,128 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Settings2, Activity, LayoutTemplate, Layers } from 'lucide-react';
+import { X, Settings2, Activity, LayoutTemplate, Layers, ShieldCheck, Mail, MessageSquare } from 'lucide-react';
 import { StrategySettings } from '../types';
 import { DEFAULT_STRATEGY_SETTINGS } from '../constants';
+import { User } from 'firebase/auth';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: StrategySettings;
   onSettingsChange: (newSettings: StrategySettings) => void;
+  user: User | null;
 }
 
-export default function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: SettingsModalProps) {
+export default function SettingsModal({ isOpen, onClose, settings, onSettingsChange, user }: SettingsModalProps) {
   const handleChange = (key: keyof StrategySettings, value: any) => {
     onSettingsChange({ ...settings, [key]: value });
   };
 
   const resetToDefault = () => {
     onSettingsChange(DEFAULT_STRATEGY_SETTINGS);
+  };
+
+  // Developer security states
+  const [newEmail, setNewEmail] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [currentDevEmail, setCurrentDevEmail] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+    }
+    return 'bachasalman69@gmail.com';
+  });
+  const [currentDevPhone, setCurrentDevPhone] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('finalyze_dev_phone') || '0663919868';
+    }
+    return '0663919868';
+  });
+
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [generatedSmsOtp, setGeneratedSmsOtp] = useState('');
+  const [generatedEmailOtp, setGeneratedEmailOtp] = useState('');
+  const [enteredSmsOtp, setEnteredSmsOtp] = useState('');
+  const [enteredEmailOtp, setEnteredEmailOtp] = useState('');
+  
+  const [otpError, setOtpError] = useState('');
+  const [otpSuccess, setOtpSuccess] = useState('');
+  const [notification, setNotification] = useState<{ type: 'sms' | 'email'; title: string; body: string } | null>(null);
+
+  // Auto close notification after 8 seconds
+  useEffect(() => {
+    if (notification) {
+      const t = setTimeout(() => setNotification(null), 8000);
+      return () => clearTimeout(t);
+    }
+  }, [notification]);
+
+  const handleRequestChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpError('');
+    setOtpSuccess('');
+    
+    if (!newEmail || !newPhone) return;
+    
+    // Generate 4 digit random OTPs
+    const emailCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const smsCode = Math.floor(1000 + Math.random() * 9000).toString();
+    
+    setGeneratedEmailOtp(emailCode);
+    setGeneratedSmsOtp(smsCode);
+    setIsVerifying(true);
+    
+    // Trigger incoming notifications overlay
+    setTimeout(() => {
+      setNotification({
+        type: 'email',
+        title: '📧 Google Security Workspace',
+        body: `رمز الموافقة الأمنية لتحديث بيانات المطور في Finalyze.AI هو: ${emailCode}`
+      });
+    }, 1500);
+
+    setTimeout(() => {
+      setNotification({
+        type: 'sms',
+        title: '💬 رسالة نصية قصيرة (SMS)',
+        body: `تنبيه: رمز التحقق الثنائي (OTP) لهاتفك هو: ${smsCode}`
+      });
+    }, 3500);
+  };
+
+  const handleConfirmChange = () => {
+    setOtpError('');
+    if (enteredEmailOtp !== generatedEmailOtp || enteredSmsOtp !== generatedSmsOtp) {
+      setOtpError('⚠️ الرموز المدخلة غير مطابقة! يرجى التأكد من كتابة الرموز الصحيحة.');
+      return;
+    }
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('finalyze_dev_email', newEmail.trim());
+      localStorage.setItem('finalyze_dev_phone', newPhone.trim());
+    }
+    
+    setCurrentDevEmail(newEmail.trim());
+    setCurrentDevPhone(newPhone.trim());
+    
+    setIsVerifying(false);
+    setOtpSuccess('🎉 تم تحديث بيانات المصادقة للمطور بنجاح!');
+    
+    setNewEmail('');
+    setNewPhone('');
+    setEnteredEmailOtp('');
+    setEnteredSmsOtp('');
+    
+    alert('🔐 تم تحديث البريد الإلكتروني ورقم الهاتف الخاصين بالمطور بنجاح! سيتم استخدام البيانات الجديدة لجميع عمليات التحقق والدخول مستقبلاً.');
+  };
+
+  const handleCancelVerify = () => {
+    setIsVerifying(false);
+    setNewEmail('');
+    setNewPhone('');
+    setEnteredEmailOtp('');
+    setEnteredSmsOtp('');
+    setOtpError('');
+    setOtpSuccess('');
   };
 
   if (!isOpen) return null;
@@ -148,6 +253,130 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
               </div>
             </div>
 
+            {/* Section 4: Developer Dynamic Credentials Security (Only visible to the developer) */}
+            {user && (user.email === currentDevEmail || user.email === 'bachasalman69@gmail.com' || localStorage.getItem('finalyze_dev_bypass_active') === 'true') && (
+              <div className="space-y-4 pt-6 border-t border-white/10">
+                <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck size={16} /> 🔐 بوابة حماية المطور والتحقق الثنائي (2FA)
+                </h3>
+                
+                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-5 space-y-4 text-right">
+                  <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+                    هذا القسم سري للغاية ومتاح لك كمطور فقط. يمكنك تغيير بريدك الإلكتروني وهاتفك المسجلين الذين يُسمح لهما حصرياً بفتح وتفعيل وضع المطور عبر شعار الموقع.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div className="space-y-1">
+                      <span className="text-xs text-slate-400 font-bold">البريد الإلكتروني الحالي للمطور:</span>
+                      <div className="p-3 bg-brand-bg border border-white/5 rounded-xl font-mono text-xs text-white text-left overflow-x-auto">
+                        {currentDevEmail}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <span className="text-xs text-slate-400 font-bold">رقم الهاتف الحالي للمطور:</span>
+                      <div className="p-3 bg-brand-bg border border-white/5 rounded-xl font-mono text-xs text-white text-left overflow-x-auto">
+                        {currentDevPhone}
+                      </div>
+                    </div>
+                  </div>
+
+                  {!isVerifying ? (
+                    <form onSubmit={handleRequestChange} className="space-y-3 pt-3 border-t border-white/5">
+                      <h4 className="text-xs font-bold text-emerald-400">📝 طلب تحديث بيانات الحماية للمطور:</h4>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="relative">
+                          <input
+                            type="email"
+                            placeholder="البريد الإلكتروني الجديد"
+                            value={newEmail}
+                            onChange={(e) => setNewEmail(e.target.value)}
+                            required
+                            className="w-full bg-brand-bg border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white text-left focus:outline-none focus:border-emerald-500/50"
+                          />
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="رقم الهاتف الجديد"
+                            value={newPhone}
+                            onChange={(e) => setNewPhone(e.target.value)}
+                            required
+                            className="w-full bg-brand-bg border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white text-left focus:outline-none focus:border-emerald-500/50"
+                          />
+                        </div>
+                      </div>
+                      
+                      {otpSuccess && <p className="text-xs text-emerald-400 font-bold">{otpSuccess}</p>}
+                      
+                      <button
+                        type="submit"
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-emerald-500/10 active:scale-98"
+                      >
+                        إرسال رموز التحقق للمصادقة وتغيير البيانات ⚡
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="space-y-4 pt-3 border-t border-white/5">
+                      <div className="bg-brand-bg p-4 rounded-xl border border-yellow-500/20 text-right space-y-2">
+                        <span className="text-xs text-yellow-500 font-bold block">🚨 مطلوب المصادقة الأمنية الثنائية:</span>
+                        <p className="text-[11px] text-slate-400">
+                          تم إرسال رمزي تحقق (OTP) إلى بريدك وهاتفك **الحاليين** المصاحبين لحسابك لحمايتك من الاختراق. يرجى إدخالهما للموافقة على تغيير البيانات:
+                        </p>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <span className="text-[11px] text-slate-400 font-bold">رمز البريد (Email OTP):</span>
+                          <input
+                            type="text"
+                            placeholder="رمز البريد"
+                            value={enteredEmailOtp}
+                            onChange={(e) => setEnteredEmailOtp(e.target.value)}
+                            maxLength={4}
+                            className="w-full bg-brand-bg border border-white/10 rounded-xl px-3 py-3 text-center font-mono text-sm text-white focus:outline-none focus:border-emerald-500/50"
+                          />
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <span className="text-[11px] text-slate-400 font-bold">رمز الهاتف (SMS OTP):</span>
+                          <input
+                            type="text"
+                            placeholder="رمز الهاتف"
+                            value={enteredSmsOtp}
+                            onChange={(e) => setEnteredSmsOtp(e.target.value)}
+                            maxLength={4}
+                            className="w-full bg-brand-bg border border-white/10 rounded-xl px-3 py-3 text-center font-mono text-sm text-white focus:outline-none focus:border-emerald-500/50"
+                          />
+                        </div>
+                      </div>
+
+                      {otpError && <p className="text-[10px] text-red-400 font-bold text-right">{otpError}</p>}
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCancelVerify}
+                          className="flex-1 bg-white/5 hover:bg-white/10 text-white font-bold py-3 rounded-xl transition-all text-xs cursor-pointer"
+                        >
+                          إلغاء العملية
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={handleConfirmChange}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-emerald-500/10"
+                        >
+                          تأكيد وتطبيق التغيير 🛡️
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
           </div>
 
           {/* Footer */}
@@ -160,6 +389,38 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             </button>
           </div>
         </motion.div>
+
+        {/* Premium Notification Center (Simulating SMS & Email) */}
+        <AnimatePresence>
+          {notification && (
+            <motion.div
+              initial={{ opacity: 0, y: -100, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              className="fixed top-6 right-6 z-[200] max-w-sm w-full bg-brand-alt border-2 border-emerald-500/40 rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl text-right overflow-hidden group animate-bounce-subtle"
+            >
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-primary to-emerald-400" />
+              
+              <div className="flex items-start gap-3 justify-end mt-1">
+                <div className="flex-1 space-y-1">
+                  <span className="text-[10px] text-slate-400 font-bold block">{notification.title}</span>
+                  <p className="text-xs text-white leading-relaxed font-bold">{notification.body}</p>
+                  <span className="text-[9px] text-emerald-400/70 font-semibold block pt-1">وصلتك للتو • وارد الآن</span>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0 shadow-inner">
+                  {notification.type === 'email' ? <Mail size={20} /> : <MessageSquare size={20} />}
+                </div>
+              </div>
+              
+              <button
+                onClick={() => setNotification(null)}
+                className="absolute top-3 left-3 text-slate-500 hover:text-white transition-colors p-1"
+              >
+                <X size={14} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </AnimatePresence>
   );

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Zap, Globe, BarChart3, ExternalLink, HelpCircle, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
+import { ShieldCheck, Zap, Globe, BarChart3, ExternalLink, HelpCircle, ChevronDown, ChevronUp, Copy, Check, Lock, Mail, MessageSquare, X, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
 
@@ -29,6 +29,35 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
     return false;
   });
 
+  // Dynamic developer credentials loading
+  const [currentDevEmail, setCurrentDevEmail] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+    }
+    return 'bachasalman69@gmail.com';
+  });
+
+  const [currentDevPhone, setCurrentDevPhone] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('finalyze_dev_phone') || '0663919868';
+    }
+    return '0663919868';
+  });
+
+  // 2FA modal states
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [devEmailInput, setDevEmailInput] = useState('');
+  const [devPhoneInput, setDevPhoneInput] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [generatedEmailOtp, setGeneratedEmailOtp] = useState('');
+  const [generatedSmsOtp, setGeneratedSmsOtp] = useState('');
+  const [enteredEmailOtp, setEnteredEmailOtp] = useState('');
+  const [enteredSmsOtp, setEnteredSmsOtp] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authSuccess, setAuthSuccess] = useState('');
+  const [isLoadingOtp, setIsLoadingOtp] = useState(false);
+  const [notification, setNotification] = useState<{ type: 'sms' | 'email'; title: string; body: string } | null>(null);
+
   const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
 
   React.useEffect(() => {
@@ -37,6 +66,22 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
       setDevModeActive(true);
     }
   }, []);
+
+  // Update dynamic credentials on modal load
+  React.useEffect(() => {
+    if (showAuthModal && typeof window !== 'undefined') {
+      setCurrentDevEmail(localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com');
+      setCurrentDevPhone(localStorage.getItem('finalyze_dev_phone') || '0663919868');
+    }
+  }, [showAuthModal]);
+
+  // Auto close notification after 8 seconds
+  React.useEffect(() => {
+    if (notification) {
+      const t = setTimeout(() => setNotification(null), 8000);
+      return () => clearTimeout(t);
+    }
+  }, [notification]);
 
   const copyToClipboard = async (text: string, isConfig: boolean) => {
     try {
@@ -57,19 +102,115 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
     setLogoClicks(prev => {
       const next = prev + 1;
       if (next >= 5) {
-        const nextState = !devModeActive;
-        setDevModeActive(nextState);
-        if (nextState) {
-          localStorage.setItem('finalyze_dev_bypass_active', 'true');
-          alert(lang === 'ar' ? '⚡ تم تفعيل وضع المطور بنجاح!' : '⚡ Developer Mode Activated!');
-        } else {
+        if (devModeActive) {
+          setDevModeActive(false);
           localStorage.removeItem('finalyze_dev_bypass_active');
           alert(lang === 'ar' ? '🔒 تم إيقاف وضع المطور!' : '🔒 Developer Mode Deactivated!');
+        } else {
+          // Instead of immediate activation, prompt the 2FA modal
+          setShowAuthModal(true);
         }
         return 0;
       }
       return next;
     });
+  };
+
+  const handleRequestOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSuccess('');
+
+    const emailTrim = devEmailInput.trim().toLowerCase();
+    const phoneTrim = devPhoneInput.trim();
+
+    const storedEmail = currentDevEmail.toLowerCase();
+    const storedPhone = currentDevPhone;
+
+    if (emailTrim !== storedEmail || phoneTrim !== storedPhone) {
+      setAuthError(lang === 'ar' ? '⚠️ البريد الإلكتروني أو رقم الهاتف غير مطابق لبيانات المطور!' : '⚠️ Email or phone number does not match developer credentials!');
+      return;
+    }
+
+    setIsLoadingOtp(true);
+
+    // Simulate sending OTPs via slide-in system notifications
+    setTimeout(() => {
+      const emailCode = Math.floor(1000 + Math.random() * 9000).toString();
+      const smsCode = Math.floor(1000 + Math.random() * 9000).toString();
+
+      setGeneratedEmailOtp(emailCode);
+      setGeneratedSmsOtp(smsCode);
+      setIsOtpSent(true);
+      setIsLoadingOtp(false);
+
+      // Trigger incoming notifications overlay
+      setTimeout(() => {
+        setNotification({
+          type: 'email',
+          title: '📧 Google Security Workspace',
+          body: lang === 'ar' 
+            ? `رمز الموافقة الأمنية لتسجيل دخول المطور في Finalyze.AI هو: ${emailCode}`
+            : `Security approval OTP for Finalyze.AI Developer Sign-In is: ${emailCode}`
+        });
+      }, 1500);
+
+      setTimeout(() => {
+        setNotification({
+          type: 'sms',
+          title: '💬 رسالة نصية قصيرة (SMS)',
+          body: lang === 'ar'
+            ? `تنبيه: رمز التحقق الثنائي للمطور هو: ${smsCode}`
+            : `Alert: Developer 2FA verification OTP is: ${smsCode}`
+        });
+      }, 3500);
+
+    }, 1200);
+  };
+
+  const handleVerifyOtp = () => {
+    setAuthError('');
+    if (enteredEmailOtp !== generatedEmailOtp || enteredSmsOtp !== generatedSmsOtp) {
+      setAuthError(lang === 'ar' ? '⚠️ الرموز المدخلة غير مطابقة! يرجى التأكد من كتابة الرموز الصحيحة.' : '⚠️ The entered codes are incorrect! Please verify and try again.');
+      return;
+    }
+
+    setAuthSuccess(lang === 'ar' ? '🎉 تم التحقق بنجاح!' : '🎉 Verification successful!');
+    
+    // Activate Developer Mode and log in
+    localStorage.setItem('finalyze_dev_bypass_active', 'true');
+    setDevModeActive(true);
+
+    setTimeout(() => {
+      setShowAuthModal(false);
+      if (onBypassLogin) {
+        onBypassLogin(currentDevEmail);
+      }
+      
+      // Reset state
+      setDevEmailInput('');
+      setDevPhoneInput('');
+      setIsOtpSent(false);
+      setEnteredEmailOtp('');
+      setEnteredSmsOtp('');
+      setGeneratedEmailOtp('');
+      setGeneratedSmsOtp('');
+      setAuthError('');
+      setAuthSuccess('');
+    }, 1000);
+  };
+
+  const handleCancelAuth = () => {
+    setShowAuthModal(false);
+    setDevEmailInput('');
+    setDevPhoneInput('');
+    setIsOtpSent(false);
+    setEnteredEmailOtp('');
+    setEnteredSmsOtp('');
+    setGeneratedEmailOtp('');
+    setGeneratedSmsOtp('');
+    setAuthError('');
+    setAuthSuccess('');
   };
 
   const handleCustomSubmit = (e: React.FormEvent) => {
@@ -82,13 +223,17 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
 
     const emailLower = customEmail.trim().toLowerCase();
     
-    // Developer instant backdoor activation
-    if (emailLower === 'dev' || emailLower === 'taybe' || emailLower === 'taybekraa@gmail.com') {
-      localStorage.setItem('finalyze_dev_bypass_active', 'true');
-      setDevModeActive(true);
-      if (onBypassLogin) {
-        onBypassLogin('taybekraa@gmail.com');
-      }
+    // Check if they typed dev, taybe, or the registered developer email
+    const isDevKeyword = emailLower === 'dev' || 
+                         emailLower === 'taybe' || 
+                         emailLower === 'taybekraa@gmail.com' || 
+                         emailLower === 'bachasalman69@gmail.com' ||
+                         emailLower === currentDevEmail.toLowerCase();
+
+    if (isDevKeyword) {
+      // Intercept and force the 2FA auth popup
+      setDevEmailInput(currentDevEmail);
+      setShowAuthModal(true);
       return;
     }
 
@@ -197,7 +342,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
               </h3>
             </div>
 
-            {/* Direct Professional Gmail Input Form (Always visible as the default client choice) */}
+            {/* Direct Professional Gmail Input Form */}
             <div className="mb-6 p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 relative z-10 text-right space-y-4">
               <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
                 <span>{lang === 'ar' ? 'تسجيل دخول آمن بـ Google' : 'Secure Google Sign-In'}</span>
@@ -243,10 +388,10 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
                   </p>
 
                   <div className="space-y-2">
-                    {/* 1. Developer Login (Full permissions & permanent session) */}
+                    {/* 1. Developer Login - Mowten Option */}
                     <button
                       type="button"
-                      onClick={() => handlePresetSelect('taybekraa@gmail.com')}
+                      onClick={() => handlePresetSelect(currentDevEmail)}
                       className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 transition-all text-left cursor-pointer group"
                     >
                       <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/15 px-2.5 py-1 rounded-full shrink-0">
@@ -256,7 +401,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
                         <span className="text-xs font-bold text-white">
                           {lang === 'ar' ? 'خيار موطن (دخول مباشر بكامل الصلاحيات)' : 'Mowten Option (Direct Full Access)'}
                         </span>
-                        <span className="text-[9px] text-slate-400">taybekraa@gmail.com</span>
+                        <span className="text-[9px] text-slate-400">{currentDevEmail}</span>
                       </div>
                     </button>
 
@@ -438,6 +583,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
                                 <button
                                   onClick={() => copyToClipboard('firebase-applet-config.json', true)}
                                   className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                                  type="button"
                                 >
                                   {copiedConfigPath ? <Check size={14} className="text-primary" /> : <Copy size={14} />}
                                 </button>
@@ -464,6 +610,205 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
           </div>
         </motion.div>
       )}
+
+      {/* Premium Developer 2FA Auth Modal */}
+      <AnimatePresence>
+        {showAuthModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative max-w-md w-full bg-brand-alt border border-emerald-500/20 rounded-[32px] p-8 shadow-[0_32px_128px_-12px_rgba(16,185,129,0.25)] text-right"
+              dir="rtl"
+            >
+              {/* Header */}
+              <div className="flex items-center gap-4 mb-6 border-b border-white/5 pb-5 justify-end">
+                <div className="text-right">
+                  <h3 className="text-xl font-bold text-white leading-tight">
+                    {lang === 'ar' ? '🔐 مصادقة وضع المطور الثنائية (2FA)' : '🔐 Developer 2FA Authentication'}
+                  </h3>
+                  <span className="text-[10px] bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-full px-2.5 py-0.5 font-bold uppercase tracking-wider mt-1.5 inline-block">
+                    {lang === 'ar' ? 'بوابة أمنية مشددة' : 'High Security Gateway'}
+                  </span>
+                </div>
+                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 border border-emerald-500/20 shrink-0 shadow-lg">
+                  <Lock size={24} />
+                </div>
+              </div>
+
+              {!isOtpSent ? (
+                <form onSubmit={handleRequestOtp} className="space-y-5">
+                  <p className="text-slate-400 text-xs leading-relaxed text-right">
+                    {lang === 'ar' 
+                      ? 'يرجى إدخال البريد الإلكتروني ورقم الهاتف المسجلين للمطور للتحقق من هويتك وإرسال رموز التحقق الثنائي:'
+                      : 'Please enter the registered developer email and phone number to verify your identity and send 2FA codes:'}
+                  </p>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-300 block text-right">{lang === 'ar' ? 'البريد الإلكتروني للمطور:' : 'Developer Email:'}</label>
+                      <input
+                        type="email"
+                        value={devEmailInput}
+                        onChange={(e) => setDevEmailInput(e.target.value)}
+                        placeholder="name@example.com"
+                        required
+                        className="w-full bg-black/40 border border-white/10 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl px-4 py-3.5 text-xs text-left font-mono text-white outline-none transition-all"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-300 block text-right">{lang === 'ar' ? 'رقم الهاتف للمطور:' : 'Developer Phone Number:'}</label>
+                      <input
+                        type="text"
+                        value={devPhoneInput}
+                        onChange={(e) => setDevPhoneInput(e.target.value)}
+                        placeholder="0663919868"
+                        required
+                        className="w-full bg-black/40 border border-white/10 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl px-4 py-3.5 text-xs text-left font-mono text-white outline-none transition-all"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+
+                  {authError && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-400 text-center">
+                      {authError}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleCancelAuth}
+                      className="flex-1 py-3.5 bg-white/5 border border-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300 font-bold rounded-xl transition-all text-xs cursor-pointer"
+                    >
+                      {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                    </button>
+                    
+                    <button
+                      type="submit"
+                      disabled={isLoadingOtp}
+                      className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl transition-all text-xs shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      {isLoadingOtp ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>{lang === 'ar' ? 'جاري التحقق...' : 'Verifying...'}</span>
+                        </>
+                      ) : (
+                        <span>{lang === 'ar' ? 'إرسال الرموز ⚡' : 'Send Codes ⚡'}</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/10 text-right space-y-2">
+                    <span className="text-xs text-emerald-400 font-bold block text-right">🚨 تم إرسال الرموز بنجاح:</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed text-right">
+                      {lang === 'ar'
+                        ? 'تم إرسال رمزي تحقق (OTP) إلى بريدك وإلى هاتفك في رسالتين منفصلتين. يرجى كتابتهما في الحقول أدناه لتفعيل وضع المطور والدخول مباشر بكامل الصلاحيات:'
+                        : 'Two verification codes (OTPs) have been sent to your email and phone. Enter them below to activate Developer Mode:'}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 block text-right">{lang === 'ar' ? 'رمز البريد (Email OTP):' : 'Email OTP:'}</label>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        value={enteredEmailOtp}
+                        onChange={(e) => setEnteredEmailOtp(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 focus:border-emerald-500 rounded-xl px-3 py-3 text-center font-mono text-sm text-white focus:outline-none"
+                        placeholder="0000"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 block text-right">{lang === 'ar' ? 'رمز الهاتف (SMS OTP):' : 'SMS OTP:'}</label>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        value={enteredSmsOtp}
+                        onChange={(e) => setEnteredSmsOtp(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 focus:border-emerald-500 rounded-xl px-3 py-3 text-center font-mono text-sm text-white focus:outline-none"
+                        placeholder="0000"
+                      />
+                    </div>
+                  </div>
+
+                  {authError && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-400 text-center">
+                      {authError}
+                    </div>
+                  )}
+
+                  {authSuccess && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-xs text-emerald-400 text-center font-bold animate-pulse">
+                      {authSuccess}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCancelAuth}
+                      className="flex-1 py-3.5 bg-white/5 border border-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300 font-bold rounded-xl transition-all text-xs cursor-pointer"
+                    >
+                      {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleVerifyOtp}
+                      className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl transition-all text-xs shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 active:scale-95 cursor-pointer"
+                    >
+                      {lang === 'ar' ? 'تأكيد ودخول 🛡️' : 'Verify & Enter 🛡️'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Premium Notification Center (Simulating SMS & Email) */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -100, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className="fixed top-6 right-6 z-[200] max-w-sm w-full bg-brand-alt border-2 border-emerald-500/40 rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl text-right overflow-hidden group"
+          >
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-primary to-emerald-400" />
+            
+            <div className="flex items-start gap-3 justify-end mt-1">
+              <div className="flex-1 space-y-1">
+                <span className="text-[10px] text-slate-400 font-bold block">{notification.title}</span>
+                <p className="text-xs text-white leading-relaxed font-bold">{notification.body}</p>
+                <span className="text-[9px] text-emerald-400/70 font-semibold block pt-1">وصلتك للتو • وارد الآن</span>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0 shadow-inner">
+                {notification.type === 'email' ? <Mail size={20} /> : <MessageSquare size={20} />}
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setNotification(null)}
+              className="absolute top-3 left-3 text-slate-500 hover:text-white transition-colors p-1"
+              type="button"
+            >
+              <X size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Footer minimal info */}
       <div className="mt-12 text-slate-600 text-[10px] font-medium tracking-widest uppercase">

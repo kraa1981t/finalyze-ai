@@ -446,8 +446,9 @@ export default function App() {
         const email = savedUser.email || '';
 
         // Check if the user is a developer:
-        // Developer emails: bachasalman69@gmail.com, taybekraa@gmail.com, or user who has explicitly selected dev mode
-        const isDeveloper = email === 'bachasalman69@gmail.com' || 
+        const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+        const isDeveloper = email === activeDevEmail ||
+                            email === 'bachasalman69@gmail.com' || 
                             email === 'taybekraa@gmail.com' || 
                             email.includes('dev') ||
                             localStorage.getItem('finalyze_dev_bypass_active') === 'true';
@@ -495,7 +496,8 @@ export default function App() {
       if (u) {
         setUser(u);
         const email = u.email || '';
-        const isDeveloper = email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
+        const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+        const isDeveloper = email === activeDevEmail || email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
         
         // Cache Firebase session in custom storage for 3-day / permanent benefits
         const mockCompactUser = {
@@ -561,15 +563,19 @@ export default function App() {
     }
   };
 
-  const handleBypassLogin = (email: string = 'taybekraa@gmail.com') => {
-    const isDeveloper = email === 'bachasalman69@gmail.com' || 
-                        email === 'taybekraa@gmail.com' || 
-                        email.includes('dev');
+  const handleBypassLogin = (email?: string) => {
+    const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+    const finalEmail = email || activeDevEmail;
+    
+    const isDeveloper = finalEmail === activeDevEmail || 
+                        finalEmail === 'bachasalman69@gmail.com' || 
+                        finalEmail === 'taybekraa@gmail.com' || 
+                        finalEmail.includes('dev');
                         
     const mockUser = {
-      uid: 'mock_uid_' + email.replace(/[^a-zA-Z0-9]/g, ''),
-      email: email,
-      displayName: isDeveloper ? 'Taybe Developer' : 'Premium Subscriber',
+      uid: 'mock_uid_' + finalEmail.replace(/[^a-zA-Z0-9]/g, ''),
+      email: finalEmail,
+      displayName: isDeveloper ? 'Developer' : 'Premium Subscriber',
       photoURL: isDeveloper 
         ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150'
         : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150',
@@ -646,12 +652,13 @@ export default function App() {
       <SettingsModal 
         isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} 
         settings={settings} onSettingsChange={setSettings} 
+        user={user}
       />
 
       <ApiKeyModal 
-        isOpen={isApiKeyOpen || (!!user && user.email !== 'bachasalman69@gmail.com' && !hasApiKey)}
+        isOpen={isApiKeyOpen || (!!user && user.email !== (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com') && !hasApiKey)}
         onClose={() => setIsApiKeyOpen(false)}
-        isBlocking={!hasApiKey && user?.email !== 'bachasalman69@gmail.com'}
+        isBlocking={!hasApiKey && user?.email !== (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com')}
         lang={lang}
         user={user}
         onSaved={(key) => {
