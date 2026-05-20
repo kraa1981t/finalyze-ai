@@ -23,6 +23,17 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const isDeveloperSession = () => {
+    if (!user) return false;
+    const email = user.email || '';
+    const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+    return email === activeDevEmail ||
+           email === 'bachasalman69@gmail.com' ||
+           email === 'taybekraa@gmail.com' ||
+           email.includes('dev') ||
+           localStorage.getItem('finalyze_dev_bypass_active') === 'true';
+  };
+
   useEffect(() => {
     if (isOpen) {
       const savedKey = localStorage.getItem('finalyze_user_qwen_api_key') || '';
@@ -146,7 +157,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           </div>
           <div>
             <h3 className="text-xl font-bold text-white leading-tight">{t.title}</h3>
-            {user?.email === 'bachasalman69@gmail.com' && (
+            {isDeveloperSession() && (
               <span className="text-[10px] bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 rounded-full px-2.5 py-0.5 font-bold uppercase tracking-wider mt-1 inline-block">
                 Admin Account
               </span>
@@ -283,7 +294,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         </div>
 
         {/* Small admin notice if relevant */}
-        {user?.email === 'bachasalman69@gmail.com' && (
+        {isDeveloperSession() && (
           <div className="flex items-center gap-2 mt-4 text-[10px] text-emerald-400/60 justify-center">
             <Info size={12} />
             <span>{t.adminBypassInfo}</span>

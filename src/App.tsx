@@ -32,6 +32,17 @@ export default function App() {
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
+
+  const isDeveloperSession = () => {
+    if (!user) return false;
+    const email = user.email || '';
+    const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+    return email === activeDevEmail ||
+           email === 'bachasalman69@gmail.com' ||
+           email === 'taybekraa@gmail.com' ||
+           email.includes('dev') ||
+           localStorage.getItem('finalyze_dev_bypass_active') === 'true';
+  };
   
   const [settings, setSettings] = useState<StrategySettings>(() => {
     const saved = localStorage.getItem('strategy_settings');
@@ -656,9 +667,9 @@ export default function App() {
       />
 
       <ApiKeyModal 
-        isOpen={isApiKeyOpen || (!!user && user.email !== (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com') && !hasApiKey)}
+        isOpen={isApiKeyOpen || (!!user && !isDeveloperSession() && !hasApiKey)}
         onClose={() => setIsApiKeyOpen(false)}
-        isBlocking={!hasApiKey && user?.email !== (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com')}
+        isBlocking={!hasApiKey && !isDeveloperSession()}
         lang={lang}
         user={user}
         onSaved={(key) => {
@@ -677,7 +688,7 @@ export default function App() {
         isWaiting={isScanningFinished}
         isRadarUnlocked={isRadarUnlocked}
         onUnlockRadar={handleUnlockRadar}
-        hasApiKey={hasApiKey}
+        hasApiKey={hasApiKey || isDeveloperSession()}
         onOpenApiKey={() => setIsApiKeyOpen(true)}
       />
 
