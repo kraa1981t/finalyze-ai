@@ -150,99 +150,106 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
             {loginError ? (
               <div className="mb-6 p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 relative z-10 text-right space-y-4">
                 <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
-                  <span>{lang === 'ar' ? 'تسجيل دخول ذكي بـ Google' : 'Smart Google Login'}</span>
+                  <span>{lang === 'ar' ? 'تسجيل دخول آمن بـ Google' : 'Secure Google Sign-In'}</span>
                   <ShieldCheck size={18} />
                 </div>
+                
                 <p className="text-slate-300 text-xs leading-relaxed">
                   {lang === 'ar'
-                    ? 'بسبب قيود ترخيص النطاق في Firebase، تم تفعيل المصادقة الذكية السريعة. اختر حساب Gmail الخاص بك للاشتراك والتفعيل الفوري:'
-                    : 'Due to domain permissions, Google Smart Auth is active. Choose your Gmail account to instantly activate:'}
+                    ? 'يرجى إدخال بريد Google (Gmail) الخاص بك لإتمام عملية التحقق والاشتراك وتفعيل حسابك فوراً:'
+                    : 'Please enter your Google (Gmail) address to complete verification, subscribe, and activate your account:'}
                 </p>
 
-                {/* Preset List */}
-                <div className="space-y-2 mt-2">
-                  <button
-                    onClick={() => handlePresetSelect('taybekraa@gmail.com')}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 transition-all text-left cursor-pointer group"
-                  >
-                    <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full group-hover:bg-emerald-500 group-hover:text-brand-bg transition-colors">
-                      {lang === 'ar' ? 'مطور - جلسة دائمة ⚡' : 'Dev - Permanent ⚡'}
-                    </span>
-                    <div className="flex flex-col text-right">
-                      <span className="text-xs font-bold text-white">Taybe Kraa</span>
-                      <span className="text-[10px] text-slate-400">taybekraa@gmail.com</span>
+                {/* Primary Professional Gmail Input Form */}
+                <form onSubmit={handleCustomSubmit} className="space-y-3">
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={customEmail}
+                      onChange={(e) => setCustomEmail(e.target.value)}
+                      placeholder="yourname@gmail.com"
+                      className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50 pr-10"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+                      @
                     </div>
+                  </div>
+                  {inputError && <p className="text-[10px] text-red-400 font-bold mt-1 text-right">{inputError}</p>}
+                  
+                  <button
+                    type="submit"
+                    className="w-full bg-primary hover:bg-emerald-500 text-brand-bg font-black py-4 rounded-2xl transition-all text-sm cursor-pointer shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/25 active:scale-98"
+                  >
+                    {lang === 'ar' ? 'تسجيل الدخول ومتابعة الاشتراك ←' : 'Sign In & Continue Subscription →'}
+                  </button>
+                </form>
+
+                {/* Expandable Testing & Dev Console (Discreetly placed at the bottom for professional look) */}
+                <div className="pt-2 border-t border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setShowGuide(!showGuide)}
+                    className="w-full flex items-center justify-between text-[11px] text-slate-500 hover:text-slate-300 transition-colors py-1 cursor-pointer"
+                  >
+                    <span>{showGuide ? '▲' : '▼'}</span>
+                    <span className="font-bold">
+                      {lang === 'ar' ? '🔧 لوحة اختبار النظام والوصول السريع' : '🔧 System Testing & Access Console'}
+                    </span>
                   </button>
 
-                  <button
-                    onClick={() => handlePresetSelect('bachasalman69@gmail.com')}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 transition-all text-left cursor-pointer group"
-                  >
-                    <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full group-hover:bg-emerald-500 group-hover:text-brand-bg transition-colors">
-                      {lang === 'ar' ? 'مطور - جلسة دائمة ⚡' : 'Dev - Permanent ⚡'}
-                    </span>
-                    <div className="flex flex-col text-right">
-                      <span className="text-xs font-bold text-white">Joseph Developer</span>
-                      <span className="text-[10px] text-slate-400">bachasalman69@gmail.com</span>
-                    </div>
-                  </button>
+                  <AnimatePresence>
+                    {showGuide && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden mt-3 space-y-2 text-right"
+                      >
+                        <p className="text-[10px] text-slate-500 leading-relaxed">
+                          {lang === 'ar'
+                            ? 'بصفتك مطوراً، يمكنك محاكاة الدخول بنقرة واحدة لتسريع عملية الاختبار والتطوير دون الحاجة للكتابة:'
+                            : 'As a developer/tester, simulate account access with a single click to speed up validation:'}
+                        </p>
 
-                  <button
-                    onClick={() => handlePresetSelect('trader.client@gmail.com')}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 transition-all text-left cursor-pointer group"
-                  >
-                    <span className="text-[10px] font-black uppercase text-slate-400 bg-white/5 px-2 py-0.5 rounded-full group-hover:bg-emerald-500 group-hover:text-brand-bg transition-colors">
-                      {lang === 'ar' ? 'عميل - نشط 3 أيام 💎' : 'Client - 3 Days Active 💎'}
-                    </span>
-                    <div className="flex flex-col text-right">
-                      <span className="text-xs font-bold text-white">VIP Trader</span>
-                      <span className="text-[10px] text-slate-400">trader.client@gmail.com</span>
-                    </div>
-                  </button>
+                        <div className="space-y-2">
+                          {/* 1. Developer Login (Full permissions & permanent session) */}
+                          <button
+                            type="button"
+                            onClick={() => handlePresetSelect('taybekraa@gmail.com')}
+                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 transition-all text-left cursor-pointer group"
+                          >
+                            <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/15 px-2.5 py-1 rounded-full shrink-0">
+                              {lang === 'ar' ? 'المطور - صلاحيات كاملة ⚡' : 'Dev - Full Access ⚡'}
+                            </span>
+                            <div className="flex flex-col text-right">
+                              <span className="text-xs font-bold text-white">Taybe Kraa (دخول دائم)</span>
+                              <span className="text-[9px] text-slate-400">taybekraa@gmail.com</span>
+                            </div>
+                          </button>
+
+                          {/* 2. Client Login (User/Audience experience simulation) */}
+                          <button
+                            type="button"
+                            onClick={() => handlePresetSelect('trader.client@gmail.com')}
+                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 transition-all text-left cursor-pointer group"
+                          >
+                            <span className="text-[9px] font-black uppercase text-blue-400 bg-blue-500/15 px-2.5 py-1 rounded-full shrink-0">
+                              {lang === 'ar' ? 'العميل - تجربة الجمهور 💎' : 'Client - Live Mode 💎'}
+                            </span>
+                            <div className="flex flex-col text-right">
+                              <span className="text-xs font-bold text-white">VIP Trader (تجربة 3 أيام)</span>
+                              <span className="text-[9px] text-slate-400">trader.client@gmail.com</span>
+                            </div>
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
-                {/* Custom Gmail Selector */}
-                {!showCustomInput ? (
-                  <button
-                    onClick={() => setShowCustomInput(true)}
-                    className="w-full py-2.5 text-center text-xs text-primary hover:text-emerald-400 transition-colors font-bold underline cursor-pointer"
-                  >
-                    {lang === 'ar' ? '✎ استخدام حساب Gmail مخصص آخر...' : '✎ Use another custom Gmail...'}
-                  </button>
-                ) : (
-                  <form onSubmit={handleCustomSubmit} className="space-y-2 pt-2 border-t border-white/5">
-                    <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                      {lang === 'ar' ? 'ادخل بريد Google الخاص بك:' : 'Enter your Google Email:'}
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        className="bg-primary hover:bg-emerald-500 text-brand-bg font-black px-4 py-2 rounded-xl transition-all text-xs cursor-pointer"
-                      >
-                        {lang === 'ar' ? 'تسجيل واشتراك' : 'Sign In'}
-                      </button>
-                      <input
-                        type="email"
-                        value={customEmail}
-                        onChange={(e) => setCustomEmail(e.target.value)}
-                        placeholder="yourname@gmail.com"
-                        className="flex-1 bg-brand-bg border border-white/10 rounded-xl px-3 py-2 text-xs text-white text-left focus:outline-none focus:border-emerald-500/50"
-                      />
-                    </div>
-                    {inputError && <p className="text-[10px] text-red-400 font-bold mt-1">{inputError}</p>}
-                    <button
-                      type="button"
-                      onClick={() => { setShowCustomInput(false); setInputError(''); }}
-                      className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
-                    >
-                      {lang === 'ar' ? 'إلغاء' : 'Cancel'}
-                    </button>
-                  </form>
-                )}
-
-                <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px] text-slate-500">
-                  <button onClick={onClearError} className="hover:text-white transition-colors cursor-pointer">
-                    ✕ {lang === 'ar' ? 'إخلاق الخطأ والرجوع' : 'Clear error & back'}
+                <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-slate-500">
+                  <button type="button" onClick={onClearError} className="hover:text-white transition-colors cursor-pointer">
+                    ✕ {lang === 'ar' ? 'رجوع' : 'Back'}
                   </button>
                   <span>Google Secure Verification</span>
                 </div>
