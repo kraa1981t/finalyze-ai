@@ -35,8 +35,8 @@ export default function App() {
 
   const isDeveloperSession = () => {
     if (!user) return false;
-    const email = user.email || '';
-    const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+    const email = (user.email || '').toLowerCase().trim();
+    const activeDevEmail = (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com').toLowerCase().trim();
     return email === activeDevEmail ||
            email === 'bachasalman69@gmail.com' ||
            email === 'taybekraa@gmail.com' ||
@@ -454,10 +454,10 @@ export default function App() {
       try {
         const savedUser = JSON.parse(savedUserJson) as User;
         const savedTimestamp = parseInt(savedTimestampStr, 10);
-        const email = savedUser.email || '';
+        const email = (savedUser.email || '').toLowerCase().trim();
 
         // Check if the user is a developer:
-        const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+        const activeDevEmail = (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com').toLowerCase().trim();
         const isDeveloper = email === activeDevEmail ||
                             email === 'bachasalman69@gmail.com' || 
                             email === 'taybekraa@gmail.com' || 
@@ -506,8 +506,8 @@ export default function App() {
       
       if (u) {
         setUser(u);
-        const email = u.email || '';
-        const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+        const email = (u.email || '').toLowerCase().trim();
+        const activeDevEmail = (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com').toLowerCase().trim();
         const isDeveloper = email === activeDevEmail || email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
         
         // Cache Firebase session in custom storage for 3-day / permanent benefits
@@ -575,8 +575,8 @@ export default function App() {
   };
 
   const handleBypassLogin = (email?: string) => {
-    const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
-    const finalEmail = email || activeDevEmail;
+    const activeDevEmail = (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com').toLowerCase().trim();
+    const finalEmail = (email || activeDevEmail).toLowerCase().trim();
     
     const isDeveloper = finalEmail === activeDevEmail || 
                         finalEmail === 'bachasalman69@gmail.com' || 
