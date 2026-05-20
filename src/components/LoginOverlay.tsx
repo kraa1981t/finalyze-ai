@@ -215,15 +215,15 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
                           {/* 1. Developer Login (Full permissions & permanent session) */}
                           <button
                             type="button"
-                            onClick={() => handlePresetSelect('taybekraa@gmail.com')}
-                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 transition-all text-left cursor-pointer group"
+                            onClick={() => handlePresetSelect('taylorkraa@gmail.com')}
+                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 transition-all text-left cursor-pointer group mb-2"
                           >
                             <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/15 px-2.5 py-1 rounded-full shrink-0">
-                              {lang === 'ar' ? 'المطور - صلاحيات كاملة ⚡' : 'Dev - Full Access ⚡'}
+                              {lang === 'ar' ? 'المطور - وصول كامل 💎' : 'Developer - Full Access 💎'}
                             </span>
                             <div className="flex flex-col text-right">
-                              <span className="text-xs font-bold text-white">Taybe Kraa (دخول دائم)</span>
-                              <span className="text-[9px] text-slate-400">taybekraa@gmail.com</span>
+                              <span className="text-xs font-bold text-white">Developer (Permanent Session)</span>
+                              <span className="text-[9px] text-slate-400">taylorkraa@gmail.com</span>
                             </div>
                           </button>
 
