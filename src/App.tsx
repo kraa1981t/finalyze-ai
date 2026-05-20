@@ -592,7 +592,7 @@ export default function App() {
       localStorage.removeItem('finalyze_dev_bypass_active');
     }
     
-    setHasApiKey(true);
+    setHasApiKey(!!localStorage.getItem('finalyze_user_qwen_api_key'));
     setLoginError(null);
   };
 

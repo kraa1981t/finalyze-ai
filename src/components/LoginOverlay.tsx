@@ -56,7 +56,12 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
   const [authError, setAuthError] = useState('');
   const [authSuccess, setAuthSuccess] = useState('');
   const [isLoadingOtp, setIsLoadingOtp] = useState(false);
-  const [notification, setNotification] = useState<{ type: 'sms' | 'email'; title: string; body: string } | null>(null);
+  const [notification, setNotification] = useState<{ type: 'sms' | 'email'; title: string; body: string; isCustomerActivation?: boolean } | null>(null);
+
+  // Custom Customer Verification States
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [showSimulatedEmail, setShowSimulatedEmail] = useState(false);
 
   const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
 
@@ -107,8 +112,12 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
           localStorage.removeItem('finalyze_dev_bypass_active');
           alert(lang === 'ar' ? '🔒 تم إيقاف وضع المطور!' : '🔒 Developer Mode Deactivated!');
         } else {
-          // Instead of immediate activation, prompt the 2FA modal
-          setShowAuthModal(true);
+          // Instant direct activation and bypass login for the developer!
+          localStorage.setItem('finalyze_dev_bypass_active', 'true');
+          setDevModeActive(true);
+          if (onBypassLogin) {
+            onBypassLogin(currentDevEmail);
+          }
         }
         return 0;
       }
@@ -241,9 +250,22 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
       setInputError(lang === 'ar' ? 'الرجاء إدخال بريد إلكتروني صحيح' : 'Please enter a valid email');
       return;
     }
-    if (onBypassLogin) {
-      onBypassLogin(emailLower);
-    }
+
+    // Activate pending verification state
+    setPendingVerification(true);
+    setVerificationEmail(emailLower);
+
+    // Trigger premium notification after 2 seconds
+    setTimeout(() => {
+      setNotification({
+        type: 'email',
+        title: lang === 'ar' ? '📧 Finalyze AI Security' : '📧 Finalyze AI Security',
+        body: lang === 'ar'
+          ? `رسالة تنشيط الحساب لـ ${emailLower} جاهزة. انقر هنا لفتح البريد وتأكيد التحقق.`
+          : `Account activation email for ${emailLower} is ready. Click to open and verify.`,
+        isCustomerActivation: true
+      });
+    }, 2000);
   };
 
   const handlePresetSelect = (email: string) => {
@@ -342,90 +364,127 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
               </h3>
             </div>
 
-            {/* Direct Professional Gmail Input Form */}
-            <div className="mb-6 p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 relative z-10 text-right space-y-4">
-              <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
-                <span>{lang === 'ar' ? 'تسجيل دخول آمن بـ Google' : 'Secure Google Sign-In'}</span>
-                <ShieldCheck size={18} />
-              </div>
-              
-              <p className="text-slate-300 text-xs leading-relaxed">
-                {lang === 'ar'
-                  ? 'يرجى إدخال بريد Google (Gmail) الخاص بك لإتمام عملية التحقق والاشتراك وتفعيل حسابك فوراً:'
-                  : 'Please enter your Google (Gmail) address to complete verification, subscribe, and activate your account:'}
-              </p>
-
-              <form onSubmit={handleCustomSubmit} className="space-y-3">
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={customEmail}
-                    onChange={(e) => setCustomEmail(e.target.value)}
-                    placeholder="yourname@gmail.com"
-                    className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50 pr-10"
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
-                    @
-                  </div>
+            {/* Direct Professional Gmail Input Form / Pending Verification */}
+            {!pendingVerification ? (
+              <div className="mb-6 p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 relative z-10 text-right space-y-4">
+                <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
+                  <span>{lang === 'ar' ? 'تسجيل دخول آمن بـ Google' : 'Secure Google Sign-In'}</span>
+                  <ShieldCheck size={18} />
                 </div>
-                {inputError && <p className="text-[10px] text-red-400 font-bold mt-1 text-right">{inputError}</p>}
                 
-                <button
-                  type="submit"
-                  className="w-full bg-primary hover:bg-emerald-500 text-brand-bg font-black py-4 rounded-2xl transition-all text-sm cursor-pointer shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/25 active:scale-98"
-                >
-                  {lang === 'ar' ? 'تسجيل الدخول ومتابعة الاشتراك ←' : 'Sign In & Continue Subscription →'}
-                </button>
-              </form>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  {lang === 'ar'
+                    ? 'يرجى إدخال بريد Google (Gmail) الخاص بك لإتمام عملية التحقق والاشتراك وتفعيل حسابك فوراً:'
+                    : 'Please enter your Google (Gmail) address to complete verification, subscribe, and activate your account:'}
+                </p>
 
-              {/* Direct Bypass Options for Developer Mode (Only visible if devModeActive is true) */}
-              {devModeActive && (
-                <div className="pt-4 border-t border-white/5 space-y-3 text-right">
-                  <p className="text-[11px] text-slate-400 leading-relaxed font-bold">
-                    {lang === 'ar'
-                      ? '⚡ خيارات المطور للمحاكاة والاختبار السريع:'
-                      : '⚡ Developer Bypass & Simulation Options:'}
-                  </p>
+                <form onSubmit={handleCustomSubmit} className="space-y-3">
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={customEmail}
+                      onChange={(e) => setCustomEmail(e.target.value)}
+                      placeholder="yourname@gmail.com"
+                      className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50 pr-10"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+                      @
+                    </div>
+                  </div>
+                  {inputError && <p className="text-[10px] text-red-400 font-bold mt-1 text-right">{inputError}</p>}
+                  
+                  <button
+                    type="submit"
+                    className="w-full bg-primary hover:bg-emerald-500 text-brand-bg font-black py-4 rounded-2xl transition-all text-sm cursor-pointer shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/25 active:scale-98"
+                  >
+                    {lang === 'ar' ? 'تسجيل الدخول ومتابعة الاشتراك ←' : 'Sign In & Continue Subscription →'}
+                  </button>
+                </form>
 
-                  <div className="space-y-2">
-                    {/* 1. Developer Login - Mowten Option */}
-                    <button
-                      type="button"
-                      onClick={() => handlePresetSelect(currentDevEmail)}
-                      className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 transition-all text-left cursor-pointer group"
-                    >
-                      <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/15 px-2.5 py-1 rounded-full shrink-0">
-                        {lang === 'ar' ? 'خيار موطن ⚡' : 'Mowten Option ⚡'}
-                      </span>
-                      <div className="flex flex-col text-right">
-                        <span className="text-xs font-bold text-white">
-                          {lang === 'ar' ? 'خيار موطن (دخول مباشر بكامل الصلاحيات)' : 'Mowten Option (Direct Full Access)'}
+                {/* Direct Bypass Options for Developer Mode (Only visible if devModeActive is true) */}
+                {devModeActive && (
+                  <div className="pt-4 border-t border-white/5 space-y-3 text-right">
+                    <p className="text-[11px] text-slate-400 leading-relaxed font-bold">
+                      {lang === 'ar'
+                        ? '⚡ خيارات المطور للمحاكاة والاختبار السريع:'
+                        : '⚡ Developer Bypass & Simulation Options:'}
+                    </p>
+
+                    <div className="space-y-2">
+                      {/* 1. Developer Login - Mowten Option */}
+                      <button
+                        type="button"
+                        onClick={() => handlePresetSelect(currentDevEmail)}
+                        className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 transition-all text-left cursor-pointer group"
+                      >
+                        <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/15 px-2.5 py-1 rounded-full shrink-0">
+                          {lang === 'ar' ? 'خيار موطن ⚡' : 'Mowten Option ⚡'}
                         </span>
-                        <span className="text-[9px] text-slate-400">{currentDevEmail}</span>
-                      </div>
-                    </button>
+                        <div className="flex flex-col text-right">
+                          <span className="text-xs font-bold text-white">
+                            {lang === 'ar' ? 'خيار موطن (دخول مباشر بكامل الصلاحيات)' : 'Mowten Option (Direct Full Access)'}
+                          </span>
+                          <span className="text-[9px] text-slate-400">{currentDevEmail}</span>
+                        </div>
+                      </button>
 
-                    {/* 2. Client Login (User/Audience experience simulation) */}
-                    <button
-                      type="button"
-                      onClick={() => handlePresetSelect('trader.client@gmail.com')}
-                      className="w-full flex items-center justify-between p-3 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 transition-all text-left cursor-pointer group"
-                    >
-                      <span className="text-[9px] font-black uppercase text-blue-400 bg-blue-500/15 px-2.5 py-1 rounded-full shrink-0">
-                        {lang === 'ar' ? 'العميل - محاكاة تجربة الجمهور 💎' : 'Client - Simulation Mode 💎'}
-                      </span>
-                      <div className="flex flex-col text-right">
-                        <span className="text-xs font-bold text-white">VIP Trader (تجربة العميل)</span>
-                        <span className="text-[9px] text-slate-400">trader.client@gmail.com</span>
-                      </div>
-                    </button>
+                      {/* 2. Client Login (User/Audience experience simulation) */}
+                      <button
+                        type="button"
+                        onClick={() => handlePresetSelect('trader.client@gmail.com')}
+                        className="w-full flex items-center justify-between p-3 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 transition-all text-left cursor-pointer group"
+                      >
+                        <span className="text-[9px] font-black uppercase text-blue-400 bg-blue-500/15 px-2.5 py-1 rounded-full shrink-0">
+                          {lang === 'ar' ? 'العميل - محاكاة تجربة الجمهور 💎' : 'Client - Simulation Mode 💎'}
+                        </span>
+                        <div className="flex flex-col text-right">
+                          <span className="text-xs font-bold text-white">VIP Trader (تجربة العميل)</span>
+                          <span className="text-[9px] text-slate-400">trader.client@gmail.com</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-right space-y-5">
+                <div className="flex items-center gap-2 text-amber-400 justify-end font-bold text-sm">
+                  <span>{lang === 'ar' ? 'تأكيد البريد الإلكتروني معلق' : 'Email Verification Pending'}</span>
+                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                </div>
+                
+                <h4 className="text-md font-bold text-white leading-snug">
+                  {lang === 'ar' ? '📧 قم بتأكيد بريدك الإلكتروني لتنشيط الحساب' : '📧 Confirm Your Email to Activate Account'}
+                </h4>
+                
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  {lang === 'ar'
+                    ? `لقد أرسلنا رسالة تنشيط أمنية إلى البريد المسجل: ${verificationEmail}. يرجى النقر على زر "تأكيد التحقق" الأخضر الموجود داخل الرسالة للدخول المباشر.`
+                    : `We have sent a secure activation email to: ${verificationEmail}. Please click the green "Confirm Verification" button inside the message to log in.`}
+                </p>
+
+                <div className="bg-black/30 p-3 rounded-2xl border border-white/5 space-y-2">
+                  <div className="text-[10px] text-slate-400 font-bold">
+                    {lang === 'ar' ? '🛡️ حالة المحاكاة الأمنية:' : '🛡️ Security Simulation Status:'}
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-amber-400 justify-end font-semibold">
+                    <span>{lang === 'ar' ? 'بانتظار وصول إشعار البريد الإلكتروني (خلال ثانيتين)...' : 'Waiting for email notification (2s)...'}</span>
+                    <Loader2 size={10} className="animate-spin" />
                   </div>
                 </div>
-              )}
 
-              <div className="flex items-center justify-center pt-2 border-t border-white/5 text-[9px] text-slate-500">
-                <span>Google Secure Verification</span>
+                <button
+                  type="button"
+                  onClick={() => setPendingVerification(false)}
+                  className="w-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[11px] font-bold py-2.5 rounded-xl transition-all cursor-pointer text-center"
+                >
+                  {lang === 'ar' ? '← العودة وتغيير البريد الإلكتروني' : '← Go Back & Change Email'}
+                </button>
               </div>
+            )}
+
+            <div className="flex items-center justify-center pt-2 border-t border-white/5 text-[9px] text-slate-500">
+              <span>Google Secure Verification</span>
             </div>
 
             <p className="mt-6 text-center text-xs text-slate-500">
@@ -784,7 +843,15 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
             initial={{ opacity: 0, y: -100, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.9 }}
-            className="fixed top-6 right-6 z-[200] max-w-sm w-full bg-brand-alt border-2 border-emerald-500/40 rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl text-right overflow-hidden group"
+            className={`fixed top-6 right-6 z-[200] max-w-sm w-full bg-brand-alt border-2 ${
+              notification.isCustomerActivation ? 'border-emerald-500 cursor-pointer hover:bg-white/5' : 'border-emerald-500/40'
+            } rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl text-right overflow-hidden group transition-all`}
+            onClick={() => {
+              if (notification.isCustomerActivation) {
+                setShowSimulatedEmail(true);
+                setNotification(null);
+              }
+            }}
           >
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-primary to-emerald-400" />
             
@@ -792,7 +859,11 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
               <div className="flex-1 space-y-1">
                 <span className="text-[10px] text-slate-400 font-bold block">{notification.title}</span>
                 <p className="text-xs text-white leading-relaxed font-bold">{notification.body}</p>
-                <span className="text-[9px] text-emerald-400/70 font-semibold block pt-1">وصلتك للتو • وارد الآن</span>
+                <span className="text-[9px] text-emerald-400/70 font-semibold block pt-1">
+                  {notification.isCustomerActivation 
+                    ? (lang === 'ar' ? 'انقر لفتح البريد الإلكتروني وتنشيط الحساب' : 'Click to open email & activate account')
+                    : (lang === 'ar' ? 'وصلتك للتو • وارد الآن' : 'Just arrived • Inbox now')}
+                </span>
               </div>
               <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0 shadow-inner">
                 {notification.type === 'email' ? <Mail size={20} /> : <MessageSquare size={20} />}
@@ -800,13 +871,128 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
             </div>
             
             <button
-              onClick={() => setNotification(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setNotification(null);
+              }}
               className="absolute top-3 left-3 text-slate-500 hover:text-white transition-colors p-1"
               type="button"
             >
               <X size={14} />
             </button>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Premium Simulated Email Modal */}
+      <AnimatePresence>
+        {showSimulatedEmail && (
+          <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative max-w-lg w-full bg-white text-slate-800 rounded-[32px] p-0 shadow-[0_32px_128px_-12px_rgba(255,255,255,0.15)] overflow-hidden"
+              dir="rtl"
+            >
+              {/* Email App Header */}
+              <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                </div>
+                <div className="text-xs font-bold text-slate-400 font-mono">
+                  {lang === 'ar' ? 'صندوق الوارد الآمن' : 'Secure Inbox'}
+                </div>
+                <button
+                  onClick={() => setShowSimulatedEmail(false)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6 overflow-y-auto max-h-[80vh]">
+                {/* Mail Metadata */}
+                <div className="border-b border-slate-100 pb-4 space-y-2 text-right">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>{new Date().toLocaleTimeString()}</span>
+                    <div>
+                      <span className="font-bold text-slate-800">من: </span>
+                      <span>Finalyze AI Security &lt;security@finalyze.ai&gt;</span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500 text-right">
+                    <span className="font-bold text-slate-800">إلى: </span>
+                    <span className="font-mono">{verificationEmail}</span>
+                  </div>
+                  <div className="text-sm font-bold text-slate-800 pt-1">
+                    {lang === 'ar' ? '📥 رمز التنشيط وتأكيد التحقق من حسابك في Finalyze.AI' : '📥 Finalyze.AI Account Activation & Verification'}
+                  </div>
+                </div>
+
+                {/* Email Body */}
+                <div className="space-y-6 text-right">
+                  <div className="flex items-center gap-3 justify-end">
+                    <div className="flex flex-col text-right">
+                      <span className="text-lg font-black text-slate-900 tracking-tighter">
+                        Finalyze.<span className="text-emerald-600 italic">AI</span>
+                      </span>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 font-black">Security Workspace</span>
+                    </div>
+                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden border border-slate-200">
+                      <img src="/logo.png" alt="Finalyze AI Logo" className="w-full h-full object-cover scale-110" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-base font-bold text-slate-950">
+                      {lang === 'ar' ? 'مرحباً بك في منصة التحليل المالي الذكية!' : 'Welcome to the Smart Trading Analytics Platform!'}
+                    </h3>
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                      {lang === 'ar'
+                        ? 'لقد قمت بالتسجيل أو تسجيل الدخول باستخدام البريد الإلكتروني في موقعنا. كخطوة أمان إلزامية لحماية بياناتك والاشتراك الخاص بك، يرجى تأكيد صحة وملكيتك لهذا البريد الإلكتروني بالنقر على زر التنشيط أدناه:'
+                        : 'You registered or signed in using your email on our website. As a security step to protect your account and subscription, please confirm ownership of this email address by clicking the activation button below:'}
+                    </p>
+                  </div>
+
+                  {/* Green Button Verification */}
+                  <div className="py-6 flex flex-col items-center justify-center bg-slate-50 rounded-3xl border border-slate-100 space-y-3">
+                    <button
+                      onClick={() => {
+                        // Click verifies and redirects to my site (onBypassLogin logs them in)
+                        if (onBypassLogin) {
+                          onBypassLogin(verificationEmail);
+                        }
+                        setShowSimulatedEmail(false);
+                        setPendingVerification(false);
+                      }}
+                      className="inline-flex items-center gap-3 px-8 py-4 bg-[#10B981] hover:bg-[#0D9668] text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer text-base"
+                    >
+                      <Check size={20} className="stroke-[3] text-white" />
+                      <span>{lang === 'ar' ? 'تأكيد التحقق' : 'Confirm Verification'}</span>
+                    </button>
+                    <span className="text-[10px] text-slate-400 font-semibold">
+                      {lang === 'ar' ? 'تأكيد آمن بنقرة واحدة • Finalyze AI Secure Verification' : 'One-click Secure Verification'}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {lang === 'ar'
+                      ? 'بمجرد الضغط على هذا الزر الأخضر، سيتم تنشيط حسابك ونقلك تلقائياً إلى لوحة التحكم الرئيسية لإدخال مفتاح تشغيل الذكاء الاصطناعي وبدء التحليل.'
+                      : 'Once you click this green button, your account will be activated and you will be redirected to the main dashboard to configure your API key.'}
+                  </p>
+                </div>
+
+                {/* Email Footer */}
+                <div className="border-t border-slate-100 pt-5 text-center text-[10px] text-slate-400 space-y-1">
+                  <p>© {new Date().getFullYear()} Finalyze.AI Inc. All Rights Reserved.</p>
+                  <p>This is an automated security notification. Please do not reply directly to this email.</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
