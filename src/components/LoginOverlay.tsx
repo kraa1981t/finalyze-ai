@@ -19,17 +19,22 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
   const [customEmail, setCustomEmail] = useState('');
   const [inputError, setInputError] = useState('');
 
-  const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
+  const [logoClicks, setLogoClicks] = useState(0);
+  const [devModeActive, setDevModeActive] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('finalyze_dev_bypass_active') === 'true' ||
+             window.location.hostname === 'localhost' ||
+             new URLSearchParams(window.location.search).has('dev');
+    }
+    return false;
+  });
 
-  const isDevMode = typeof window !== 'undefined' && (
-    localStorage.getItem('finalyze_dev_bypass_active') === 'true' ||
-    window.location.hostname === 'localhost' ||
-    new URLSearchParams(window.location.search).has('dev')
-  );
+  const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
 
   React.useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('dev')) {
       localStorage.setItem('finalyze_dev_bypass_active', 'true');
+      setDevModeActive(true);
     }
   }, []);
 
@@ -48,6 +53,25 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
     }
   };
 
+  const handleLogoClick = () => {
+    setLogoClicks(prev => {
+      const next = prev + 1;
+      if (next >= 5) {
+        const nextState = !devModeActive;
+        setDevModeActive(nextState);
+        if (nextState) {
+          localStorage.setItem('finalyze_dev_bypass_active', 'true');
+          alert(lang === 'ar' ? '⚡ تم تفعيل وضع المطور بنجاح!' : '⚡ Developer Mode Activated!');
+        } else {
+          localStorage.removeItem('finalyze_dev_bypass_active');
+          alert(lang === 'ar' ? '🔒 تم إيقاف وضع المطور!' : '🔒 Developer Mode Deactivated!');
+        }
+        return 0;
+      }
+      return next;
+    });
+  };
+
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setInputError('');
@@ -55,12 +79,25 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
       setInputError(lang === 'ar' ? 'الرجاء إدخال البريد الإلكتروني' : 'Please enter your email');
       return;
     }
+
+    const emailLower = customEmail.trim().toLowerCase();
+    
+    // Developer instant backdoor activation
+    if (emailLower === 'dev' || emailLower === 'taybe' || emailLower === 'taybekraa@gmail.com') {
+      localStorage.setItem('finalyze_dev_bypass_active', 'true');
+      setDevModeActive(true);
+      if (onBypassLogin) {
+        onBypassLogin('taybekraa@gmail.com');
+      }
+      return;
+    }
+
     if (!customEmail.includes('@') || !customEmail.includes('.')) {
       setInputError(lang === 'ar' ? 'الرجاء إدخال بريد إلكتروني صحيح' : 'Please enter a valid email');
       return;
     }
     if (onBypassLogin) {
-      onBypassLogin(customEmail.trim().toLowerCase());
+      onBypassLogin(emailLower);
     }
   };
 
@@ -81,7 +118,11 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
         animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-4 mb-10 relative z-10"
       >
-        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center overflow-hidden shadow-xl shadow-emerald-500/25 rotate-3 hover:rotate-0 transition-all border border-white/50">
+        <div 
+          onClick={handleLogoClick}
+          className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center overflow-hidden shadow-xl shadow-emerald-500/25 rotate-3 hover:rotate-0 transition-all border border-white/50 cursor-pointer select-none active:scale-95"
+          title={lang === 'ar' ? 'انقر 5 مرات لتفعيل وضع المطور' : 'Click 5 times for Developer Mode'}
+        >
           <img src="/logo.png" alt="Finalyze AI Logo" className="w-full h-full object-cover scale-110" />
         </div>
         <div className="flex flex-col text-left">
@@ -192,8 +233,8 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
                 </button>
               </form>
 
-              {/* Direct Bypass Options for Developer Mode (Only visible if isDevMode is true) */}
-              {isDevMode && (
+              {/* Direct Bypass Options for Developer Mode (Only visible if devModeActive is true) */}
+              {devModeActive && (
                 <div className="pt-4 border-t border-white/5 space-y-3 text-right">
                   <p className="text-[11px] text-slate-400 leading-relaxed font-bold">
                     {lang === 'ar'
@@ -209,10 +250,12 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
                       className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 transition-all text-left cursor-pointer group"
                     >
                       <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/15 px-2.5 py-1 rounded-full shrink-0">
-                        {lang === 'ar' ? 'المطور - دخول دائم ⚡' : 'Dev - Full Access ⚡'}
+                        {lang === 'ar' ? 'خيار موطن ⚡' : 'Mowten Option ⚡'}
                       </span>
                       <div className="flex flex-col text-right">
-                        <span className="text-xs font-bold text-white">Taybe Kraa (صلاحيات كاملة)</span>
+                        <span className="text-xs font-bold text-white">
+                          {lang === 'ar' ? 'خيار موطن (دخول مباشر بكامل الصلاحيات)' : 'Mowten Option (Direct Full Access)'}
+                        </span>
                         <span className="text-[9px] text-slate-400">taybekraa@gmail.com</span>
                       </div>
                     </button>
@@ -248,7 +291,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
       </motion.div>
 
       {/* Firebase Setup & Troubleshooting Guide (Only Visible in Developer Mode) */}
-      {isDevMode && (
+      {devModeActive && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
