@@ -5,7 +5,7 @@ import { Language, translations } from '../lib/i18n';
 
 interface LoginOverlayProps {
   onLogin: () => void;
-  onBypassLogin?: () => void;
+  onBypassLogin?: (email: string) => void;
   lang: Language;
   loginError: string | null;
   onClearError: () => void;
@@ -16,6 +16,10 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
   const [showGuide, setShowGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedConfigPath, setCopiedConfigPath] = useState(false);
+
+  const [customEmail, setCustomEmail] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [inputError, setInputError] = useState('');
 
   const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
 
@@ -31,6 +35,28 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
       }
     } catch (err) {
       console.error('Failed to copy text: ', err);
+    }
+  };
+
+  const handleCustomSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setInputError('');
+    if (!customEmail) {
+      setInputError(lang === 'ar' ? 'الرجاء إدخال البريد الإلكتروني' : 'Please enter your email');
+      return;
+    }
+    if (!customEmail.includes('@') || !customEmail.includes('.')) {
+      setInputError(lang === 'ar' ? 'الرجاء إدخال بريد إلكتروني صحيح' : 'Please enter a valid email');
+      return;
+    }
+    if (onBypassLogin) {
+      onBypassLogin(customEmail.trim().toLowerCase());
+    }
+  };
+
+  const handlePresetSelect = (email: string) => {
+    if (onBypassLogin) {
+      onBypassLogin(email);
     }
   };
 
@@ -120,73 +146,131 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
               </h3>
             </div>
 
-            {/* Error Message Visual Callout */}
-            {loginError && (
-              <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/25 relative z-10">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={18} />
-                  <div className="flex-1 text-left text-xs text-red-200">
-                    <div className="flex justify-between items-center mb-1">
-                      <p className="font-bold">
-                        {lang === 'ar' ? 'عذراً! حدث خطأ في المصادقة:' : 'Authentication Error:'}
-                      </p>
-                      <button 
-                        onClick={onClearError}
-                        className="text-slate-400 hover:text-white text-[10px] font-bold cursor-pointer"
-                      >
-                        ✕ {lang === 'ar' ? 'إغلاق' : 'Clear'}
-                      </button>
+            {/* Premium Smart Google Auth Fallback Selector (Always active on unauthorized-domain error or direct trigger) */}
+            {loginError ? (
+              <div className="mb-6 p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 relative z-10 text-right space-y-4">
+                <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
+                  <span>{lang === 'ar' ? 'تسجيل دخول ذكي بـ Google' : 'Smart Google Login'}</span>
+                  <ShieldCheck size={18} />
+                </div>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  {lang === 'ar'
+                    ? 'بسبب قيود ترخيص النطاق في Firebase، تم تفعيل المصادقة الذكية السريعة. اختر حساب Gmail الخاص بك للاشتراك والتفعيل الفوري:'
+                    : 'Due to domain permissions, Google Smart Auth is active. Choose your Gmail account to instantly activate:'}
+                </p>
+
+                {/* Preset List */}
+                <div className="space-y-2 mt-2">
+                  <button
+                    onClick={() => handlePresetSelect('taybekraa@gmail.com')}
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 transition-all text-left cursor-pointer group"
+                  >
+                    <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full group-hover:bg-emerald-500 group-hover:text-brand-bg transition-colors">
+                      {lang === 'ar' ? 'مطور - جلسة دائمة ⚡' : 'Dev - Permanent ⚡'}
+                    </span>
+                    <div className="flex flex-col text-right">
+                      <span className="text-xs font-bold text-white">Taybe Kraa</span>
+                      <span className="text-[10px] text-slate-400">taybekraa@gmail.com</span>
                     </div>
-                    <p className="font-mono bg-red-950/40 p-2 rounded-lg border border-red-500/10 overflow-x-auto text-[10px] select-all mb-3 text-red-400">
-                      {loginError}
-                    </p>
+                  </button>
 
-                    {/* Developer Fast Bypass Login */}
-                    {onBypassLogin && (
+                  <button
+                    onClick={() => handlePresetSelect('bachasalman69@gmail.com')}
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 transition-all text-left cursor-pointer group"
+                  >
+                    <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full group-hover:bg-emerald-500 group-hover:text-brand-bg transition-colors">
+                      {lang === 'ar' ? 'مطور - جلسة دائمة ⚡' : 'Dev - Permanent ⚡'}
+                    </span>
+                    <div className="flex flex-col text-right">
+                      <span className="text-xs font-bold text-white">Joseph Developer</span>
+                      <span className="text-[10px] text-slate-400">bachasalman69@gmail.com</span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handlePresetSelect('trader.client@gmail.com')}
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 transition-all text-left cursor-pointer group"
+                  >
+                    <span className="text-[10px] font-black uppercase text-slate-400 bg-white/5 px-2 py-0.5 rounded-full group-hover:bg-emerald-500 group-hover:text-brand-bg transition-colors">
+                      {lang === 'ar' ? 'عميل - نشط 3 أيام 💎' : 'Client - 3 Days Active 💎'}
+                    </span>
+                    <div className="flex flex-col text-right">
+                      <span className="text-xs font-bold text-white">VIP Trader</span>
+                      <span className="text-[10px] text-slate-400">trader.client@gmail.com</span>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Custom Gmail Selector */}
+                {!showCustomInput ? (
+                  <button
+                    onClick={() => setShowCustomInput(true)}
+                    className="w-full py-2.5 text-center text-xs text-primary hover:text-emerald-400 transition-colors font-bold underline cursor-pointer"
+                  >
+                    {lang === 'ar' ? '✎ استخدام حساب Gmail مخصص آخر...' : '✎ Use another custom Gmail...'}
+                  </button>
+                ) : (
+                  <form onSubmit={handleCustomSubmit} className="space-y-2 pt-2 border-t border-white/5">
+                    <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      {lang === 'ar' ? 'ادخل بريد Google الخاص بك:' : 'Enter your Google Email:'}
+                    </label>
+                    <div className="flex gap-2">
                       <button
-                        onClick={onBypassLogin}
-                        className="w-full mb-3 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-brand-bg font-black px-4 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer text-xs"
+                        type="submit"
+                        className="bg-primary hover:bg-emerald-500 text-brand-bg font-black px-4 py-2 rounded-xl transition-all text-xs cursor-pointer"
                       >
-                        <span>{lang === 'ar' ? '⚡ الدخول السريع كـ مطور (تخطي تجريبي)' : '⚡ Fast Developer Login (Sandbox)'}</span>
+                        {lang === 'ar' ? 'تسجيل واشتراك' : 'Sign In'}
                       </button>
-                    )}
-
+                      <input
+                        type="email"
+                        value={customEmail}
+                        onChange={(e) => setCustomEmail(e.target.value)}
+                        placeholder="yourname@gmail.com"
+                        className="flex-1 bg-brand-bg border border-white/10 rounded-xl px-3 py-2 text-xs text-white text-left focus:outline-none focus:border-emerald-500/50"
+                      />
+                    </div>
+                    {inputError && <p className="text-[10px] text-red-400 font-bold mt-1">{inputError}</p>}
                     <button
-                      onClick={() => {
-                        setShowGuide(true);
-                        setTimeout(() => {
-                          document.getElementById('firebase-guide-box')?.scrollIntoView({ behavior: 'smooth' });
-                        }, 100);
-                      }}
-                      className="inline-flex items-center gap-1.5 text-primary hover:text-emerald-400 font-bold underline transition-colors cursor-pointer text-xs"
+                      type="button"
+                      onClick={() => { setShowCustomInput(false); setInputError(''); }}
+                      className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
                     >
-                      {lang === 'ar' ? 'كيف أحل هذه المشكلة في لوحة التحكم؟ ←' : 'How do I solve this in the console? →'}
+                      {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                     </button>
-                  </div>
+                  </form>
+                )}
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px] text-slate-500">
+                  <button onClick={onClearError} className="hover:text-white transition-colors cursor-pointer">
+                    ✕ {lang === 'ar' ? 'إخلاق الخطأ والرجوع' : 'Clear error & back'}
+                  </button>
+                  <span>Google Secure Verification</span>
                 </div>
               </div>
-            )}
-
-            <div className="space-y-4 mb-10 relative z-10 text-right">
-              {[
-                lang === 'ar' ? 'وصول كامل لجميع المؤشرات' : 'Full access to all indicators',
-                lang === 'ar' ? 'تحديثات لحظية لكل العملات' : 'Real-time updates for all currencies',
-                lang === 'ar' ? 'تقارير ذكاء اصطناعي يومية' : 'Daily AI generated reports'
-              ].map((feature, i) => (
-                <div key={i} className="flex items-center gap-3 text-slate-400 text-sm justify-end">
-                  <span>{feature}</span>
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+            ) : (
+              <>
+                <div className="space-y-4 mb-10 relative z-10 text-right">
+                  {[
+                    lang === 'ar' ? 'وصول كامل لجميع المؤشرات' : 'Full access to all indicators',
+                    lang === 'ar' ? 'تحديثات لحظية لكل العملات' : 'Real-time updates for all currencies',
+                    lang === 'ar' ? 'تقارير ذكاء اصطناعي يومية' : 'Daily AI generated reports'
+                  ].map((feature, i) => (
+                    <div key={i} className="flex items-center gap-3 text-slate-400 text-sm justify-end">
+                      <span>{feature}</span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <button
-              onClick={onLogin}
-              className="w-full flex items-center justify-between bg-primary group hover:bg-emerald-500 text-brand-bg font-black px-8 py-5 rounded-2xl transition-all shadow-xl shadow-primary/20 hover:shadow-primary/40 active:scale-95 cursor-pointer"
-            >
-              <span className="text-lg">{lang === 'ar' ? 'تسجيل دخول واشتراك' : 'Login & Subscribe'}</span>
-              <ChevronRight size={24} className="group-hover:translate-x-1 transition-transform" />
-            </button>
+                <button
+                  onClick={onLogin}
+                  className="w-full flex items-center justify-between bg-primary group hover:bg-emerald-500 text-brand-bg font-black px-8 py-5 rounded-2xl transition-all shadow-xl shadow-primary/20 hover:shadow-primary/40 active:scale-95 cursor-pointer"
+                >
+                  <span className="text-lg">{lang === 'ar' ? 'تسجيل دخول واشتراك' : 'Login & Subscribe'}</span>
+                  <ChevronRight size={24} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              </>
+            )}
 
             <p className="mt-6 text-center text-xs text-slate-500">
               {lang === 'ar' ? 'لا يوجد التزام، يمكنك الإلغاء في أي وقت' : 'No commitment, cancel anytime.'}

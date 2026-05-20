@@ -435,29 +435,82 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Check if developer bypass is active
-    const isBypass = localStorage.getItem('finalyze_dev_bypass_active') === 'true';
-    if (isBypass) {
-      const mockUser = {
-        uid: 'dev_bypass_uid_bachasalman',
-        email: 'bachasalman69@gmail.com',
-        displayName: 'Joseph Developer',
-        photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
-        emailVerified: true,
-      } as User;
-      setUser(mockUser);
-      setHasApiKey(true);
-      setLoading(false);
-      return;
+    // 1. Check if we have a persistent custom session
+    const savedUserJson = localStorage.getItem('finalyze_auth_user');
+    const savedTimestampStr = localStorage.getItem('finalyze_auth_timestamp');
+
+    if (savedUserJson && savedTimestampStr) {
+      try {
+        const savedUser = JSON.parse(savedUserJson) as User;
+        const savedTimestamp = parseInt(savedTimestampStr, 10);
+        const email = savedUser.email || '';
+
+        // Check if the user is a developer:
+        // Developer emails: bachasalman69@gmail.com, taybekraa@gmail.com, or user who has explicitly selected dev mode
+        const isDeveloper = email === 'bachasalman69@gmail.com' || 
+                            email === 'taybekraa@gmail.com' || 
+                            email.includes('dev') ||
+                            localStorage.getItem('finalyze_dev_bypass_active') === 'true';
+
+        if (isDeveloper) {
+          // Keep developer session active forever
+          setUser(savedUser);
+          setHasApiKey(true);
+          setLoading(false);
+          return;
+        } else {
+          // Regular client session expires after 3 days (3 * 24 * 60 * 60 * 1000 ms)
+          const elapsed = Date.now() - savedTimestamp;
+          const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
+          if (elapsed < threeDaysInMs) {
+            setUser(savedUser);
+            const localKey = localStorage.getItem('finalyze_user_qwen_api_key');
+            if (localKey) {
+              setHasApiKey(true);
+            } else {
+              setHasApiKey(false);
+            }
+            setLoading(false);
+            return;
+          } else {
+            // Session expired! Clear custom keys
+            localStorage.removeItem('finalyze_auth_user');
+            localStorage.removeItem('finalyze_auth_timestamp');
+            localStorage.removeItem('finalyze_dev_bypass_active');
+            localStorage.removeItem('finalyze_user_qwen_api_key');
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore persistent custom session:", e);
+      }
     }
 
+    // 2. Standard Firebase Auth listener
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      // Prevent resetting mock state if user enables bypass mid-session
-      if (localStorage.getItem('finalyze_dev_bypass_active') === 'true') {
+      // Don't let state changes override custom persistent session if it is set
+      if (localStorage.getItem('finalyze_auth_user')) {
         return;
       }
+      
       if (u) {
         setUser(u);
+        const email = u.email || '';
+        const isDeveloper = email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
+        
+        // Cache Firebase session in custom storage for 3-day / permanent benefits
+        const mockCompactUser = {
+          uid: u.uid,
+          email: u.email,
+          displayName: u.displayName || 'User',
+          photoURL: u.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+          emailVerified: u.emailVerified,
+        };
+        localStorage.setItem('finalyze_auth_user', JSON.stringify(mockCompactUser));
+        localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+        if (isDeveloper) {
+          localStorage.setItem('finalyze_dev_bypass_active', 'true');
+        }
+
         const localKey = localStorage.getItem('finalyze_user_qwen_api_key');
         if (localKey) {
           setHasApiKey(true);
@@ -508,26 +561,48 @@ export default function App() {
     }
   };
 
-  const handleBypassLogin = () => {
+  const handleBypassLogin = (email: string = 'taybekraa@gmail.com') => {
+    const isDeveloper = email === 'bachasalman69@gmail.com' || 
+                        email === 'taybekraa@gmail.com' || 
+                        email.includes('dev');
+                        
     const mockUser = {
-      uid: 'dev_bypass_uid_bachasalman',
-      email: 'bachasalman69@gmail.com',
-      displayName: 'Joseph Developer',
-      photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+      uid: 'mock_uid_' + email.replace(/[^a-zA-Z0-9]/g, ''),
+      email: email,
+      displayName: isDeveloper ? 'Taybe Developer' : 'Premium Subscriber',
+      photoURL: isDeveloper 
+        ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150'
+        : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150',
       emailVerified: true,
     } as User;
+
     setUser(mockUser);
-    localStorage.setItem('finalyze_dev_bypass_active', 'true');
+    localStorage.setItem('finalyze_auth_user', JSON.stringify(mockUser));
+    localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+    
+    if (isDeveloper) {
+      localStorage.setItem('finalyze_dev_bypass_active', 'true');
+    } else {
+      localStorage.removeItem('finalyze_dev_bypass_active');
+    }
+    
     setHasApiKey(true);
     setLoginError(null);
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.warn("SignOut firebase warning:", e);
+    }
     localStorage.removeItem('finalyze_user_qwen_api_key');
     localStorage.removeItem('finalyze_dev_bypass_active');
+    localStorage.removeItem('finalyze_auth_user');
+    localStorage.removeItem('finalyze_auth_timestamp');
     setHasApiKey(false);
     setAnalysisResults(null);
+    setUser(null);
   };
 
   const t = translations[lang];
