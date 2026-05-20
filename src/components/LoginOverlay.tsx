@@ -5,12 +5,13 @@ import { Language, translations } from '../lib/i18n';
 
 interface LoginOverlayProps {
   onLogin: () => void;
+  onBypassLogin?: () => void;
   lang: Language;
   loginError: string | null;
   onClearError: () => void;
 }
 
-export default function LoginOverlay({ onLogin, lang, loginError, onClearError }: LoginOverlayProps) {
+export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError, onClearError }: LoginOverlayProps) {
   const t = translations[lang];
   const [showGuide, setShowGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
@@ -139,6 +140,17 @@ export default function LoginOverlay({ onLogin, lang, loginError, onClearError }
                     <p className="font-mono bg-red-950/40 p-2 rounded-lg border border-red-500/10 overflow-x-auto text-[10px] select-all mb-3 text-red-400">
                       {loginError}
                     </p>
+
+                    {/* Developer Fast Bypass Login */}
+                    {onBypassLogin && (
+                      <button
+                        onClick={onBypassLogin}
+                        className="w-full mb-3 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-brand-bg font-black px-4 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer text-xs"
+                      >
+                        <span>{lang === 'ar' ? '⚡ الدخول السريع كـ مطور (تخطي تجريبي)' : '⚡ Fast Developer Login (Sandbox)'}</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => {
                         setShowGuide(true);
@@ -148,7 +160,7 @@ export default function LoginOverlay({ onLogin, lang, loginError, onClearError }
                       }}
                       className="inline-flex items-center gap-1.5 text-primary hover:text-emerald-400 font-bold underline transition-colors cursor-pointer text-xs"
                     >
-                      {lang === 'ar' ? 'كيف أحل هذه المشكلة فوراً؟ ←' : 'How do I solve this immediately? →'}
+                      {lang === 'ar' ? 'كيف أحل هذه المشكلة في لوحة التحكم؟ ←' : 'How do I solve this in the console? →'}
                     </button>
                   </div>
                 </div>

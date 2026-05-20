@@ -435,7 +435,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Check if developer bypass is active
+    const isBypass = localStorage.getItem('finalyze_dev_bypass_active') === 'true';
+    if (isBypass) {
+      const mockUser = {
+        uid: 'dev_bypass_uid_bachasalman',
+        email: 'bachasalman69@gmail.com',
+        displayName: 'Joseph Developer',
+        photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+        emailVerified: true,
+      } as User;
+      setUser(mockUser);
+      setHasApiKey(true);
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      // Prevent resetting mock state if user enables bypass mid-session
+      if (localStorage.getItem('finalyze_dev_bypass_active') === 'true') {
+        return;
+      }
       if (u) {
         setUser(u);
         const localKey = localStorage.getItem('finalyze_user_qwen_api_key');
@@ -488,9 +508,24 @@ export default function App() {
     }
   };
 
+  const handleBypassLogin = () => {
+    const mockUser = {
+      uid: 'dev_bypass_uid_bachasalman',
+      email: 'bachasalman69@gmail.com',
+      displayName: 'Joseph Developer',
+      photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+      emailVerified: true,
+    } as User;
+    setUser(mockUser);
+    localStorage.setItem('finalyze_dev_bypass_active', 'true');
+    setHasApiKey(true);
+    setLoginError(null);
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     localStorage.removeItem('finalyze_user_qwen_api_key');
+    localStorage.removeItem('finalyze_dev_bypass_active');
     setHasApiKey(false);
     setAnalysisResults(null);
   };
@@ -525,6 +560,7 @@ export default function App() {
         {!user && !loading && (
           <LoginOverlay 
             onLogin={handleLogin} 
+            onBypassLogin={handleBypassLogin}
             lang={lang} 
             loginError={loginError}
             onClearError={() => setLoginError(null)}
