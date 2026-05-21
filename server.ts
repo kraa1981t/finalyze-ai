@@ -144,37 +144,40 @@ async function startServer() {
     }
   });
 
-  // API Route: AI Analysis Proxy (Resolves CORS issues)
+  // API Route: AI Analysis Proxy (for Google Gemini API)
   app.post("/api/ai-analysis", async (req, res) => {
     try {
       const { prompt, userApiKey } = req.body;
-      const apiKey = userApiKey || process.env.VITE_QWEN_API_KEY;
-      const apiUrl = process.env.VITE_QWEN_API_URL;
-      const model = process.env.VITE_QWEN_MODEL || "qwen-plus";
+      const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+      const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
       if (!apiKey) {
-        return res.status(400).json({ error: "Qwen API Key is required. Please set your key in the top-right toolbar." });
+        return res.status(400).json({ error: "Gemini API Key is required. Please set your key in the top-right toolbar." });
       }
+
+      const systemInstruction = "You are a professional financial analyst AI. You provide strict, math-based technical analysis. Always respond in valid JSON format.";
+
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
       let retries = 3;
       let response;
       let data;
 
       while (retries > 0) {
-        response = await fetch(`${apiUrl}/chat/completions`, {
+        response = await fetch(geminiUrl, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: model,
-            messages: [
-              { role: "system", content: "You are a professional financial analyst AI. You provide strict, math-based technical analysis." },
-              { role: "user", content: prompt }
+            system_instruction: {
+              parts: [{ text: systemInstruction }]
+            },
+            contents: [
+              { role: "user", parts: [{ text: prompt }] }
             ],
-            temperature: 0.1,
-            response_format: { type: "json_object" }
+            generationConfig: {
+              temperature: 0.1,
+              response_mime_type: "application/json"
+            }
           })
         });
 
@@ -187,7 +190,7 @@ async function startServer() {
 
         if (!response.ok) {
           const errorText = await response.text();
-          let errorMessage = `Qwen API returned ${response.status}`;
+          let errorMessage = `Gemini API returned ${response.status}`;
           try {
             const errJson = JSON.parse(errorText);
             errorMessage = errJson?.error?.message || errJson?.error?.code || errorMessage;
@@ -200,10 +203,16 @@ async function startServer() {
       }
 
       if (!data) {
-        return res.status(503).json({ error: "Qwen API service temporarily unavailable. Please try again." });
+        return res.status(503).json({ error: "Gemini API service temporarily unavailable. Please try again." });
       }
 
-      res.json(data);
+      // Transform Gemini response to OpenAI-compatible format
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      res.json({
+        choices: [{
+          message: { content: text }
+        }]
+      });
     } catch (error: any) {
       console.error("AI Proxy error:", error);
       res.status(500).json({ error: error.message || "Internal server error during AI analysis" });

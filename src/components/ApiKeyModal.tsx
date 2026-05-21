@@ -64,7 +64,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
 
   useEffect(() => {
     if (isOpen) {
-      const savedKey = localStorage.getItem('finalyze_user_qwen_api_key') || '';
+      const savedKey = localStorage.getItem('finalyze_user_gemini_api_key') || '';
       setKeyInput(savedKey);
       setError(null);
       setSuccess(false);
@@ -89,23 +89,23 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
   const isAr = lang === 'ar';
 
   const t = {
-    title: isAr ? 'إعداد مفتاح Qwen API الخاص بك' : 'Configure Your Qwen API Key',
+    title: isAr ? 'إعداد مفتاح Gemini API الخاص بك' : 'Configure Your Gemini API Key',
     desc: isAr 
-      ? 'لكي تتمكن من استخدام خدمات التحليل الفني والذكاء الاصطناعي دون انقطاع، يرجى وضع مفتاح Qwen API الخاص بك من منصة Alibaba Cloud. هذا المفتاح سيحفظ بأمان تام في حسابك ولن يستعمله أحد غيرك.'
-      : 'To continue using our institutional AI analysis services, please link your personal Qwen API key from Alibaba Cloud. This key is stored securely in your private account and is only visible to you.',
-    step1: isAr ? '1. تسجيل حساب وإنشاء مفتاح على علي بابا' : '1. Sign up & Create Key on Alibaba Cloud',
+      ? 'لكي تتمكن من استخدام خدمات التحليل الفني والذكاء الاصطناعي دون انقطاع، يرجى وضع مفتاح Gemini API الخاص بك من Google AI Studio. هذا المفتاح سيحفظ بأمان تام في حسابك ولن يستعمله أحد غيرك.'
+      : 'To continue using our institutional AI analysis services, please link your personal Gemini API key from Google AI Studio. This key is stored securely in your private account and is only visible to you.',
+    step1: isAr ? '1. الحصول على مفتاح Gemini من Google' : '1. Get Your Gemini API Key from Google',
     step1Desc: isAr
-      ? 'اضغط على الزر أدناه لفتح الصفحة الرسمية لعلي بابا، قم بالتسجيل بنفس البريد الإلكتروني الخاص بك، ثم قم بإنشاء مفتاح API جديد ونسخه.'
-      : 'Click the button below to open the official Alibaba Cloud page. Sign up with your Gmail, create a new API Key and copy it.',
-    btnAlibaba: isAr ? 'الحصول على مفتاح Qwen لـ Finalyze AI' : 'Get Qwen Key for Finalyze AI',
+      ? 'اضغط على الزر أدناه لفتح صفحة Google AI Studio، سجل الدخول بحساب Google الخاص بك، ثم انقر على "Get API Key" وانسخ المفتاح.'
+      : 'Click the button below to open Google AI Studio, sign in with your Google account, click "Get API Key" and copy the key.',
+    btnAlibaba: isAr ? 'الحصول على مفتاح Gemini مجاناً' : 'Get Free Gemini API Key',
     step2: isAr ? '2. ضع المفتاح في الأسفل للتحقق منه' : '2. Paste Your API Key Below to Verify',
-    placeholder: isAr ? 'ضع مفتاح الـ API الخاص بك هنا (sk-...)' : 'Paste your API key here (sk-...)',
+    placeholder: isAr ? 'ضع مفتاح Gemini API هنا' : 'Paste your Gemini API key here',
     btnVerify: isAr ? 'التحقق والحفظ والبدء' : 'Verify, Save & Start',
     btnVerifying: isAr ? 'جاري التحقق من المفتاح...' : 'Verifying Key...',
     btnSaved: isAr ? 'تم التحقق والحفظ بنجاح!' : 'Successfully Verified & Saved!',
     errorInvalid: isAr 
-      ? 'المفتاح غير صالح أو غير نشط. يرجى التأكد من نسخه بالكامل من علي بابا والمحاولة مجدداً.' 
-      : 'API key is invalid or inactive. Please make sure you copied it correctly from Alibaba and try again.',
+      ? 'المفتاح غير صالح. يرجى التأكد من نسخه بالكامل من Google AI Studio والمحاولة مجدداً.' 
+      : 'API key is invalid. Please make sure you copied it correctly from Google AI Studio and try again.',
     emptyKey: isAr ? 'الرجاء إدخال المفتاح أولاً.' : 'Please enter your key first.',
     logoutText: isAr ? 'تسجيل الخروج من الحساب' : 'Log Out from Account',
     adminBypassInfo: isAr
@@ -135,7 +135,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     setIsLoading(true);
 
     try {
-      // Direct Live Verification: Send a short request to Qwen API using this key
+      // Direct Live Verification: Send a short request to Gemini API using this key
       const response = await fetch('/api/ai-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -156,13 +156,13 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
 
       // Valid API key! Now store it.
       // 1. Store in localStorage for instant access
-      localStorage.setItem('finalyze_user_qwen_api_key', trimmedKey);
+      localStorage.setItem('finalyze_user_gemini_api_key', trimmedKey);
 
       // 2. Store in Firestore if a real user is logged in
       if (user && user.uid && user.uid !== 'developer') {
         const userDocRef = doc(db, 'users', user.uid);
         await setDoc(userDocRef, {
-          qwenApiKey: trimmedKey,
+          geminiApiKey: trimmedKey,
           updatedAt: new Date().toISOString()
         }, { merge: true });
       }
@@ -226,7 +226,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           </p>
           
           <a
-            href="https://modelstudio.console.alibabacloud.com/eu-central-1?tab=globalset&source=finalyze-ai&ref=finalyze-ai#/efm/api_key"
+            href="https://aistudio.google.com/apikey"
             target="_blank"
             rel="noopener noreferrer"
             className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 text-brand-bg font-black px-6 py-4.5 rounded-xl transition-all shadow-lg shadow-sky-500/20 hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0 text-sm"
