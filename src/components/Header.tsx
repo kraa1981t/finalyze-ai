@@ -490,16 +490,11 @@ export default function Header({
                 title={lang === 'ar' ? 'إعداد مفتاح API الخاص بك' : 'Configure API Key'}
               >
                 <Key size={18} />
-                {!hasApiKey && user && (() => {
-                  const email = (user.email || '').toLowerCase().trim();
-                  const activeDevEmail = (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com').toLowerCase().trim();
-                  const isDeveloper = email === activeDevEmail || 
-                                      email === 'bachasalman69@gmail.com' || 
-                                      email === 'taybekraa@gmail.com' || 
-                                      email.includes('dev') || 
-                                      localStorage.getItem('finalyze_dev_bypass_active') === 'true';
-                  return !isDeveloper;
-                })() && (
+                {!hasApiKey && user && 
+                 user.email !== (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com') && 
+                 user.email !== 'taybekraa@gmail.com' && 
+                 !user.email?.includes('dev') && 
+                 localStorage.getItem('finalyze_dev_bypass_active') !== 'true' && (
                   <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-600 rounded-full border border-white animate-pulse" />
                 )}
               </button>
