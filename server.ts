@@ -181,9 +181,18 @@ async function startServer() {
         if (response.status === 429) {
           retries--;
           if (retries === 0) break;
-          // Wait 5 seconds before retrying
           await new Promise(resolve => setTimeout(resolve, 5000));
           continue;
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = `Qwen API returned ${response.status}`;
+          try {
+            const errJson = JSON.parse(errorText);
+            errorMessage = errJson?.error?.message || errJson?.error?.code || errorMessage;
+          } catch {}
+          return res.status(response.status).json({ error: errorMessage });
         }
 
         data = await response.json();
@@ -191,7 +200,7 @@ async function startServer() {
       }
 
       if (!data) {
-        data = await response?.json();
+        return res.status(503).json({ error: "Qwen API service temporarily unavailable. Please try again." });
       }
 
       res.json(data);

@@ -205,6 +205,10 @@ export async function analyzeMarket(params: {
       body: JSON.stringify({ prompt: technicalPrompt, userApiKey })
     }).then(r => r.json());
 
+    if (aiResponse?.error) {
+      throw new Error(aiResponse.error);
+    }
+
     if (!aiResponse?.choices?.[0]?.message?.content) {
       throw new Error("AI Synthesis Error: No response content.");
     }

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "qwen": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "QwenLM",
+      "options": {
+        "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "apiKey": "sk-ws-djI.TpElV2EN87j8KgFCQOf0OWVMsk8Dkb6hr__auJjmsWbdh6nT5F5LjXMR7gPQwg89m3kVFkLplX__Xpokg0lNVyzI-aWvP3sEl_ki5pl8YAvKQ4Pa5vUPVWLscLjOupYa.MEQCIFa9jy3Mt9hKhf0q8Jv0-gPfYkNHiMM687ECjo4SyjiSAiBCKr8C7wjtNJNYleYXeNoJLiTt8AcxTYdduCOL-N9B6g"
+      },
+      "models": {
+        "qwen-turbo": { "name": "Qwen Turbo" },
+        "qwen-plus": { "name": "Qwen Plus" },
+        "qwen-max": { "name": "Qwen Max" },
+        "qwen-vl-plus": { "name": "Qwen-VL Plus (يدعم الصور)" },
+        "qwen-vl-max": { "name": "Qwen-VL Max (يدعم الصور)" }
+      }
+    }
+  }
+}
