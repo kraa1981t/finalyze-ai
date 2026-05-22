@@ -36,7 +36,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate }: SidebarPanel
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: isRTL ? 100 : -100, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className={`fixed top-24 bottom-0 w-56 z-40 bg-white/95 backdrop-blur-xl border-l border-black/10 shadow-2xl flex flex-col ${isRTL ? 'right-0 border-l' : 'left-0 border-r'}`}
+      className={`fixed top-24 bottom-0 w-56 z-40 bg-[#D1FAE5]/95 backdrop-blur-xl border-l border-black/10 shadow-2xl flex flex-col ${isRTL ? 'right-0 border-l' : 'left-0 border-r'}`}
       style={{ direction: isRTL ? 'rtl' : 'ltr' }}
     >
       {/* Header */}
