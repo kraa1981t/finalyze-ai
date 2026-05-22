@@ -29,9 +29,10 @@ interface PaymentModalProps {
   planLabel: string;
   amount: number;
   asPage?: boolean;
+  manageMode?: boolean;
 }
 
-export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode }: PaymentModalProps) {
   const [addresses, setAddresses] = useState<CryptoAddress[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -39,11 +40,12 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     } catch { return DEFAULT_ADDRESSES; }
   });
   const [prices, setPrices] = useState<Record<string, { usd: number }>>({});
+  const [editAddresses, setEditAddresses] = useState<CryptoAddress[]>([]);
+  const [isAdmin, setIsAdmin] = useState(manageMode || false);
+  const [newAddress, setNewAddress] = useState<CryptoAddress>({ id: '', name: '', address: '' });
+  const [nextId, setNextId] = useState(100);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [editAddresses, setEditAddresses] = useState<CryptoAddress[]>([]);
-  const [newAddress, setNewAddress] = useState({ name: '', address: '' });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -109,25 +111,37 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h3 className="text-xl font-bold text-white">Complete Payment</h3>
-            <p className="text-sm text-slate-400">{planLabel} Plan - ${amount} USD</p>
+            <h3 className="text-xl font-bold text-white">{manageMode ? 'إدارة عناوين الدفع' : 'Complete Payment'}</h3>
+            {!manageMode && <p className="text-sm text-slate-400">{planLabel} Plan - ${amount} USD</p>}
           </div>
         </div>
-        <button
-          onClick={() => setIsAdmin(!isAdmin)}
-          className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all"
-          title={isAdmin ? 'Lock addresses' : 'Edit addresses'}
-        >
-          {isAdmin ? <Lock size={16} /> : <Unlock size={16} />}
-        </button>
+        {!manageMode && (
+          <button
+            onClick={() => setIsAdmin(!isAdmin)}
+            className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all"
+            title={isAdmin ? 'Lock addresses' : 'Edit addresses'}
+          >
+            {isAdmin ? <Lock size={16} /> : <Unlock size={16} />}
+          </button>
+        )}
       </div>
 
-      <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6">
-        <p className="text-sm text-amber-400 font-bold text-center">
-          Send exactly <span className="text-lg">${amount} USD</span> worth of crypto to any address below.
-          Your subscription activates automatically after 1 confirmation.
-        </p>
-      </div>
+      {!manageMode && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6">
+          <p className="text-sm text-amber-400 font-bold text-center">
+            Send exactly <span className="text-lg">${amount} USD</span> worth of crypto to any address below.
+            Your subscription activates automatically after 1 confirmation.
+          </p>
+        </div>
+      )}
+
+      {manageMode && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 mb-6">
+          <p className="text-sm text-emerald-400 font-bold text-center">
+            أنت في وضع الإدارة. يمكنك إضافة وتعديل وحذف عناوين الدفع. التغييرات تحفظ تلقائياً في المتصفح.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
         {addresses.length === 0 && !isAdmin && (

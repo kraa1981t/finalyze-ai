@@ -1,15 +1,16 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Key, DollarSign } from 'lucide-react';
+import { Settings, Key, DollarSign, Wallet } from 'lucide-react';
 import { Language } from '../lib/i18n';
 
 interface SidebarPanelProps {
   lang: Language;
   onClose: () => void;
-  onNavigate: (page: 'settings' | 'apiKey' | 'plans') => void;
+  onNavigate: (page: 'settings' | 'apiKey' | 'plans' | 'paymentSettings') => void;
+  isDeveloper?: boolean;
 }
 
-export default function SidebarPanel({ lang, onClose, onNavigate }: SidebarPanelProps) {
+export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper }: SidebarPanelProps) {
   const isRTL = lang === 'ar';
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -27,6 +28,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate }: SidebarPanel
     { icon: Settings, label: lang === 'ar' ? 'الإعدادات' : 'Settings', page: 'settings' as const, color: 'from-amber-400 to-amber-600' },
     { icon: Key, label: lang === 'ar' ? 'مفتاح API' : 'API Key', page: 'apiKey' as const, color: 'from-amber-400 to-amber-600' },
     { icon: DollarSign, label: lang === 'ar' ? 'الخطط' : 'Plans', page: 'plans' as const, color: 'from-amber-400 to-amber-600' },
+    ...(isDeveloper ? [{ icon: Wallet, label: lang === 'ar' ? 'عناوين الدفع' : 'Payment Addresses', page: 'paymentSettings' as const, color: 'from-amber-400 to-amber-600' }] : []),
   ];
 
   return (

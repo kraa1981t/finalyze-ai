@@ -35,7 +35,7 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans'>('main');
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings'>('main');
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
@@ -698,6 +698,7 @@ export default function App() {
             lang={lang}
             onClose={() => setIsSidebarOpen(false)}
             onNavigate={(page) => { setActivePage(page); setIsSidebarOpen(false); }}
+            isDeveloper={isDeveloperSession()}
           />
         )}
       </AnimatePresence>
@@ -770,6 +771,17 @@ export default function App() {
                 planLabel={paymentPlan?.label || ''}
                 amount={paymentPlan?.amount || 0}
                 asPage
+              />
+            )}
+
+            {activePage === 'paymentSettings' && (
+              <PaymentModal
+                isOpen={true}
+                onClose={() => setActivePage('main')}
+                planLabel=""
+                amount={0}
+                asPage
+                manageMode
               />
             )}
           </motion.div>
