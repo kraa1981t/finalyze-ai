@@ -3,7 +3,7 @@ import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, getRedir
 import { auth, db } from './lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, Activity } from 'lucide-react';
+import { TrendingUp, Activity, ArrowLeft } from 'lucide-react';
 import Header from './components/Header';
 import AnalysisForm from './components/AnalysisForm';
 import AnalysisResultView from './components/AnalysisResultView';
