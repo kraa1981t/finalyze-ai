@@ -1,0 +1,81 @@
+import React, { useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Settings, Key, DollarSign } from 'lucide-react';
+import { Language } from '../lib/i18n';
+
+interface SidebarPanelProps {
+  lang: Language;
+  onClose: () => void;
+  onNavigate: (page: 'settings' | 'apiKey' | 'plans') => void;
+}
+
+export default function SidebarPanel({ lang, onClose, onNavigate }: SidebarPanelProps) {
+  const isRTL = lang === 'ar';
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
+  const items = [
+    { icon: Settings, label: lang === 'ar' ? 'الإعدادات' : 'Settings', page: 'settings' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: Key, label: lang === 'ar' ? 'مفتاح API' : 'API Key', page: 'apiKey' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: DollarSign, label: lang === 'ar' ? 'الخطط' : 'Plans', page: 'plans' as const, color: 'from-amber-400 to-amber-600' },
+  ];
+
+  return (
+    <motion.div
+      ref={panelRef}
+      initial={{ x: isRTL ? 100 : -100, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: isRTL ? 100 : -100, opacity: 0 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className={`fixed top-24 bottom-0 w-56 z-40 bg-white/95 backdrop-blur-xl border-l border-black/10 shadow-2xl flex flex-col ${isRTL ? 'right-0 border-l' : 'left-0 border-r'}`}
+      style={{ direction: isRTL ? 'rtl' : 'ltr' }}
+    >
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-black/5">
+        <h3 className="text-xs font-black uppercase tracking-widest text-black/50">
+          {lang === 'ar' ? 'لوحة التحكم' : 'Dashboard'}
+        </h3>
+      </div>
+
+      {/* Icons */}
+      <div className="flex-1 flex flex-col gap-2 p-4">
+        {items.map((item, i) => {
+          const Icon = item.icon;
+          return (
+            <motion.button
+              key={item.page}
+              initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.1 }}
+              onClick={() => onNavigate(item.page)}
+              className="flex items-center gap-4 px-4 py-4 rounded-2xl bg-white/10 border border-black/10 hover:bg-[#F59E0B]/10 hover:border-[#F59E0B]/30 transition-all group shadow-sm hover:shadow-md"
+            >
+              <div className={`p-2.5 rounded-xl bg-gradient-to-br ${item.color} border border-black/10 text-black shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all`}>
+                <Icon size={20} />
+              </div>
+              <span className="text-sm font-black text-black/80 group-hover:text-black transition-colors">
+                {item.label}
+              </span>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="px-5 py-3 border-t border-black/5">
+        <p className="text-[9px] text-black/30 font-black uppercase tracking-widest text-center">
+          Joseph.Trading
+        </p>
+      </div>
+    </motion.div>
+  );
+}

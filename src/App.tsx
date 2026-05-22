@@ -10,6 +10,7 @@ import AnalysisResultView from './components/AnalysisResultView';
 import ConnectionStatus from './components/ConnectionStatus';
 import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
+import SidebarPanel from './components/SidebarPanel';
 import TopSignals from './components/TopSignals';
 import PortfolioPanel from './components/PortfolioPanel';
 
@@ -27,16 +28,13 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [isApiKeyOpen, setIsApiKeyOpen] = useState(false);
-  const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
   const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string } | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_groq_api_key'));
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans'>('main');
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
@@ -680,51 +678,29 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <SettingsModal 
-        isOpen={isSettingsOpen && activePage === 'main'} onClose={() => setIsSettingsOpen(false)} 
-        settings={settings} onSettingsChange={setSettings} 
-        user={user}
-      />
-
-      <ApiKeyModal 
-        isOpen={activePage === 'main' && (isApiKeyOpen || (!!user && !isDeveloperSession() && !hasApiKey))}
-        onClose={() => setIsApiKeyOpen(false)}
-        isBlocking={!hasApiKey && !isDeveloperSession()}
-        lang={lang}
-        user={user}
-        onSaved={(key) => {
-          setHasApiKey(true);
-          setIsApiKeyOpen(false);
-        }}
-      />
-
-      <SubscriptionModal
-        isOpen={isSubscriptionOpen && !paymentPlan && activePage === 'main'}
-        onClose={() => setIsSubscriptionOpen(false)}
-        onSelectPlan={(amount, label) => setPaymentPlan({ amount, label })}
-      />
-
-      <PaymentModal
-        isOpen={!!paymentPlan && activePage === 'main'}
-        onClose={() => { setPaymentPlan(null); setIsSubscriptionOpen(false); }}
-        planLabel={paymentPlan?.label || ''}
-        amount={paymentPlan?.amount || 0}
-      />
-
       <Header 
         user={user} onLogin={handleLogin} onLogout={handleLogout} 
         isDark={isDark} toggleTheme={() => setIsDark(!isDark)}
         lang={lang} onLangChange={setLang}
-        onOpenSettings={() => setActivePage('settings')}
         showBack={!!analysisResults} onBack={() => setAnalysisResults(null)}
         autoSettings={autoSettings} onAutoSettingsChange={setAutoSettings}
         isWaiting={isScanningFinished}
         isRadarUnlocked={isRadarUnlocked}
         onUnlockRadar={handleUnlockRadar}
         hasApiKey={hasApiKey || isDeveloperSession()}
-        onOpenApiKey={() => setActivePage('apiKey')}
-        onOpenSubscription={() => setActivePage('plans')}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
       />
+
+      {/* Sidebar Panel - pushes content, doesn't overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <SidebarPanel
+            lang={lang}
+            onClose={() => setIsSidebarOpen(false)}
+            onNavigate={(page) => { setActivePage(page); setIsSidebarOpen(false); }}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isScanningFinished && !foundAnyStrong && autoSettings.isEnabled && (
@@ -741,7 +717,7 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-28 relative">
+      <main className={`flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-28 relative transition-all duration-300 ${isSidebarOpen ? (lang === 'ar' ? 'mr-56' : 'ml-56') : ''}`}>
         {/* Dedicated pages (from dashboard) */}
         {activePage !== 'main' && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
