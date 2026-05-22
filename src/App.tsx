@@ -738,8 +738,8 @@ export default function App() {
       </AnimatePresence>
       
       <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-28 relative">
-        {/* FORM - always mounted to preserve error state */}
-        <div style={{ display: analysisResults ? 'none' : 'block' }}>
+        {/* FORM - hidden during analysis, hidden when results show (mounted to preserve state) */}
+        <div style={{ display: isAnalyzing || analysisResults ? 'none' : 'block' }}>
           <TopSignals 
             signals={topSignals} onRemove={removeSignal} 
             onSelect={handleSelectSignal} onClearAll={() => setTopSignals([])}
@@ -774,14 +774,9 @@ export default function App() {
           <ConnectionStatus />
         </div>
 
-        {/* Loading overlay - covers main content */}
+        {/* Loading view - separate, no overlap with form */}
         {isAnalyzing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-brand/90 backdrop-blur-md flex flex-col items-center justify-center p-8 space-y-8 z-50"
-          >
+          <div className="flex flex-col items-center justify-center p-8 space-y-8 min-h-[60vh]">
             <div className="relative w-24 h-24">
               <div className="absolute inset-0 border-b-2 border-primary rounded-full animate-spin" />
               <div className="absolute inset-0 flex items-center justify-center text-primary">
@@ -796,7 +791,7 @@ export default function App() {
                 </div>
               )}
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* Results */}
