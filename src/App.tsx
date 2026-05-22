@@ -737,68 +737,74 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-28">
-        <AnimatePresence mode="wait">
-          {!analysisResults && !isAnalyzing ? (
-            <motion.div key="analysis-input" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <TopSignals 
-                signals={topSignals} onRemove={removeSignal} 
-                onSelect={handleSelectSignal} onClearAll={() => setTopSignals([])}
-                lang={lang} 
-              />
+      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-28 relative">
+        {/* FORM - always mounted to preserve error state */}
+        <div style={{ display: analysisResults ? 'none' : 'block' }}>
+          <TopSignals 
+            signals={topSignals} onRemove={removeSignal} 
+            onSelect={handleSelectSignal} onClearAll={() => setTopSignals([])}
+            lang={lang} 
+          />
 
-              {/* 10px Thick Emerald Green Glowing Divider */}
-              <div className="h-[10px] bg-emerald-500 rounded-full my-10 shadow-[0_0_20px_rgba(16,185,129,0.7)] border-t border-emerald-400/20" />
+          <div className="h-[10px] bg-emerald-500 rounded-full my-10 shadow-[0_0_20px_rgba(16,185,129,0.7)] border-t border-emerald-400/20" />
 
-              <AnalysisForm 
-                 user={user} lang={lang} settings={settings}
-                 onBegin={() => setIsAnalyzing(true)}
-                 onProgress={(current, total, index) => setProgress({ current, total, index })}
-                 onResult={(results) => {
-                   // Comprehensive Crypto Check for results
-                   const day = new Date().getDay();
-                   const allCryptos = ALL_SYMBOLS_DB.crypto || [];
-                   
-                   const filtered = (day === 0 || day === 6) 
-                     ? results.filter(r => {
-                         const sym = r.symbol.toUpperCase();
-                         return allCryptos.includes(sym) || sym.includes('-USD') || sym.endsWith('USD');
-                       })
-                     : results;
-                   
-                   setAnalysisResults(filtered);
-                   setIsAnalyzing(false);
-                   setProgress(null);
-                   updateTopSignals(filtered);
-                   playAudio('fail');
-                 }} 
-                 onError={() => { setIsAnalyzing(false); setProgress(null); }}
-              />
-              <ConnectionStatus />
-            </motion.div>
-          ) : isAnalyzing ? (
-            <motion.div key="analyzing" className="flex flex-col items-center justify-center p-8 space-y-8 h-96">
-              <div className="relative w-24 h-24">
-                <div className="absolute inset-0 border-b-2 border-primary rounded-full animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center text-primary">
-                  <TrendingUp size={32} />
+          <AnalysisForm 
+             user={user} lang={lang} settings={settings}
+             onBegin={() => setIsAnalyzing(true)}
+             onProgress={(current, total, index) => setProgress({ current, total, index })}
+             onResult={(results) => {
+               const day = new Date().getDay();
+               const allCryptos = ALL_SYMBOLS_DB.crypto || [];
+               
+               const filtered = (day === 0 || day === 6) 
+                 ? results.filter(r => {
+                     const sym = r.symbol.toUpperCase();
+                     return allCryptos.includes(sym) || sym.includes('-USD') || sym.endsWith('USD');
+                   })
+                 : results;
+               
+               setAnalysisResults(filtered);
+               setIsAnalyzing(false);
+               setProgress(null);
+               updateTopSignals(filtered);
+               playAudio('fail');
+             }} 
+             onError={() => { setIsAnalyzing(false); setProgress(null); }}
+          />
+          <ConnectionStatus />
+        </div>
+
+        {/* Loading overlay - covers main content */}
+        {isAnalyzing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-brand/90 backdrop-blur-md flex flex-col items-center justify-center p-8 space-y-8 z-50"
+          >
+            <div className="relative w-24 h-24">
+              <div className="absolute inset-0 border-b-2 border-primary rounded-full animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center text-primary">
+                <TrendingUp size={32} />
+              </div>
+            </div>
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-bold text-brand-text">{t.analyzing}</h2>
+              {progress && (
+                <div className="text-primary font-black animate-pulse">
+                  {progress.current} ({progress.index + 1}/{progress.total})
                 </div>
-              </div>
-              <div className="text-center space-y-2">
-                <h2 className="text-2xl font-bold text-brand-text">{t.analyzing}</h2>
-                {progress && (
-                  <div className="text-primary font-black animate-pulse">
-                    {progress.current} ({progress.index + 1}/{progress.total})
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <AnalysisResultView results={analysisResults || []} lang={lang} settings={settings} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Results */}
+        {analysisResults && !isAnalyzing && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <AnalysisResultView results={analysisResults || []} lang={lang} settings={settings} />
+          </motion.div>
+        )}
       </main>
 
       <footer className="py-8 border-t border-white/5 bg-brand-alt/30">
