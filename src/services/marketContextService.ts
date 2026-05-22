@@ -23,7 +23,45 @@ export interface MarketContext {
   econEvents: EconEvent[];
 }
 
-function symbolToQuery(symbol: string, type: string): string {
+const CACHE_TTL = 10 * 60 * 1000;
+let fgCache: { data: FearGreedData; ts: number } | null = null;
+let ecCache: { data: EconEvent[]; ts: number } | null = null;
+
+async function getFearGreed(): Promise<FearGreedData> {
+  if (fgCache && Date.now() - fgCache.ts < CACHE_TTL) return fgCache.data;
+  try {
+    const r = await fetch('/api/context-fear-greed');
+    const d = await r.json();
+    fgCache = { data: d, ts: Date.now() };
+    return d;
+  } catch {
+    return { value: 50, classification: 'Neutral' };
+  }
+}
+
+async function getEconCalendar(): Promise<EconEvent[]> {
+  if (ecCache && Date.now() - ecCache.ts < CACHE_TTL) return ecCache.data;
+  try {
+    const r = await fetch('/api/context-econ-calendar');
+    const d = await r.json();
+    ecCache = { data: d.events || [], ts: Date.now() };
+    return d.events || [];
+  } catch {
+    return [];
+  }
+}
+
+async function getNews(query: string): Promise<NewsArticle[]> {
+  try {
+    const r = await fetch(`/api/context-news?query=${encodeURIComponent(query)}`);
+    const d = await r.json();
+    return d.articles || [];
+  } catch {
+    return [];
+  }
+}
+
+function symbolToQuery(symbol: string): string {
   const upper = symbol.toUpperCase();
   if (upper.includes('BTC')) return 'Bitcoin cryptocurrency';
   if (upper.includes('ETH')) return 'Ethereum cryptocurrency';
@@ -44,18 +82,12 @@ function symbolToQuery(symbol: string, type: string): string {
   return `${symbol} financial market`;
 }
 
-export async function fetchMarketContext(symbol: string, type: string): Promise<MarketContext> {
-  const query = symbolToQuery(symbol, type);
-
-  const [fearGreedRes, newsRes, econRes] = await Promise.all([
-    fetch('/api/context-fear-greed').then(r => r.json()).catch(() => ({ value: 50, classification: 'Neutral' })),
-    fetch(`/api/context-news?query=${encodeURIComponent(query)}`).then(r => r.json()).catch(() => ({ articles: [] })),
-    fetch('/api/context-econ-calendar').then(r => r.json()).catch(() => ({ events: [] }))
+export async function fetchMarketContext(symbol: string): Promise<MarketContext> {
+  const query = symbolToQuery(symbol);
+  const [fearGreed, econEvents, news] = await Promise.all([
+    getFearGreed(),
+    getEconCalendar(),
+    getNews(query),
   ]);
-
-  return {
-    fearGreed: fearGreedRes as FearGreedData,
-    news: (newsRes.articles || []) as NewsArticle[],
-    econEvents: (econRes.events || []) as EconEvent[]
-  };
+  return { fearGreed, news, econEvents };
 }

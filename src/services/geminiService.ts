@@ -115,7 +115,7 @@ export async function analyzeMarket(params: {
     }
     
     // Fetch real market context (Fear & Greed, News, Economic Events)
-    const context = await fetchMarketContext(symbol, type);
+    const context = await fetchMarketContext(symbol);
     const newsText = context.news.length > 0
       ? context.news.map(n => `• ${n.title} (${n.source})`).join('\n')
       : 'No recent news available.';
