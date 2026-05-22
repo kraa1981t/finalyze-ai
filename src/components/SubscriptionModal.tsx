@@ -9,9 +9,10 @@ interface SubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectPlan: (amount: number, label: string) => void;
+  asPage?: boolean;
 }
 
-export default function SubscriptionModal({ isOpen, onClose, onSelectPlan }: SubscriptionModalProps) {
+export default function SubscriptionModal({ isOpen, onClose, onSelectPlan, asPage }: SubscriptionModalProps) {
   const [prices, setPrices] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -44,6 +45,126 @@ export default function SubscriptionModal({ isOpen, onClose, onSelectPlan }: Sub
     { key: 'yearly', label: 'Yearly', price: prices.yearly, icon: Crown, desc: 'Best value - all features + VIP support', color: 'from-amber-500 to-orange-600', border: 'border-amber-500/30', best: true },
   ];
 
+  const pageInner = (
+    <>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+            <DollarSign size={28} />
+          </div>
+          <div>
+            <h3 className="text-2xl font-bold text-white">Subscription Plans</h3>
+            <p className="text-sm text-slate-400">Unlock full institutional analysis</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsAdmin(!isAdmin)}
+            className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+            title={isAdmin ? 'Lock prices' : 'Unlock to edit prices'}
+          >
+            {isAdmin ? <Lock size={16} /> : <Unlock size={16} />}
+          </button>
+          <button onClick={onClose} className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+            <X size={20} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {plans.map((plan) => {
+          const Icon = plan.icon;
+          return (
+            <div
+              key={plan.key}
+              className={`relative bg-white/5 border ${plan.border} rounded-3xl p-6 flex flex-col transition-all hover:-translate-y-1 hover:shadow-xl ${plan.popular ? 'ring-2 ring-emerald-500/50' : ''} ${plan.best ? 'ring-2 ring-amber-500/50' : ''}`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full shadow-lg">
+                  Popular
+                </div>
+              )}
+              {plan.best && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full shadow-lg">
+                  Best Value
+                </div>
+              )}
+
+              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${plan.color} flex items-center justify-center mb-4 shadow-lg`}>
+                <Icon size={22} className="text-white" />
+              </div>
+
+              <h4 className="text-lg font-black text-white uppercase tracking-wider mb-1">{plan.label}</h4>
+              <p className="text-xs text-slate-400 mb-6 leading-relaxed">{plan.desc}</p>
+
+              {isAdmin ? (
+                <div className="mb-6">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1 block">Price (USD)</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-black text-white">$</span>
+                    <input
+                      type="number"
+                      value={editPrices[plan.key]}
+                      onChange={(e) => setEditPrices({ ...editPrices, [plan.key]: e.target.value })}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-white outline-none focus:border-emerald-500"
+                      min="1"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-6">
+                  <span className="text-4xl font-black text-white">${plan.price}</span>
+                  <span className="text-sm text-slate-400 ml-1">/ {plan.key === 'yearly' ? 'yr' : plan.key === 'monthly' ? 'mo' : 'wk'}</span>
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  if (!isAdmin) onSelectPlan(plan.price, plan.label);
+                }}
+                disabled={isAdmin}
+                className={`mt-auto w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg bg-gradient-to-r ${plan.color} text-white hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isAdmin ? 'Save to lock' : `Subscribe $${plan.price}`}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <AnimatePresence>
+        {isAdmin && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="mt-6 flex justify-center"
+          >
+            <button
+              onClick={savePrices}
+              className="flex items-center gap-2 bg-emerald-500 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-emerald-400 transition-all active:scale-95"
+            >
+              <Check size={18} />
+              Save All Prices
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <p className="text-center text-[10px] text-slate-500 mt-6">
+        All plans auto-renew. Cancel anytime. Crypto payment only.
+      </p>
+    </>
+  );
+
+  if (asPage) {
+    return (
+      <div>
+        {pageInner}
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
       <motion.div
@@ -52,113 +173,7 @@ export default function SubscriptionModal({ isOpen, onClose, onSelectPlan }: Sub
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="relative max-w-4xl w-full bg-brand-alt border border-white/10 rounded-[32px] p-8 shadow-[0_32px_128px_-12px_rgba(0,0,0,0.85)]"
       >
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 border border-emerald-500/20">
-              <DollarSign size={28} />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-white">Subscription Plans</h3>
-              <p className="text-sm text-slate-400">Unlock full institutional analysis</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsAdmin(!isAdmin)}
-              className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-              title={isAdmin ? 'Lock prices' : 'Unlock to edit prices'}
-            >
-              {isAdmin ? <Lock size={16} /> : <Unlock size={16} />}
-            </button>
-            <button onClick={onClose} className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all">
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((plan) => {
-            const Icon = plan.icon;
-            return (
-              <div
-                key={plan.key}
-                className={`relative bg-white/5 border ${plan.border} rounded-3xl p-6 flex flex-col transition-all hover:-translate-y-1 hover:shadow-xl ${plan.popular ? 'ring-2 ring-emerald-500/50' : ''} ${plan.best ? 'ring-2 ring-amber-500/50' : ''}`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full shadow-lg">
-                    Popular
-                  </div>
-                )}
-                {plan.best && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full shadow-lg">
-                    Best Value
-                  </div>
-                )}
-
-                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${plan.color} flex items-center justify-center mb-4 shadow-lg`}>
-                  <Icon size={22} className="text-white" />
-                </div>
-
-                <h4 className="text-lg font-black text-white uppercase tracking-wider mb-1">{plan.label}</h4>
-                <p className="text-xs text-slate-400 mb-6 leading-relaxed">{plan.desc}</p>
-
-                {isAdmin ? (
-                  <div className="mb-6">
-                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1 block">Price (USD)</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl font-black text-white">$</span>
-                      <input
-                        type="number"
-                        value={editPrices[plan.key]}
-                        onChange={(e) => setEditPrices({ ...editPrices, [plan.key]: e.target.value })}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-white outline-none focus:border-emerald-500"
-                        min="1"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mb-6">
-                    <span className="text-4xl font-black text-white">${plan.price}</span>
-                    <span className="text-sm text-slate-400 ml-1">/ {plan.key === 'yearly' ? 'yr' : plan.key === 'monthly' ? 'mo' : 'wk'}</span>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => {
-                    if (!isAdmin) onSelectPlan(plan.price, plan.label);
-                  }}
-                  disabled={isAdmin}
-                  className={`mt-auto w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg bg-gradient-to-r ${plan.color} text-white hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {isAdmin ? 'Save to lock' : `Subscribe $${plan.price}`}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        <AnimatePresence>
-          {isAdmin && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="mt-6 flex justify-center"
-            >
-              <button
-                onClick={savePrices}
-                className="flex items-center gap-2 bg-emerald-500 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-emerald-400 transition-all active:scale-95"
-              >
-                <Check size={18} />
-                Save All Prices
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <p className="text-center text-[10px] text-slate-500 mt-6">
-          All plans auto-renew. Cancel anytime. Crypto payment only.
-        </p>
+        {pageInner}
       </motion.div>
     </div>
   );

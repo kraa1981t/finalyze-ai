@@ -12,7 +12,7 @@ import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
 import TopSignals from './components/TopSignals';
 import PortfolioPanel from './components/PortfolioPanel';
-import DashboardPanel from './components/DashboardPanel';
+
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType } from './types';
 import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS } from './constants';
 import { Language, translations } from './lib/i18n';
@@ -37,6 +37,7 @@ export default function App() {
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans'>('main');
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
@@ -680,13 +681,13 @@ export default function App() {
       </AnimatePresence>
 
       <SettingsModal 
-        isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} 
+        isOpen={isSettingsOpen && activePage === 'main'} onClose={() => setIsSettingsOpen(false)} 
         settings={settings} onSettingsChange={setSettings} 
         user={user}
       />
 
       <ApiKeyModal 
-        isOpen={isApiKeyOpen || (!!user && !isDeveloperSession() && !hasApiKey)}
+        isOpen={activePage === 'main' && (isApiKeyOpen || (!!user && !isDeveloperSession() && !hasApiKey))}
         onClose={() => setIsApiKeyOpen(false)}
         isBlocking={!hasApiKey && !isDeveloperSession()}
         lang={lang}
@@ -698,13 +699,13 @@ export default function App() {
       />
 
       <SubscriptionModal
-        isOpen={isSubscriptionOpen && !paymentPlan}
+        isOpen={isSubscriptionOpen && !paymentPlan && activePage === 'main'}
         onClose={() => setIsSubscriptionOpen(false)}
         onSelectPlan={(amount, label) => setPaymentPlan({ amount, label })}
       />
 
       <PaymentModal
-        isOpen={!!paymentPlan}
+        isOpen={!!paymentPlan && activePage === 'main'}
         onClose={() => { setPaymentPlan(null); setIsSubscriptionOpen(false); }}
         planLabel={paymentPlan?.label || ''}
         amount={paymentPlan?.amount || 0}
@@ -714,25 +715,15 @@ export default function App() {
         user={user} onLogin={handleLogin} onLogout={handleLogout} 
         isDark={isDark} toggleTheme={() => setIsDark(!isDark)}
         lang={lang} onLangChange={setLang}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={() => setActivePage('settings')}
         showBack={!!analysisResults} onBack={() => setAnalysisResults(null)}
         autoSettings={autoSettings} onAutoSettingsChange={setAutoSettings}
         isWaiting={isScanningFinished}
         isRadarUnlocked={isRadarUnlocked}
         onUnlockRadar={handleUnlockRadar}
         hasApiKey={hasApiKey || isDeveloperSession()}
-        onOpenApiKey={() => setIsApiKeyOpen(true)}
-        onOpenSubscription={() => setIsSubscriptionOpen(true)}
-        onToggleDashboard={() => setIsDashboardOpen(!isDashboardOpen)}
-      />
-
-      <DashboardPanel
-        isOpen={isDashboardOpen}
-        onClose={() => setIsDashboardOpen(false)}
-        lang={lang}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenApiKey={() => setIsApiKeyOpen(true)}
-        onOpenSubscription={() => setIsSubscriptionOpen(true)}
+        onOpenApiKey={() => setActivePage('apiKey')}
+        onOpenSubscription={() => setActivePage('plans')}
       />
 
       <AnimatePresence>
@@ -751,8 +742,65 @@ export default function App() {
       </AnimatePresence>
       
       <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-28 relative">
+        {/* Dedicated pages (from dashboard) */}
+        {activePage !== 'main' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <button
+              onClick={() => setActivePage('main')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-alt border border-white/10 text-brand-muted hover:text-brand-text transition-colors mb-6"
+            >
+              <ArrowLeft size={18} />
+              <span className="text-xs font-black uppercase tracking-widest">
+                {lang === 'ar' ? 'العودة للرئيسية' : 'Back to Main'}
+              </span>
+            </button>
+
+            {activePage === 'settings' && (
+              <SettingsModal
+                isOpen={true}
+                onClose={() => setActivePage('main')}
+                settings={settings}
+                onSettingsChange={(s) => { setSettings(s); setActivePage('main'); }}
+                user={user}
+                asPage
+              />
+            )}
+
+            {activePage === 'apiKey' && (
+              <ApiKeyModal
+                isOpen={true}
+                onClose={() => setActivePage('main')}
+                isBlocking={false}
+                lang={lang}
+                user={user}
+                onSaved={() => { setHasApiKey(true); setActivePage('main'); }}
+                asPage
+              />
+            )}
+
+            {activePage === 'plans' && !paymentPlan && (
+              <SubscriptionModal
+                isOpen={true}
+                onClose={() => setActivePage('main')}
+                onSelectPlan={(amount, label) => { setPaymentPlan({ amount, label }); }}
+                asPage
+              />
+            )}
+
+            {activePage === 'plans' && paymentPlan && (
+              <PaymentModal
+                isOpen={true}
+                onClose={() => { setPaymentPlan(null); setActivePage('main'); }}
+                planLabel={paymentPlan?.label || ''}
+                amount={paymentPlan?.amount || 0}
+                asPage
+              />
+            )}
+          </motion.div>
+        )}
+
         {/* FORM - hidden during analysis, hidden when results show (mounted to preserve state) */}
-        <div style={{ display: isAnalyzing || analysisResults ? 'none' : 'block' }}>
+        <div style={{ display: isAnalyzing || analysisResults || activePage !== 'main' ? 'none' : 'block' }}>
           <TopSignals 
             signals={topSignals} onRemove={removeSignal} 
             onSelect={handleSelectSignal} onClearAll={() => setTopSignals([])}

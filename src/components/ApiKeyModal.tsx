@@ -14,9 +14,10 @@ interface ApiKeyModalProps {
   lang: Language;
   user: User | null;
   onSaved: (key: string) => void;
+  asPage?: boolean;
 }
 
-export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, onSaved }: ApiKeyModalProps) {
+export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, onSaved, asPage }: ApiKeyModalProps) {
   const [keyInput, setKeyInput] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +26,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
   const [logoClicks, setLogoClicks] = useState(0);
 
   const isDeveloperSession = () => {
-    // 1. URL param bypass
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.has('dev') || params.get('owner') === '1') {
@@ -33,11 +33,8 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         return true;
       }
     }
-    // 2. Permanent owner flag
     if (localStorage.getItem('finalyze_permanent_owner') === 'true') return true;
-    // 3. Standard bypass active flag
     if (localStorage.getItem('finalyze_dev_bypass_active') === 'true') return true;
-    // 4. Email checks
     if (!user) return false;
     const email = user.email || '';
     const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
@@ -47,7 +44,28 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
            email.includes('dev');
   };
 
-  // Keyboard shortcut: Ctrl+Shift+D → instant developer bypass
+  const isAr = lang === 'ar';
+  const t = {
+    title: isAr ? 'مفتاح API' : 'Set Your Groq API Key',
+    desc: isAr
+      ? 'للوصول إلى التحليلات المتقدمة، يلزمك إدخال مفتاح API من Groq. المفتاح يُخزن بشكل آمن في متصفحك.'
+      : 'To access advanced AI analysis, you need a Groq API key. It is stored safely in your browser.',
+    step1: isAr ? 'الخطوة 1: إنشاء المفتاح' : 'Step 1: Create a key',
+    step1Desc: isAr
+      ? 'توجه إلى منصة Groq Console وأنشئ مفتاح API مجاني.'
+      : 'Go to the Groq Console and generate a free API key.',
+    btnAlibaba: isAr ? 'فتح منصة Groq' : 'Open Groq Console',
+    step2: isAr ? 'الخطوة 2: لصق المفتاح' : 'Step 2: Paste your key',
+    placeholder: isAr ? 'gsk_... الصق المفتاح هنا' : 'gsk_... paste your key here',
+    btnVerify: isAr ? 'تحقق وحفظ' : 'Verify & Save',
+    btnVerifying: isAr ? 'جارٍ التحقق...' : 'Verifying...',
+    btnSaved: isAr ? '✓ تم الحفظ بنجاح!' : '✓ Saved Successfully!',
+    emptyKey: isAr ? 'يرجى إدخال مفتاح API' : 'Please enter an API key',
+    errorInvalid: isAr ? 'المفتاح غير صحيح. يرجى التحقق والمحاولة مجدداً.' : 'Invalid API key. Please check and try again.',
+    logoutText: isAr ? 'تسجيل خروج' : 'Logout',
+    adminBypassInfo: isAr ? 'وضع المطور نشط — تم تجاوز المفتاح.' : 'Developer mode active — API key bypassed.',
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'D') {
@@ -72,7 +90,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     }
   }, [isOpen]);
 
-  // 5-click on key icon → developer bypass
   const handleLogoClick = () => {
     const next = logoClicks + 1;
     setLogoClicks(next);
@@ -84,42 +101,13 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     }
   };
 
-  if (!isOpen) return null;
-
-  const isAr = lang === 'ar';
-
-  const t = {
-    title: isAr ? 'إعداد مفتاح Groq AI الخاص بك' : 'Configure Your Groq AI API Key',
-    desc: isAr 
-      ? 'لكي تتمكن من استخدام خدمات التحليل الفني والذكاء الاصطناعي دون انقطاع، يرجى وضع مفتاح Groq API الخاص بك من Groq Console. هذا المفتاح سيحفظ بأمان تام في حسابك ولن يستعمله أحد غيرك.'
-      : 'To continue using our institutional AI analysis services, please link your personal Groq API key from Groq Console. This key is stored securely in your private account and is only visible to you.',
-    step1: isAr ? '1. الحصول على مفتاح Groq من الموقع' : '1. Get Your Groq API Key',
-    step1Desc: isAr
-      ? 'اضغط على الزر أدناه لفتح صفحة Groq Console، سجل الدخول بحساب Google أو GitHub الخاص بك، ثم انقر على "Create API Key" وانسخ المفتاح.'
-      : 'Click the button below to open Groq Console, sign in with your Google or GitHub account, click "Create API Key" and copy the key.',
-    btnAlibaba: isAr ? 'الحصول على مفتاح Groq مجاناً' : 'Get Free Groq API Key',
-    step2: isAr ? '2. ضع المفتاح في الأسفل للتحقق منه' : '2. Paste Your API Key Below to Verify',
-    placeholder: isAr ? 'ضع مفتاح Groq API هنا' : 'Paste your Groq API key here',
-    btnVerify: isAr ? 'التحقق والحفظ والبدء' : 'Verify, Save & Start',
-    btnVerifying: isAr ? 'جاري التحقق من المفتاح...' : 'Verifying Key...',
-    btnSaved: isAr ? 'تم التحقق والحفظ بنجاح!' : 'Successfully Verified & Saved!',
-    errorInvalid: isAr 
-      ? 'المفتاح غير صالح. يرجى التأكد من نسخه بالكامل من Groq Console والمحاولة مجدداً.' 
-      : 'API key is invalid. Please make sure you copied it correctly from Groq Console and try again.',
-    emptyKey: isAr ? 'الرجاء إدخال المفتاح أولاً.' : 'Please enter your key first.',
-    logoutText: isAr ? 'تسجيل الخروج من الحساب' : 'Log Out from Account',
-    adminBypassInfo: isAr
-      ? 'ملاحظة: حساب المشرف يقوم باستخدام المفتاح الافتراضي للموقع تلقائياً.'
-      : 'Note: Admin accounts use the default platform key automatically.'
-  };
-
   const handleLogout = async () => {
     try {
+      localStorage.removeItem('finalyze_dev_bypass_active');
+      localStorage.removeItem('finalyze_permanent_owner');
       await signOut(auth);
       onClose();
-    } catch (e) {
-      console.error("Logout failed:", e);
-    }
+    } catch {}
   };
 
   const handleVerifyAndSave = async () => {
@@ -135,7 +123,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     setIsLoading(true);
 
     try {
-      // Direct Live Verification: Send a short request to Groq API using this key
       const response = await fetch('/api/ai-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,11 +141,8 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         throw new Error("Invalid Response structure");
       }
 
-      // Valid API key! Now store it.
-      // 1. Store in localStorage for instant access
       localStorage.setItem('finalyze_user_groq_api_key', trimmedKey);
 
-      // 2. Store in Firestore if a real user is logged in
       if (user && user.uid && user.uid !== 'developer') {
         const userDocRef = doc(db, 'users', user.uid);
         await setDoc(userDocRef, {
@@ -170,7 +154,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
       setSuccess(true);
       onSaved(trimmedKey);
       
-      // Delay closing to show success checkmark
       setTimeout(() => {
         onClose();
       }, 1500);
@@ -183,6 +166,166 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     }
   };
 
+  if (!isOpen) return null;
+
+  const pageInner = (
+    <>
+      <div className="flex items-center gap-4 mb-6 border-b border-white/5 pb-5">
+        <div 
+          className="w-12 h-12 bg-sky-500/10 rounded-2xl flex items-center justify-center text-sky-400 border border-sky-500/20 cursor-pointer select-none"
+          onClick={handleLogoClick}
+          title={logoClicks > 0 ? `${5 - logoClicks} more clicks...` : ''}
+        >
+          <Key size={24} />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-white leading-tight">{t.title}</h3>
+          {isDeveloperSession() && (
+            <span className="text-[10px] bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 rounded-full px-2.5 py-0.5 font-bold uppercase tracking-wider mt-1 inline-block">
+              Admin Account
+            </span>
+          )}
+        </div>
+      </div>
+
+      <p className="text-slate-400 text-sm leading-relaxed mb-6">
+        {t.desc}
+      </p>
+
+      <div className="space-y-3 mb-6 bg-white/5 border border-white/5 rounded-2xl p-5">
+        <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+          {t.step1}
+        </h4>
+        <p className="text-xs text-slate-400 leading-relaxed">
+          {t.step1Desc}
+        </p>
+        
+        <a
+          href="https://console.groq.com/keys"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 text-brand-bg font-black px-6 py-4.5 rounded-xl transition-all shadow-lg shadow-sky-500/20 hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0 text-sm"
+        >
+          <span>{t.btnAlibaba}</span>
+          <ExternalLink size={16} />
+        </a>
+      </div>
+
+      <div className="space-y-4 mb-6">
+        <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          {t.step2}
+        </h4>
+
+        <div className="relative">
+          <input
+            type={showKey ? 'text' : 'password'}
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+            placeholder={t.placeholder}
+            className="w-full bg-black/40 border border-white/10 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
+            dir="ltr"
+            disabled={isLoading || success}
+          />
+          <button
+            onClick={() => setShowKey(!showKey)}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        </div>
+      </div>
+
+      <AnimatePresence mode="wait">
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-start gap-3 mb-6"
+          >
+            <AlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" />
+            <span className="text-xs text-red-400 leading-normal">{error}</span>
+          </motion.div>
+        )}
+
+        {success && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-start gap-3 mb-6"
+          >
+            <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+            <span className="text-xs text-emerald-400 leading-normal">{t.btnSaved}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex flex-col gap-3">
+        <button
+          onClick={handleVerifyAndSave}
+          disabled={isLoading || success}
+          className={`w-full flex items-center justify-center gap-2 py-4.5 rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-95 shadow-xl ${
+            success
+              ? 'bg-emerald-500 text-brand-bg shadow-emerald-500/20 cursor-default'
+              : isLoading
+              ? 'bg-emerald-500/50 text-brand-bg/60 shadow-emerald-500/10 cursor-not-allowed'
+              : 'bg-emerald-500 hover:bg-emerald-400 text-brand-bg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5'
+          }`}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              <span>{t.btnVerifying}</span>
+            </>
+          ) : success ? (
+            <span>{t.btnSaved}</span>
+          ) : (
+            <>
+              <span>{t.btnVerify}</span>
+              <ArrowRight size={18} className={isAr ? "rotate-180" : ""} />
+            </>
+          )}
+        </button>
+
+        {isBlocking ? (
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/25 hover:text-red-300 font-bold rounded-xl transition-all text-xs tracking-wider uppercase"
+          >
+            <LogOut size={14} />
+            <span>{t.logoutText}</span>
+          </button>
+        ) : (
+          <button
+            onClick={onClose}
+            disabled={isLoading}
+            className="w-full py-3 bg-white/5 border border-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300 font-bold rounded-xl transition-all text-xs tracking-wider uppercase"
+          >
+            {isAr ? 'إلغاء' : 'Cancel'}
+          </button>
+        )}
+      </div>
+
+      {isDeveloperSession() && (
+        <div className="flex items-center gap-2 mt-4 text-[10px] text-emerald-400/60 justify-center">
+          <Info size={12} />
+          <span>{t.adminBypassInfo}</span>
+        </div>
+      )}
+    </>
+  );
+
+  if (asPage) {
+    return (
+      <div>
+        {pageInner}
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
       <motion.div
@@ -191,160 +334,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="relative max-w-lg w-full bg-brand-alt border border-white/10 rounded-[32px] p-8 shadow-[0_32px_128px_-12px_rgba(0,0,0,0.85)]"
       >
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6 border-b border-white/5 pb-5">
-          <div 
-            className="w-12 h-12 bg-sky-500/10 rounded-2xl flex items-center justify-center text-sky-400 border border-sky-500/20 cursor-pointer select-none"
-            onClick={handleLogoClick}
-            title={logoClicks > 0 ? `${5 - logoClicks} more clicks...` : ''}
-          >
-            <Key size={24} />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-white leading-tight">{t.title}</h3>
-            {isDeveloperSession() && (
-              <span className="text-[10px] bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 rounded-full px-2.5 py-0.5 font-bold uppercase tracking-wider mt-1 inline-block">
-                Admin Account
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Description */}
-        <p className="text-slate-400 text-sm leading-relaxed mb-6">
-          {t.desc}
-        </p>
-
-        {/* Step 1 */}
-        <div className="space-y-3 mb-6 bg-white/5 border border-white/5 rounded-2xl p-5">
-          <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-            {t.step1}
-          </h4>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            {t.step1Desc}
-          </p>
-          
-          <a
-            href="https://console.groq.com/keys"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 text-brand-bg font-black px-6 py-4.5 rounded-xl transition-all shadow-lg shadow-sky-500/20 hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0 text-sm"
-          >
-            <span>{t.btnAlibaba}</span>
-            <ExternalLink size={16} />
-          </a>
-        </div>
-
-        {/* Step 2 */}
-        <div className="space-y-4 mb-6">
-          <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            {t.step2}
-          </h4>
-
-          {/* Input field */}
-          <div className="relative">
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              placeholder={t.placeholder}
-              className="w-full bg-black/40 border border-white/10 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
-              dir="ltr"
-              disabled={isLoading || success}
-            />
-            <button
-              onClick={() => setShowKey(!showKey)}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-        </div>
-
-        {/* Status / Error alerts */}
-        <AnimatePresence mode="wait">
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-start gap-3 mb-6"
-            >
-              <AlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" />
-              <span className="text-xs text-red-400 leading-normal">{error}</span>
-            </motion.div>
-          )}
-
-          {success && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-start gap-3 mb-6"
-            >
-              <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
-              <span className="text-xs text-emerald-400 leading-normal">{t.btnSaved}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Buttons */}
-        <div className="flex flex-col gap-3">
-          <button
-            onClick={handleVerifyAndSave}
-            disabled={isLoading || success}
-            className={`w-full flex items-center justify-center gap-2 py-4.5 rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-95 shadow-xl ${
-              success
-                ? 'bg-emerald-500 text-brand-bg shadow-emerald-500/20 cursor-default'
-                : isLoading
-                ? 'bg-emerald-500/50 text-brand-bg/60 shadow-emerald-500/10 cursor-not-allowed'
-                : 'bg-emerald-500 hover:bg-emerald-400 text-brand-bg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5'
-            }`}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                <span>{t.btnVerifying}</span>
-              </>
-            ) : success ? (
-              <span>{t.btnSaved}</span>
-            ) : (
-              <>
-                <span>{t.btnVerify}</span>
-                <ArrowRight size={18} className={isAr ? "rotate-180" : ""} />
-              </>
-            )}
-          </button>
-
-          {/* Close or Logout options */}
-          {isBlocking ? (
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/25 hover:text-red-300 font-bold rounded-xl transition-all text-xs tracking-wider uppercase"
-            >
-              <LogOut size={14} />
-              <span>{t.logoutText}</span>
-            </button>
-          ) : (
-            <button
-              onClick={onClose}
-              disabled={isLoading}
-              className="w-full py-3 bg-white/5 border border-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300 font-bold rounded-xl transition-all text-xs tracking-wider uppercase"
-            >
-              {isAr ? 'إلغاء' : 'Cancel'}
-            </button>
-          )}
-        </div>
-
-        {/* Small admin notice if relevant */}
-        {isDeveloperSession() && (
-          <div className="flex items-center gap-2 mt-4 text-[10px] text-emerald-400/60 justify-center">
-            <Info size={12} />
-            <span>{t.adminBypassInfo}</span>
-          </div>
-        )}
+        {pageInner}
       </motion.div>
     </div>
   );

@@ -148,19 +148,45 @@ export default function Header({
           </div>
 
           <div className="flex items-center gap-3 mb-2">
-            {/* Dashboard Toggle */}
-            <button
-              onClick={onToggleDashboard}
-              className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:bg-white/20 transition-all"
-              title={lang === 'ar' ? 'لوحة القيادة' : 'Dashboard'}
-            >
-              <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">
-                {lang === 'ar' ? 'القائمة' : 'Menu'}
-              </span>
-              <div className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black shadow-md">
-                <Menu size={18} />
-              </div>
-            </button>
+            {/* Navigation buttons */}
+            <div className="flex items-center gap-1.5 bg-white/10 rounded-2xl border border-white/20 p-1.5 shadow-sm">
+              <button
+                onClick={onOpenSettings}
+                className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 transition-all"
+                title={lang === 'ar' ? 'الإعدادات' : 'Settings'}
+              >
+                <div className="p-1.5 rounded-lg bg-[#F59E0B]/20 border border-[#F59E0B]/10 text-black">
+                  <Settings size={16} />
+                </div>
+                <span className="text-[8px] font-black uppercase text-black/70 tracking-[0.15em]">
+                  {lang === 'ar' ? 'إعدادات' : 'Settings'}
+                </span>
+              </button>
+              <button
+                onClick={onOpenApiKey}
+                className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 transition-all"
+                title={lang === 'ar' ? 'مفتاح API' : 'API Key'}
+              >
+                <div className="p-1.5 rounded-lg bg-sky-500/20 border border-sky-500/10 text-black">
+                  <Key size={16} />
+                </div>
+                <span className="text-[8px] font-black uppercase text-black/70 tracking-[0.15em]">
+                  {lang === 'ar' ? 'مفتاح' : 'API Key'}
+                </span>
+              </button>
+              <button
+                onClick={onOpenSubscription}
+                className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 transition-all"
+                title={lang === 'ar' ? 'الخطط' : 'Plans'}
+              >
+                <div className="p-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/10 text-black">
+                  <DollarSign size={16} />
+                </div>
+                <span className="text-[8px] font-black uppercase text-black/70 tracking-[0.15em]">
+                  {lang === 'ar' ? 'خطط' : 'Plans'}
+                </span>
+              </button>
+            </div>
 
             {/* Auto Analysis Scanner */}
             <div className="relative">
