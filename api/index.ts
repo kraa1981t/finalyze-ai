@@ -58,6 +58,19 @@ app.get("/api/context-econ-calendar", async (_req, res) => {
   }
 });
 
+// API Route: Crypto Prices (from Coingecko) for Payment Modal
+app.get("/api/crypto-prices", async (_req, res) => {
+  try {
+    const response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,litecoin,tron,solana&vs_currencies=usd", {
+      signal: AbortSignal.timeout(5000)
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch {
+    res.json({});
+  }
+});
+
 // Helper for Market Data Fetching
 const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
   try {

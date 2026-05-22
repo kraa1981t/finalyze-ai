@@ -84,6 +84,19 @@ async function startServer() {
     }
   });
 
+  // API Route: Crypto Prices (from Coingecko) for Payment Modal
+  app.get("/api/crypto-prices", async (_req, res) => {
+    try {
+      const response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,litecoin,tron,solana&vs_currencies=usd", {
+        signal: AbortSignal.timeout(5000)
+      });
+      const data = await response.json();
+      res.json(data);
+    } catch {
+      res.json({});
+    }
+  });
+
   // API Route: Market Data (Proxy to Yahoo Finance)
   app.get("/api/market-data", async (req, res) => {
     try {

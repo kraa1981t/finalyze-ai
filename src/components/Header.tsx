@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Zap, Clock, Layers, Volume2, ListFilter, Upload, Music, Sparkles, Settings, Activity, Trash2, AlertTriangle, Key } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Zap, Clock, Layers, Volume2, ListFilter, Upload, Music, Sparkles, Settings, Activity, Trash2, AlertTriangle, Key, DollarSign } from 'lucide-react';
 import { saveAudioBlob, deleteAudioBlob } from '../lib/db';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/i18n';
@@ -27,6 +27,7 @@ interface HeaderProps {
   onUnlockRadar: () => void;
   hasApiKey: boolean;
   onOpenApiKey: () => void;
+  onOpenSubscription: () => void;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -54,7 +55,8 @@ export default function Header({
   isRadarUnlocked,
   onUnlockRadar,
   hasApiKey,
-  onOpenApiKey
+  onOpenApiKey,
+  onOpenSubscription
 }: HeaderProps) {
   const t = translations[lang];
   const [isAutoMenuOpen, setIsAutoMenuOpen] = React.useState(false);
@@ -497,6 +499,17 @@ export default function Header({
                  localStorage.getItem('finalyze_dev_bypass_active') !== 'true' && (
                   <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-600 rounded-full border border-white animate-pulse" />
                 )}
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
+              <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Plans</span>
+              <button 
+                onClick={onOpenSubscription}
+                className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
+                title="Subscription Plans"
+              >
+                <DollarSign size={18} />
               </button>
             </div>
 

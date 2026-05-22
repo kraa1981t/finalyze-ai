@@ -16,6 +16,8 @@ import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, AL
 import { Language, translations } from './lib/i18n';
 import { analyzeMarket } from './services/geminiService';
 import ApiKeyModal from './components/ApiKeyModal';
+import SubscriptionModal from './components/SubscriptionModal';
+import PaymentModal from './components/PaymentModal';
 
 
 export default function App() {
@@ -23,6 +25,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isApiKeyOpen, setIsApiKeyOpen] = useState(false);
+  const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
+  const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string } | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_groq_api_key'));
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -690,6 +694,19 @@ export default function App() {
         }}
       />
 
+      <SubscriptionModal
+        isOpen={isSubscriptionOpen && !paymentPlan}
+        onClose={() => setIsSubscriptionOpen(false)}
+        onSelectPlan={(amount, label) => setPaymentPlan({ amount, label })}
+      />
+
+      <PaymentModal
+        isOpen={!!paymentPlan}
+        onClose={() => { setPaymentPlan(null); setIsSubscriptionOpen(false); }}
+        planLabel={paymentPlan?.label || ''}
+        amount={paymentPlan?.amount || 0}
+      />
+
       <Header 
         user={user} onLogin={handleLogin} onLogout={handleLogout} 
         isDark={isDark} toggleTheme={() => setIsDark(!isDark)}
@@ -702,6 +719,7 @@ export default function App() {
         onUnlockRadar={handleUnlockRadar}
         hasApiKey={hasApiKey || isDeveloperSession()}
         onOpenApiKey={() => setIsApiKeyOpen(true)}
+        onOpenSubscription={() => setIsSubscriptionOpen(true)}
       />
 
       <AnimatePresence>
