@@ -149,7 +149,7 @@ async function startServer() {
     try {
       const { prompt, userApiKey } = req.body;
       const apiKey = userApiKey || process.env.GROQ_API_KEY;
-      const model = process.env.GROQ_MODEL || "llama3-70b-8192";
+      const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
       if (!apiKey) {
         return res.status(400).json({ error: "Groq API Key is required. Please set your key in the top-right toolbar." });
