@@ -60,7 +60,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setEditAddresses(JSON.parse(JSON.stringify(addresses)));
       setCopiedId(null);
       setNewAddress({ name: '', address: '' });
-      setIsAdmin(false);
+      if (!manageMode) setIsAdmin(false);
     }
   }, [isOpen]);
 
@@ -84,7 +84,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     const clean = editAddresses.filter(a => a.name && a.address);
     setAddresses(clean);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-    setIsAdmin(false);
+    if (!manageMode) setIsAdmin(false);
   };
 
   const addNewAddress = () => {
