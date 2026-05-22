@@ -12,6 +12,7 @@ import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
 import TopSignals from './components/TopSignals';
 import PortfolioPanel from './components/PortfolioPanel';
+import DashboardPanel from './components/DashboardPanel';
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType } from './types';
 import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS } from './constants';
 import { Language, translations } from './lib/i18n';
@@ -35,6 +36,7 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
@@ -719,6 +721,16 @@ export default function App() {
         isRadarUnlocked={isRadarUnlocked}
         onUnlockRadar={handleUnlockRadar}
         hasApiKey={hasApiKey || isDeveloperSession()}
+        onOpenApiKey={() => setIsApiKeyOpen(true)}
+        onOpenSubscription={() => setIsSubscriptionOpen(true)}
+        onToggleDashboard={() => setIsDashboardOpen(!isDashboardOpen)}
+      />
+
+      <DashboardPanel
+        isOpen={isDashboardOpen}
+        onClose={() => setIsDashboardOpen(false)}
+        lang={lang}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenApiKey={() => setIsApiKeyOpen(true)}
         onOpenSubscription={() => setIsSubscriptionOpen(true)}
       />

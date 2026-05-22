@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Zap, Clock, Layers, Volume2, ListFilter, Upload, Music, Sparkles, Settings, Activity, Trash2, AlertTriangle, Key, DollarSign } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Zap, Clock, Layers, Volume2, ListFilter, Upload, Music, Sparkles, Settings, Activity, Trash2, AlertTriangle, Key, DollarSign, Menu } from 'lucide-react';
 import { saveAudioBlob, deleteAudioBlob } from '../lib/db';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/i18n';
@@ -28,6 +28,7 @@ interface HeaderProps {
   hasApiKey: boolean;
   onOpenApiKey: () => void;
   onOpenSubscription: () => void;
+  onToggleDashboard?: () => void;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -56,7 +57,8 @@ export default function Header({
   onUnlockRadar,
   hasApiKey,
   onOpenApiKey,
-  onOpenSubscription
+  onOpenSubscription,
+  onToggleDashboard
 }: HeaderProps) {
   const t = translations[lang];
   const [isAutoMenuOpen, setIsAutoMenuOpen] = React.useState(false);
@@ -146,6 +148,20 @@ export default function Header({
           </div>
 
           <div className="flex items-center gap-3 mb-2">
+            {/* Dashboard Toggle */}
+            <button
+              onClick={onToggleDashboard}
+              className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:bg-white/20 transition-all"
+              title={lang === 'ar' ? 'لوحة القيادة' : 'Dashboard'}
+            >
+              <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">
+                {lang === 'ar' ? 'القائمة' : 'Menu'}
+              </span>
+              <div className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black shadow-md">
+                <Menu size={18} />
+              </div>
+            </button>
+
             {/* Auto Analysis Scanner */}
             <div className="relative">
               <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:shadow-md transition-shadow">
@@ -480,47 +496,6 @@ export default function Header({
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
-
-            <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm relative">
-              <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">
-                {lang === 'ar' ? 'المفتاح' : 'API Key'}
-              </span>
-              <button 
-                onClick={onOpenApiKey}
-                className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md relative flex items-center justify-center"
-                title={lang === 'ar' ? 'إعداد مفتاح API الخاص بك' : 'Configure API Key'}
-              >
-                <Key size={18} />
-                {!hasApiKey && user && 
-                 user.email !== (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com') && 
-                 user.email !== 'taybekraa@gmail.com' && 
-                 !user.email?.includes('dev') && 
-                 localStorage.getItem('finalyze_dev_bypass_active') !== 'true' && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-600 rounded-full border border-white animate-pulse" />
-                )}
-              </button>
-            </div>
-
-            <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
-              <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Plans</span>
-              <button 
-                onClick={onOpenSubscription}
-                className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
-                title="Subscription Plans"
-              >
-                <DollarSign size={18} />
-              </button>
-            </div>
-
-            <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
-              <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Strategy</span>
-              <button 
-                onClick={onOpenSettings}
-                className="p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
-              >
-                <Settings size={18} />
-              </button>
             </div>
 
             <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
