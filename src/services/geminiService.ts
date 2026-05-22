@@ -115,12 +115,22 @@ export async function analyzeMarket(params: {
     }
     
     // Fetch real market context (Fear & Greed, News, Economic Events)
-    const context = await fetchMarketContext(symbol);
-    const newsText = context.news.length > 0
-      ? context.news.map(n => `• ${n.title} (${n.source})`).join('\n')
+    let contextFearGreed = null;
+    let contextNews: { title: string; source: string }[] = [];
+    let contextEcon: any[] = [];
+    try {
+      const ctx = await fetchMarketContext(symbol);
+      contextFearGreed = ctx.fearGreed;
+      contextNews = ctx.news;
+      contextEcon = ctx.econEvents;
+    } catch (e) {
+      console.warn("[Context] Failed to fetch market context:", e);
+    }
+    const newsText = contextNews.length > 0
+      ? contextNews.map(n => `• ${n.title} (${n.source})`).join('\n')
       : 'No recent news available.';
-    const eventsText = context.econEvents.length > 0
-      ? context.econEvents.map(e => `• ${e.country} | ${e.title} | Impact: ${e.impact} | Forecast: ${e.forecast} | Previous: ${e.previous}`).join('\n')
+    const eventsText = contextEcon.length > 0
+      ? contextEcon.map(e => `• ${e.country} | ${e.title} | Impact: ${e.impact} | Forecast: ${e.forecast} | Previous: ${e.previous}`).join('\n')
       : 'No major economic events this week.';
 
     const technicalPrompt = `
@@ -145,7 +155,7 @@ export async function analyzeMarket(params: {
       - Micro EMA Cross (9/21): ${microMetrics?.emaCross || 'unknown'}
 
       **⚠️ REAL-TIME MARKET CONTEXT (LIVE DATA - NOT GUESSED)**:
-      - Fear & Greed Index: ${context.fearGreed?.value ?? 'N/A'}/100 (${context.fearGreed?.classification ?? 'Unknown'})
+      - Fear & Greed Index: ${contextFearGreed?.value ?? 'N/A'}/100 (${contextFearGreed?.classification ?? 'Unknown'})
       - Recent News Headlines:
         ${newsText}
       - Upcoming Economic Events (High/Medium Impact):
@@ -176,7 +186,7 @@ export async function analyzeMarket(params: {
          * If news is mixed or no relevant news, **do not adjust confidence** (neutral).
          * CRITICAL: If volatility is chaotic with extreme spreads, downgrade signal regardless of news.
       2. **REAL FEAR & GREED INDEX (تصويت الجمهور والمؤسسات)**:
-         * Use the REAL Fear & Greed Index value provided above (${context.fearGreed?.value ?? 'N/A'}/100).
+         * Use the REAL Fear & Greed Index value provided above (${contextFearGreed?.value ?? 'N/A'}/100).
          * **EXTREME FEAR (0-25)**: Market is oversold. Retail is panicking. Institutions are accumulating. If technicals show bullish structure, this is a STRONG contrarian buy signal. Boost confidence by +5%.
          * **FEAR (25-45)**: Caution dominates. Retail is bearish. Await technical confirmation before entry.
          * **NEUTRAL (45-55)**: Low conviction. Only trade if technical setup is exceptionally clear (confidence ≥ 70).
@@ -302,7 +312,7 @@ export async function analyzeMarket(params: {
       confidence: finalConfidence,
       summary: resultData.summary,
       technicalScore: metrics?.momentumScore || 50,
-      sentimentScore: context.fearGreed?.value ?? 50,
+      sentimentScore: contextFearGreed?.value ?? 50,
       trendMaturity: age <= 8 ? 'infancy' : (age <= 30 ? 'youth' : 'aging'),
       trendAge: age,
       microTF,
