@@ -121,7 +121,7 @@ export default function Header({
         </div>
       )}
 
-      <header className="sticky top-0 z-50 bg-[#87CEEB]/95 backdrop-blur-xl border-b border-black/10 shadow-2xl shadow-sky-500/10 h-24">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#87CEEB]/95 backdrop-blur-xl border-b border-black/10 shadow-2xl shadow-sky-500/10 h-24">
         <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between pt-4">
           <div className="flex items-center gap-8 mb-2">
             {showBack && (

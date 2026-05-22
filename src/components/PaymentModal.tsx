@@ -39,6 +39,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount }: Pay
   });
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [editAddresses, setEditAddresses] = useState<CryptoAddress[]>([]);
   const [newAddress, setNewAddress] = useState({ name: '', address: '' });
@@ -65,6 +66,14 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount }: Pay
       await navigator.clipboard.writeText(addr);
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
+    } catch {}
+  };
+
+  const copyAmount = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedAmountId(id);
+      setTimeout(() => setCopiedAmountId(null), 2000);
     } catch {}
   };
 
@@ -186,14 +195,20 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount }: Pay
                     onChange={(e) => setEditAddresses(prev => prev.map(a => a.id === item.id ? { ...a, address: e.target.value } : a))}
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-emerald-500"
                   />
-                ) : (
+                  ) : (
                   <div className="bg-black/40 rounded-xl px-4 py-3">
                     <div className="flex items-center justify-between">
                       <code className="text-xs font-mono text-slate-300 break-all select-all">{item.address}</code>
                       {calcCryptoAmount(item.id) !== '...' && (
-                        <span className="text-[10px] font-bold text-emerald-400 ml-2 shrink-0">
-                          ≈ {calcCryptoAmount(item.id)} {item.name.split(' ').pop()?.replace(/[()]/g, '')}
-                        </span>
+                        <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                          <span className="text-[10px] font-bold text-emerald-400">≈ {calcCryptoAmount(item.id)} {item.name.split(' ').pop()?.replace(/[()]/g, '')}</span>
+                          <button
+                            onClick={() => copyAmount(`${calcCryptoAmount(item.id)} ${item.name.split(' ').pop()?.replace(/[()]/g, '')}`, 'amt_' + item.id)}
+                            className="p-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
+                          >
+                            {copiedAmountId === 'amt_' + item.id ? <Check size={10} /> : <Copy size={10} />}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>

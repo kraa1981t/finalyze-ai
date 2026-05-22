@@ -737,7 +737,7 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8">
+      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-28">
         <AnimatePresence mode="wait">
           {!analysisResults && !isAnalyzing ? (
             <motion.div key="analysis-input" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
