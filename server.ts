@@ -34,6 +34,56 @@ async function startServer() {
     });
   });
 
+  // API Route: Market Context - Fear & Greed Index
+  app.get("/api/context-fear-greed", async (_req, res) => {
+    try {
+      const response = await fetch("https://api.alternative.me/fng/?limit=1");
+      const data = await response.json();
+      const item = data?.data?.[0];
+      res.json({ value: Number(item?.value) || 50, classification: item?.value_classification || "Neutral" });
+    } catch {
+      res.json({ value: 50, classification: "Neutral" });
+    }
+  });
+
+  // API Route: Market Context - Latest News
+  app.get("/api/context-news", async (req, res) => {
+    try {
+      const query = (req.query.query as string) || "financial markets";
+      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+      const response = await fetch(rssUrl);
+      const xml = await response.text();
+      const titles = [...xml.matchAll(/<title>(.*?)<\/title>/g)].slice(1).map(m => m[1]);
+      const sources = [...xml.matchAll(/<source>(.*?)<\/source>/g)].map(m => m[1]);
+      const articles = titles.slice(0, 8).map((title, i) => ({
+        title,
+        source: sources[i] || "News"
+      }));
+      res.json({ articles });
+    } catch {
+      res.json({ articles: [] });
+    }
+  });
+
+  // API Route: Market Context - Economic Calendar
+  app.get("/api/context-econ-calendar", async (_req, res) => {
+    try {
+      const response = await fetch("https://nfs.faireconomy.media/ff_calendar_thisweek.json");
+      const data = await response.json();
+      const events = (data || []).filter((e: any) => e.impact === "High" || e.impact === "Medium").slice(0, 10).map((e: any) => ({
+        title: e.title,
+        country: e.country,
+        date: e.date,
+        impact: e.impact,
+        forecast: e.forecast || "-",
+        previous: e.previous || "-"
+      }));
+      res.json({ events });
+    } catch {
+      res.json({ events: [] });
+    }
+  });
+
   // API Route: Market Data (Proxy to Yahoo Finance)
   app.get("/api/market-data", async (req, res) => {
     try {

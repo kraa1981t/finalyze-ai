@@ -1,5 +1,6 @@
 import { MarketType, AnalysisResult, TradingStyle, SignalType, StrategySettings } from "../types";
 import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
+import { fetchMarketContext } from "./marketContextService";
 
 /**
  * ROBUST TECHNICAL ENGINE (VERSION 2.0)
@@ -113,6 +114,15 @@ export async function analyzeMarket(params: {
       console.warn("Failed to fetch micro timeframe data:", e);
     }
     
+    // Fetch real market context (Fear & Greed, News, Economic Events)
+    const context = await fetchMarketContext(symbol, type);
+    const newsText = context.news.length > 0
+      ? context.news.map(n => `• ${n.title} (${n.source})`).join('\n')
+      : 'No recent news available.';
+    const eventsText = context.econEvents.length > 0
+      ? context.econEvents.map(e => `• ${e.country} | ${e.title} | Impact: ${e.impact} | Forecast: ${e.forecast} | Previous: ${e.previous}`).join('\n')
+      : 'No major economic events this week.';
+
     const technicalPrompt = `
       You are an Elite Institutional Trader and Quantitative Analyst (ICT/SMC Expert).
       Your task is to analyze the following asset and provide a definitive trading decision.
@@ -134,6 +144,13 @@ export async function analyzeMarket(params: {
       - Micro Trend Direction: ${microMetrics?.direction || 'sideways'}
       - Micro EMA Cross (9/21): ${microMetrics?.emaCross || 'unknown'}
 
+      **⚠️ REAL-TIME MARKET CONTEXT (LIVE DATA - NOT GUESSED)**:
+      - Fear & Greed Index: ${context.fearGreed?.value ?? 'N/A'}/100 (${context.fearGreed?.classification ?? 'Unknown'})
+      - Recent News Headlines:
+        ${newsText}
+      - Upcoming Economic Events (High/Medium Impact):
+        ${eventsText}
+
       **USER STRATEGY SETTINGS**:
       - News & Volatility Guard: ${settings.useNewsGuard ? 'ENABLED' : 'DISABLED'}
       - Volume Confirmation: ${settings.useVolumeAnalysis ? 'ENABLED' : 'DISABLED'}
@@ -151,16 +168,29 @@ export async function analyzeMarket(params: {
         * If the macro trend is strong but the Micro Timeframe is still actively in a **PULLBACK** state, you MUST downgrade the signal to "buy" (with lower confidence) or "neutral", and clearly flag in "microSignal" that it is a "pullback".
 
       **STRATEGY EVALUATION & SUPPORTIVE WEIGHTS**:
-      1. **NEWS & VOLATILITY GUARD (Dynamic Support Factor)**:
-         * If News Guard is ENABLED, evaluate if the recent candles show high volatility or price expansion (indicating high-impact news breakouts). 
-         * If the price action is structured (e.g. an institutional news breakout that cleanly Breaks Structure - BOS), treat the news as **SUPPORTIVE momentum** and **ADD +5% to +10% to the confidence score** to reward the strong breakout.
-         * Only if the volatility is chaotic, extremely messy, or spread is too high, treat it as dangerous and reduce the confidence score or issue "no_entry".
-      2. **MARKET SENTIMENT CONSENSUS (تصويت الجمهور والمؤثرين)**:
-         * Calculate a "sentimentScore" (0-100) representing the collective consensus of institutional influencers, retail followers, and financial market sentiment.
-         * If the technical setup is highly bullish/bearish and this market consensus aligns with the setup, use it as a **SUPPORTIVE weight to boost the final confidence score**. High confluence between structure and sentiment is rewarded with a higher confidence rating!
-      3. **VOLUME CONFIRMATION**: If Volume Confirmation is ENABLED, look for supportive volume. A breakout or strong reversal should ideally be backed by average or above-average volume.
-      4. **MACRO ALIGNMENT**: If Higher Timeframe Alignment is ENABLED, ensure the trade aligns with the overall macro trend (e.g., higher timeframes are in a similar direction or consolidating support/resistance).
-      5. **TECHNICAL INDICATORS**: If Indicator Alignment is ENABLED, verify that EMA cross (9/21) or RSI are supportive (e.g., not extremely overbought >75 for Buy, or oversold <25 for Sell).
+      1. **REAL NEWS IMPACT (Dynamic Support Factor)**:
+         * Use the REAL news headlines provided above (NOT guessed data). Do NOT make up or imagine news.
+         * TECHNICAL CRITERION: If News Guard is ENABLED, evaluate if the recent candles show high volatility or price expansion (confirming news-driven move).
+         * If REAL news is bullish (positive earnings, regulatory approval, adoption) AND price action shows a clean Break of Structure (BOS), treat the news as **SUPPORTIVE** and **ADD +5% to +10% to the confidence score**.
+         * If REAL news is bearish (regulatory crackdown, hack, rate hikes) AND price shows distribution, **REDUCE confidence by -5% to -10%** or issue "no_entry".
+         * If news is mixed or no relevant news, **do not adjust confidence** (neutral).
+         * CRITICAL: If volatility is chaotic with extreme spreads, downgrade signal regardless of news.
+      2. **REAL FEAR & GREED INDEX (تصويت الجمهور والمؤسسات)**:
+         * Use the REAL Fear & Greed Index value provided above (${context.fearGreed?.value ?? 'N/A'}/100).
+         * **EXTREME FEAR (0-25)**: Market is oversold. Retail is panicking. Institutions are accumulating. If technicals show bullish structure, this is a STRONG contrarian buy signal. Boost confidence by +5%.
+         * **FEAR (25-45)**: Caution dominates. Retail is bearish. Await technical confirmation before entry.
+         * **NEUTRAL (45-55)**: Low conviction. Only trade if technical setup is exceptionally clear (confidence ≥ 70).
+         * **GREED (55-75)**: Retail is bullish. Trend-following works well. If technicals align, this confirms momentum.
+         * **EXTREME GREED (75-100)**: Market is overbought. Euphoria. Danger of correction. If you give a buy signal, cap confidence at 75 max. For sell signals, this is supportive.
+         * Adjust the "sentimentScore" field to reflect this REAL index value.
+      3. **REAL ECONOMIC EVENTS IMPACT**:
+         * Use the REAL economic events listed above. 
+         * If a HIGH impact event is coming within 24 hours (e.g., FOMC, NFP, CPI, interest rate decision), **warn in the summary** that volatility is expected.
+         * If a high-impact event just passed and caused a clean breakout, treat it as a valid technical signal.
+         * If NEWS GUARD is ENABLED and a major event is imminent, **reduce confidence by -10%** (uncertainty penalty) or flag as "no_entry".
+      4. **VOLUME CONFIRMATION**: If Volume Confirmation is ENABLED, look for supportive volume. A breakout or strong reversal should ideally be backed by average or above-average volume.
+      5. **MACRO ALIGNMENT**: If Higher Timeframe Alignment is ENABLED, ensure the trade aligns with the overall macro trend (e.g., higher timeframes are in a similar direction or consolidating support/resistance).
+      6. **TECHNICAL INDICATORS**: If Indicator Alignment is ENABLED, verify that EMA cross (9/21) or RSI are supportive (e.g., not extremely overbought >75 for Buy, or oversold <25 for Sell).
 
       **INSTITUTIONAL ANALYSIS INSTRUCTIONS**:
       1. MARKET STRUCTURE (SMC): Identify if there is a Break of Structure (BOS) or Change of Character (CHOCH) on the ${timeframe} timeframe.
@@ -272,7 +302,7 @@ export async function analyzeMarket(params: {
       confidence: finalConfidence,
       summary: resultData.summary,
       technicalScore: metrics?.momentumScore || 50,
-      sentimentScore: finalConfidence,
+      sentimentScore: context.fearGreed?.value ?? 50,
       trendMaturity: age <= 8 ? 'infancy' : (age <= 30 ? 'youth' : 'aging'),
       trendAge: age,
       microTF,
