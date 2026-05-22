@@ -16,6 +16,7 @@ import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType } fr
 import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS } from './constants';
 import { Language, translations } from './lib/i18n';
 import { analyzeMarket } from './services/geminiService';
+import { resolveConflicts } from './services/portfolioRiskService';
 import ApiKeyModal from './components/ApiKeyModal';
 import SubscriptionModal from './components/SubscriptionModal';
 import PaymentModal from './components/PaymentModal';
@@ -235,13 +236,12 @@ export default function App() {
         if (index >= 0) {
           if (updated[index].timestamp !== res.timestamp) {
             changed = true;
-            // No sound for mere updates, only for brand new appearances
           }
           updated[index] = res;
         } else {
           updated.unshift(res);
           changed = true;
-          hasBrandNewSymbol = true; // Trigger sound ONLY for new symbols
+          hasBrandNewSymbol = true;
         }
       } else {
         const prevLength = updated.length;
@@ -251,14 +251,14 @@ export default function App() {
     });
 
     if (changed) {
-      // 1. UPDATE UI
-      setTopSignals(updated.slice(0, 15));
+      // Resolve conflicts: when buy & sell coexist in same cluster, keep only the best
+      const resolved = resolveConflicts(updated);
+      setTopSignals(resolved.slice(0, 15));
       
-      // 2. DELAYED AUDIO TRIGGER (Guarantees visual paints first)
       if (hasBrandNewSymbol) {
         setTimeout(() => {
           playAudio('success');
-        }, 400); // 400ms delay ensures UI is visible before sound hits
+        }, 400);
       }
     }
   };

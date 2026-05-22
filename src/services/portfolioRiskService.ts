@@ -147,3 +147,85 @@ export function analyzePortfolio(signals: AnalysisResult[]): PortfolioAnalysis {
 
   return { warnings, exposures, totalLong, totalShort, netExposure: totalLong - totalShort };
 }
+
+function signalScore(s: AnalysisResult): number {
+  const direction = isBuyLike(s.signal) ? 1 : isSellLike(s.signal) ? -1 : 0;
+  const strength = s.signal === SignalType.STRONG_BUY || s.signal === SignalType.STRONG_SELL ? 1.2 : 1;
+  return direction * s.confidence * strength;
+}
+
+export function resolveConflicts(signals: AnalysisResult[]): AnalysisResult[] {
+  if (signals.length < 2) return signals;
+
+  const kept = new Set<string>();
+  const result: AnalysisResult[] = [];
+
+  // 1. Resolve cluster conflicts (buy vs sell in same cluster)
+  const clusterMap = new Map<string, AnalysisResult[]>();
+  for (const s of signals) {
+    const clusters = getClustersForSymbol(s.symbol);
+    // If symbol is not in any cluster, add it with empty cluster key
+    if (clusters.length === 0) {
+      if (!clusterMap.has('__ungrouped__')) clusterMap.set('__ungrouped__', []);
+      clusterMap.get('__ungrouped__')!.push(s);
+    }
+    for (const c of clusters) {
+      if (!clusterMap.has(c)) clusterMap.set(c, []);
+      clusterMap.get(c)!.push(s);
+    }
+  }
+
+  for (const [, syms] of clusterMap) {
+    const buySignals = syms.filter(s => isBuyLike(s.signal));
+    const sellSignals = syms.filter(s => isSellLike(s.signal));
+    const neutralSignals = syms.filter(s => !isBuyLike(s.signal) && !isSellLike(s.signal));
+
+    // Keep all neutrals
+    for (const s of neutralSignals) {
+      if (!kept.has(s.symbol)) {
+        kept.add(s.symbol);
+        result.push(s);
+      }
+    }
+
+    if (buySignals.length > 0 && sellSignals.length > 0) {
+      // Conflict: keep only the single highest-scoring signal
+      const best = [...buySignals, ...sellSignals].sort((a, b) => Math.abs(signalScore(b)) - Math.abs(signalScore(a)))[0];
+      if (!kept.has(best.symbol)) {
+        kept.add(best.symbol);
+        result.push(best);
+      }
+    } else {
+      // No conflict: keep all signals
+      for (const s of syms) {
+        if (!kept.has(s.symbol)) {
+          kept.add(s.symbol);
+          result.push(s);
+        }
+      }
+    }
+  }
+
+  // 2. Resolve inverse pair conflicts
+  for (const [a, b] of INVERSE_PAIRS) {
+    const sigA = result.find(s => s.symbol === a);
+    const sigB = result.find(s => s.symbol === b);
+    if (!sigA || !sigB) continue;
+
+    const dirA = isBuyLike(sigA.signal) ? 1 : isSellLike(sigA.signal) ? -1 : 0;
+    const dirB = isBuyLike(sigB.signal) ? 1 : isSellLike(sigB.signal) ? -1 : 0;
+
+    // Only conflict if both have direction and same direction (both buy or both sell)
+    if (dirA !== 0 && dirB !== 0 && dirA === dirB) {
+      const scoreA = Math.abs(signalScore(sigA));
+      const scoreB = Math.abs(signalScore(sigB));
+      if (scoreA >= scoreB) {
+        result.splice(result.indexOf(sigB), 1);
+      } else {
+        result.splice(result.indexOf(sigA), 1);
+      }
+    }
+  }
+
+  return result;
+}
