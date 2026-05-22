@@ -198,7 +198,7 @@ export async function analyzeMarket(params: {
       }
     `;
 
-    const userApiKey = localStorage.getItem('finalyze_user_gemini_api_key') || '';
+    const userApiKey = localStorage.getItem('finalyze_user_groq_api_key') || '';
     const aiResponse = await fetch('/api/ai-analysis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

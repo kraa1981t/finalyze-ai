@@ -23,7 +23,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isApiKeyOpen, setIsApiKeyOpen] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_gemini_api_key'));
+  const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_groq_api_key'));
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
@@ -488,7 +488,7 @@ export default function App() {
           const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
           if (elapsed < threeDaysInMs) {
             setUser(savedUser);
-            const localKey = localStorage.getItem('finalyze_user_gemini_api_key');
+            const localKey = localStorage.getItem('finalyze_user_groq_api_key');
             if (localKey) {
               setHasApiKey(true);
             } else {
@@ -501,7 +501,7 @@ export default function App() {
             localStorage.removeItem('finalyze_auth_user');
             localStorage.removeItem('finalyze_auth_timestamp');
             localStorage.removeItem('finalyze_dev_bypass_active');
-            localStorage.removeItem('finalyze_user_gemini_api_key');
+            localStorage.removeItem('finalyze_user_groq_api_key');
           }
         }
       } catch (e) {
@@ -536,7 +536,7 @@ export default function App() {
           localStorage.setItem('finalyze_dev_bypass_active', 'true');
         }
 
-        const localKey = localStorage.getItem('finalyze_user_gemini_api_key');
+        const localKey = localStorage.getItem('finalyze_user_groq_api_key');
         if (localKey) {
           setHasApiKey(true);
         } else {
@@ -544,8 +544,8 @@ export default function App() {
             const userDoc = await getDoc(doc(db, 'users', u.uid));
             if (userDoc.exists()) {
               const data = userDoc.data();
-              if (data?.geminiApiKey) {
-                localStorage.setItem('finalyze_user_gemini_api_key', data.geminiApiKey);
+              if (data?.groqApiKey || data?.geminiApiKey) {
+                localStorage.setItem('finalyze_user_groq_api_key', data.groqApiKey || data.geminiApiKey);
                 setHasApiKey(true);
               } else {
                 setHasApiKey(false);
@@ -615,7 +615,7 @@ export default function App() {
       localStorage.removeItem('finalyze_dev_bypass_active');
     }
     
-    setHasApiKey(!!localStorage.getItem('finalyze_user_gemini_api_key'));
+    setHasApiKey(!!localStorage.getItem('finalyze_user_groq_api_key'));
     setLoginError(null);
   };
 
@@ -625,7 +625,7 @@ export default function App() {
     } catch (e) {
       console.warn("SignOut firebase warning:", e);
     }
-    localStorage.removeItem('finalyze_user_gemini_api_key');
+    localStorage.removeItem('finalyze_user_groq_api_key');
     localStorage.removeItem('finalyze_dev_bypass_active');
     localStorage.removeItem('finalyze_auth_user');
     localStorage.removeItem('finalyze_auth_timestamp');
