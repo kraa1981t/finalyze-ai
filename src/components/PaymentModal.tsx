@@ -37,7 +37,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount }: Pay
       return saved ? JSON.parse(saved) : DEFAULT_ADDRESSES;
     } catch { return DEFAULT_ADDRESSES; }
   });
-  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [prices, setPrices] = useState<Record<string, { usd: number }>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);

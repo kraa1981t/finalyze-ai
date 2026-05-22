@@ -11,6 +11,7 @@ import ConnectionStatus from './components/ConnectionStatus';
 import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
 import TopSignals from './components/TopSignals';
+import PortfolioPanel from './components/PortfolioPanel';
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType } from './types';
 import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS } from './constants';
 import { Language, translations } from './lib/i18n';
@@ -745,6 +746,8 @@ export default function App() {
             onSelect={handleSelectSignal} onClearAll={() => setTopSignals([])}
             lang={lang} 
           />
+
+          <PortfolioPanel signals={topSignals} lang={lang} />
 
           <div className="h-[10px] bg-emerald-500 rounded-full my-10 shadow-[0_0_20px_rgba(16,185,129,0.7)] border-t border-emerald-400/20" />
 
