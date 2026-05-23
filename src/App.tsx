@@ -35,11 +35,12 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings'>(() => (localStorage.getItem('activePage') as any) || 'main');
-
-  useEffect(() => {
-    localStorage.setItem('activePage', activePage);
-  }, [activePage]);
+  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' => {
+    const hash = window.location.hash.slice(1);
+    if (['settings', 'apiKey', 'plans', 'paymentSettings'].includes(hash)) return hash as any;
+    return 'main';
+  };
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings'>(getPageFromHash);
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
@@ -125,6 +126,20 @@ export default function App() {
     };
     window.addEventListener('custom-audio-updated', handleAudioChange);
     return () => window.removeEventListener('custom-audio-updated', handleAudioChange);
+  }, []);
+
+  // Sync URL hash with activePage so refreshes keep the same page
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if ((hash || 'main') !== activePage) {
+      window.location.hash = activePage === 'main' ? '' : activePage;
+    }
+  }, [activePage]);
+
+  useEffect(() => {
+    const onHashChange = () => setActivePage(getPageFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
   const [progress, setProgress] = useState<{ current: string, total: number, index: number } | null>(null);
