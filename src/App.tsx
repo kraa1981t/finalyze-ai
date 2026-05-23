@@ -730,32 +730,35 @@ export default function App() {
   }, [loading]);
 
   const handleLogin = async () => {
+    console.log("=== handleLogin called ===");
     setLoginError(null);
     setManualAuthUrl(null);
     setRedirecting(true);
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
+    console.log("State updated, creating provider...");
     try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      console.log("Calling signInWithRedirect...");
       await signInWithRedirect(auth, provider);
+      console.log("signInWithRedirect resolved (should not happen if redirect works)");
+      // If we get here, redirect didn't happen - show fallback after 3s
+      setTimeout(() => {
+        setRedirecting(prev => {
+          if (prev) {
+            const authDomain = 'https://gen-lang-client-0856831678.firebaseapp.com';
+            const redirectUri = window.location.origin;
+            const manualUrl = `${authDomain}/__/auth/handler?apiKey=AIzaSyBxl9iZpPaIxjfgnJSfKEpZpq6M9I733zg&providerId=google.com&authType=signInViaRedirect&redirect_uri=${encodeURIComponent(redirectUri)}`;
+            setManualAuthUrl(manualUrl);
+            return true;
+          }
+          return prev;
+        });
+      }, 3000);
     } catch (error: any) {
-      console.error("Redirect sign-in failed:", error);
-      setLoginError(error.code || error.message);
+      console.error("=== signInWithRedirect ERROR ===", error);
+      setLoginError(`Google sign-in error: ${error.code || error.message}`);
       setRedirecting(false);
     }
-    // After 3 seconds if still redirecting, show manual autocomplete link
-    setTimeout(() => {
-      setRedirecting(prev => {
-        if (prev) {
-          const authDomain = 'https://gen-lang-client-0856831678.firebaseapp.com';
-          const apiKey = 'AIzaSyBxl9iZpPaIxjfgnJSfKEpZpq6M9I733zg';
-          const redirectUri = window.location.origin;
-          const manualUrl = `${authDomain}/__/auth/handler?apiKey=${apiKey}&providerId=google.com&authType=signInViaRedirect&redirect_uri=${encodeURIComponent(redirectUri)}`;
-          setManualAuthUrl(manualUrl);
-          return true;
-        }
-        return prev;
-      });
-    }, 3000);
   };
 
   const handleClientAuth = async (email: string, password?: string) => {
