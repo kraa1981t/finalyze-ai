@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, Activity, ArrowLeft } from 'lucide-react';
+import { TrendingUp, Activity, ArrowLeft, Users } from 'lucide-react';
 import Header from './components/Header';
 import AnalysisForm from './components/AnalysisForm';
 import AnalysisResultView from './components/AnalysisResultView';
@@ -22,6 +22,7 @@ import { resolveConflicts } from './services/portfolioRiskService';
 import ApiKeyModal from './components/ApiKeyModal';
 import SubscriptionModal from './components/SubscriptionModal';
 import PaymentModal from './components/PaymentModal';
+import ClientMonitor from './components/ClientMonitor';
 
 
 export default function App() {
@@ -35,12 +36,12 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' => {
+  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor' => {
     const hash = window.location.hash.slice(1);
-    if (['settings', 'apiKey', 'plans', 'paymentSettings'].includes(hash)) return hash as any;
+    if (['settings', 'apiKey', 'plans', 'paymentSettings', 'clientMonitor'].includes(hash)) return hash as any;
     return 'main';
   };
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings'>(getPageFromHash);
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor'>(getPageFromHash);
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
@@ -80,6 +81,69 @@ export default function App() {
            email.includes('dev');
   };
   
+  interface ClientRecord {
+    id: string;
+    email: string;
+    uid: string;
+    status: 'active' | 'inactive' | 'banned';
+    plan: 'free' | 'paid';
+    planExpiry: string | null;
+    registeredAt: any;
+    rank: number;
+  }
+  const [clients, setClients] = useState<ClientRecord[]>([]);
+
+  const fetchClients = async () => {
+    try {
+      const q = query(collection(db, 'clients'), orderBy('rank', 'asc'));
+      const snap = await getDocs(q);
+      setClients(snap.docs.map(d => ({ id: d.id, ...d.data() } as ClientRecord)));
+    } catch (e) {
+      console.warn('Failed to fetch clients:', e);
+    }
+  };
+
+  const saveClientRecord = async (uid: string, email: string) => {
+    try {
+      const existing = await getDocs(query(collection(db, 'clients'), where('uid', '==', uid)));
+      if (!existing.empty) return;
+      const count = (await getDocs(collection(db, 'clients'))).size;
+      await addDoc(collection(db, 'clients'), {
+        email, uid, status: 'inactive', plan: 'free', planExpiry: null,
+        registeredAt: serverTimestamp(), rank: count + 1,
+      });
+    } catch (e) {
+      console.warn('Failed to save client record:', e);
+    }
+  };
+
+  const updateClientStatus = async (uid: string, status: 'active' | 'inactive' | 'banned') => {
+    try {
+      const snap = await getDocs(query(collection(db, 'clients'), where('uid', '==', uid)));
+      if (!snap.empty) {
+        await updateDoc(doc(db, 'clients', snap.docs[0].id), { status });
+        fetchClients();
+      }
+    } catch (e) { console.warn('Failed to update client status:', e); }
+  };
+
+  const banClient = async (clientId: string) => {
+    await updateDoc(doc(db, 'clients', clientId), { status: 'banned' });
+    fetchClients();
+  };
+
+  const deleteClientRecord = async (clientId: string) => {
+    await deleteDoc(doc(db, 'clients', clientId));
+    fetchClients();
+  };
+
+  const renewClientPlan = async (clientId: string, days: number) => {
+    const exp = new Date();
+    exp.setDate(exp.getDate() + days);
+    await updateDoc(doc(db, 'clients', clientId), { plan: 'paid', planExpiry: exp.toISOString() });
+    fetchClients();
+  };
+
   const [settings, setSettings] = useState<StrategySettings>(() => {
     const saved = localStorage.getItem('strategy_settings');
     if (saved) {
@@ -558,6 +622,18 @@ export default function App() {
         const email = u.email || '';
         const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
         const isDeveloper = email === activeDevEmail || email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
+
+        if (!isDeveloper && u.emailVerified) {
+          await saveClientRecord(u.uid, email);
+          await updateClientStatus(u.uid, 'active');
+        } else if (!isDeveloper && !u.emailVerified) {
+          await saveClientRecord(u.uid, email);
+        }
+
+        // Fetch clients list for developer session
+        if (isDeveloper || localStorage.getItem('finalyze_dev_bypass_active') === 'true') {
+          fetchClients();
+        }
         
         // Cache Firebase session in custom storage for 3-day / permanent benefits
         const mockCompactUser = {
@@ -638,6 +714,7 @@ export default function App() {
       if (err.code === 'auth/user-not-found') {
         try {
           const cred = await createUserWithEmailAndPassword(auth, email, password);
+          await saveClientRecord(cred.user.uid, email);
           await sendEmailVerification(cred.user);
           localStorage.removeItem('finalyze_auth_user');
           localStorage.removeItem('finalyze_auth_timestamp');
@@ -878,6 +955,17 @@ export default function App() {
                 asPage
                 manageMode
                 lang={lang}
+              />
+            )}
+
+            {activePage === 'clientMonitor' && (
+              <ClientMonitor
+                clients={clients}
+                lang={lang}
+                onRefresh={fetchClients}
+                onBan={banClient}
+                onDelete={deleteClientRecord}
+                onRenew={renewClientPlan}
               />
             )}
           </motion.div>
