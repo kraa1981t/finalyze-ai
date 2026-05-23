@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, reload } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -623,6 +623,32 @@ export default function App() {
     }
   };
 
+  const handleEmailSignUp = async (email: string, password: string) => {
+    setLoginError(null);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(cred.user);
+      setLoginError('verify_email');
+    } catch (err: any) {
+      setLoginError(err.code || err.message);
+    }
+  };
+
+  const handleEmailLogin = async (email: string, password: string) => {
+    setLoginError(null);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      if (!cred.user.emailVerified) {
+        await sendEmailVerification(cred.user);
+        setLoginError('verify_email');
+        await signOut(auth);
+      }
+    } catch (err: any) {
+      setLoginError(err.code || err.message);
+    }
+  };
+
+
   const handleBypassLogin = (email?: string) => {
     const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
     const finalEmail = email || activeDevEmail;
@@ -702,6 +728,8 @@ export default function App() {
           <LoginOverlay 
             onLogin={handleLogin} 
             onBypassLogin={handleBypassLogin}
+            onEmailSignUp={handleEmailSignUp}
+            onEmailLogin={handleEmailLogin}
             lang={lang} 
             loginError={loginError}
             onClearError={() => setLoginError(null)}

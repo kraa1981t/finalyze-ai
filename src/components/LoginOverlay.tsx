@@ -6,18 +6,23 @@ import { Language } from '../lib/i18n';
 interface LoginOverlayProps {
   onLogin: () => void;
   onBypassLogin?: (email: string) => void;
+  onEmailSignUp?: (email: string, password: string) => void;
+  onEmailLogin?: (email: string, password: string) => void;
   lang: Language;
   loginError: string | null;
   onClearError: () => void;
 }
 
-export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError, onClearError }: LoginOverlayProps) {
+export default function LoginOverlay({ onLogin, onBypassLogin, onEmailSignUp, onEmailLogin, lang, loginError, onClearError }: LoginOverlayProps) {
   const [showGuide, setShowGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedConfigPath, setCopiedConfigPath] = useState(false);
 
   const [customEmail, setCustomEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [inputError, setInputError] = useState('');
+  const [authMode, setAuthMode] = useState<'signup' | 'login'>('signup');
+  const [submitting, setSubmitting] = useState(false);
 
   const [logoClicks, setLogoClicks] = useState(0);
   const [devModeActive, setDevModeActive] = useState(() => {
@@ -222,52 +227,6 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
     setAuthSuccess('');
   };
 
-  const handleCustomSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setInputError('');
-    if (!customEmail) {
-      setInputError(lang === 'ar' ? 'الرجاء إدخال البريد الإلكتروني' : 'Please enter your email');
-      return;
-    }
-
-    const emailLower = customEmail.trim().toLowerCase();
-    
-    // Check if they typed dev, taybe, or the registered developer email
-    const isDevKeyword = emailLower === 'dev' || 
-                         emailLower === 'taybe' || 
-                         emailLower === 'taybekraa@gmail.com' || 
-                         emailLower === 'bachasalman69@gmail.com' ||
-                         emailLower === currentDevEmail.toLowerCase();
-
-    if (isDevKeyword) {
-      // Intercept and force the 2FA auth popup
-      setDevEmailInput(currentDevEmail);
-      setShowAuthModal(true);
-      return;
-    }
-
-    if (!customEmail.includes('@') || !customEmail.includes('.')) {
-      setInputError(lang === 'ar' ? 'الرجاء إدخال بريد إلكتروني صحيح' : 'Please enter a valid email');
-      return;
-    }
-
-    // Activate pending verification state
-    setPendingVerification(true);
-    setVerificationEmail(emailLower);
-
-    // Trigger premium notification after 2 seconds
-    setTimeout(() => {
-      setNotification({
-        type: 'email',
-        title: lang === 'ar' ? '📧 Finalyze AI Security' : '📧 Finalyze AI Security',
-        body: lang === 'ar'
-          ? `رسالة تنشيط الحساب لـ ${emailLower} جاهزة. انقر هنا لفتح البريد وتأكيد التحقق.`
-          : `Account activation email for ${emailLower} is ready. Click to open and verify.`,
-        isCustomerActivation: true
-      });
-    }, 2000);
-  };
-
   const handlePresetSelect = (email: string) => {
     if (onBypassLogin) {
       onBypassLogin(email);
@@ -368,38 +327,104 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
             {!pendingVerification ? (
               <div className="mb-6 p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 relative z-10 text-right space-y-4">
                 <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
-                  <span>{lang === 'ar' ? 'تسجيل دخول آمن بـ Google' : 'Secure Google Sign-In'}</span>
+                  <span>{lang === 'ar' ? 'إنشاء حساب أو تسجيل دخول' : 'Sign Up or Sign In'}</span>
                   <ShieldCheck size={18} />
                 </div>
-                
-                <p className="text-slate-300 text-xs leading-relaxed">
-                  {lang === 'ar'
-                    ? 'يرجى إدخال بريد Google (Gmail) الخاص بك لإتمام عملية التحقق والاشتراك وتفعيل حسابك فوراً:'
-                    : 'Please enter your Google (Gmail) address to complete verification, subscribe, and activate your account:'}
-                </p>
 
-                <form onSubmit={handleCustomSubmit} className="space-y-3">
-                  <div className="relative">
-                    <input
-                      type="email"
-                      value={customEmail}
-                      onChange={(e) => setCustomEmail(e.target.value)}
-                      placeholder="yourname@gmail.com"
-                      className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50 pr-10"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
-                      @
-                    </div>
-                  </div>
+                {/* Tabs */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setAuthMode('signup')}
+                    className={`flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                      authMode === 'signup'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-white/5 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {lang === 'ar' ? 'إنشاء حساب' : 'Sign Up'}
+                  </button>
+                  <button
+                    onClick={() => setAuthMode('login')}
+                    className={`flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                      authMode === 'login'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-white/5 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {lang === 'ar' ? 'تسجيل دخول' : 'Sign In'}
+                  </button>
+                </div>
+
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!customEmail || !password) return;
+                  setSubmitting(true);
+                  if (authMode === 'signup') {
+                    await onEmailSignUp?.(customEmail, password);
+                  } else {
+                    await onEmailLogin?.(customEmail, password);
+                  }
+                  setSubmitting(false);
+                }} className="space-y-3">
+                  <input
+                    type="email"
+                    value={customEmail}
+                    onChange={(e) => setCustomEmail(e.target.value)}
+                    placeholder={lang === 'ar' ? 'البريد الإلكتروني' : 'your@email.com'}
+                    className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50"
+                    required
+                  />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={lang === 'ar' ? 'كلمة المرور' : 'Password (min 6 chars)'}
+                    className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50"
+                    required
+                    minLength={6}
+                  />
                   {inputError && <p className="text-[10px] text-red-400 font-bold mt-1 text-right">{inputError}</p>}
-                  
+
+                  {loginError === 'verify_email' && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-center">
+                      <p className="text-xs text-amber-400 font-bold">
+                        {lang === 'ar'
+                          ? '📧 تم إنشاء الحساب! تحقق من بريدك الإلكتروني واضغط على رابط التفعيل المرسل إليك.'
+                          : '📧 Account created! Check your email and click the verification link sent to you.'}
+                      </p>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    className="w-full bg-primary hover:bg-emerald-500 text-brand-bg font-black py-4 rounded-2xl transition-all text-sm cursor-pointer shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/25 active:scale-98"
+                    disabled={submitting || !customEmail || !password}
+                    className="w-full bg-primary hover:bg-emerald-500 text-brand-bg font-black py-4 rounded-2xl transition-all text-sm cursor-pointer shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/25 active:scale-98 disabled:opacity-50"
                   >
-                    {lang === 'ar' ? 'تسجيل الدخول ومتابعة الاشتراك ←' : 'Sign In & Continue Subscription →'}
+                    {submitting
+                      ? (lang === 'ar' ? 'جاري...' : 'Please wait...')
+                      : (authMode === 'signup'
+                        ? (lang === 'ar' ? 'إنشاء حساب ←' : 'Sign Up →')
+                        : (lang === 'ar' ? 'تسجيل دخول ←' : 'Sign In →'))}
                   </button>
                 </form>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-white/10" />
+                  </div>
+                  <div className="relative flex justify-center text-xs text-slate-500">
+                    <span className="bg-emerald-500/5 px-2">{lang === 'ar' ? 'أو' : 'OR'}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={onLogin}
+                  className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-4 rounded-2xl transition-all text-sm shadow-lg active:scale-98"
+                >
+                  {lang === 'ar' ? 'تسجيل دخول بـ Google' : 'Sign In with Google'}
+                </button>
+
+                {inputError && <p className="text-[10px] text-red-400 font-bold mt-1 text-right">{inputError}</p>}
 
                 {/* Direct Bypass Options for Developer Mode (Only visible if devModeActive is true) */}
                 {devModeActive && (
