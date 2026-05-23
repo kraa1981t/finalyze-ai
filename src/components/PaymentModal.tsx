@@ -82,15 +82,22 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   }, [isOpen]);
 
   const saveAll = useCallback(() => {
-    const clean = displayList.filter(a => a.name && a.address);
-    setDisplayList(clean);
+    setDisplayList(prev => {
+      const clean = prev.filter(a => a.name && a.address);
+      saveAddressesToStorage(clean);
+      return clean;
+    });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
     if (!manageMode) setIsAdmin(false);
-  }, [displayList, manageMode]);
+  }, [manageMode]);
 
   const deleteItem = useCallback((id: string) => {
-    setDisplayList(prev => prev.filter(a => a.id !== id));
+    setDisplayList(prev => {
+      const updated = prev.filter(a => a.id !== id);
+      saveAddressesToStorage(updated);
+      return updated;
+    });
   }, []);
 
   const updateAddressField = useCallback((id: string, address: string) => {
@@ -100,7 +107,11 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const addNew = useCallback(() => {
     if (!newAddress.name || !newAddress.address) return;
     const id = 'custom_' + Date.now();
-    setDisplayList(prev => [...prev, { id, name: newAddress.name, address: newAddress.address }]);
+    setDisplayList(prev => {
+      const updated = [...prev, { id, name: newAddress.name, address: newAddress.address }];
+      saveAddressesToStorage(updated);
+      return updated;
+    });
     setNewAddress({ id: '', name: '', address: '' });
   }, [newAddress]);
 
