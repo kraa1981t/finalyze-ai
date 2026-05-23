@@ -27,12 +27,16 @@ const STORAGE_KEY = 'crypto_payment_addresses';
 function loadAddresses(): CryptoAddress[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : DEFAULT_ADDRESSES;
+    const result = saved ? JSON.parse(saved) : DEFAULT_ADDRESSES;
+    console.log('[PaymentModal] LOAD:', result.length, 'addresses from localStorage');
+    return result;
   } catch { return DEFAULT_ADDRESSES; }
 }
 
 function saveAddressesToStorage(data: CryptoAddress[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const verify = localStorage.getItem(STORAGE_KEY);
+  console.log('[PaymentModal] SAVE:', data.length, 'addresses, verify OK:', verify ? JSON.parse(verify).length === data.length : false);
 }
 
 interface CryptoAddress {
