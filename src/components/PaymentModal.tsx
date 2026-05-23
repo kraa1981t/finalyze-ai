@@ -61,6 +61,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    saveAddressesToStorage(displayList);
+  }, [displayList]);
+
+  useEffect(() => {
     if (!isOpen) return;
     fetch('/api/crypto-prices')
       .then(r => r.json())
@@ -77,24 +81,17 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     }
   }, [isOpen]);
 
-  const refresh = useCallback(() => {
-    setDisplayList(loadAddresses());
-  }, []);
-
   const saveAll = useCallback(() => {
     const clean = displayList.filter(a => a.name && a.address);
-    saveAddressesToStorage(clean);
-    refresh();
+    setDisplayList(clean);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
     if (!manageMode) setIsAdmin(false);
-  }, [displayList, refresh, manageMode]);
+  }, [displayList, manageMode]);
 
   const deleteItem = useCallback((id: string) => {
-    const updated = displayList.filter(a => a.id !== id);
-    setDisplayList(updated);
-    saveAddressesToStorage(updated);
-  }, [displayList]);
+    setDisplayList(prev => prev.filter(a => a.id !== id));
+  }, []);
 
   const updateAddressField = useCallback((id: string, address: string) => {
     setDisplayList(prev => prev.map(a => a.id === id ? { ...a, address } : a));
@@ -103,11 +100,9 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const addNew = useCallback(() => {
     if (!newAddress.name || !newAddress.address) return;
     const id = 'custom_' + Date.now();
-    const updated = [...displayList, { id, name: newAddress.name, address: newAddress.address }];
-    setDisplayList(updated);
-    saveAddressesToStorage(updated);
+    setDisplayList(prev => [...prev, { id, name: newAddress.name, address: newAddress.address }]);
     setNewAddress({ id: '', name: '', address: '' });
-  }, [newAddress, displayList]);
+  }, [newAddress]);
 
   const copyAddress = async (addr: string, id: string) => {
     try {
