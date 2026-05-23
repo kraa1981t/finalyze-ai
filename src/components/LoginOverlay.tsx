@@ -11,9 +11,10 @@ interface LoginOverlayProps {
   loginError: string | null;
   onClearError: () => void;
   redirecting?: boolean;
+  manualAuthUrl?: string | null;
 }
 
-export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lang, loginError, onClearError, redirecting }: LoginOverlayProps) {
+export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lang, loginError, onClearError, redirecting, manualAuthUrl }: LoginOverlayProps) {
   const [showGuide, setShowGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedConfigPath, setCopiedConfigPath] = useState(false);
@@ -447,6 +448,24 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
                         ? (lang === 'ar' ? 'جاري...' : 'Redirecting...')
                         : (lang === 'ar' ? 'تسجيل دخول بـ Google' : 'Sign In with Google')}
                     </button>
+                    {manualAuthUrl && (
+                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-center space-y-2">
+                        <p className="text-[11px] text-amber-400 font-bold">
+                          {lang === 'ar' ? '⚠️ لم يتم التوجيه تلقائياً. استخدم الرابط أدناه:' : '⚠️ Auto-redirect failed. Use the link below:'}
+                        </p>
+                        <a
+                          href={manualAuthUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block w-full bg-amber-500 hover:bg-amber-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all"
+                        >
+                          {lang === 'ar' ? '👆 اضغط هنا لتسجيل الدخول بـ Google' : '👆 Click here to Sign In with Google'}
+                        </a>
+                        <p className="text-[10px] text-slate-500">
+                          {lang === 'ar' ? 'بعد تسجيل الدخول، ارجع لهذه الصفحة' : 'After signing in, return to this page'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

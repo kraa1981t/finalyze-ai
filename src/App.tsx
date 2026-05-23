@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithCredential, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -30,6 +30,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
+  const [manualAuthUrl, setManualAuthUrl] = useState<string | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string; durationDays: number } | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_groq_api_key'));
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
@@ -545,29 +546,19 @@ export default function App() {
     settings.minStrongConfidence
   ]);
 
-  const OAUTH_CLIENT_ID = '413309732602-boqcqkkc7cba6f7f8pkdb3lc7qs309sl.apps.googleusercontent.com';
-
   useEffect(() => {
-    // Handle Google OAuth return via URL hash fragment (id_token)
-    const hash = window.location.hash;
-    if (hash && hash.includes('id_token=')) {
-      const params = new URLSearchParams(hash.slice(1));
-      const idToken = params.get('id_token');
-      if (idToken) {
-        (async () => {
-          try {
-            const credential = GoogleAuthProvider.credential(idToken);
-            await signInWithCredential(auth, credential);
-          } catch (e: any) {
-            console.error('Google OAuth callback error:', e);
-            setLoginError(e.code || e.message);
-          }
-        })();
-        // Clean the URL hash
-        window.history.replaceState({}, '', window.location.pathname);
-      }
-    }
-    setRedirecting(false);
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          setUser(result.user);
+        }
+      })
+      .catch((error: any) => {
+        console.error("Redirect login failure on mount:", error);
+      })
+      .finally(() => {
+        setRedirecting(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -740,12 +731,31 @@ export default function App() {
 
   const handleLogin = async () => {
     setLoginError(null);
+    setManualAuthUrl(null);
     setRedirecting(true);
-    // Generate random nonce for security
-    const nonce = Array.from({ length: 16 }, () => Math.random().toString(36)[2]).join('');
-    const redirectUri = window.location.origin;
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=id_token&client_id=${OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20email%20profile&nonce=${nonce}`;
-    window.location.href = googleAuthUrl;
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    try {
+      await signInWithRedirect(auth, provider);
+    } catch (error: any) {
+      console.error("Redirect sign-in failed:", error);
+      setLoginError(error.code || error.message);
+      setRedirecting(false);
+    }
+    // After 3 seconds if still redirecting, show manual autocomplete link
+    setTimeout(() => {
+      setRedirecting(prev => {
+        if (prev) {
+          const authDomain = 'https://gen-lang-client-0856831678.firebaseapp.com';
+          const apiKey = 'AIzaSyBxl9iZpPaIxjfgnJSfKEpZpq6M9I733zg';
+          const redirectUri = window.location.origin;
+          const manualUrl = `${authDomain}/__/auth/handler?apiKey=${apiKey}&providerId=google.com&authType=signInViaRedirect&redirect_uri=${encodeURIComponent(redirectUri)}`;
+          setManualAuthUrl(manualUrl);
+          return true;
+        }
+        return prev;
+      });
+    }, 3000);
   };
 
   const handleClientAuth = async (email: string, password?: string) => {
@@ -905,6 +915,7 @@ export default function App() {
             loginError={loginError}
             onClearError={() => setLoginError(null)}
             redirecting={redirecting}
+            manualAuthUrl={manualAuthUrl}
           />
         )}
       </AnimatePresence>
