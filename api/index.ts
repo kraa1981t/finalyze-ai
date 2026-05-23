@@ -1,5 +1,10 @@
 import express from "express";
 
+const FALLBACK_PRICES = {
+  bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 },
+  tron: { usd: 0.12 }, solana: { usd: 150 },
+};
+
 const app = express();
 app.use(express.json());
 
@@ -61,13 +66,17 @@ app.get("/api/context-econ-calendar", async (_req, res) => {
 // API Route: Crypto Prices (from Coingecko) for Payment Modal
 app.get("/api/crypto-prices", async (_req, res) => {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     const response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,litecoin,tron,solana&vs_currencies=usd", {
-      signal: AbortSignal.timeout(5000)
+      signal: controller.signal
     });
+    clearTimeout(timeout);
     const data = await response.json();
-    res.json(data);
+    if (data.bitcoin?.usd) return res.json(data);
+    res.json(FALLBACK_PRICES);
   } catch {
-    res.json({});
+    res.json(FALLBACK_PRICES);
   }
 });
 
