@@ -835,6 +835,23 @@ export default function App() {
 
         {/* FORM - hidden during analysis, hidden when results show (mounted to preserve state) */}
         <div style={{ display: isAnalyzing || analysisResults || activePage !== 'main' ? 'none' : 'block' }}>
+          {activeSubscription && (() => {
+            const daysLeft = Math.ceil((new Date(activeSubscription.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            return (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 mb-6 flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-bold text-emerald-400">{activeSubscription.label} Plan Active</span>
+                  <span className="text-xs text-slate-500 mr-3">{daysLeft} days remaining</span>
+                </div>
+                <button
+                  onClick={() => { localStorage.removeItem('active_subscription'); setActiveSubscription(null); }}
+                  className="text-[10px] text-red-400 hover:text-red-300 underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            );
+          })()}
           <TopSignals 
             signals={topSignals} onRemove={removeSignal} 
             onSelect={handleSelectSignal} onClearAll={() => setTopSignals([])}
