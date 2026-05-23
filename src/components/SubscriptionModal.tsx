@@ -28,9 +28,9 @@ export default function SubscriptionModal({ isOpen, onClose, onSelectPlan, asPag
 
   const savePrices = () => {
     const clean = {
-      weekly: Math.max(1, Number(editPrices.weekly) || DEFAULT_PRICES.weekly),
-      monthly: Math.max(1, Number(editPrices.monthly) || DEFAULT_PRICES.monthly),
-      yearly: Math.max(1, Number(editPrices.yearly) || DEFAULT_PRICES.yearly),
+      weekly: Math.max(0.01, Number(editPrices.weekly) || DEFAULT_PRICES.weekly),
+      monthly: Math.max(0.01, Number(editPrices.monthly) || DEFAULT_PRICES.monthly),
+      yearly: Math.max(0.01, Number(editPrices.yearly) || DEFAULT_PRICES.yearly),
     };
     setPrices(clean);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
@@ -107,13 +107,13 @@ export default function SubscriptionModal({ isOpen, onClose, onSelectPlan, asPag
                       value={editPrices[plan.key]}
                       onChange={(e) => setEditPrices({ ...editPrices, [plan.key]: e.target.value })}
                       className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-white outline-none focus:border-emerald-500"
-                      min="1"
+                      min="0.01" step="0.01"
                     />
                   </div>
                 </div>
               ) : (
                 <div className="mb-6">
-                  <span className="text-4xl font-black text-white">${plan.price}</span>
+                  <span className="text-4xl font-black text-white">${Number(plan.price).toFixed(2)}</span>
                   <span className="text-sm text-slate-400 ml-1">/ {plan.key === 'yearly' ? 'yr' : plan.key === 'monthly' ? 'mo' : 'wk'}</span>
                 </div>
               )}
@@ -125,7 +125,7 @@ export default function SubscriptionModal({ isOpen, onClose, onSelectPlan, asPag
                 disabled={isAdmin}
                 className={`mt-auto w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg bg-gradient-to-r ${plan.color} text-white hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {isAdmin ? 'Save to lock' : `Subscribe $${plan.price}`}
+                {isAdmin ? 'Save to lock' : `Subscribe $${Number(plan.price).toFixed(2)}`}
               </button>
             </div>
           );
