@@ -730,18 +730,13 @@ export default function App() {
   }, [loading]);
 
   const handleLogin = async () => {
-    console.log("=== handleLogin called ===");
     setLoginError(null);
     setManualAuthUrl(null);
     setRedirecting(true);
-    console.log("State updated, creating provider...");
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      console.log("Calling signInWithRedirect...");
       await signInWithRedirect(auth, provider);
-      console.log("signInWithRedirect resolved (should not happen if redirect works)");
-      // If we get here, redirect didn't happen - show fallback after 3s
       setTimeout(() => {
         setRedirecting(prev => {
           if (prev) {
@@ -756,7 +751,18 @@ export default function App() {
       }, 3000);
     } catch (error: any) {
       console.error("=== signInWithRedirect ERROR ===", error);
-      setLoginError(`Google sign-in error: ${error.code || error.message}`);
+      if (error.code === 'auth/unauthorized-domain') {
+        setLoginError(`⛔ هذا النطاق (${window.location.hostname}) غير مسموح به في Firebase.
+
+لحل المشكلة:
+1. افتح https://console.firebase.google.com
+2. اختر مشروع "gen-lang-client-0856831678"
+3. Authentication → Settings → Authorized domains
+4. أضف "${window.location.hostname}"
+5. انقر Save وحاول مرة أخرى`);
+      } else {
+        setLoginError(`Google sign-in error: ${error.code || error.message}`);
+      }
       setRedirecting(false);
     }
   };
