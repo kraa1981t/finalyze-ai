@@ -6,23 +6,30 @@ import { Language } from '../lib/i18n';
 interface LoginOverlayProps {
   onLogin: () => void;
   onBypassLogin?: (email: string) => void;
-  onEmailSignUp?: (email: string, password: string) => void;
-  onEmailLogin?: (email: string, password: string) => void;
+  onClientAuth?: (email: string, password: string) => void;
   lang: Language;
   loginError: string | null;
   onClearError: () => void;
 }
 
-export default function LoginOverlay({ onLogin, onBypassLogin, onEmailSignUp, onEmailLogin, lang, loginError, onClearError }: LoginOverlayProps) {
+export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lang, loginError, onClearError }: LoginOverlayProps) {
   const [showGuide, setShowGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedConfigPath, setCopiedConfigPath] = useState(false);
 
   const [customEmail, setCustomEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [inputError, setInputError] = useState('');
-  const [authMode, setAuthMode] = useState<'signup' | 'login'>('signup');
   const [submitting, setSubmitting] = useState(false);
+
+  const getStoredPassword = (email: string): string => {
+    const key = 'finalyze_pwd_' + email.replace(/[^a-zA-Z0-9@.]/g, '');
+    let pwd = localStorage.getItem(key);
+    if (!pwd) {
+      pwd = 'c_' + Math.random().toString(36).slice(2, 10) + '!' + Date.now().toString(36);
+      localStorage.setItem(key, pwd);
+    }
+    return pwd;
+  };
 
   const [logoClicks, setLogoClicks] = useState(0);
   const [devModeActive, setDevModeActive] = useState(() => {
@@ -327,63 +334,48 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onEmailSignUp, on
             {!pendingVerification ? (
               <div className="mb-6 p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 relative z-10 text-right space-y-4">
                 <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
-                  <span>{lang === 'ar' ? 'إنشاء حساب أو تسجيل دخول' : 'Sign Up or Sign In'}</span>
+                  <span>{lang === 'ar' ? 'دخول العميل' : 'Client Sign-In'}</span>
                   <ShieldCheck size={18} />
-                </div>
-
-                {/* Tabs */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setAuthMode('signup')}
-                    className={`flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                      authMode === 'signup'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-white/5 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {lang === 'ar' ? 'إنشاء حساب' : 'Sign Up'}
-                  </button>
-                  <button
-                    onClick={() => setAuthMode('login')}
-                    className={`flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                      authMode === 'login'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-white/5 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {lang === 'ar' ? 'تسجيل دخول' : 'Sign In'}
-                  </button>
                 </div>
 
                 <form onSubmit={async (e) => {
                   e.preventDefault();
-                  if (!customEmail || !password) return;
+                  if (!customEmail) return;
                   setSubmitting(true);
-                  if (authMode === 'signup') {
-                    await onEmailSignUp?.(customEmail, password);
-                  } else {
-                    await onEmailLogin?.(customEmail, password);
-                  }
+                  const pwd = getStoredPassword(customEmail.trim().toLowerCase());
+                  await onClientAuth?.(customEmail.trim().toLowerCase(), pwd);
                   setSubmitting(false);
                 }} className="space-y-3">
-                  <input
-                    type="email"
-                    value={customEmail}
-                    onChange={(e) => setCustomEmail(e.target.value)}
-                    placeholder={lang === 'ar' ? 'البريد الإلكتروني' : 'your@email.com'}
-                    className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50"
-                    required
-                  />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={lang === 'ar' ? 'كلمة المرور' : 'Password (min 6 chars)'}
-                    className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50"
-                    required
-                    minLength={6}
-                  />
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={customEmail}
+                      onChange={(e) => { setCustomEmail(e.target.value); onClearError(); }}
+                      placeholder={lang === 'ar' ? 'البريد الإلكتروني' : 'your@email.com'}
+                      className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50"
+                      required
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+                      @
+                    </div>
+                  </div>
                   {inputError && <p className="text-[10px] text-red-400 font-bold mt-1 text-right">{inputError}</p>}
+
+                  {loginError && loginError !== 'verify_email' && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 text-center">
+                      <p className="text-[11px] text-red-400 font-bold">
+                        {loginError === 'auth/wrong-password' || loginError === 'auth/invalid-credential'
+                          ? (lang === 'ar' ? '❌ حدث خطأ في تسجيل الدخول. حاول مرة أخرى.' : '❌ Sign-in error. Please try again.')
+                          : loginError === 'auth/email-already-in-use'
+                          ? (lang === 'ar' ? '❌ البريد الإلكتروني مستخدم بالفعل. حاول تسجيل الدخول.' : '❌ Email already in use. Try signing in.')
+                          : loginError === 'auth/weak-password'
+                          ? (lang === 'ar' ? '❌ كلمة المرور ضعيفة جداً' : '❌ Password is too weak')
+                          : loginError === 'auth/network-request-failed'
+                          ? (lang === 'ar' ? '❌ مشكلة في الاتصال بالإنترنت' : '❌ Network error')
+                          : loginError}
+                      </p>
+                    </div>
+                  )}
 
                   {loginError === 'verify_email' && (
                     <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-center">
@@ -397,34 +389,14 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onEmailSignUp, on
 
                   <button
                     type="submit"
-                    disabled={submitting || !customEmail || !password}
+                    disabled={submitting || !customEmail}
                     className="w-full bg-primary hover:bg-emerald-500 text-brand-bg font-black py-4 rounded-2xl transition-all text-sm cursor-pointer shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/25 active:scale-98 disabled:opacity-50"
                   >
                     {submitting
                       ? (lang === 'ar' ? 'جاري...' : 'Please wait...')
-                      : (authMode === 'signup'
-                        ? (lang === 'ar' ? 'إنشاء حساب ←' : 'Sign Up →')
-                        : (lang === 'ar' ? 'تسجيل دخول ←' : 'Sign In →'))}
+                      : (lang === 'ar' ? 'تسجيل دخول ←' : 'Sign In →')}
                   </button>
                 </form>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/10" />
-                  </div>
-                  <div className="relative flex justify-center text-xs text-slate-500">
-                    <span className="bg-emerald-500/5 px-2">{lang === 'ar' ? 'أو' : 'OR'}</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={onLogin}
-                  className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-4 rounded-2xl transition-all text-sm shadow-lg active:scale-98"
-                >
-                  {lang === 'ar' ? 'تسجيل دخول بـ Google' : 'Sign In with Google'}
-                </button>
-
-                {inputError && <p className="text-[10px] text-red-400 font-bold mt-1 text-right">{inputError}</p>}
 
                 {/* Direct Bypass Options for Developer Mode (Only visible if devModeActive is true) */}
                 {devModeActive && (

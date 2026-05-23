@@ -623,21 +623,7 @@ export default function App() {
     }
   };
 
-  const handleEmailSignUp = async (email: string, password: string) => {
-    setLoginError(null);
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await sendEmailVerification(cred.user);
-      localStorage.removeItem('finalyze_auth_user');
-      localStorage.removeItem('finalyze_auth_timestamp');
-      await signOut(auth);
-      setLoginError('verify_email');
-    } catch (err: any) {
-      setLoginError(err.code || err.message);
-    }
-  };
-
-  const handleEmailLogin = async (email: string, password: string) => {
+  const handleClientAuth = async (email: string, password: string) => {
     setLoginError(null);
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -649,9 +635,39 @@ export default function App() {
         setLoginError('verify_email');
       }
     } catch (err: any) {
+      if (err.code === 'auth/user-not-found') {
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          await sendEmailVerification(cred.user);
+          localStorage.removeItem('finalyze_auth_user');
+          localStorage.removeItem('finalyze_auth_timestamp');
+          await signOut(auth);
+          setLoginError('verify_email');
+        } catch (signupErr: any) {
+          setLoginError(signupErr.code || signupErr.message);
+        }
+      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setLoginError('auth/wrong-password');
+      } else {
+        setLoginError(err.code || err.message);
+      }
+    }
+  };
+
+  const handleEmailLogin = async (email: string, password: string) => {
+    setLoginError(null);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      if (!cred.user.emailVerified) {
+        await sendEmailVerification(cred.user);
+        setLoginError('verify_email');
+        await signOut(auth);
+      }
+    } catch (err: any) {
       setLoginError(err.code || err.message);
     }
   };
+
 
   const handleBypassLogin = (email?: string) => {
     const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
@@ -732,8 +748,7 @@ export default function App() {
           <LoginOverlay 
             onLogin={handleLogin} 
             onBypassLogin={handleBypassLogin}
-            onEmailSignUp={handleEmailSignUp}
-            onEmailLogin={handleEmailLogin}
+            onClientAuth={handleClientAuth}
             lang={lang} 
             loginError={loginError}
             onClearError={() => setLoginError(null)}
