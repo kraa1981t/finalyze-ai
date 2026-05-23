@@ -15,6 +15,13 @@ const COINGECKO_MAP: Record<string, string> = {
   btc: 'bitcoin', eth: 'ethereum', ltc: 'litecoin', trx: 'tron', sol: 'solana',
 };
 
+const POPULAR_COINS = [
+  'Bitcoin (BTC)', 'Ethereum (ETH)', 'Litecoin (LTC)', 'TRON (TRX)',
+  'Solana (SOL)', 'USDT (TRC20)', 'USDC (ERC20)', 'BNB (BSC)',
+  'Cardano (ADA)', 'XRP (Ripple)', 'Polkadot (DOT)', 'Dogecoin (DOGE)',
+  'Avalanche (AVAX)', 'Polygon (MATIC)', 'Chainlink (LINK)',
+];
+
 const STORAGE_KEY = 'crypto_payment_addresses';
 
 interface CryptoAddress {
@@ -43,6 +50,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [editAddresses, setEditAddresses] = useState<CryptoAddress[]>([]);
   const [isAdmin, setIsAdmin] = useState(manageMode || false);
   const [newAddress, setNewAddress] = useState<CryptoAddress>({ id: '', name: '', address: '' });
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [nextId, setNextId] = useState(100);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
@@ -235,13 +243,30 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               className="bg-emerald-500/5 border border-dashed border-emerald-500/30 rounded-2xl p-4 space-y-3"
             >
               <h5 className="text-xs font-black uppercase text-emerald-400 tracking-widest">Add New Address</h5>
-              <input
-                type="text"
-                placeholder="Coin name (e.g. Dogecoin DOGE)"
-                value={newAddress.name}
-                onChange={(e) => setNewAddress({ ...newAddress, name: e.target.value })}
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-emerald-500"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Coin name (e.g. Dogecoin DOGE)"
+                  value={newAddress.name}
+                  onChange={(e) => { setNewAddress({ ...newAddress, name: e.target.value }); setShowSuggestions(true); }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-emerald-500"
+                />
+                {showSuggestions && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-gray-900 border border-white/10 rounded-xl max-h-48 overflow-y-auto shadow-2xl">
+                    {POPULAR_COINS.filter(c => c.toLowerCase().includes(newAddress.name.toLowerCase())).map(coin => (
+                      <button
+                        key={coin}
+                        onMouseDown={() => { setNewAddress({ ...newAddress, name: coin }); setShowSuggestions(false); }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-emerald-500/20 hover:text-white transition-all font-medium"
+                      >
+                        {coin}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input
                 type="text"
                 placeholder="Wallet address"
