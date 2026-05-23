@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -706,52 +706,46 @@ export default function App() {
     }
   };
 
-  const handleClientAuth = async (email: string, password: string) => {
+  const handleClientAuth = async (email: string) => {
     setLoginError(null);
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      if (!cred.user.emailVerified) {
-        await sendEmailVerification(cred.user);
-        localStorage.removeItem('finalyze_auth_user');
-        localStorage.removeItem('finalyze_auth_timestamp');
-        await signOut(auth);
-        setLoginError('verify_email');
-      }
+      // Placeholder to prevent onAuthStateChanged from overriding
+      localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+
+      // Sign in anonymously (no Email/Password provider needed)
+      const cred = await signInAnonymously(auth);
+      const uid = cred.user.uid;
+
+      // Save client record to Firestore
+      await saveClientRecord(uid, email);
+      await updateClientStatus(uid, 'active');
+
+      // Create mock user (same pattern as handleBypassLogin)
+      const mockUser = {
+        uid,
+        email,
+        displayName: 'Client',
+        photoURL: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150',
+        emailVerified: true,
+      } as User;
+
+      setUser(mockUser);
+      localStorage.setItem('finalyze_auth_user', JSON.stringify(mockUser));
+      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+      localStorage.removeItem('finalyze_dev_bypass_active');
+      setHasApiKey(!!localStorage.getItem('finalyze_user_groq_api_key'));
+      setLoginError(null);
     } catch (err: any) {
-      if (err.code === 'auth/user-not-found') {
-        try {
-          const cred = await createUserWithEmailAndPassword(auth, email, password);
-          await saveClientRecord(cred.user.uid, email);
-          await sendEmailVerification(cred.user);
-          localStorage.removeItem('finalyze_auth_user');
-          localStorage.removeItem('finalyze_auth_timestamp');
-          await signOut(auth);
-          setLoginError('verify_email');
-        } catch (signupErr: any) {
-          setLoginError(signupErr.code || signupErr.message);
-        }
-      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setLoginError('auth/wrong-password');
+      localStorage.removeItem('finalyze_auth_user');
+      localStorage.removeItem('finalyze_auth_timestamp');
+      if (err.code === 'auth/operation-not-allowed') {
+        setLoginError('auth/operation-not-allowed');
       } else {
         setLoginError(err.code || err.message);
       }
     }
   };
-
-  const handleEmailLogin = async (email: string, password: string) => {
-    setLoginError(null);
-    try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      if (!cred.user.emailVerified) {
-        await sendEmailVerification(cred.user);
-        setLoginError('verify_email');
-        await signOut(auth);
-      }
-    } catch (err: any) {
-      setLoginError(err.code || err.message);
-    }
-  };
-
 
   const handleBypassLogin = (email?: string) => {
     const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';

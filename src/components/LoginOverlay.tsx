@@ -6,7 +6,7 @@ import { Language } from '../lib/i18n';
 interface LoginOverlayProps {
   onLogin: () => void;
   onBypassLogin?: (email: string) => void;
-  onClientAuth?: (email: string, password: string) => void;
+  onClientAuth?: (email: string) => void;
   lang: Language;
   loginError: string | null;
   onClearError: () => void;
@@ -20,16 +20,6 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
   const [customEmail, setCustomEmail] = useState('');
   const [inputError, setInputError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  const getStoredPassword = (email: string): string => {
-    const key = 'finalyze_pwd_' + email.replace(/[^a-zA-Z0-9@.]/g, '');
-    let pwd = localStorage.getItem(key);
-    if (!pwd) {
-      pwd = 'c_' + Math.random().toString(36).slice(2, 10) + '!' + Date.now().toString(36);
-      localStorage.setItem(key, pwd);
-    }
-    return pwd;
-  };
 
   const [logoClicks, setLogoClicks] = useState(0);
   const [devModeActive, setDevModeActive] = useState(() => {
@@ -342,8 +332,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
                   e.preventDefault();
                   if (!customEmail) return;
                   setSubmitting(true);
-                  const pwd = getStoredPassword(customEmail.trim().toLowerCase());
-                  await onClientAuth?.(customEmail.trim().toLowerCase(), pwd);
+                  await onClientAuth?.(customEmail.trim().toLowerCase());
                   setSubmitting(false);
                 }} className="space-y-3">
                   <div className="relative">
@@ -364,12 +353,10 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
                   {loginError && loginError !== 'verify_email' && (
                     <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 text-center">
                       <p className="text-[11px] text-red-400 font-bold">
-                        {loginError === 'auth/wrong-password' || loginError === 'auth/invalid-credential'
-                          ? (lang === 'ar' ? '❌ حدث خطأ في تسجيل الدخول. حاول مرة أخرى.' : '❌ Sign-in error. Please try again.')
-                          : loginError === 'auth/email-already-in-use'
-                          ? (lang === 'ar' ? '❌ البريد الإلكتروني مستخدم بالفعل. حاول تسجيل الدخول.' : '❌ Email already in use. Try signing in.')
-                          : loginError === 'auth/weak-password'
-                          ? (lang === 'ar' ? '❌ كلمة المرور ضعيفة جداً' : '❌ Password is too weak')
+                        {loginError === 'auth/operation-not-allowed'
+                          ? (lang === 'ar'
+                            ? '❌ خدمة تسجيل الدخول غير مفعلة. تواصل مع المطور لتفعيل Anonymous Auth في Firebase.'
+                            : '❌ Sign-in service not enabled. Contact the developer to enable Anonymous Auth in Firebase.')
                           : loginError === 'auth/network-request-failed'
                           ? (lang === 'ar' ? '❌ مشكلة في الاتصال بالإنترنت' : '❌ Network error')
                           : loginError}
