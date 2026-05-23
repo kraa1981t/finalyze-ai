@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, reload } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -628,6 +628,9 @@ export default function App() {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await sendEmailVerification(cred.user);
+      localStorage.removeItem('finalyze_auth_user');
+      localStorage.removeItem('finalyze_auth_timestamp');
+      await signOut(auth);
       setLoginError('verify_email');
     } catch (err: any) {
       setLoginError(err.code || err.message);
@@ -640,14 +643,15 @@ export default function App() {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       if (!cred.user.emailVerified) {
         await sendEmailVerification(cred.user);
-        setLoginError('verify_email');
+        localStorage.removeItem('finalyze_auth_user');
+        localStorage.removeItem('finalyze_auth_timestamp');
         await signOut(auth);
+        setLoginError('verify_email');
       }
     } catch (err: any) {
       setLoginError(err.code || err.message);
     }
   };
-
 
   const handleBypassLogin = (email?: string) => {
     const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
