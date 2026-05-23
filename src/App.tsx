@@ -680,6 +680,13 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Fetch clients on mount if developer bypass is active
+  useEffect(() => {
+    if (!loading && isDeveloperSession()) {
+      fetchClients();
+    }
+  }, [loading]);
+
   const handleLogin = async () => {
     setLoginError(null);
     const provider = new GoogleAuthProvider();
