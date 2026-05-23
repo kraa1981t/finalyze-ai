@@ -41,6 +41,11 @@ interface PaymentModalProps {
 }
 
 const TIMER_STORAGE_KEY = 'payment_timer_minutes';
+const NOTIFICATION_EMAIL_KEY = 'payment_notification_email';
+
+const BLOCKCYPHER_CHAINS: Record<string, string> = {
+  btc: 'btc/main', eth: 'eth/main', ltc: 'ltc/main',
+};
 
 export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm }: PaymentModalProps) {
   const [addresses, setAddresses] = useState<CryptoAddress[]>(() => {
@@ -66,6 +71,11 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const [editTimer, setEditTimer] = useState(timerMinutes);
+  const [notificationEmail, setNotificationEmail] = useState(() => localStorage.getItem(NOTIFICATION_EMAIL_KEY) || 'taybemohamed10@gmail.com');
+  const [editEmail, setEditEmail] = useState(notificationEmail);
+  const [pollingActive, setPollingActive] = useState(false);
+  const [paymentDetected, setPaymentDetected] = useState(false);
+  const [pollingStatus, setPollingStatus] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -96,6 +106,60 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     }, 1000);
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
+
+  // Poll blockchain for payment detection
+  useEffect(() => {
+    if (!selectedCoinId || paymentConfirmed || paymentDetected || !isOpen || manageMode) return;
+    const item = addresses.find(a => a.id === selectedCoinId);
+    if (!item) return;
+
+    let initialBalance: number | null = null;
+    setPollingActive(true);
+    setPollingStatus('جاري التحقق من الدفع...');
+
+    const checkTx = async () => {
+      try {
+        const apiUrl = BLOCKCYPHER_CHAINS[item.id];
+        if (!apiUrl) {
+          setPollingStatus('الفحص التلقائي غير متاح لهذه العملة');
+          return;
+        }
+        const res = await fetch(`https://api.blockcypher.com/v1/${apiUrl}/addrs/${item.address}/balance`);
+        const data = await res.json();
+        if (data.error) { setPollingStatus(''); return; }
+        const balance = data.final_balance; // in smallest unit
+        if (initialBalance === null) {
+          initialBalance = balance;
+          setPollingStatus('في انتظار وصول الدفع...');
+          return;
+        }
+        // Check if new balance >= expected
+        const coin = COINGECKO_MAP[item.id];
+        const usdPrice = coin ? prices[coin]?.usd : undefined;
+        if (usdPrice) {
+          let divisor = 1e8;
+          if (item.id === 'eth') divisor = 1e18;
+          const balanceDiff = (balance - initialBalance) / divisor;
+          const expectedCrypto = amount / usdPrice;
+          if (balanceDiff >= expectedCrypto * 0.99) {
+            setPaymentDetected(true);
+            setPaymentConfirmed(true);
+            setPollingStatus('✅ تم اكتشاف الدفع!');
+            setPollingActive(false);
+            return;
+          }
+        }
+        // Also check unconfirmed
+        if (data.unconfirmed_balance > 0) {
+          setPollingStatus('⚠️ معاملة معلقة...');
+        }
+      } catch { setPollingStatus(''); }
+    };
+
+    const interval = setInterval(checkTx, 15000);
+    checkTx(); // initial check
+    return () => { clearInterval(interval); setPollingActive(false); };
+  }, [selectedCoinId, paymentConfirmed, paymentDetected, isOpen, manageMode]);
 
   const startTimer = () => {
     setTimerSeconds(timerMinutes * 60);
@@ -246,9 +310,9 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                           className="p-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
                         >
                           {copiedAmountId === 'amt_' + item.id ? <Check size={10} /> : <Copy size={10} />}
-                        </button>
-                      </div>
-                    )}
+                          </button>
+                    </div>
+                  )}
                   </div>
                 </div>
               )}
@@ -297,20 +361,36 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Time Remaining</p>
               </div>
 
+              {pollingStatus && !paymentDetected && (
+                <p className="text-[10px] text-amber-400 text-center animate-pulse">{pollingStatus}</p>
+              )}
+
               <button
-                onClick={() => { if (paymentConfirmed) { onConfirm?.(); } else { setPaymentConfirmed(true); } }}
+                onClick={() => { if (paymentConfirmed) onConfirm?.(); }}
+                disabled={!paymentConfirmed}
                 className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
                   paymentConfirmed
-                    ? 'bg-emerald-500 text-white hover:bg-emerald-400'
-                    : 'bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30'
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer'
+                    : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
                 }`}
               >
-                {paymentConfirmed ? '🟢 Activate Plan' : '🔴 Confirm Payment'}
+                {paymentConfirmed ? '🟢 Activate Plan' : '🔴 في انتظار الدفع...'}
               </button>
-              {paymentConfirmed && (
+              {paymentDetected && (
                 <p className="text-[10px] text-emerald-400 text-center">
-                  تم تأكيد الدفع. اضغط "Activate Plan" لتفعيل خطتك.
+                  ✅ تم اكتشاف وصول المبلغ! اضغط "Activate Plan" لتفعيل خطتك.
                 </p>
+              )}
+              {timerSeconds <= 0 && !paymentDetected && (
+                <div className="text-center">
+                  <p className="text-[10px] text-red-400 mb-2">انتهت المهلة. يمكنك إعادة المحاولة.</p>
+                  <button
+                    onClick={() => { setSelectedCoinId(null); setTimerRunning(false); }}
+                    className="text-xs text-slate-400 hover:text-white underline"
+                  >
+                    اختر عملة أخرى
+                  </button>
+                </div>
               )}
             </motion.div>
           );
@@ -386,7 +466,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         )}
       </AnimatePresence>
 
-      {manageMode && (
+      {manageMode && (<>
         <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-4">
           <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">Timer Duration</h5>
           <div className="flex items-center gap-3">
@@ -406,7 +486,26 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             </button>
           </div>
         </div>
-      )}
+
+        <div className="mt-4 bg-white/5 border border-white/10 rounded-2xl p-4">
+          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">إشعارات الدفع</h5>
+          <p className="text-[10px] text-slate-500 mb-3">البريد الإلكتروني المرتبط بالمحفظة لاستقبال إشعارات وصول الدفع</p>
+          <div className="flex items-center gap-3">
+            <input
+              type="email"
+              value={editEmail}
+              onChange={(e) => setEditEmail(e.target.value)}
+              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+            />
+            <button
+              onClick={() => { setNotificationEmail(editEmail); localStorage.setItem(NOTIFICATION_EMAIL_KEY, editEmail); }}
+              className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </>)}
 
       {!manageMode && (
         <p className="text-center text-[10px] text-slate-500 mt-4">
