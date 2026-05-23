@@ -1,8 +1,10 @@
 import React from 'react';
 import { Shield, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { Language } from '../lib/i18n';
 
-export default function ConnectionStatus() {
+export default function ConnectionStatus({ lang }: { lang: Language }) {
+  const isAr = lang === 'ar';
   const connections = [
     { name: 'MetaTrader 5', status: 'connected', type: 'Trading' },
     { name: 'TradingView', status: 'connected', type: 'Charts' },
@@ -11,10 +13,10 @@ export default function ConnectionStatus() {
   ];
 
   return (
-    <div className="mt-8 p-6 bg-white border border-slate-100 rounded-3xl shadow-sm" dir="rtl">
+    <div className="mt-8 p-6 bg-white border border-slate-100 rounded-3xl shadow-sm" dir={isAr ? 'rtl' : 'ltr'}>
       <div className="flex items-center gap-2 mb-4">
         <Shield className="text-primary" size={20} />
-        <h4 className="font-bold text-slate-900 text-sm">حالة الربط والبيانات الحية</h4>
+        <h4 className="font-bold text-slate-900 text-sm">{isAr ? 'حالة الربط والبيانات الحية' : 'Live Connection & Data Status'}</h4>
       </div>
       
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -32,7 +34,7 @@ export default function ConnectionStatus() {
         ))}
       </div>
       <p className="mt-4 text-[10px] text-slate-400 text-center italic">
-        تم تفعيل الربط السحابي باستخدام مفاتيح API الخاصة بك. جميع البيانات مشفرة وآمنة.
+        {isAr ? 'تم تفعيل الربط السحابي باستخدام مفاتيح API الخاصة بك. جميع البيانات مشفرة وآمنة.' : 'Cloud connection activated using your API keys. All data is encrypted and secure.'}
       </p>
     </div>
   );

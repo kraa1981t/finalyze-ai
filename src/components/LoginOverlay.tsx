@@ -766,7 +766,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
               ) : (
                 <div className="space-y-6">
                   <div className="bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/10 text-right space-y-2">
-                    <span className="text-xs text-emerald-400 font-bold block text-right">🚨 تم إرسال الرموز بنجاح:</span>
+                    <span className="text-xs text-emerald-400 font-bold block text-right">{lang === 'ar' ? '🚨 تم إرسال الرموز بنجاح:' : '🚨 Codes Sent Successfully:'}</span>
                     <p className="text-[11px] text-slate-400 leading-relaxed text-right">
                       {lang === 'ar'
                         ? 'تم إرسال رمزي تحقق (OTP) إلى بريدك وإلى هاتفك في رسالتين منفصلتين. يرجى كتابتهما في الحقول أدناه لتفعيل وضع المطور والدخول مباشر بكامل الصلاحيات:'
@@ -919,12 +919,12 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span>{new Date().toLocaleTimeString()}</span>
                     <div>
-                      <span className="font-bold text-slate-800">من: </span>
+                      <span className="font-bold text-slate-800">{lang === 'ar' ? 'من: ' : 'From: '}</span>
                       <span>Finalyze AI Security &lt;security@finalyze.ai&gt;</span>
                     </div>
                   </div>
                   <div className="text-xs text-slate-500 text-right">
-                    <span className="font-bold text-slate-800">إلى: </span>
+                    <span className="font-bold text-slate-800">{lang === 'ar' ? 'إلى: ' : 'To: '}</span>
                     <span className="font-mono">{verificationEmail}</span>
                   </div>
                   <div className="text-sm font-bold text-slate-800 pt-1">

@@ -771,6 +771,7 @@ export default function App() {
                 onSettingsChange={(s) => { setSettings(s); setActivePage('main'); }}
                 user={user}
                 asPage
+                lang={lang}
               />
             )}
 
@@ -802,6 +803,7 @@ export default function App() {
                 planLabel={paymentPlan?.label || ''}
                 amount={paymentPlan?.amount || 0}
                 asPage
+                lang={lang}
                 onConfirm={() => {
                   const plan = paymentPlan!;
                   const expiryDate = new Date();
@@ -828,6 +830,7 @@ export default function App() {
                 amount={0}
                 asPage
                 manageMode
+                lang={lang}
               />
             )}
           </motion.div>
@@ -885,7 +888,7 @@ export default function App() {
              }} 
              onError={() => { setIsAnalyzing(false); setProgress(null); }}
           />
-          <ConnectionStatus />
+          <ConnectionStatus lang={lang} />
         </div>
 
         {/* Loading view - separate, no overlap with form */}

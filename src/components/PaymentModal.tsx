@@ -38,6 +38,7 @@ interface PaymentModalProps {
   asPage?: boolean;
   manageMode?: boolean;
   onConfirm?: () => void;
+  lang?: 'en' | 'ar';
 }
 
 const TIMER_STORAGE_KEY = 'payment_timer_minutes';
@@ -47,7 +48,8 @@ const BLOCKCYPHER_CHAINS: Record<string, string> = {
   btc: 'btc/main', eth: 'eth/main', ltc: 'ltc/main',
 };
 
-export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang }: PaymentModalProps) {
+  const isAr = lang === 'ar';
   const [addresses, setAddresses] = useState<CryptoAddress[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -81,8 +83,11 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     if (!isOpen) return;
     fetch('/api/crypto-prices')
       .then(r => r.json())
-      .then(data => setPrices(data || {}))
-      .catch(() => setPrices({}));
+      .then(data => {
+        if (data?.bitcoin?.usd) setPrices(data);
+        else setPrices({ bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 }, tron: { usd: 0.12 }, solana: { usd: 150 } });
+      })
+      .catch(() => setPrices({ bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 }, tron: { usd: 0.12 }, solana: { usd: 150 } }));
   }, [isOpen]);
 
   useEffect(() => {
@@ -115,13 +120,13 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
     let initialBalance: number | null = null;
     setPollingActive(true);
-    setPollingStatus('جاري التحقق من الدفع...');
+    setPollingStatus(isAr ? 'جاري التحقق من الدفع...' : 'Checking for payment...');
 
     const checkTx = async () => {
       try {
         const apiUrl = BLOCKCYPHER_CHAINS[item.id];
         if (!apiUrl) {
-          setPollingStatus('الفحص التلقائي غير متاح لهذه العملة');
+          setPollingStatus(isAr ? 'الفحص التلقائي غير متاح لهذه العملة' : 'Auto-check not available for this coin');
           return;
         }
         const res = await fetch(`https://api.blockcypher.com/v1/${apiUrl}/addrs/${item.address}/balance`);
@@ -130,7 +135,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         const balance = data.final_balance; // in smallest unit
         if (initialBalance === null) {
           initialBalance = balance;
-          setPollingStatus('في انتظار وصول الدفع...');
+          setPollingStatus(isAr ? 'في انتظار وصول الدفع...' : 'Awaiting payment...');
           return;
         }
         // Check if new balance >= expected
@@ -144,14 +149,14 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           if (balanceDiff >= expectedCrypto * 0.99) {
             setPaymentDetected(true);
             setPaymentConfirmed(true);
-            setPollingStatus('✅ تم اكتشاف الدفع!');
+            setPollingStatus(isAr ? '✅ تم اكتشاف الدفع!' : '✅ Payment detected!');
             setPollingActive(false);
             return;
           }
         }
         // Also check unconfirmed
         if (data.unconfirmed_balance > 0) {
-          setPollingStatus('⚠️ معاملة معلقة...');
+          setPollingStatus(isAr ? '⚠️ معاملة معلقة...' : '⚠️ Pending transaction...');
         }
       } catch { setPollingStatus(''); }
     };
@@ -215,7 +220,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h3 className="text-xl font-bold text-white">{manageMode ? 'إدارة عناوين الدفع' : 'Complete Payment'}</h3>
+            <h3 className="text-xl font-bold text-white">{isAr ? (manageMode ? 'إدارة عناوين الدفع' : 'إتمام الدفع') : (manageMode ? 'Payment Settings' : 'Complete Payment')}</h3>
             {!manageMode && <p className="text-sm text-slate-400">{planLabel} Plan - ${amount} USD</p>}
           </div>
         </div>
@@ -224,7 +229,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       {!manageMode && !selectedCoinId && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6">
           <p className="text-sm text-amber-400 font-bold text-center">
-            اختر عملة وانسخ العنوان للدفع. سيظهر العداد والمبلغ بعد النسخ.
+            {isAr ? 'اختر عملة وانسخ العنوان للدفع. سيظهر العداد والمبلغ بعد النسخ.' : 'Choose a coin and copy the address to pay. The timer and amount will appear after copying.'}
           </p>
         </div>
       )}
@@ -232,7 +237,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       {manageMode && (
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 mb-6">
           <p className="text-sm text-emerald-400 font-bold text-center">
-            أنت في وضع الإدارة. يمكنك إضافة وتعديل وحذف عناوين الدفع. التغييرات تحفظ تلقائياً في المتصفح.
+            {isAr ? 'أنت في وضع الإدارة. يمكنك إضافة وتعديل وحذف عناوين الدفع. التغييرات تحفظ تلقائياً في المتصفح.' : 'You are in admin mode. You can add, edit, and delete payment addresses. Changes are saved automatically.'}
           </p>
         </div>
       )}
@@ -374,21 +379,21 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                     : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
                 }`}
               >
-                {paymentConfirmed ? '🟢 Activate Plan' : '🔴 في انتظار الدفع...'}
+                {paymentConfirmed ? '🟢 Activate Plan' : (isAr ? '🔴 في انتظار الدفع...' : '🔴 Awaiting payment...')}
               </button>
               {paymentDetected && (
                 <p className="text-[10px] text-emerald-400 text-center">
-                  ✅ تم اكتشاف وصول المبلغ! اضغط "Activate Plan" لتفعيل خطتك.
+                  {isAr ? '✅ تم اكتشاف وصول المبلغ! اضغط "Activate Plan" لتفعيل خطتك.' : '✅ Payment received! Press "Activate Plan" to activate your plan.'}
                 </p>
               )}
               {timerSeconds <= 0 && !paymentDetected && (
                 <div className="text-center">
-                  <p className="text-[10px] text-red-400 mb-2">انتهت المهلة. يمكنك إعادة المحاولة.</p>
+                  <p className="text-[10px] text-red-400 mb-2">{isAr ? 'انتهت المهلة. يمكنك إعادة المحاولة.' : 'Time expired. You can try again.'}</p>
                   <button
                     onClick={() => { setSelectedCoinId(null); setTimerRunning(false); }}
                     className="text-xs text-slate-400 hover:text-white underline"
                   >
-                    اختر عملة أخرى
+                    {isAr ? 'اختر عملة أخرى' : 'Choose another coin'}
                   </button>
                 </div>
               )}
@@ -488,8 +493,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         </div>
 
         <div className="mt-4 bg-white/5 border border-white/10 rounded-2xl p-4">
-          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">إشعارات الدفع</h5>
-          <p className="text-[10px] text-slate-500 mb-3">البريد الإلكتروني المرتبط بالمحفظة لاستقبال إشعارات وصول الدفع</p>
+          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">{isAr ? 'إشعارات الدفع' : 'Payment Notifications'}</h5>
+          <p className="text-[10px] text-slate-500 mb-3">{isAr ? 'البريد الإلكتروني المرتبط بالمحفظة لاستقبال إشعارات وصول الدفع' : 'Email linked to your wallet for receiving payment arrival notifications'}</p>
           <div className="flex items-center gap-3">
             <input
               type="email"
@@ -509,7 +514,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
       {!manageMode && (
         <p className="text-center text-[10px] text-slate-500 mt-4">
-          بعد النسخ، أرسل المبلغ إلى العنوان. الوقت المتبقي: {Math.floor(timerSeconds / 60)} دقيقة
+          {isAr ? `بعد النسخ، أرسل المبلغ إلى العنوان. الوقت المتبقي: ${Math.floor(timerSeconds / 60)} دقيقة` : `After copying, send the amount to the address. Time remaining: ${Math.floor(timerSeconds / 60)} min`}
         </p>
       )}
     </>

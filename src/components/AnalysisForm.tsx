@@ -190,7 +190,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
 
         } catch (symbolError: any) {
           console.error(`[Analysis Error] ${currentSymbol}:`, symbolError);
-          const msg = symbolError.message || "فشل التحليل بسبب خطأ غير معروف";
+          const msg = symbolError.message || (lang === 'ar' ? "فشل التحليل بسبب خطأ غير معروف" : "Analysis failed due to unknown error");
           setFormError(`${currentSymbol}: ${msg}`);
           // REMOVED: alert() popup as it is annoying for the user.
         }
