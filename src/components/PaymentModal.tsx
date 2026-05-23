@@ -15,6 +15,14 @@ const COINGECKO_MAP: Record<string, string> = {
   btc: 'bitcoin', eth: 'ethereum', ltc: 'litecoin', trx: 'tron', sol: 'solana',
 };
 
+const PRICE_ALIASES: Record<string, string> = {
+  bitcoin: 'bitcoin', btc: 'bitcoin',
+  ethereum: 'ethereum', eth: 'ethereum',
+  litecoin: 'litecoin', ltc: 'litecoin',
+  tron: 'tron', trx: 'tron',
+  solana: 'solana', sol: 'solana',
+};
+
 const POPULAR_COINS = [
   'Bitcoin (BTC)', 'Ethereum (ETH)', 'Litecoin (LTC)', 'TRON (TRX)',
   'Solana (SOL)', 'USDT (TRC20)', 'USDC (ERC20)', 'BNB (BSC)',
@@ -203,8 +211,17 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setNewAddress({ name: '', address: '' });
   };
 
-  const calcCryptoAmount = (coinId: string): string => {
-    const coin = COINGECKO_MAP[coinId];
+  const calcCryptoAmount = (coinId: string, coinName?: string): string => {
+    // Try direct coin ID lookup first
+    let coin = COINGECKO_MAP[coinId];
+    // If not found, try extracting ticker from name (e.g., "Bitcoin (BTC)" → "btc")
+    if (!coin && coinName) {
+      const match = coinName.match(/\((\w+)\)/);
+      if (match) {
+        const ticker = match[1].toLowerCase();
+        coin = COINGECKO_MAP[ticker] || PRICE_ALIASES[ticker];
+      }
+    }
     const usdPrice = coin ? prices[coin]?.usd : undefined;
     if (!usdPrice || usdPrice <= 0) return '...';
     return (amount / usdPrice).toFixed(coinId === 'trx' ? 2 : coinId === 'sol' ? 4 : 8);
@@ -307,11 +324,11 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 <div className="bg-black/40 rounded-xl px-4 py-3">
                   <div className="flex items-center justify-between">
                     <code className="text-xs font-mono text-slate-300 break-all select-all">{item.address}</code>
-                    {calcCryptoAmount(item.id) !== '...' && (
+                    {calcCryptoAmount(item.id, item.name) !== '...' && (
                       <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                        <span className="text-[10px] font-bold text-emerald-400">≈ {calcCryptoAmount(item.id)} {item.name.split(' ').pop()?.replace(/[()]/g, '')}</span>
+                        <span className="text-[10px] font-bold text-emerald-400">≈ {calcCryptoAmount(item.id, item.name)} {item.name.split(' ').pop()?.replace(/[()]/g, '')}</span>
                         <button
-                          onClick={() => copyAmount(`${calcCryptoAmount(item.id)} ${item.name.split(' ').pop()?.replace(/[()]/g, '')}`, 'amt_' + item.id)}
+                          onClick={() => copyAmount(`${calcCryptoAmount(item.id, item.name)} ${item.name.split(' ').pop()?.replace(/[()]/g, '')}`, 'amt_' + item.id)}
                           className="p-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
                         >
                           {copiedAmountId === 'amt_' + item.id ? <Check size={10} /> : <Copy size={10} />}
@@ -331,7 +348,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           if (!item) return null;
           const coin = COINGECKO_MAP[item.id];
           const ticker = item.name.split(' ').pop()?.replace(/[()]/g, '') || '';
-          const cryptoAmount = calcCryptoAmount(item.id);
+          const cryptoAmount = calcCryptoAmount(item.id, item.name);
           const formatTime = (secs: number) => {
             const m = Math.floor(secs / 60);
             const s = secs % 60;
