@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -79,7 +79,7 @@ export default function App() {
            email.includes('dev');
   };
 
-  const isSigningInRef = useRef(false);
+
   
   interface ClientRecord {
     id: string;
@@ -546,6 +546,18 @@ export default function App() {
   ]);
 
   useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          setUser(result.user);
+        }
+      })
+      .catch((error: any) => {
+        console.error("Redirect login failure on mount:", error);
+      });
+  }, []);
+
+  useEffect(() => {
     // 1. Check if we have a persistent custom session
     const savedUserJson = localStorage.getItem('finalyze_auth_user');
     const savedTimestampStr = localStorage.getItem('finalyze_auth_timestamp');
@@ -601,10 +613,6 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       // Don't let state changes override custom persistent session if it is set
       if (localStorage.getItem('finalyze_auth_user')) {
-        return;
-      }
-      // Block state updates during signInWithPopup to prevent re-renders from killing the popup
-      if (isSigningInRef.current) {
         return;
       }
       
@@ -721,20 +729,11 @@ export default function App() {
     setLoginError(null);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    isSigningInRef.current = true;
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
     } catch (error: any) {
-      if (error.code === 'auth/popup-closed-by-user') {
-        console.log('User closed the popup manually');
-      } else if (error.code === 'auth/popup-blocked') {
-        setLoginError('Popup blocked. Please allow popups for this site, then try again.');
-      } else {
-        console.error("Sign-in failed:", error);
-        setLoginError(error.code || error.message);
-      }
-    } finally {
-      isSigningInRef.current = false;
+      console.error("Redirect sign-in failed:", error);
+      setLoginError(error.code || error.message);
     }
   };
 
