@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalLink } from 'lucide-react';
 
@@ -24,6 +24,17 @@ const POPULAR_COINS = [
 
 const STORAGE_KEY = 'crypto_payment_addresses';
 
+function loadAddresses(): CryptoAddress[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : DEFAULT_ADDRESSES;
+  } catch { return DEFAULT_ADDRESSES; }
+}
+
+function saveAddressesToStorage(data: CryptoAddress[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
 interface CryptoAddress {
   id: string;
   name: string;
@@ -40,18 +51,11 @@ interface PaymentModalProps {
 }
 
 export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode }: PaymentModalProps) {
-  const [addresses, setAddresses] = useState<CryptoAddress[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : DEFAULT_ADDRESSES;
-    } catch { return DEFAULT_ADDRESSES; }
-  });
   const [prices, setPrices] = useState<Record<string, { usd: number }>>({});
-  const [editAddresses, setEditAddresses] = useState<CryptoAddress[]>([]);
+  const [displayList, setDisplayList] = useState<CryptoAddress[]>(() => loadAddresses());
   const [isAdmin, setIsAdmin] = useState(manageMode || false);
   const [newAddress, setNewAddress] = useState<CryptoAddress>({ id: '', name: '', address: '' });
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [nextId, setNextId] = useState(100);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -66,12 +70,44 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
   useEffect(() => {
     if (isOpen) {
-      setEditAddresses(JSON.parse(JSON.stringify(addresses)));
+      setDisplayList(loadAddresses());
       setCopiedId(null);
-      setNewAddress({ name: '', address: '' });
+      setNewAddress({ id: '', name: '', address: '' });
       if (!manageMode) setIsAdmin(false);
     }
   }, [isOpen]);
+
+  const refresh = useCallback(() => {
+    setDisplayList(loadAddresses());
+  }, []);
+
+  const saveAll = useCallback(() => {
+    const clean = displayList.filter(a => a.name && a.address);
+    saveAddressesToStorage(clean);
+    refresh();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    if (!manageMode) setIsAdmin(false);
+  }, [displayList, refresh, manageMode]);
+
+  const deleteItem = useCallback((id: string) => {
+    const updated = displayList.filter(a => a.id !== id);
+    setDisplayList(updated);
+    saveAddressesToStorage(updated);
+  }, [displayList]);
+
+  const updateAddressField = useCallback((id: string, address: string) => {
+    setDisplayList(prev => prev.map(a => a.id === id ? { ...a, address } : a));
+  }, []);
+
+  const addNew = useCallback(() => {
+    if (!newAddress.name || !newAddress.address) return;
+    const id = 'custom_' + Date.now();
+    const updated = [...displayList, { id, name: newAddress.name, address: newAddress.address }];
+    setDisplayList(updated);
+    saveAddressesToStorage(updated);
+    setNewAddress({ id: '', name: '', address: '' });
+  }, [newAddress, displayList]);
 
   const copyAddress = async (addr: string, id: string) => {
     try {
@@ -87,25 +123,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setCopiedAmountId(id);
       setTimeout(() => setCopiedAmountId(null), 2000);
     } catch {}
-  };
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(addresses));
-  }, [addresses]);
-
-  const saveAddresses = () => {
-    const clean = editAddresses.filter(a => a.name && a.address);
-    setAddresses(clean);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    if (!manageMode) setIsAdmin(false);
-  };
-
-  const addNewAddress = () => {
-    if (!newAddress.name || !newAddress.address) return;
-    const id = 'custom_' + Date.now();
-    setEditAddresses([...editAddresses, { id, name: newAddress.name, address: newAddress.address }]);
-    setNewAddress({ name: '', address: '' });
   };
 
   const calcCryptoAmount = (coinId: string): string => {
@@ -158,11 +175,11 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       )}
 
       <div className="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-        {addresses.length === 0 && !isAdmin && (
+        {displayList.length === 0 && !isAdmin && (
           <p className="text-center text-slate-500 py-8">No payment addresses configured.</p>
         )}
 
-        {(isAdmin ? editAddresses : addresses).map((item) => {
+        {displayList.map((item) => {
           const coin = COINGECKO_MAP[item.id];
           const usdPrice = coin ? prices[coin]?.usd : undefined;
 
@@ -202,7 +219,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   )}
                   {isAdmin && (
                     <button
-                      onClick={() => setEditAddresses(prev => prev.filter(a => a.id !== item.id))}
+                      onClick={() => deleteItem(item.id)}
                       className="p-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all"
                     >
                       <Trash2 size={14} />
@@ -214,11 +231,11 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               {isAdmin ? (
                 <input
                   type="text"
-                  value={editAddresses.find(a => a.id === item.id)?.address || ''}
-                  onChange={(e) => setEditAddresses(prev => prev.map(a => a.id === item.id ? { ...a, address: e.target.value } : a))}
+                  value={displayList.find(a => a.id === item.id)?.address || ''}
+                  onChange={(e) => updateAddressField(item.id, e.target.value)}
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-emerald-500"
                 />
-                ) : (
+              ) : (
                 <div className="bg-black/40 rounded-xl px-4 py-3">
                   <div className="flex items-center justify-between">
                     <code className="text-xs font-mono text-slate-300 break-all select-all">{item.address}</code>
@@ -281,7 +298,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-emerald-500"
               />
               <button
-                onClick={addNewAddress}
+                onClick={addNew}
                 disabled={!newAddress.name || !newAddress.address}
                 className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-emerald-500 text-white font-black text-xs uppercase tracking-widest hover:bg-emerald-400 transition-all disabled:opacity-50"
               >
@@ -301,7 +318,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             className="mt-6 flex justify-center"
           >
             <button
-              onClick={saveAddresses}
+              onClick={saveAll}
               className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg transition-all active:scale-95 ${saved ? 'bg-emerald-400 text-white' : 'bg-emerald-500 text-white hover:bg-emerald-400'}`}
             >
               {saved ? <><Check size={18} /> Saved!</> : <><Check size={18} /> Save All Addresses</>}
