@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -67,11 +67,9 @@ export default function App() {
         return true;
       }
     }
-    // 2. Permanent owner flag (never cleared, survives logout)
-    if (localStorage.getItem('finalyze_permanent_owner') === 'true') return true;
-    // 3. Standard bypass active flag
+    // 2. Standard localStorage flag
     if (localStorage.getItem('finalyze_dev_bypass_active') === 'true') return true;
-    // 4. User email checks
+    // 3. User email checks
     if (!user) return false;
     const email = user.email || '';
     const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
@@ -80,6 +78,8 @@ export default function App() {
            email === 'taybekraa@gmail.com' ||
            email.includes('dev');
   };
+
+  const isSigningInRef = useRef(false);
   
   interface ClientRecord {
     id: string;
@@ -546,19 +546,6 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result?.user) {
-          setUser(result.user);
-        }
-      })
-      .catch((error: any) => {
-        console.error("Redirect login failure on mount:", error);
-        setLoginError(error.code || error.message);
-      });
-  }, []);
-
-  useEffect(() => {
     // 1. Check if we have a persistent custom session
     const savedUserJson = localStorage.getItem('finalyze_auth_user');
     const savedTimestampStr = localStorage.getItem('finalyze_auth_timestamp');
@@ -614,6 +601,10 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       // Don't let state changes override custom persistent session if it is set
       if (localStorage.getItem('finalyze_auth_user')) {
+        return;
+      }
+      // Block state updates during signInWithPopup to prevent re-renders from killing the popup
+      if (isSigningInRef.current) {
         return;
       }
       
@@ -729,19 +720,21 @@ export default function App() {
   const handleLogin = async () => {
     setLoginError(null);
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    isSigningInRef.current = true;
     try {
       await signInWithPopup(auth, provider);
-    } catch (popupError: any) {
-      console.warn("Popup blocked or failed, falling back to Redirect:", popupError);
-      if (popupError.code !== 'auth/popup-closed-by-user') {
-        setLoginError(popupError.code || popupError.message);
+    } catch (error: any) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.log('User closed the popup manually');
+      } else if (error.code === 'auth/popup-blocked') {
+        setLoginError('Popup blocked. Please allow popups for this site, then try again.');
+      } else {
+        console.error("Sign-in failed:", error);
+        setLoginError(error.code || error.message);
       }
-      try {
-        await signInWithRedirect(auth, provider);
-      } catch (redirectError: any) {
-        console.error("Redirect sign-in also failed:", redirectError);
-        setLoginError(redirectError.code || redirectError.message);
-      }
+    } finally {
+      isSigningInRef.current = false;
     }
   };
 
