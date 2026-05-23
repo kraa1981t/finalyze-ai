@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithCredential, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -79,7 +79,7 @@ export default function App() {
            email.includes('dev');
   };
 
-
+  const unsubscribeRef = useRef<(() => void) | null>(null);
   
   interface ClientRecord {
     id: string;
@@ -671,6 +671,7 @@ export default function App() {
       }
       setLoading(false);
     });
+    unsubscribeRef.current = unsubscribe;
     return () => unsubscribe();
   }, []);
 
@@ -713,25 +714,70 @@ export default function App() {
     }
   }, [loading]);
 
-  const handleGoogleCredential = async (credential: string) => {
-    setLoginError(null);
-    try {
-      const firebaseCredential = GoogleAuthProvider.credential(credential);
-      await signInWithCredential(auth, firebaseCredential);
-    } catch (error: any) {
-      console.error("Google credential sign-in failed:", error);
-      setLoginError(error.code || error.message);
-    }
-  };
-
-  // Kept for Header backward compatibility (behind overlay anyway)
   const handleLogin = async () => {
     setLoginError(null);
+    // Unsubscribe from onAuthStateChanged to prevent re-renders during popup
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+    }
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      // Try GIS-based approach via the overlay instead
-      console.log("Header login button clicked (should be covered by overlay)");
+      await signInWithPopup(auth, provider);
     } catch (error: any) {
-      setLoginError(error.code || error.message);
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.log('User closed the popup manually');
+      } else if (error.code === 'auth/popup-blocked') {
+        setLoginError('Popup blocked. Please allow popups for this site, then try again.');
+      } else {
+        console.error("Sign-in failed:", error);
+        setLoginError(error.code || error.message);
+      }
+    } finally {
+      // Re-subscribe to auth state after popup completes
+      const newUnsub = onAuthStateChanged(auth, async (u) => {
+        if (localStorage.getItem('finalyze_auth_user')) return;
+        if (u) {
+          setUser(u);
+          const email = u.email || '';
+          const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+          const isDeveloper = email === activeDevEmail || email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
+          if (!isDeveloper && u.emailVerified) {
+            try {
+              const existing = await getDocs(query(collection(db, 'clients'), where('uid', '==', u.uid)));
+              if (existing.empty) {
+                const count = (await getDocs(collection(db, 'clients'))).size;
+                await addDoc(collection(db, 'clients'), {
+                  email, uid: u.uid, status: 'verified', plan: 'free', planExpiry: null,
+                  registeredAt: serverTimestamp(), rank: count + 1,
+                });
+              }
+            } catch (e) { console.warn('Failed to save Google client:', e); }
+          }
+          if (isDeveloper || localStorage.getItem('finalyze_dev_bypass_active') === 'true') fetchClients();
+          const mockCompactUser = { uid: u.uid, email: u.email, displayName: u.displayName || 'User', photoURL: u.photoURL || '', emailVerified: u.emailVerified };
+          localStorage.setItem('finalyze_auth_user', JSON.stringify(mockCompactUser));
+          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+          if (isDeveloper) localStorage.setItem('finalyze_dev_bypass_active', 'true');
+          const localKey = localStorage.getItem('finalyze_user_groq_api_key');
+          if (localKey) { setHasApiKey(true); }
+          else {
+            try {
+              const userDoc = await getDoc(doc(db, 'users', u.uid));
+              if (userDoc.exists()) {
+                const data = userDoc.data();
+                if (data?.groqApiKey || data?.geminiApiKey) { localStorage.setItem('finalyze_user_groq_api_key', data.groqApiKey || data.geminiApiKey); setHasApiKey(true); }
+                else { setHasApiKey(false); }
+              } else { setHasApiKey(false); }
+            } catch (err) { setHasApiKey(false); }
+          }
+        } else {
+          setUser(null);
+          setHasApiKey(false);
+        }
+        setLoading(false);
+      });
+      unsubscribeRef.current = newUnsub;
     }
   };
 
@@ -888,7 +934,6 @@ export default function App() {
             onLogin={handleLogin} 
             onBypassLogin={handleBypassLogin}
             onClientAuth={handleClientAuth}
-            onGoogleCredential={handleGoogleCredential}
             lang={lang} 
             loginError={loginError}
             onClearError={() => setLoginError(null)}
