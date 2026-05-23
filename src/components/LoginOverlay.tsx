@@ -10,9 +10,10 @@ interface LoginOverlayProps {
   lang: Language;
   loginError: string | null;
   onClearError: () => void;
+  redirecting?: boolean;
 }
 
-export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lang, loginError, onClearError }: LoginOverlayProps) {
+export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lang, loginError, onClearError, redirecting }: LoginOverlayProps) {
   const [showGuide, setShowGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedConfigPath, setCopiedConfigPath] = useState(false);
@@ -428,16 +429,23 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
                 {authMethod === 'google' && (
                   <div className="space-y-3">
                     <p className="text-xs text-slate-400 text-center">
-                      {lang === 'ar'
-                        ? 'سجل دخول بحساب Google الخاص بك'
-                        : 'Sign in with your Google account'}
+                      {redirecting
+                        ? (lang === 'ar' ? 'جاري التوجيه إلى Google...' : 'Redirecting to Google...')
+                        : (lang === 'ar' ? 'سجل دخول بحساب Google الخاص بك' : 'Sign in with your Google account')}
                     </p>
                     <button
                       onClick={onLogin}
-                      className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-4 rounded-2xl transition-all text-sm shadow-lg active:scale-98 flex items-center justify-center gap-3"
+                      disabled={redirecting}
+                      className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-4 rounded-2xl transition-all text-sm shadow-lg active:scale-98 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Globe size={18} />
-                      {lang === 'ar' ? 'تسجيل دخول بـ Google' : 'Sign In with Google'}
+                      {redirecting ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <Globe size={18} />
+                      )}
+                      {redirecting
+                        ? (lang === 'ar' ? 'جاري...' : 'Redirecting...')
+                        : (lang === 'ar' ? 'تسجيل دخول بـ Google' : 'Sign In with Google')}
                     </button>
                   </div>
                 )}
