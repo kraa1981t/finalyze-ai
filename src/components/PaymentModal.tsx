@@ -56,7 +56,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       return saved ? JSON.parse(saved) : DEFAULT_ADDRESSES;
     } catch { return DEFAULT_ADDRESSES; }
   });
-  const [prices, setPrices] = useState<Record<string, { usd: number }>>({});
+  const [prices, setPrices] = useState<Record<string, { usd: number }>>({
+    bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 },
+    tron: { usd: 0.12 }, solana: { usd: 150 },
+  });
   const [editAddresses, setEditAddresses] = useState<CryptoAddress[]>([]);
   const [isAdmin, setIsAdmin] = useState(manageMode || false);
   const [newAddress, setNewAddress] = useState<CryptoAddress>({ id: '', name: '', address: '' });
@@ -83,11 +86,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     if (!isOpen) return;
     fetch('/api/crypto-prices')
       .then(r => r.json())
-      .then(data => {
-        if (data?.bitcoin?.usd) setPrices(data);
-        else setPrices({ bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 }, tron: { usd: 0.12 }, solana: { usd: 150 } });
-      })
-      .catch(() => setPrices({ bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 }, tron: { usd: 0.12 }, solana: { usd: 150 } }));
+      .then(data => { if (data?.bitcoin?.usd) setPrices(data); })
+      .catch(() => {});
   }, [isOpen]);
 
   useEffect(() => {
