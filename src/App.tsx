@@ -28,7 +28,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string } | null>(null);
+  const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string; durationDays: number } | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_groq_api_key'));
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -44,6 +44,18 @@ export default function App() {
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
+  const [activeSubscription, setActiveSubscription] = useState<{ label: string; amount: number; expiryDate: string } | null>(() => {
+    try {
+      const saved = localStorage.getItem('active_subscription');
+      if (!saved) return null;
+      const sub = JSON.parse(saved);
+      if (new Date(sub.expiryDate) < new Date()) {
+        localStorage.removeItem('active_subscription');
+        return null;
+      }
+      return sub;
+    } catch { return null; }
+  });
 
   const isDeveloperSession = () => {
     // 1. URL parameter bypass — add ?dev or ?owner=1 to any URL to bypass as developer
@@ -778,7 +790,7 @@ export default function App() {
               <SubscriptionModal
                 isOpen={true}
                 onClose={() => setActivePage('main')}
-                onSelectPlan={(amount, label) => { setPaymentPlan({ amount, label }); }}
+                onSelectPlan={(amount, label, durationDays) => { setPaymentPlan({ amount, label, durationDays }); }}
                 asPage
               />
             )}
@@ -790,6 +802,21 @@ export default function App() {
                 planLabel={paymentPlan?.label || ''}
                 amount={paymentPlan?.amount || 0}
                 asPage
+                onConfirm={() => {
+                  const plan = paymentPlan!;
+                  const expiryDate = new Date();
+                  expiryDate.setDate(expiryDate.getDate() + plan.durationDays);
+                  const sub = {
+                    label: plan.label,
+                    amount: plan.amount,
+                    activatedAt: new Date().toISOString(),
+                    expiryDate: expiryDate.toISOString(),
+                  };
+                  localStorage.setItem('active_subscription', JSON.stringify(sub));
+                  setActiveSubscription(sub);
+                  setPaymentPlan(null);
+                  setActivePage('main');
+                }}
               />
             )}
 

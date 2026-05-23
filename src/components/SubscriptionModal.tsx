@@ -8,7 +8,7 @@ const STORAGE_KEY = 'subscription_prices';
 interface SubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectPlan: (amount: number, label: string) => void;
+  onSelectPlan: (amount: number, label: string, durationDays: number) => void;
   asPage?: boolean;
 }
 
@@ -40,9 +40,9 @@ export default function SubscriptionModal({ isOpen, onClose, onSelectPlan, asPag
   if (!isOpen) return null;
 
   const plans = [
-    { key: 'weekly', label: 'Weekly', price: prices.weekly, icon: Sparkles, desc: '7 days of institutional analysis & radar alerts', color: 'from-sky-500 to-sky-600', border: 'border-sky-500/30' },
-    { key: 'monthly', label: 'Monthly', price: prices.monthly, icon: Star, desc: 'Full market access & priority signals', color: 'from-emerald-500 to-emerald-600', border: 'border-emerald-500/30', popular: true },
-    { key: 'yearly', label: 'Yearly', price: prices.yearly, icon: Crown, desc: 'Best value - all features + VIP support', color: 'from-amber-500 to-orange-600', border: 'border-amber-500/30', best: true },
+    { key: 'weekly', label: 'Weekly', price: prices.weekly, icon: Sparkles, desc: '7 days of institutional analysis & radar alerts', color: 'from-sky-500 to-sky-600', border: 'border-sky-500/30', durationDays: 7 },
+    { key: 'monthly', label: 'Monthly', price: prices.monthly, icon: Star, desc: 'Full market access & priority signals', color: 'from-emerald-500 to-emerald-600', border: 'border-emerald-500/30', popular: true, durationDays: 30 },
+    { key: 'yearly', label: 'Yearly', price: prices.yearly, icon: Crown, desc: 'Best value - all features + VIP support', color: 'from-amber-500 to-orange-600', border: 'border-amber-500/30', best: true, durationDays: 365 },
   ];
 
   const pageInner = (
@@ -120,7 +120,7 @@ export default function SubscriptionModal({ isOpen, onClose, onSelectPlan, asPag
 
               <button
                 onClick={() => {
-                  if (!isAdmin) onSelectPlan(plan.price, plan.label);
+                  if (!isAdmin) onSelectPlan(plan.price, plan.label, plan.durationDays);
                 }}
                 disabled={isAdmin}
                 className={`mt-auto w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg bg-gradient-to-r ${plan.color} text-white hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}

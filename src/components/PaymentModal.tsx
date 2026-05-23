@@ -37,9 +37,12 @@ interface PaymentModalProps {
   amount: number;
   asPage?: boolean;
   manageMode?: boolean;
+  onConfirm?: () => void;
 }
 
-export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode }: PaymentModalProps) {
+const TIMER_STORAGE_KEY = 'payment_timer_minutes';
+
+export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm }: PaymentModalProps) {
   const [addresses, setAddresses] = useState<CryptoAddress[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -54,6 +57,15 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [nextId, setNextId] = useState(100);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
+  const [selectedCoinId, setSelectedCoinId] = useState<string | null>(null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [timerMinutes, setTimerMinutes] = useState(() => {
+    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
+    return saved ? parseInt(saved) : 30;
+  });
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [editTimer, setEditTimer] = useState(timerMinutes);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -68,14 +80,34 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setEditAddresses(JSON.parse(JSON.stringify(addresses)));
       setCopiedId(null);
       setNewAddress({ name: '', address: '' });
+      setSelectedCoinId(null);
+      setPaymentConfirmed(false);
+      setTimerRunning(false);
+      setTimerSeconds(0);
       if (!manageMode) setIsAdmin(false);
     }
   }, [isOpen]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (!timerRunning || timerSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setTimerSeconds(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timerRunning, timerSeconds]);
+
+  const startTimer = () => {
+    setTimerSeconds(timerMinutes * 60);
+    setTimerRunning(true);
+  };
 
   const copyAddress = async (addr: string, id: string) => {
     try {
       await navigator.clipboard.writeText(addr);
       setCopiedId(id);
+      setSelectedCoinId(id);
+      if (!timerRunning) startTimer();
       setTimeout(() => setCopiedId(null), 2000);
     } catch {}
   };
@@ -123,22 +155,12 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             {!manageMode && <p className="text-sm text-slate-400">{planLabel} Plan - ${amount} USD</p>}
           </div>
         </div>
-        {!manageMode && (
-          <button
-            onClick={() => setIsAdmin(!isAdmin)}
-            className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all"
-            title={isAdmin ? 'Lock addresses' : 'Edit addresses'}
-          >
-            {isAdmin ? <Lock size={16} /> : <Unlock size={16} />}
-          </button>
-        )}
       </div>
 
-      {!manageMode && (
+      {!manageMode && !selectedCoinId && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6">
           <p className="text-sm text-amber-400 font-bold text-center">
-            Send exactly <span className="text-lg">${amount} USD</span> worth of crypto to any address below.
-            Your subscription activates automatically after 1 confirmation.
+            اختر عملة وانسخ العنوان للدفع. سيظهر العداد والمبلغ بعد النسخ.
           </p>
         </div>
       )}
@@ -161,7 +183,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           const usdPrice = coin ? prices[coin]?.usd : undefined;
 
           return (
-            <div key={item.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 transition-all hover:border-white/20">
+            <div key={item.id} className={`bg-white/5 border rounded-2xl p-4 transition-all hover:border-white/20 ${selectedCoinId === item.id ? 'border-emerald-500/50 ring-1 ring-emerald-500/30' : 'border-white/10'}`}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-black text-xs shadow-lg">
@@ -234,6 +256,66 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           );
         })}
 
+        {/* Payment confirmation panel (client mode) */}
+        {!manageMode && selectedCoinId && (() => {
+          const item = addresses.find(a => a.id === selectedCoinId);
+          if (!item) return null;
+          const coin = COINGECKO_MAP[item.id];
+          const ticker = item.name.split(' ').pop()?.replace(/[()]/g, '') || '';
+          const cryptoAmount = calcCryptoAmount(item.id);
+          const formatTime = (secs: number) => {
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+          };
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 bg-emerald-500/5 border border-emerald-500/30 rounded-2xl p-5 space-y-4"
+            >
+              <h5 className="text-xs font-black uppercase text-emerald-400 tracking-widest text-center">
+                {planLabel} Plan — ${amount} USD
+              </h5>
+              <div className="bg-black/40 rounded-xl px-5 py-4 text-center">
+                <div className="text-2xl font-black text-white font-mono">
+                  {cryptoAmount === '...' ? '...' : cryptoAmount} {ticker}
+                </div>
+                <button
+                  onClick={() => copyAmount(`${cryptoAmount} ${ticker}`, 'confirm_amt')}
+                  className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
+                >
+                  {copiedAmountId === 'confirm_amt' ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedAmountId === 'confirm_amt' ? 'Copied!' : 'Copy Amount'}
+                </button>
+              </div>
+
+              <div className="text-center">
+                <div className="text-3xl font-black font-mono text-white tabular-nums">
+                  {formatTime(timerSeconds)}
+                </div>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Time Remaining</p>
+              </div>
+
+              <button
+                onClick={() => { if (paymentConfirmed) { onConfirm?.(); } else { setPaymentConfirmed(true); } }}
+                className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
+                  paymentConfirmed
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-400'
+                    : 'bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30'
+                }`}
+              >
+                {paymentConfirmed ? '🟢 Activate Plan' : '🔴 Confirm Payment'}
+              </button>
+              {paymentConfirmed && (
+                <p className="text-[10px] text-emerald-400 text-center">
+                  تم تأكيد الدفع. اضغط "Activate Plan" لتفعيل خطتك.
+                </p>
+              )}
+            </motion.div>
+          );
+        })()}
+
         <AnimatePresence>
           {isAdmin && (
             <motion.div
@@ -304,9 +386,33 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         )}
       </AnimatePresence>
 
-      <p className="text-center text-[10px] text-slate-500 mt-4">
-        After sending, your subscription activates within 1-5 minutes. Contact support if delayed.
-      </p>
+      {manageMode && (
+        <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-4">
+          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">Timer Duration</h5>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              value={editTimer}
+              onChange={(e) => setEditTimer(Math.max(1, Number(e.target.value) || 1))}
+              className="w-24 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-emerald-500"
+              min="1"
+            />
+            <span className="text-sm text-slate-400">minutes</span>
+            <button
+              onClick={() => { setTimerMinutes(editTimer); localStorage.setItem(TIMER_STORAGE_KEY, String(editTimer)); }}
+              className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
+            >
+              Save Timer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!manageMode && (
+        <p className="text-center text-[10px] text-slate-500 mt-4">
+          بعد النسخ، أرسل المبلغ إلى العنوان. الوقت المتبقي: {Math.floor(timerSeconds / 60)} دقيقة
+        </p>
+      )}
     </>
   );
 
