@@ -54,6 +54,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [nextId, setNextId] = useState(100);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -88,10 +89,15 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     } catch {}
   };
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(addresses));
+  }, [addresses]);
+
   const saveAddresses = () => {
     const clean = editAddresses.filter(a => a.name && a.address);
     setAddresses(clean);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
     if (!manageMode) setIsAdmin(false);
   };
 
@@ -296,9 +302,9 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           >
             <button
               onClick={saveAddresses}
-              className="flex items-center gap-2 bg-emerald-500 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-emerald-400 transition-all active:scale-95"
+              className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg transition-all active:scale-95 ${saved ? 'bg-emerald-400 text-white' : 'bg-emerald-500 text-white hover:bg-emerald-400'}`}
             >
-              <Check size={18} /> Save All Addresses
+              {saved ? <><Check size={18} /> Saved!</> : <><Check size={18} /> Save All Addresses</>}
             </button>
           </motion.div>
         )}
