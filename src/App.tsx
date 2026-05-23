@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithCredential, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -546,18 +546,6 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result?.user) {
-          setUser(result.user);
-        }
-      })
-      .catch((error: any) => {
-        console.error("Redirect login failure on mount:", error);
-      });
-  }, []);
-
-  useEffect(() => {
     // 1. Check if we have a persistent custom session
     const savedUserJson = localStorage.getItem('finalyze_auth_user');
     const savedTimestampStr = localStorage.getItem('finalyze_auth_timestamp');
@@ -725,14 +713,24 @@ export default function App() {
     }
   }, [loading]);
 
+  const handleGoogleCredential = async (credential: string) => {
+    setLoginError(null);
+    try {
+      const firebaseCredential = GoogleAuthProvider.credential(credential);
+      await signInWithCredential(auth, firebaseCredential);
+    } catch (error: any) {
+      console.error("Google credential sign-in failed:", error);
+      setLoginError(error.code || error.message);
+    }
+  };
+
+  // Kept for Header backward compatibility (behind overlay anyway)
   const handleLogin = async () => {
     setLoginError(null);
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      await signInWithRedirect(auth, provider);
+      // Try GIS-based approach via the overlay instead
+      console.log("Header login button clicked (should be covered by overlay)");
     } catch (error: any) {
-      console.error("Redirect sign-in failed:", error);
       setLoginError(error.code || error.message);
     }
   };
@@ -890,6 +888,7 @@ export default function App() {
             onLogin={handleLogin} 
             onBypassLogin={handleBypassLogin}
             onClientAuth={handleClientAuth}
+            onGoogleCredential={handleGoogleCredential}
             lang={lang} 
             loginError={loginError}
             onClearError={() => setLoginError(null)}

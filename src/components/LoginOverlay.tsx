@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ShieldCheck, Zap, Globe, BarChart3, ExternalLink, HelpCircle, ChevronDown, ChevronUp, Copy, Check, Lock, Mail, MessageSquare, X, Loader2, Key, AtSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
@@ -7,12 +7,13 @@ interface LoginOverlayProps {
   onLogin: () => void;
   onBypassLogin?: (email: string) => void;
   onClientAuth?: (email: string, password: string) => void;
+  onGoogleCredential: (credential: string) => void;
   lang: Language;
   loginError: string | null;
   onClearError: () => void;
 }
 
-export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lang, loginError, onClearError }: LoginOverlayProps) {
+export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, onGoogleCredential, lang, loginError, onClearError }: LoginOverlayProps) {
   const [showGuide, setShowGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedConfigPath, setCopiedConfigPath] = useState(false);
@@ -233,6 +234,39 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
     }
   };
 
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+  const gisInitialized = useRef(false);
+
+  const GIS_CLIENT_ID = '413309732602-boqcqkkc7cba6f7f8pkdb3lc7qs309sl.apps.googleusercontent.com';
+
+  useEffect(() => {
+    if (authMethod === 'google' && googleBtnRef.current && typeof window !== 'undefined') {
+      const win = window as any;
+      if (win.google?.accounts && !gisInitialized.current) {
+        gisInitialized.current = true;
+        win.google.accounts.id.initialize({
+          client_id: GIS_CLIENT_ID,
+          callback: (response: any) => {
+            if (response.credential) {
+              onGoogleCredential(response.credential);
+            }
+          },
+          cancel_on_tap_outside: false,
+        });
+      }
+      if (win.google?.accounts) {
+        win.google.accounts.id.renderButton(googleBtnRef.current, {
+          type: 'standard',
+          shape: 'pill',
+          theme: 'outline',
+          size: 'large',
+          width: googleBtnRef.current.offsetWidth || 300,
+          logo_alignment: 'center',
+        });
+      }
+    }
+  }, [authMethod, onGoogleCredential, GIS_CLIENT_ID]);
+
   return (
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-start p-4 bg-brand-bg overflow-y-auto pt-12 pb-8">
       {/* Background decoration */}
@@ -429,16 +463,10 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
                   <div className="space-y-3">
                     <p className="text-xs text-slate-400 text-center">
                       {lang === 'ar'
-                        ? 'سجل دخول بحساب Google الخاص بك'
-                        : 'Sign in with your Google account'}
+                        ? 'انقر على زر Google أدناه لاختيار حسابك'
+                        : 'Click the Google button below to select your account'}
                     </p>
-                    <button
-                      onClick={onLogin}
-                      className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-4 rounded-2xl transition-all text-sm shadow-lg active:scale-98 flex items-center justify-center gap-3"
-                    >
-                      <Globe size={18} />
-                      {lang === 'ar' ? 'تسجيل دخول بـ Google' : 'Sign In with Google'}
-                    </button>
+                    <div ref={googleBtnRef} className="flex justify-center min-h-[40px]" />
                   </div>
                 )}
 
