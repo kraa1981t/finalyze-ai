@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Zap, Globe, BarChart3, ExternalLink, HelpCircle, ChevronDown, ChevronUp, Copy, Check, Lock, Mail, MessageSquare, X, Loader2 } from 'lucide-react';
+import { ShieldCheck, Zap, Globe, BarChart3, ExternalLink, HelpCircle, ChevronDown, ChevronUp, Copy, Check, Lock, Mail, MessageSquare, X, Loader2, Key, AtSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
 
 interface LoginOverlayProps {
   onLogin: () => void;
   onBypassLogin?: (email: string) => void;
-  onClientAuth?: (email: string) => void;
+  onClientAuth?: (email: string, password: string) => void;
   lang: Language;
   loginError: string | null;
   onClearError: () => void;
@@ -18,8 +18,11 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
   const [copiedConfigPath, setCopiedConfigPath] = useState(false);
 
   const [customEmail, setCustomEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [inputError, setInputError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [authMethod, setAuthMethod] = useState<'email' | 'google'>('email');
+  const [verificationLink, setVerificationLink] = useState('');
 
   const [logoClicks, setLogoClicks] = useState(0);
   const [devModeActive, setDevModeActive] = useState(() => {
@@ -320,22 +323,50 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
               </h3>
             </div>
 
-            {/* Direct Professional Gmail Input Form / Pending Verification */}
+            {/* Client Sign-In - Two Options */}
             {!pendingVerification ? (
               <div className="mb-6 p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 relative z-10 text-right space-y-4">
                 <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
-                  <span>{lang === 'ar' ? 'دخول العميل' : 'Client Sign-In'}</span>
+                  <span>{lang === 'ar' ? 'تسجيل الدخول' : 'Client Sign-In'}</span>
                   <ShieldCheck size={18} />
                 </div>
 
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!customEmail) return;
-                  setSubmitting(true);
-                  await onClientAuth?.(customEmail.trim().toLowerCase());
-                  setSubmitting(false);
-                }} className="space-y-3">
-                  <div className="relative">
+                {/* Method Tabs */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setAuthMethod('email')}
+                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                      authMethod === 'email'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-white/5 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <AtSign size={14} />
+                    {lang === 'ar' ? 'إيميل + كلمة سر' : 'Email + Password'}
+                  </button>
+                  <button
+                    onClick={() => setAuthMethod('google')}
+                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                      authMethod === 'google'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-white/5 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Globe size={14} />
+                    Google
+                  </button>
+                </div>
+
+                {/* Email + Password Form */}
+                {authMethod === 'email' && (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!customEmail || !password) return;
+                    setSubmitting(true);
+                    setVerificationLink('');
+                    await onClientAuth?.(customEmail.trim().toLowerCase(), password);
+                    setSubmitting(false);
+                  }} className="space-y-3">
                     <input
                       type="email"
                       value={customEmail}
@@ -344,46 +375,72 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
                       className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50"
                       required
                     />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
-                      @
-                    </div>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => { setPassword(e.target.value); onClearError(); }}
+                      placeholder={lang === 'ar' ? 'كلمة المرور' : 'Password'}
+                      className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50"
+                      required
+                      minLength={6}
+                    />
+                    {inputError && <p className="text-[10px] text-red-400 font-bold mt-1 text-right">{inputError}</p>}
+
+                    {loginError && loginError !== 'verify_email' && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 text-center">
+                        <p className="text-[11px] text-red-400 font-bold">
+                          {loginError === 'auth/network-request-failed'
+                            ? (lang === 'ar' ? '❌ مشكلة في الاتصال بالإنترنت' : '❌ Network error')
+                            : loginError}
+                        </p>
+                      </div>
+                    )}
+
+                    {loginError === 'verify_email' && (
+                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-center">
+                        <p className="text-xs text-amber-400 font-bold mb-2">
+                          {lang === 'ar'
+                            ? '📧 تم إنشاء الحساب! اضغط على الرابط لتفعيل حسابك:'
+                            : '📧 Account created! Click the link to verify:'}
+                        </p>
+                        <a href={(() => { try { return localStorage.getItem('finalyze_verify_link') || '#'; } catch { return '#'; } })()}
+                          target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-400 transition-all shadow-lg">
+                          <ShieldCheck size={16} />
+                          {lang === 'ar' ? 'تفعيل الحساب ✓' : 'Verify Account ✓'}
+                        </a>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={submitting || !customEmail || !password}
+                      className="w-full bg-primary hover:bg-emerald-500 text-brand-bg font-black py-4 rounded-2xl transition-all text-sm cursor-pointer shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/25 active:scale-98 disabled:opacity-50"
+                    >
+                      {submitting
+                        ? (lang === 'ar' ? 'جاري...' : 'Please wait...')
+                        : (lang === 'ar' ? 'تسجيل وإرسال التفعيل ←' : 'Sign Up & Verify →')}
+                    </button>
+                  </form>
+                )}
+
+                {/* Google Sign-In */}
+                {authMethod === 'google' && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-slate-400 text-center">
+                      {lang === 'ar'
+                        ? 'سجل دخول بحساب Google الخاص بك'
+                        : 'Sign in with your Google account'}
+                    </p>
+                    <button
+                      onClick={onLogin}
+                      className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-4 rounded-2xl transition-all text-sm shadow-lg active:scale-98 flex items-center justify-center gap-3"
+                    >
+                      <Globe size={18} />
+                      {lang === 'ar' ? 'تسجيل دخول بـ Google' : 'Sign In with Google'}
+                    </button>
                   </div>
-                  {inputError && <p className="text-[10px] text-red-400 font-bold mt-1 text-right">{inputError}</p>}
-
-                  {loginError && loginError !== 'verify_email' && (
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 text-center">
-                      <p className="text-[11px] text-red-400 font-bold">
-                        {loginError === 'auth/operation-not-allowed'
-                          ? (lang === 'ar'
-                            ? '❌ خدمة تسجيل الدخول غير مفعلة. تواصل مع المطور لتفعيل Anonymous Auth في Firebase.'
-                            : '❌ Sign-in service not enabled. Contact the developer to enable Anonymous Auth in Firebase.')
-                          : loginError === 'auth/network-request-failed'
-                          ? (lang === 'ar' ? '❌ مشكلة في الاتصال بالإنترنت' : '❌ Network error')
-                          : loginError}
-                      </p>
-                    </div>
-                  )}
-
-                  {loginError === 'verify_email' && (
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-center">
-                      <p className="text-xs text-amber-400 font-bold">
-                        {lang === 'ar'
-                          ? '📧 تم إنشاء الحساب! تحقق من بريدك الإلكتروني واضغط على رابط التفعيل المرسل إليك.'
-                          : '📧 Account created! Check your email and click the verification link sent to you.'}
-                      </p>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={submitting || !customEmail}
-                    className="w-full bg-primary hover:bg-emerald-500 text-brand-bg font-black py-4 rounded-2xl transition-all text-sm cursor-pointer shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/25 active:scale-98 disabled:opacity-50"
-                  >
-                    {submitting
-                      ? (lang === 'ar' ? 'جاري...' : 'Please wait...')
-                      : (lang === 'ar' ? 'تسجيل دخول ←' : 'Sign In →')}
-                  </button>
-                </form>
+                )}
 
                 {/* Direct Bypass Options for Developer Mode (Only visible if devModeActive is true) */}
                 {devModeActive && (

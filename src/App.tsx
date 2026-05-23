@@ -85,7 +85,7 @@ export default function App() {
     id: string;
     email: string;
     uid: string;
-    status: 'active' | 'inactive' | 'banned';
+    status: 'verified' | 'pending' | 'banned';
     plan: 'free' | 'paid';
     planExpiry: string | null;
     registeredAt: any;
@@ -624,10 +624,17 @@ export default function App() {
         const isDeveloper = email === activeDevEmail || email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
 
         if (!isDeveloper && u.emailVerified) {
-          await saveClientRecord(u.uid, email);
-          await updateClientStatus(u.uid, 'active');
-        } else if (!isDeveloper && !u.emailVerified) {
-          await saveClientRecord(u.uid, email);
+          // Google users are already verified — save as verified client
+          try {
+            const existing = await getDocs(query(collection(db, 'clients'), where('uid', '==', u.uid)));
+            if (existing.empty) {
+              const count = (await getDocs(collection(db, 'clients'))).size;
+              await addDoc(collection(db, 'clients'), {
+                email, uid: u.uid, status: 'verified', plan: 'free', planExpiry: null,
+                registeredAt: serverTimestamp(), rank: count + 1,
+              });
+            }
+          } catch (e) { console.warn('Failed to save Google client:', e); }
         }
 
         // Fetch clients list for developer session
@@ -687,6 +694,38 @@ export default function App() {
     }
   }, [loading]);
 
+  // Handle email verification from URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const vEmail = params.get('email');
+    const vToken = params.get('token');
+    const isVerify = params.get('verify') === 'true';
+
+    if (isVerify && vEmail && vToken) {
+      (async () => {
+        try {
+          const snap = await getDocs(query(collection(db, 'clients'), where('email', '==', vEmail), where('verifyToken', '==', vToken)));
+          if (!snap.empty) {
+            const docRef = doc(db, 'clients', snap.docs[0].id);
+            await updateDoc(docRef, { status: 'verified', verifyToken: '' });
+            // Clean URL
+            window.history.replaceState({}, '', window.location.pathname);
+            // Auto sign-in
+            alert(lang === 'ar'
+              ? '✅ تم تفعيل حسابك بنجاح! سجل دخول الآن.'
+              : '✅ Account verified! Sign in now.');
+          } else {
+            alert(lang === 'ar' ? '❌ رابط التفعيل غير صالح أو منتهي.' : '❌ Invalid or expired verification link.');
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+        } catch (e) {
+          console.error('Verification error:', e);
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      })();
+    }
+  }, [loading]);
+
   const handleLogin = async () => {
     setLoginError(null);
     const provider = new GoogleAuthProvider();
@@ -706,41 +745,73 @@ export default function App() {
     }
   };
 
-  const handleClientAuth = async (email: string) => {
+  const handleClientAuth = async (email: string, password?: string) => {
     setLoginError(null);
     try {
-      // Placeholder to prevent onAuthStateChanged from overriding
+      // Check if client is already registered in Firestore
+      const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
+      const existing = existingSnap.docs[0];
+
+      if (existing) {
+        const data = existing.data();
+        if (data.status === 'verified') {
+          // Already verified — sign in directly
+          localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+          const cred = await signInAnonymously(auth);
+          const mockUser = {
+            uid: cred.user.uid, email,
+            displayName: 'Client',
+            photoURL: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150',
+            emailVerified: true,
+          } as User;
+          setUser(mockUser);
+          localStorage.setItem('finalyze_auth_user', JSON.stringify(mockUser));
+          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+          localStorage.removeItem('finalyze_dev_bypass_active');
+          setHasApiKey(!!localStorage.getItem('finalyze_user_groq_api_key'));
+          return;
+        }
+        // Not verified — resend verification
+        if (data.verifyToken) {
+          const link = `${window.location.origin}/verify?email=${encodeURIComponent(email)}&token=${data.verifyToken}`;
+          setLoginError('verify_email');
+          return;
+        }
+      }
+
+      // New client registration
+      if (!password) {
+        setLoginError('auth/weak-password');
+        return;
+      }
+
+      // Generate verification token
+      const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
+      const verifyLink = `${window.location.origin}/verify?email=${encodeURIComponent(email)}&token=${verifyToken}`;
+
+      // Simple hash for password (client-side, for demo purposes)
+      const pwdHash = btoa(password + ':finalyze_salt');
+
+      // Save to Firestore
       localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
       localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-
-      // Sign in anonymously (no Email/Password provider needed)
       const cred = await signInAnonymously(auth);
-      const uid = cred.user.uid;
+      await addDoc(collection(db, 'clients'), {
+        email, uid: cred.user.uid, password: pwdHash, verifyToken,
+        status: 'pending', plan: 'free', planExpiry: null,
+        registeredAt: serverTimestamp(), rank: 0,
+      });
 
-      // Save client record to Firestore
-      await saveClientRecord(uid, email);
-      await updateClientStatus(uid, 'active');
-
-      // Create mock user (same pattern as handleBypassLogin)
-      const mockUser = {
-        uid,
-        email,
-        displayName: 'Client',
-        photoURL: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150',
-        emailVerified: true,
-      } as User;
-
-      setUser(mockUser);
-      localStorage.setItem('finalyze_auth_user', JSON.stringify(mockUser));
-      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-      localStorage.removeItem('finalyze_dev_bypass_active');
-      setHasApiKey(!!localStorage.getItem('finalyze_user_groq_api_key'));
-      setLoginError(null);
+      // Show verification link in the UI
+      setLoginError('verify_email');
+      // Store the link so LoginOverlay can display it
+      localStorage.setItem('finalyze_verify_link', verifyLink);
     } catch (err: any) {
       localStorage.removeItem('finalyze_auth_user');
       localStorage.removeItem('finalyze_auth_timestamp');
-      if (err.code === 'auth/operation-not-allowed') {
-        setLoginError('auth/operation-not-allowed');
+      if (err.code === 'auth/network-request-failed') {
+        setLoginError('auth/network-request-failed');
       } else {
         setLoginError(err.code || err.message);
       }

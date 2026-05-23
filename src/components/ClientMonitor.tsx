@@ -7,7 +7,7 @@ interface ClientRecord {
   id: string;
   email: string;
   uid: string;
-  status: 'active' | 'inactive' | 'banned';
+  status: 'verified' | 'pending' | 'banned';
   plan: 'free' | 'paid';
   planExpiry: string | null;
   registeredAt: any;
@@ -56,8 +56,8 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
       <div className="grid grid-cols-4 gap-4">
         {[
           { label: isAr ? 'إجمالي' : 'Total', value: clients.length, color: 'text-blue-400' },
-          { label: isAr ? 'نشط' : 'Active', value: clients.filter(c => c.status === 'active').length, color: 'text-emerald-400' },
-          { label: isAr ? 'غير نشط' : 'Inactive', value: clients.filter(c => c.status === 'inactive').length, color: 'text-amber-400' },
+          { label: isAr ? 'مفعل' : 'Verified', value: clients.filter(c => c.status === 'verified').length, color: 'text-emerald-400' },
+          { label: isAr ? 'قيد الانتظار' : 'Pending', value: clients.filter(c => c.status === 'pending').length, color: 'text-amber-400' },
           { label: isAr ? 'محظور' : 'Banned', value: clients.filter(c => c.status === 'banned').length, color: 'text-red-400' },
         ].map((stat, i) => (
           <div key={i} className="bg-brand-alt rounded-2xl p-4 border border-white/5 text-center">
@@ -100,7 +100,7 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        {client.status === 'active' ? (
+                        {client.status === 'verified' ? (
                           <CheckCircle size={12} className="text-emerald-400" />
                         ) : client.status === 'banned' ? (
                           <Ban size={12} className="text-red-400" />
@@ -108,12 +108,12 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
                           <Clock size={12} className="text-amber-400" />
                         )}
                         <span className={`text-[11px] font-bold ${
-                          client.status === 'active' ? 'text-emerald-400' :
+                          client.status === 'verified' ? 'text-emerald-400' :
                           client.status === 'banned' ? 'text-red-400' : 'text-amber-400'
                         }`}>
-                          {client.status === 'active' ? (isAr ? 'نشط' : 'Active') :
+                          {client.status === 'verified' ? (isAr ? 'مفعل' : 'Verified') :
                            client.status === 'banned' ? (isAr ? 'محظور' : 'Banned') :
-                           (isAr ? 'غير نشط' : 'Inactive')}
+                           (isAr ? 'قيد الانتظار' : 'Pending')}
                         </span>
                       </div>
                     </td>
