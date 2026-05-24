@@ -143,12 +143,17 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
 
       localStorage.setItem('finalyze_user_groq_api_key', trimmedKey);
 
-      if (user && user.uid && user.uid !== 'developer') {
-        const userDocRef = doc(db, 'users', user.uid);
-        await setDoc(userDocRef, {
-          groqApiKey: trimmedKey,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
+      // Save to Firestore (best effort — don't block on failure)
+      try {
+        if (user && user.uid && user.uid !== 'developer') {
+          const userDocRef = doc(db, 'users', user.uid);
+          await setDoc(userDocRef, {
+            groqApiKey: trimmedKey,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+      } catch (fsErr) {
+        console.warn('Failed to save API key to Firestore (rules may not be published):', fsErr);
       }
 
       setSuccess(true);
