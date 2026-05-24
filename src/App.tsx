@@ -33,6 +33,8 @@ export default function App() {
   const [manualAuthUrl, setManualAuthUrl] = useState<string | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string; durationDays: number } | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_groq_api_key'));
+  const [pendingVerification, setPendingVerification] = useState<string | null>(null);
+  const [needsApiKey, setNeedsApiKey] = useState<string | null>(null);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
@@ -626,20 +628,6 @@ export default function App() {
         const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
         const isDeveloper = email === activeDevEmail || email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
 
-        if (!isDeveloper && u.emailVerified) {
-          // Google users are already verified — save as verified client
-          try {
-            const existing = await getDocs(query(collection(db, 'clients'), where('uid', '==', u.uid)));
-            if (existing.empty) {
-              const count = (await getDocs(collection(db, 'clients'))).size;
-              await addDoc(collection(db, 'clients'), {
-                email, uid: u.uid, status: 'verified', plan: 'free', planExpiry: null,
-                registeredAt: serverTimestamp(), rank: count + 1,
-              });
-            }
-          } catch (e) { console.warn('Failed to save Google client:', e); }
-        }
-
         // Fetch clients list for developer session
         if (isDeveloper || localStorage.getItem('finalyze_dev_bypass_active') === 'true') {
           fetchClients();
@@ -713,10 +701,20 @@ export default function App() {
             await updateDoc(docRef, { status: 'verified', verifyToken: '' });
             // Clean URL
             window.history.replaceState({}, '', window.location.pathname);
-            // Auto sign-in
-            alert(lang === 'ar'
-              ? '✅ تم تفعيل حسابك بنجاح! سجل دخول الآن.'
-              : '✅ Account verified! Sign in now.');
+            // Auto sign-in anonymously and redirect to API key setup
+            localStorage.setItem('finalyze_auth_user', JSON.stringify({ email: vEmail, placeholder: true }));
+            localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+            localStorage.removeItem('finalyze_dev_bypass_active');
+            localStorage.removeItem('active_subscription');
+            const cred = await signInAnonymously(auth);
+            const mockUser = {
+              uid: cred.user.uid, email: vEmail,
+              displayName: 'Client',
+              photoURL: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150',
+              emailVerified: true,
+            } as User;
+            setUser(mockUser);
+            setNeedsApiKey(vEmail);
           } else {
             alert(lang === 'ar' ? '❌ رابط التفعيل غير صالح أو منتهي.' : '❌ Invalid or expired verification link.');
             window.history.replaceState({}, '', window.location.pathname);
@@ -739,8 +737,54 @@ export default function App() {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
-      if (result?.user) {
-        setUser(result.user);
+      if (result?.user?.email) {
+        const email = result.user.email;
+        // Check if client already exists in Firestore
+        const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
+        const existing = existingSnap.docs[0];
+        if (existing) {
+          const data = existing.data();
+          if (data.status === 'verified') {
+            // Already verified and has API key — sign in directly
+            await signOut(auth);
+            localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+            localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+            const cred = await signInAnonymously(auth);
+            const mockUser = {
+              uid: cred.user.uid, email,
+              displayName: result.user.displayName || 'Client',
+              photoURL: result.user.photoURL || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150',
+              emailVerified: true,
+            } as User;
+            setUser(mockUser);
+            const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+            setHasApiKey(hasKey);
+            if (!hasKey) {
+              setNeedsApiKey(email);
+            }
+            return;
+          }
+          // Already pending — show existing verify link
+          if (data.verifyToken) {
+            const link = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${data.verifyToken}`;
+            setPendingVerification(link);
+            return;
+          }
+        }
+        // New Google client — save as pending
+        const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
+        const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
+        // Sign out of Google, sign in anonymously to get uid
+        await signOut(auth);
+        const cred = await signInAnonymously(auth);
+        await addDoc(collection(db, 'clients'), {
+          email, uid: cred.user.uid, verifyToken,
+          status: 'pending', plan: 'free', planExpiry: null,
+          registeredAt: serverTimestamp(), rank: 0,
+        });
+        // Save verify link for display
+        localStorage.setItem('finalyze_verify_link', verifyLink);
+        setPendingVerification(verifyLink);
       }
     } catch (error: any) {
       console.error("=== signInWithPopup ERROR ===", error);
@@ -911,7 +955,7 @@ export default function App() {
       />
 
       <AnimatePresence>
-        {!user && !loading && (
+        {!user && !loading && !pendingVerification && !needsApiKey && (
           <LoginOverlay 
             onLogin={handleLogin} 
             onBypassLogin={handleBypassLogin}
@@ -924,6 +968,52 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Pending verification message */}
+      {pendingVerification && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="max-w-lg w-full bg-brand-alt border border-white/10 rounded-[32px] p-8 shadow-[0_32px_128px_-12px_rgba(0,0,0,0.85)] text-center">
+            <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">
+              {lang === 'ar' ? 'تحقق من بريدك الإلكتروني' : 'Check Your Email'}
+            </h2>
+            <p className="text-slate-400 text-sm leading-relaxed mb-6">
+              {lang === 'ar'
+                ? 'تم إرسال رابط التفعيل إلى بريدك الإلكتروني. اضغط على الرابط لتفعيل حسابك وإعداد مفتاح API.'
+                : 'A verification link has been sent to your email. Click the link to activate your account and set up your API key.'}
+            </p>
+            <a
+              href={pendingVerification}
+              className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-brand-bg font-black px-6 py-3 rounded-xl transition-all text-sm"
+            >
+              {lang === 'ar' ? 'فتح رابط التفعيل' : 'Open Verification Link'}
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Blocking API Key setup for newly verified clients */}
+      {needsApiKey && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <ApiKeyModal
+            isOpen={true}
+            onClose={() => {}}
+            isBlocking={true}
+            lang={lang}
+            user={user}
+            onSaved={(key) => {
+              setHasApiKey(true);
+              setNeedsApiKey(null);
+              setActivePage('main');
+            }}
+            asPage
+          />
+        </div>
+      )}
 
       <Header 
         user={user} onLogin={handleLogin} onLogout={handleLogout} 
