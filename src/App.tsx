@@ -113,9 +113,10 @@ export default function App() {
       const q = query(collection(db, 'clients'), orderBy('rank', 'asc'));
       const snap = await getDocs(q);
       const fsClients = snap.docs.map(d => ({ id: d.id, ...d.data() } as ClientRecord));
-      // Merge: Firestore takes priority, add any local-only clients
       const fsEmails = new Set(fsClients.map(c => c.email));
       const merged = [...fsClients, ...localClients.filter(c => !fsEmails.has(c.email))];
+      // Sync localStorage with merged data so all clients persist locally
+      localStorage.setItem('finalyze_clients', JSON.stringify(merged));
       setClients(merged);
     } catch (e) {
       console.warn('Failed to fetch clients from Firestore, using local cache:', e);
@@ -791,6 +792,22 @@ export default function App() {
         // New or pending — send email, show API key page (save client only after key entry)
         await signOut(auth);
         const cred = await signInAnonymously(auth);
+        // Save to localStorage immediately so Client Monitor shows all registered users
+        const pendingClient: any = {
+          id: 'local_' + Date.now(),
+          email,
+          uid: cred.user.uid,
+          status: 'pending',
+          plan: 'free',
+          planExpiry: null,
+          registeredAt: new Date().toISOString(),
+          rank: 0,
+        };
+        const existingLocal: any[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+        if (!existingLocal.find((c: any) => c.email === email)) {
+          existingLocal.push(pendingClient);
+          localStorage.setItem('finalyze_clients', JSON.stringify(existingLocal));
+        }
         const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
         const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
         // Send email (best effort)
