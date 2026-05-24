@@ -107,12 +107,19 @@ export default function App() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
 
   const fetchClients = async () => {
+    // Merge Firestore clients with localStorage fallback
+    const localClients: ClientRecord[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
     try {
       const q = query(collection(db, 'clients'), orderBy('rank', 'asc'));
       const snap = await getDocs(q);
-      setClients(snap.docs.map(d => ({ id: d.id, ...d.data() } as ClientRecord)));
+      const fsClients = snap.docs.map(d => ({ id: d.id, ...d.data() } as ClientRecord));
+      // Merge: Firestore takes priority, add any local-only clients
+      const fsEmails = new Set(fsClients.map(c => c.email));
+      const merged = [...fsClients, ...localClients.filter(c => !fsEmails.has(c.email))];
+      setClients(merged);
     } catch (e) {
-      console.warn('Failed to fetch clients:', e);
+      console.warn('Failed to fetch clients from Firestore, using local cache:', e);
+      setClients(localClients);
     }
   };
 
@@ -1026,6 +1033,29 @@ export default function App() {
               // Save client to Firestore after key validation
               const email = user?.email;
               if (email) {
+                const newClient = {
+                  id: 'local_' + Date.now(),
+                  email,
+                  uid: user?.uid || '',
+                  status: 'pending' as const,
+                  plan: 'free' as const,
+                  planExpiry: null,
+                  registeredAt: new Date().toISOString(),
+                  rank: 0,
+                  groqApiKey: groqKey,
+                  deepseekApiKey: deepseekKey || '',
+                };
+                // Save to localStorage as fallback
+                const localClients: any[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+                const existingIdx = localClients.findIndex(c => c.email === email);
+                if (existingIdx >= 0) {
+                  localClients[existingIdx] = { ...localClients[existingIdx], groqApiKey: groqKey, deepseekApiKey: deepseekKey || '' };
+                } else {
+                  localClients.push(newClient);
+                }
+                localStorage.setItem('finalyze_clients', JSON.stringify(localClients));
+                fetchClients();
+                // Try Firestore (best effort)
                 try {
                   const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
                   if (existingSnap.docs[0]) {
@@ -1037,7 +1067,7 @@ export default function App() {
                       registeredAt: serverTimestamp(), rank: 0,
                     });
                   }
-                } catch (e) { console.warn('Failed to save client after key entry:', e); }
+                } catch (e) { console.warn('Failed to save client to Firestore, localStorage fallback active:', e); }
               }
             }}
             onLogout={handleLogout}
