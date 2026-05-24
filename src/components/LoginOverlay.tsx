@@ -326,7 +326,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
             </div>
 
             {/* Client Sign-In - Two Options */}
-            {pendingVerification || loginError === 'verify_email' ? (
+            {pendingVerification || (loginError === 'verify_email' && (() => { try { return localStorage.getItem('finalyze_verify_link'); } catch { return null; } })()) ? (
               <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-right space-y-5">
                 <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
                   <span>{lang === 'ar' ? 'تسجيل الدخول' : 'Client Sign-In'}</span>

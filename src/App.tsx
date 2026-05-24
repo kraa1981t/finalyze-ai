@@ -549,6 +549,9 @@ export default function App() {
   ]);
 
   useEffect(() => {
+    // Clear stale auth state on mount
+    localStorage.removeItem('finalyze_verify_link');
+    setLoginError(null);
     getRedirectResult(auth)
       .then((result) => {
         if (result?.user) {
