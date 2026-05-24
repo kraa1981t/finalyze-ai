@@ -846,8 +846,12 @@ export default function App() {
         }
         // Not verified — resend verification
         if (data.verifyToken) {
-          const link = `${window.location.origin}/verify?email=${encodeURIComponent(email)}&token=${data.verifyToken}`;
-          setShowVerification(true);
+          // Sign in and show verification banner
+          localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+          localStorage.setItem('finalyze_verify_link', `${window.location.origin}/verify?email=${encodeURIComponent(email)}&token=${data.verifyToken}`);
+          const cred = await signInAnonymously(auth);
+          setUser({ uid: cred.user.uid, email, displayName: '', emailVerified: true } as User);
           return;
         }
       }
@@ -866,8 +870,6 @@ export default function App() {
       const pwdHash = btoa(password + ':finalyze_salt');
 
       // Save to Firestore
-      localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
       const cred = await signInAnonymously(auth);
       await addDoc(collection(db, 'clients'), {
         email, uid: cred.user.uid, password: pwdHash, verifyToken,
@@ -875,10 +877,14 @@ export default function App() {
         registeredAt: serverTimestamp(), rank: 0,
       });
 
-      // Show verification message
-      setShowVerification(true);
-      // Store the link so LoginOverlay can display it
+      // Sign in directly and show verification banner on main page
+      localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
       localStorage.setItem('finalyze_verify_link', verifyLink);
+      const mockUser = {
+        uid: cred.user.uid, email, displayName: '', emailVerified: true,
+      } as User;
+      setUser(mockUser);
     } catch (err: any) {
       localStorage.removeItem('finalyze_auth_user');
       localStorage.removeItem('finalyze_auth_timestamp');
