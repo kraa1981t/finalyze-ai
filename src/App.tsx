@@ -39,6 +39,7 @@ export default function App() {
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [needsApiKey, setNeedsApiKey] = useState<string | null>(null);
+  const [pendingVerifyLink, setPendingVerifyLink] = useState<string | null>(null);
   const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor' => {
     const hash = window.location.hash.slice(1);
     if (['settings', 'apiKey', 'plans', 'paymentSettings', 'clientMonitor'].includes(hash)) return hash as any;
@@ -798,6 +799,7 @@ export default function App() {
       localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
       localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
       localStorage.setItem('finalyze_verify_link', verifyLink);
+      setPendingVerifyLink(verifyLink);
       setUser({
         uid: cred.user.uid, email, displayName: result.user.displayName || 'Client',
         photoURL: result.user.photoURL || '', emailVerified: true,
@@ -852,7 +854,9 @@ export default function App() {
           // Sign in and show verification banner
           localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
           localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-          localStorage.setItem('finalyze_verify_link', `${window.location.origin}/verify?email=${encodeURIComponent(email)}&token=${data.verifyToken}`);
+          const vLink = `${window.location.origin}/verify?email=${encodeURIComponent(email)}&token=${data.verifyToken}`;
+          localStorage.setItem('finalyze_verify_link', vLink);
+          setPendingVerifyLink(vLink);
           const cred = await signInAnonymously(auth);
           setUser({ uid: cred.user.uid, email, displayName: '', emailVerified: true } as User);
           return;
@@ -884,6 +888,7 @@ export default function App() {
       localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
       localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
       localStorage.setItem('finalyze_verify_link', verifyLink);
+      setPendingVerifyLink(verifyLink);
       const mockUser = {
         uid: cred.user.uid, email, displayName: '', emailVerified: true,
       } as User;
@@ -942,9 +947,11 @@ export default function App() {
     localStorage.removeItem('finalyze_dev_bypass_active');
     localStorage.removeItem('finalyze_auth_user');
     localStorage.removeItem('finalyze_auth_timestamp');
+    localStorage.removeItem('finalyze_verify_link');
     setHasApiKey(false);
     setAnalysisResults(null);
     setUser(null);
+    setPendingVerifyLink(null);
   };
 
   const t = translations[lang];
@@ -981,7 +988,7 @@ export default function App() {
             onClientAuth={handleClientAuth}
             lang={lang} 
             loginError={loginError}
-            onClearError={() => { setLoginError(null); }}
+            onClearError={() => { setLoginError(null); setPendingVerifyLink(null); }}
             redirecting={redirecting}
             manualAuthUrl={manualAuthUrl}
           />
@@ -1033,7 +1040,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Verification banner for unverified clients */}
-      {user && localStorage.getItem('finalyze_verify_link') && !needsApiKey && (
+      {user && pendingVerifyLink && !needsApiKey && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 py-3 text-center">
           <p className="text-xs text-amber-400 font-bold inline-block">
             {lang === 'ar'
@@ -1041,7 +1048,7 @@ export default function App() {
               : '📧 Verification link sent to your email. '}
           </p>
           <a
-            href={(() => { try { const l = localStorage.getItem('finalyze_verify_link'); return l || '#'; } catch { return '#'; } })()}
+            href={pendingVerifyLink || '#'}
             target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-400 transition-all mr-2"
           >
