@@ -686,6 +686,8 @@ export default function App() {
       } else {
         setUser(null);
         setHasApiKey(false);
+        setNeedsApiKeyState(null);
+        persistNeedsApiKey(null);
       }
       setLoading(false);
     });
