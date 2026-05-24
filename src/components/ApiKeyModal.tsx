@@ -14,10 +14,11 @@ interface ApiKeyModalProps {
   lang: Language;
   user: User | null;
   onSaved: (key: string) => void;
+  onLogout?: () => void;
   asPage?: boolean;
 }
 
-export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, onSaved, asPage }: ApiKeyModalProps) {
+export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, onSaved, onLogout, asPage }: ApiKeyModalProps) {
   const [keyInput, setKeyInput] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -101,17 +102,14 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
   };
 
   const handleLogout = async () => {
-    try {
-      localStorage.removeItem('finalyze_dev_bypass_active');
-      localStorage.removeItem('finalyze_permanent_owner');
-      localStorage.removeItem('finalyze_auth_user');
-      localStorage.removeItem('finalyze_auth_timestamp');
-      localStorage.removeItem('finalyze_user_groq_api_key');
-      localStorage.removeItem('finalyze_needs_api_key');
-      localStorage.removeItem('finalyze_verify_link');
-      await signOut(auth);
-      onClose();
-    } catch {}
+    if (onLogout) {
+      onLogout();
+    } else {
+      try {
+        await signOut(auth);
+      } catch {}
+    }
+    onClose();
   };
 
   const handleVerifyAndSave = async () => {

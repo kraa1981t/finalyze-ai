@@ -686,8 +686,6 @@ export default function App() {
       } else {
         setUser(null);
         setHasApiKey(false);
-        setNeedsApiKeyState(null);
-        persistNeedsApiKey(null);
       }
       setLoading(false);
     });
@@ -970,6 +968,7 @@ export default function App() {
     localStorage.removeItem('finalyze_auth_timestamp');
     localStorage.removeItem('finalyze_verify_link');
     persistNeedsApiKey(null);
+    setNeedsApiKeyState(null);
     setHasApiKey(false);
     setAnalysisResults(null);
     setUser(null);
@@ -1031,6 +1030,7 @@ export default function App() {
               persistNeedsApiKey(null);
               setActivePage('main');
             }}
+            onLogout={handleLogout}
             asPage
           />
         </div>
@@ -1110,6 +1110,7 @@ export default function App() {
                 lang={lang}
                 user={user}
                 onSaved={() => { setHasApiKey(true); setActivePage('main'); }}
+                onLogout={handleLogout}
                 asPage
               />
             )}
