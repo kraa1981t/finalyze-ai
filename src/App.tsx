@@ -745,6 +745,9 @@ export default function App() {
     setLoginError(null);
     setManualAuthUrl(null);
     setRedirecting(true);
+    // Clear any previously saved API key so each client starts fresh
+    localStorage.removeItem('finalyze_user_groq_api_key');
+    setHasApiKey(false);
     let googleUserEmail = '';
     try {
       const provider = new GoogleAuthProvider();

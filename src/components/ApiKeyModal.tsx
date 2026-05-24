@@ -82,8 +82,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
 
   useEffect(() => {
     if (isOpen) {
-      const savedKey = localStorage.getItem('finalyze_user_groq_api_key') || '';
-      setKeyInput(savedKey);
+      setKeyInput('');
       setError(null);
       setSuccess(false);
       setLogoClicks(0);
@@ -164,7 +163,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
       }, 1500);
 
     } catch (e: any) {
-      console.error("API Key Verification Failed:", e);
       setError(t.errorInvalid);
     } finally {
       setIsLoading(false);
