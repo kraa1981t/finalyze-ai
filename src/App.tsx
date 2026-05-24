@@ -38,8 +38,6 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [pendingVerification, setPendingVerification] = useState<string | null>(null);
-  const [showVerification, setShowVerification] = useState(false);
   const [needsApiKey, setNeedsApiKey] = useState<string | null>(null);
   const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor' => {
     const hash = window.location.hash.slice(1);
@@ -745,7 +743,7 @@ export default function App() {
         setLoginError('لم نتمكن من الحصول على بريدك الإلكتروني. حاول مرة أخرى.');
         return;
       }
-      // Developer emails → sign in directly, no verification
+      // Developer emails → sign in directly
       const isDevEmail = email === 'taybekraa@gmail.com' || email === 'bachasalman69@gmail.com' || email.includes('dev');
       if (isDevEmail) {
         await signOut(auth);
@@ -756,60 +754,51 @@ export default function App() {
         setUser(mockUser);
         return;
       }
-      // Check if client exists in Firestore
+      // Check if client exists and is verified
       const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
       const existing = existingSnap.docs[0];
-      if (existing) {
-        const data = existing.data();
-        if (data.status === 'verified') {
-          // Already verified — sign in directly
-          localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-          await signOut(auth);
-          const cred = await signInAnonymously(auth);
-          const mockUser = {
-            uid: cred.user.uid, email,
-            displayName: result.user.displayName || 'Client',
-            photoURL: result.user.photoURL || '',
-            emailVerified: true,
-          } as User;
-          setUser(mockUser);
-          const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
-          setHasApiKey(hasKey);
-          if (!hasKey) setNeedsApiKey(email);
-          return;
-        }
+      if (existing && existing.data().status === 'verified') {
+        // Already verified — sign in directly
+        localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+        localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+        await signOut(auth);
+        const cred = await signInAnonymously(auth);
+        setUser({
+          uid: cred.user.uid, email, displayName: result.user.displayName || 'Client',
+          photoURL: result.user.photoURL || '', emailVerified: true,
+        } as User);
+        return;
       }
-      // New client or pending — save as pending
+      // New or pending — save client, send email, sign in directly anyway
       const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
       const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
       await signOut(auth);
       const cred = await signInAnonymously(auth);
       if (existing) {
-        // Update existing pending record with new token
         await updateDoc(doc(db, 'clients', existing.id), { verifyToken });
       } else {
-        // New record
         await addDoc(collection(db, 'clients'), {
           email, uid: cred.user.uid, verifyToken,
           status: 'pending', plan: 'free', planExpiry: null,
           registeredAt: serverTimestamp(), rank: 0,
         });
       }
-      // Send verification email via API
+      // Send verification email
       try {
         await fetch('/api/send-verification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, verifyLink }),
         });
-      } catch (e) {
-        console.warn('Email send failed, showing link directly:', e);
-      }
-      // Show blocking verification message
-      setManualAuthUrl(`https://mail.google.com/mail/u/0/#inbox`);
-      setShowVerification(true);
+      } catch (e) { console.warn('Email send failed:', e); }
+      // Sign in directly (no blocking verification)
+      localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
       localStorage.setItem('finalyze_verify_link', verifyLink);
+      setUser({
+        uid: cred.user.uid, email, displayName: result.user.displayName || 'Client',
+        photoURL: result.user.photoURL || '', emailVerified: true,
+      } as User);
     } catch (error: any) {
       console.error("=== signInWithPopup ERROR ===", error);
       if (error.code === 'auth/unauthorized-domain') {
@@ -976,17 +965,16 @@ export default function App() {
       />
 
       <AnimatePresence>
-        {!user && !loading && !pendingVerification && !needsApiKey && (
+        {!user && !loading && !needsApiKey && (
           <LoginOverlay 
             onLogin={handleLogin} 
             onBypassLogin={handleBypassLogin}
             onClientAuth={handleClientAuth}
             lang={lang} 
             loginError={loginError}
-            onClearError={() => { setLoginError(null); setShowVerification(false); }}
+            onClearError={() => { setLoginError(null); }}
             redirecting={redirecting}
             manualAuthUrl={manualAuthUrl}
-            showVerification={showVerification}
           />
         )}
       </AnimatePresence>
@@ -1034,6 +1022,24 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Verification banner for unverified clients */}
+      {user && localStorage.getItem('finalyze_verify_link') && !needsApiKey && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 py-3 text-center">
+          <p className="text-xs text-amber-400 font-bold inline-block">
+            {lang === 'ar'
+              ? '📧 تم إرسال رابط التفعيل إلى بريدك الإلكتروني. '
+              : '📧 Verification link sent to your email. '}
+          </p>
+          <a
+            href={(() => { try { const l = localStorage.getItem('finalyze_verify_link'); return l || '#'; } catch { return '#'; } })()}
+            target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-400 transition-all mr-2"
+          >
+            {lang === 'ar' ? 'تأكيد الحساب ✓' : 'Verify Account ✓'}
+          </a>
+        </div>
+      )}
 
       <AnimatePresence>
         {isScanningFinished && !foundAnyStrong && autoSettings.isEnabled && (

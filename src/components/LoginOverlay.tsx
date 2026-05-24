@@ -12,10 +12,9 @@ interface LoginOverlayProps {
   onClearError: () => void;
   redirecting?: boolean;
   manualAuthUrl?: string | null;
-  showVerification?: boolean;
 }
 
-export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lang, loginError, onClearError, redirecting, manualAuthUrl, showVerification }: LoginOverlayProps) {
+export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lang, loginError, onClearError, redirecting, manualAuthUrl }: LoginOverlayProps) {
   const [showGuide, setShowGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedConfigPath, setCopiedConfigPath] = useState(false);
@@ -327,7 +326,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
             </div>
 
             {/* Client Sign-In - Two Options */}
-            {showVerification ? (
+            {!pendingVerification ? (
               <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-right space-y-5">
                 <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
                   <span>{lang === 'ar' ? 'تسجيل الدخول' : 'Client Sign-In'}</span>
