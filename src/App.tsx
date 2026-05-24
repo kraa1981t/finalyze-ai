@@ -3,7 +3,7 @@ import { onAuthStateChanged, User, signInWithPopup, getRedirectResult, GoogleAut
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, Activity, ArrowLeft, Users } from 'lucide-react';
+import { TrendingUp, Activity, ArrowLeft, Users, Mail } from 'lucide-react';
 import Header from './components/Header';
 import AnalysisForm from './components/AnalysisForm';
 import AnalysisResultView from './components/AnalysisResultView';
@@ -767,7 +767,7 @@ export default function App() {
           if (!hasKey) setNeedsApiKey(email);
           return;
         }
-        // New or pending — save to Firestore, send email, show API key page
+        // New or pending — save to Firestore, send email, show blocking verification
         await signOut(auth);
         const cred = await signInAnonymously(auth);
         const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
@@ -782,12 +782,10 @@ export default function App() {
         }
         // Send email (best effort)
         fetch('/api/send-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, verifyLink }) }).catch(() => {});
-        // Sign in and show blocking API key page immediately
-        localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-        localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+        // Show blocking verification message (Step 1)
         localStorage.setItem('finalyze_verify_link', verifyLink);
+        setPendingVerifyLink(verifyLink);
         setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
-        setNeedsApiKey(email);
         return;
       } catch (innerErr) {
         // Firestore/anon auth failed — still sign user in with basic session
@@ -1001,7 +999,47 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Blocking API Key setup for newly verified clients */}
+      {/* Blocking verification overlay (Step 1: check email before API key) */}
+      {user && pendingVerifyLink && !needsApiKey && user.email && !user.email.includes('dev') && user.email !== 'bachasalman69@gmail.com' && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="max-w-lg w-full bg-brand-alt border border-white/10 rounded-[32px] p-8 shadow-[0_32px_128px_-12px_rgba(0,0,0,0.85)] text-center space-y-6">
+            <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto">
+              <Mail size={32} className="text-amber-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white">
+              {lang === 'ar' ? '📧 تحقق من بريدك Gmail' : '📧 Check Your Gmail'}
+            </h2>
+            <p className="text-slate-300 text-sm leading-relaxed">
+              {lang === 'ar'
+                ? 'تم إرسال رابط التفعيل إلى بريدك الإلكتروني. افتح Gmail واضغط على زر "تأكيد الحساب" الأخضر داخل الرسالة.'
+                : 'A verification link has been sent to your email. Open Gmail and click the green "Confirm Account" button.'}
+            </p>
+            <a
+              href="https://mail.google.com/mail/u/0/#inbox"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-2xl text-sm transition-all"
+            >
+              <Mail size={16} />
+              {lang === 'ar' ? 'فتح Gmail' : 'Open Gmail'}
+            </a>
+            <details className="text-center">
+              <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300">
+                {lang === 'ar' ? 'رابط التفعيل (إذا لم تصل الرسالة)' : 'Verification link (if email not received)'}
+              </summary>
+              <a
+                href={pendingVerifyLink}
+                target="_blank" rel="noopener noreferrer"
+                className="inline-block mt-2 text-[10px] text-emerald-400 underline break-all"
+              >
+                {pendingVerifyLink}
+              </a>
+            </details>
+          </div>
+        </div>
+      )}
+
+      {/* Blocking API Key setup for verified clients (Step 2) */}
       {needsApiKey && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
           <ApiKeyModal
