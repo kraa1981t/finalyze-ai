@@ -996,7 +996,7 @@ export default function App() {
       />
 
       <AnimatePresence>
-        {!user && !loading && !needsApiKey && (
+        {!user && !loading && (
           <LoginOverlay 
             onLogin={handleLogin} 
             onBypassLogin={handleBypassLogin}
@@ -1010,8 +1010,8 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Blocking API Key setup for newly verified clients */}
-      {needsApiKey && (
+      {/* Blocking API Key setup for newly verified clients (only if user is logged in) */}
+      {user && needsApiKey && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
           <ApiKeyModal
             isOpen={true}
