@@ -40,7 +40,6 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [pendingVerification, setPendingVerification] = useState<string | null>(null);
   const [needsApiKey, setNeedsApiKey] = useState<string | null>(null);
-  const isProcessingRef = useRef(false);
   const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor' => {
     const hash = window.location.hash.slice(1);
     if (['settings', 'apiKey', 'plans', 'paymentSettings', 'clientMonitor'].includes(hash)) return hash as any;
@@ -623,11 +622,6 @@ export default function App() {
         setLoading(false);
         return;
       }
-      // Skip user setup during Google registration processing
-      if (isProcessingRef.current) {
-        setLoading(false);
-        return;
-      }
       
       if (u) {
         setUser(u);
@@ -738,91 +732,23 @@ export default function App() {
     setLoginError(null);
     setManualAuthUrl(null);
     setRedirecting(true);
-    isProcessingRef.current = true;
     try {
-      // Clear any stale localStorage state
-      localStorage.removeItem('finalyze_auth_user');
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
-      console.log("=== Google sign-in result ===", result?.user?.email, result?.user?.uid, result?.user?.providerData);
-      // Try to get email from various sources
-      const googleEmail = result?.user?.email || result?.user?.providerData?.[0]?.email || '';
-      if (result?.user && googleEmail) {
-        const email = googleEmail;
-        // Check if client already exists in Firestore
-        const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
-        const existing = existingSnap.docs[0];
-        if (existing) {
-          const data = existing.data();
-          if (data.status === 'verified') {
-            // Already verified — sign in directly
-            isProcessingRef.current = false;
-            await signOut(auth);
-            localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-            localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-            const cred = await signInAnonymously(auth);
-            const mockUser = {
-              uid: cred.user.uid, email,
-              displayName: result.user.displayName || 'Client',
-              photoURL: result.user.photoURL || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150',
-              emailVerified: true,
-            } as User;
-            setUser(mockUser);
-            const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
-            setHasApiKey(hasKey);
-            if (!hasKey) {
-              setNeedsApiKey(email);
-            }
-            return;
-          }
-          // Already pending — show existing verify link
-          isProcessingRef.current = false;
-          if (data.verifyToken) {
-            const link = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${data.verifyToken}`;
-            setPendingVerification(link);
-            return;
-          }
-        }
-        // New Google client — save as pending
-        const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
-        const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
-        // Sign out of Google, sign in anonymously to get uid
-        await signOut(auth);
-        const cred = await signInAnonymously(auth);
-        await addDoc(collection(db, 'clients'), {
-          email, uid: cred.user.uid, verifyToken,
-          status: 'pending', plan: 'free', planExpiry: null,
-          registeredAt: serverTimestamp(), rank: 0,
-        });
-        // Save verify link for display
-        localStorage.setItem('finalyze_verify_link', verifyLink);
-        isProcessingRef.current = false;
-        setPendingVerification(verifyLink);
-      } else if (result?.user && !googleEmail) {
-        // Google user but no email — sign in directly as fallback
-        isProcessingRef.current = false;
+      if (result?.user) {
         setUser(result.user);
       }
     } catch (error: any) {
       console.error("=== signInWithPopup ERROR ===", error);
-      isProcessingRef.current = false;
       if (error.code === 'auth/unauthorized-domain') {
-        setLoginError(`⛔ هذا النطاق (${window.location.hostname}) غير مسموح به في Firebase.
-
-لحل المشكلة:
-1. افتح https://console.firebase.google.com
-2. اختر مشروع "gen-lang-client-0856831678"
-3. Authentication → Settings → Authorized domains
-4. أضف "${window.location.hostname}"
-5. انقر Save وحاول مرة أخرى`);
+        setLoginError(`⛔ هذا النطاق (${window.location.hostname}) غير مسموح به في Firebase.`);
       } else if (error.code === 'auth/popup-closed-by-user') {
         setLoginError('تم إغلاق نافذة تسجيل الدخول. حاول مرة أخرى.');
       } else {
         setLoginError(`Google sign-in error: ${error.code || error.message}`);
       }
     } finally {
-      isProcessingRef.current = false;
       setRedirecting(false);
     }
   };
