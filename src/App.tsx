@@ -33,13 +33,14 @@ export default function App() {
   const [manualAuthUrl, setManualAuthUrl] = useState<string | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string; durationDays: number } | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_groq_api_key'));
-  const [pendingVerification, setPendingVerification] = useState<string | null>(null);
-  const [needsApiKey, setNeedsApiKey] = useState<string | null>(null);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState<string | null>(null);
+  const [needsApiKey, setNeedsApiKey] = useState<string | null>(null);
+  const isProcessingRef = useRef(false);
   const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor' => {
     const hash = window.location.hash.slice(1);
     if (['settings', 'apiKey', 'plans', 'paymentSettings', 'clientMonitor'].includes(hash)) return hash as any;
@@ -621,6 +622,10 @@ export default function App() {
       if (localStorage.getItem('finalyze_auth_user')) {
         return;
       }
+      // Skip user setup during Google registration processing
+      if (isProcessingRef.current) {
+        return;
+      }
       
       if (u) {
         setUser(u);
@@ -731,6 +736,7 @@ export default function App() {
     setLoginError(null);
     setManualAuthUrl(null);
     setRedirecting(true);
+    isProcessingRef.current = true;
     try {
       // Clear any stale localStorage state
       localStorage.removeItem('finalyze_auth_user');
@@ -745,7 +751,8 @@ export default function App() {
         if (existing) {
           const data = existing.data();
           if (data.status === 'verified') {
-            // Already verified and has API key — sign in directly
+            // Already verified — sign in directly
+            isProcessingRef.current = false;
             await signOut(auth);
             localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
             localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
@@ -765,6 +772,7 @@ export default function App() {
             return;
           }
           // Already pending — show existing verify link
+          isProcessingRef.current = false;
           if (data.verifyToken) {
             const link = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${data.verifyToken}`;
             setPendingVerification(link);
@@ -784,10 +792,12 @@ export default function App() {
         });
         // Save verify link for display
         localStorage.setItem('finalyze_verify_link', verifyLink);
+        isProcessingRef.current = false;
         setPendingVerification(verifyLink);
       }
     } catch (error: any) {
       console.error("=== signInWithPopup ERROR ===", error);
+      isProcessingRef.current = false;
       if (error.code === 'auth/unauthorized-domain') {
         setLoginError(`⛔ هذا النطاق (${window.location.hostname}) غير مسموح به في Firebase.
 
@@ -803,6 +813,7 @@ export default function App() {
         setLoginError(`Google sign-in error: ${error.code || error.message}`);
       }
     } finally {
+      isProcessingRef.current = false;
       setRedirecting(false);
     }
   };
@@ -831,7 +842,11 @@ export default function App() {
           localStorage.setItem('finalyze_auth_user', JSON.stringify(mockUser));
           localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
           localStorage.removeItem('finalyze_dev_bypass_active');
-          setHasApiKey(!!localStorage.getItem('finalyze_user_groq_api_key'));
+          const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+          setHasApiKey(hasKey);
+          if (!hasKey) {
+            setNeedsApiKey(email);
+          }
           return;
         }
         // Not verified — resend verification
@@ -1057,7 +1072,7 @@ export default function App() {
       
       <main className={`flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-28 relative transition-all duration-300 ${isSidebarOpen ? (lang === 'ar' ? 'mr-56' : 'ml-56') : ''}`}>
         {/* Dedicated pages (from dashboard) */}
-        {activePage !== 'main' && (
+        {activePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <button
               onClick={() => setActivePage('main')}
@@ -1153,8 +1168,8 @@ export default function App() {
           </motion.div>
         )}
 
-        {/* FORM - hidden during analysis, hidden when results show (mounted to preserve state) */}
-        <div style={{ display: isAnalyzing || analysisResults || activePage !== 'main' ? 'none' : 'block' }}>
+        {/* FORM - hidden during analysis, hidden when results show, hidden when ApiKey is needed */}
+        <div style={{ display: isAnalyzing || analysisResults || activePage !== 'main' || !!needsApiKey ? 'none' : 'block' }}>
           {activeSubscription && (() => {
             const daysLeft = Math.ceil((new Date(activeSubscription.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
             return (
