@@ -256,6 +256,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             value={keyInput}
             onChange={(e) => setKeyInput(e.target.value)}
             placeholder={t.placeholder}
+            autoComplete="off"
             className="w-full bg-black/40 border border-white/10 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
             dir="ltr"
             disabled={isLoading || success}
@@ -293,6 +294,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             value={keyInput2}
             onChange={(e) => setKeyInput2(e.target.value)}
             placeholder={t.placeholder2}
+            autoComplete="off"
             className="w-full bg-black/40 border border-white/10 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
             dir="ltr"
             disabled={isLoading || success}

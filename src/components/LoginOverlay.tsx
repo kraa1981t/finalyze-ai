@@ -379,6 +379,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
                     />
                     <input
                       type="password"
+                      autoComplete="new-password"
                       value={password}
                       onChange={(e) => { setPassword(e.target.value); onClearError(); }}
                       placeholder={lang === 'ar' ? 'كلمة المرور' : 'Password'}
