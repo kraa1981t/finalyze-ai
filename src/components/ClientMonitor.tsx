@@ -55,59 +55,59 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
       {/* Summary */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: isAr ? 'إجمالي' : 'Total', value: clients.length, color: 'text-blue-400' },
+          { label: isAr ? 'إجمالي' : 'Total', value: clients.length, color: 'text-white' },
           { label: isAr ? 'مفعل' : 'Verified', value: clients.filter(c => c.status === 'verified').length, color: 'text-emerald-400' },
           { label: isAr ? 'قيد الانتظار' : 'Pending', value: clients.filter(c => c.status === 'pending').length, color: 'text-amber-400' },
           { label: isAr ? 'محظور' : 'Banned', value: clients.filter(c => c.status === 'banned').length, color: 'text-red-400' },
         ].map((stat, i) => (
-          <div key={i} className="bg-brand-alt rounded-2xl p-4 border border-white/5 text-center">
-            <div className={`text-2xl font-black ${stat.color}`}>{stat.value}</div>
-            <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">{stat.label}</div>
+          <div key={i} className="bg-brand-alt rounded-2xl p-4 border border-white/10 text-center">
+            <div className={`text-3xl font-black ${stat.color}`}>{stat.value}</div>
+            <div className="text-xs text-white/80 font-bold tracking-wider mt-1">{stat.label}</div>
           </div>
         ))}
       </div>
 
       {/* Client Table */}
       {clients.length === 0 ? (
-        <div className="bg-brand-alt rounded-2xl p-8 border border-white/5 text-center">
-          <Users size={40} className="text-slate-600 mx-auto mb-3" />
-          <p className="text-sm text-slate-500 font-bold">
+        <div className="bg-brand-alt rounded-2xl p-10 border border-white/10 text-center">
+          <Users size={48} className="text-white/20 mx-auto mb-4" />
+          <p className="text-base text-white/60 font-bold">
             {isAr ? 'لا يوجد عملاء مسجلين بعد' : 'No clients registered yet'}
           </p>
         </div>
       ) : (
-        <div className="bg-brand-alt rounded-2xl border border-white/5 overflow-hidden">
+        <div className="bg-brand-alt rounded-2xl border border-white/10 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
               <thead>
-                <tr className="border-b border-white/5">
-                  <th className="text-left px-4 py-3 text-[10px] text-slate-500 font-black uppercase tracking-widest">{isAr ? 'الرتبة' : 'Rank'}</th>
-                  <th className="text-left px-4 py-3 text-[10px] text-slate-500 font-black uppercase tracking-widest">{isAr ? 'البريد الإلكتروني' : 'Email'}</th>
-                  <th className="text-left px-4 py-3 text-[10px] text-slate-500 font-black uppercase tracking-widest">{isAr ? 'الحالة' : 'Status'}</th>
-                  <th className="text-left px-4 py-3 text-[10px] text-slate-500 font-black uppercase tracking-widest">{isAr ? 'الخطة' : 'Plan'}</th>
-                  <th className="text-left px-4 py-3 text-[10px] text-slate-500 font-black uppercase tracking-widest">{isAr ? 'المتبقي' : 'Left'}</th>
-                  <th className="text-left px-4 py-3 text-[10px] text-slate-500 font-black uppercase tracking-widest">{isAr ? 'إجراءات' : 'Actions'}</th>
+                <tr className="border-b border-white/10">
+                  <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'الرتبة' : 'Rank'}</th>
+                  <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'البريد الإلكتروني' : 'Email'}</th>
+                  <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'الحالة' : 'Status'}</th>
+                  <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'الخطة' : 'Plan'}</th>
+                  <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'المتبقي' : 'Left'}</th>
+                  <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'إجراءات' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody>
                 {clients.map((client) => (
                   <tr key={client.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-black text-brand-text">#{client.rank}</span>
+                      <span className="font-bold text-white">#{client.rank}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-brand-text">{client.email}</span>
+                      <span className="text-sky-300 font-bold text-shadow-glow">{client.email}</span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {client.status === 'verified' ? (
-                          <CheckCircle size={12} className="text-emerald-400" />
+                          <CheckCircle size={14} className="text-emerald-400" />
                         ) : client.status === 'banned' ? (
-                          <Ban size={12} className="text-red-400" />
+                          <Ban size={14} className="text-red-400" />
                         ) : (
-                          <Clock size={12} className="text-amber-400" />
+                          <Clock size={14} className="text-amber-400" />
                         )}
-                        <span className={`text-[11px] font-bold ${
+                        <span className={`text-xs font-bold ${
                           client.status === 'verified' ? 'text-emerald-400' :
                           client.status === 'banned' ? 'text-red-400' : 'text-amber-400'
                         }`}>
@@ -118,10 +118,10 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-[11px] font-black px-2 py-1 rounded-full ${
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                         client.plan === 'paid'
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : 'bg-slate-500/10 text-slate-400'
+                          ? 'bg-emerald-500/15 text-emerald-300'
+                          : 'bg-white/5 text-white/70'
                       }`}>
                         {client.plan === 'paid' ? (isAr ? 'مدفوعة' : 'Paid') : (isAr ? 'مجانية' : 'Free')}
                       </span>
@@ -132,7 +132,7 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
                           {daysLeft(client.planExpiry)} {isAr ? 'يوم' : 'days'}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-500">--</span>
+                        <span className="text-sm text-white/50">--</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
