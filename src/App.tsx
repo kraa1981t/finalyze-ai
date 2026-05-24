@@ -759,6 +759,8 @@ export default function App() {
           // Already verified — sign in directly, check API key
           await signOut(auth);
           const cred = await signInAnonymously(auth);
+          localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
           setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
           const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
           setHasApiKey(hasKey);
@@ -781,6 +783,8 @@ export default function App() {
         // Send email (best effort)
         fetch('/api/send-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, verifyLink }) }).catch(() => {});
         // Sign in with verify banner
+        localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+        localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         localStorage.setItem('finalyze_verify_link', verifyLink);
         setPendingVerifyLink(verifyLink);
         setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
@@ -1038,7 +1042,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Verification banner for unverified clients */}
-      {user && pendingVerifyLink && !needsApiKey && (
+      {user && pendingVerifyLink && !needsApiKey && user.email && !user.email.includes('dev') && user.email !== 'bachasalman69@gmail.com' && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 py-3 text-center">
           <p className="text-xs text-amber-400 font-bold inline-block">
             {lang === 'ar'
