@@ -5,6 +5,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Clients collection — allow authenticated read/write for registration flow
+    match /clients/{clientId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
     function isSignedIn() {
       return request.auth != null;
     }

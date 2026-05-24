@@ -795,6 +795,10 @@ export default function App() {
         localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         setUser({ uid: 'fallback_' + Date.now(), email, displayName: result.user.displayName || 'Client', emailVerified: true } as User);
+        // Even if Firestore fails, require API key
+        const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+        setHasApiKey(hasKey);
+        if (!hasKey) setNeedsApiKey(email);
         return;
       }
     } catch (error: any) {
