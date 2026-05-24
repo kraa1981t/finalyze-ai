@@ -751,12 +751,12 @@ export default function App() {
         return;
       }
 
-      // Try to save as pending client and send email (non-blocking)
+      // Try to save as pending client and send email
       try {
         const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
         const existing = existingSnap.docs[0]?.data();
         if (existing?.status === 'verified') {
-          // Already verified — sign in directly, check API key
+          // Already verified — sign in directly
           await signOut(auth);
           const cred = await signInAnonymously(auth);
           localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
@@ -767,7 +767,7 @@ export default function App() {
           if (!hasKey) setNeedsApiKey(email);
           return;
         }
-        // New or pending — sign out Google, sign in anonymous, save to Firestore
+        // New or pending — save to Firestore, send email, show API key page
         await signOut(auth);
         const cred = await signInAnonymously(auth);
         const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
@@ -782,12 +782,12 @@ export default function App() {
         }
         // Send email (best effort)
         fetch('/api/send-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, verifyLink }) }).catch(() => {});
-        // Sign in with verify banner
+        // Sign in and show blocking API key page immediately
         localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         localStorage.setItem('finalyze_verify_link', verifyLink);
-        setPendingVerifyLink(verifyLink);
         setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
+        setNeedsApiKey(email);
         return;
       } catch (innerErr) {
         // Firestore/anon auth failed — still sign user in with basic session
@@ -1040,24 +1040,6 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-
-      {/* Verification banner for unverified clients */}
-      {user && pendingVerifyLink && !needsApiKey && user.email && !user.email.includes('dev') && user.email !== 'bachasalman69@gmail.com' && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 py-3 text-center">
-          <p className="text-xs text-amber-400 font-bold inline-block">
-            {lang === 'ar'
-              ? '📧 تم إرسال رابط التفعيل إلى بريدك الإلكتروني. '
-              : '📧 Verification link sent to your email. '}
-          </p>
-          <a
-            href={pendingVerifyLink || '#'}
-            target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-400 transition-all mr-2"
-          >
-            {lang === 'ar' ? 'تأكيد الحساب ✓' : 'Verify Account ✓'}
-          </a>
-        </div>
-      )}
 
       <AnimatePresence>
         {isScanningFinished && !foundAnyStrong && autoSettings.isEnabled && (
