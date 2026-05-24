@@ -767,6 +767,9 @@ export default function App() {
           uid: cred.user.uid, email, displayName: result.user.displayName || 'Client',
           photoURL: result.user.photoURL || '', emailVerified: true,
         } as User);
+        const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+        setHasApiKey(hasKey);
+        if (!hasKey) setNeedsApiKey(email);
         return;
       }
       // New or pending — save client, send email, sign in directly anyway
