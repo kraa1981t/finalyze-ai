@@ -735,81 +735,79 @@ export default function App() {
     setLoginError(null);
     setManualAuthUrl(null);
     setRedirecting(true);
+    let googleUserEmail = '';
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
       const email = result?.user?.email || result?.user?.providerData?.[0]?.email || '';
-      if (!email) {
-        setLoginError('لم نتمكن من الحصول على بريدك الإلكتروني. حاول مرة أخرى.');
-        return;
-      }
+      if (!email) { throw new Error('no_email'); }
+      googleUserEmail = email;
+
       // Developer emails → sign in directly
-      const isDevEmail = email === 'taybekraa@gmail.com' || email === 'bachasalman69@gmail.com' || email.includes('dev');
-      if (isDevEmail) {
+      if (email === 'taybekraa@gmail.com' || email === 'bachasalman69@gmail.com' || email.includes('dev')) {
         await signOut(auth);
-        const mockUser = {
-          uid: 'dev_' + email.replace(/[^a-zA-Z0-9]/g, ''),
-          email, displayName: 'Developer', emailVerified: true,
-        } as User;
-        setUser(mockUser);
+        setUser({ uid: 'dev_' + email.replace(/[^a-zA-Z0-9]/g, ''), email, displayName: 'Developer', emailVerified: true } as User);
         return;
       }
-      // Check if client exists and is verified
-      const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
-      const existing = existingSnap.docs[0];
-      if (existing && existing.data().status === 'verified') {
-        // Already verified — sign in directly
-        localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-        localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+
+      // Try to save as pending client and send email (non-blocking)
+      try {
+        const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
+        const existing = existingSnap.docs[0]?.data();
+        if (existing?.status === 'verified') {
+          // Already verified — sign in directly, check API key
+          await signOut(auth);
+          const cred = await signInAnonymously(auth);
+          setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
+          const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+          setHasApiKey(hasKey);
+          if (!hasKey) setNeedsApiKey(email);
+          return;
+        }
+        // New or pending — sign out Google, sign in anonymous, save to Firestore
         await signOut(auth);
         const cred = await signInAnonymously(auth);
-        setUser({
-          uid: cred.user.uid, email, displayName: result.user.displayName || 'Client',
-          photoURL: result.user.photoURL || '', emailVerified: true,
-        } as User);
-        const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
-        setHasApiKey(hasKey);
-        if (!hasKey) setNeedsApiKey(email);
+        const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
+        const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
+        if (existingSnap.docs[0]) {
+          await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { verifyToken });
+        } else {
+          await addDoc(collection(db, 'clients'), {
+            email, uid: cred.user.uid, verifyToken, status: 'pending', plan: 'free', planExpiry: null,
+            registeredAt: serverTimestamp(), rank: 0,
+          });
+        }
+        // Send email (best effort)
+        fetch('/api/send-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, verifyLink }) }).catch(() => {});
+        // Sign in with verify banner
+        localStorage.setItem('finalyze_verify_link', verifyLink);
+        setPendingVerifyLink(verifyLink);
+        setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
+        return;
+      } catch (innerErr) {
+        // Firestore/anon auth failed — still sign user in with basic session
+        console.error('Non-critical error during client setup:', innerErr);
+        localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+        localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+        setUser({ uid: 'fallback_' + Date.now(), email, displayName: result.user.displayName || 'Client', emailVerified: true } as User);
         return;
       }
-      // New or pending — save client, send email, sign in directly anyway
-      const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
-      const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
-      await signOut(auth);
-      const cred = await signInAnonymously(auth);
-      if (existing) {
-        await updateDoc(doc(db, 'clients', existing.id), { verifyToken });
-      } else {
-        await addDoc(collection(db, 'clients'), {
-          email, uid: cred.user.uid, verifyToken,
-          status: 'pending', plan: 'free', planExpiry: null,
-          registeredAt: serverTimestamp(), rank: 0,
-        });
-      }
-      // Send verification email
-      try {
-        await fetch('/api/send-verification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, verifyLink }),
-        });
-      } catch (e) { console.warn('Email send failed:', e); }
-      // Sign in directly (no blocking verification)
-      localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-      localStorage.setItem('finalyze_verify_link', verifyLink);
-      setPendingVerifyLink(verifyLink);
-      setUser({
-        uid: cred.user.uid, email, displayName: result.user.displayName || 'Client',
-        photoURL: result.user.photoURL || '', emailVerified: true,
-      } as User);
     } catch (error: any) {
       console.error("=== signInWithPopup ERROR ===", error);
+      if (googleUserEmail) {
+        // Popup succeeded but something else failed — sign in directly anyway
+        localStorage.setItem('finalyze_auth_user', JSON.stringify({ email: googleUserEmail, placeholder: true }));
+        localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+        setUser({ uid: 'fallback_' + Date.now(), email: googleUserEmail, displayName: 'Client', emailVerified: true } as User);
+        return;
+      }
       if (error.code === 'auth/unauthorized-domain') {
         setLoginError(`⛔ هذا النطاق (${window.location.hostname}) غير مسموح به في Firebase.`);
       } else if (error.code === 'auth/popup-closed-by-user') {
         setLoginError('تم إغلاق نافذة تسجيل الدخول. حاول مرة أخرى.');
+      } else if (error.message === 'no_email') {
+        setLoginError('لم نتمكن من الحصول على بريدك الإلكتروني. حاول مرة أخرى.');
       } else {
         setLoginError(`Google sign-in error: ${error.code || error.message}`);
       }
