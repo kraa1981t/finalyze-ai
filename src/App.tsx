@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, getRedirectResult, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -734,23 +734,16 @@ export default function App() {
     setManualAuthUrl(null);
     setRedirecting(true);
     try {
+      // Clear any stale localStorage state
+      localStorage.removeItem('finalyze_auth_user');
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithRedirect(auth, provider);
-      setTimeout(() => {
-        setRedirecting(prev => {
-          if (prev) {
-            const authDomain = 'https://gen-lang-client-0856831678.firebaseapp.com';
-            const redirectUri = window.location.origin;
-            const manualUrl = `${authDomain}/__/auth/handler?apiKey=AIzaSyBxl9iZpPaIxjfgnJSfKEpZpq6M9I733zg&providerId=google.com&authType=signInViaRedirect&redirect_uri=${encodeURIComponent(redirectUri)}`;
-            setManualAuthUrl(manualUrl);
-            return true;
-          }
-          return prev;
-        });
-      }, 3000);
+      const result = await signInWithPopup(auth, provider);
+      if (result?.user) {
+        setUser(result.user);
+      }
     } catch (error: any) {
-      console.error("=== signInWithRedirect ERROR ===", error);
+      console.error("=== signInWithPopup ERROR ===", error);
       if (error.code === 'auth/unauthorized-domain') {
         setLoginError(`⛔ هذا النطاق (${window.location.hostname}) غير مسموح به في Firebase.
 
@@ -760,9 +753,12 @@ export default function App() {
 3. Authentication → Settings → Authorized domains
 4. أضف "${window.location.hostname}"
 5. انقر Save وحاول مرة أخرى`);
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        setLoginError('تم إغلاق نافذة تسجيل الدخول. حاول مرة أخرى.');
       } else {
         setLoginError(`Google sign-in error: ${error.code || error.message}`);
       }
+    } finally {
       setRedirecting(false);
     }
   };
