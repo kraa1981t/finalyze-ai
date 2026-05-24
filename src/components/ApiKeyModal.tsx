@@ -13,14 +13,16 @@ interface ApiKeyModalProps {
   isBlocking: boolean;
   lang: Language;
   user: User | null;
-  onSaved: (key: string) => void;
+  onSaved: (groqKey: string, secondaryKey?: string) => void;
   onLogout?: () => void;
   asPage?: boolean;
 }
 
 export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, onSaved, onLogout, asPage }: ApiKeyModalProps) {
   const [keyInput, setKeyInput] = useState('');
+  const [keyInput2, setKeyInput2] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [showKey2, setShowKey2] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -58,6 +60,8 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     btnAlibaba: isAr ? 'فتح منصة Groq' : 'Open Groq Console',
     step2: isAr ? 'الخطوة 2: لصق المفتاح' : 'Step 2: Paste your key',
     placeholder: isAr ? 'gsk_... الصق المفتاح هنا' : 'gsk_... paste your key here',
+    placeholder2: isAr ? 'مفتاح ثانوي (اختياري)' : 'Secondary API key (optional)',
+    subtitle2: isAr ? 'يمكنك إضافة مفتاح ثانوي لمزود آخر (اختياري)' : 'Add a secondary key for another provider (optional)',
     btnVerify: isAr ? 'تحقق وحفظ' : 'Verify & Save',
     btnVerifying: isAr ? 'جارٍ التحقق...' : 'Verifying...',
     btnSaved: isAr ? '✓ تم الحفظ بنجاح!' : '✓ Saved Successfully!',
@@ -84,6 +88,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
   useEffect(() => {
     if (isOpen) {
       setKeyInput('');
+      setKeyInput2('');
       setError(null);
       setSuccess(false);
       setLogoClicks(0);
@@ -144,6 +149,12 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
       }
 
       localStorage.setItem('finalyze_user_groq_api_key', trimmedKey);
+      const trimmedKey2 = keyInput2.trim();
+      if (trimmedKey2) {
+        localStorage.setItem('finalyze_user_secondary_api_key', trimmedKey2);
+      } else {
+        localStorage.removeItem('finalyze_user_secondary_api_key');
+      }
 
       // Save to Firestore (best effort — don't block on failure)
       try {
@@ -151,6 +162,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           const userDocRef = doc(db, 'users', user.uid);
           await setDoc(userDocRef, {
             groqApiKey: trimmedKey,
+            secondaryApiKey: trimmedKey2 || '',
             updatedAt: new Date().toISOString()
           }, { merge: true });
         }
@@ -159,7 +171,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
       }
 
       setSuccess(true);
-      onSaved(trimmedKey);
+      onSaved(trimmedKey, trimmedKey2 || undefined);
       
       setTimeout(() => {
         onClose();
@@ -257,6 +269,26 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
           >
             {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        </div>
+
+        <p className="text-[10px] text-slate-500 mt-1">{t.subtitle2}</p>
+
+        <div className="relative mt-3">
+          <input
+            type={showKey2 ? 'text' : 'password'}
+            value={keyInput2}
+            onChange={(e) => setKeyInput2(e.target.value)}
+            placeholder={t.placeholder2}
+            className="w-full bg-black/40 border border-white/10 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
+            dir="ltr"
+            disabled={isLoading || success}
+          />
+          <button
+            onClick={() => setShowKey2(!showKey2)}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            {showKey2 ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
       </div>

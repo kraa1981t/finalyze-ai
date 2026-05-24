@@ -780,19 +780,11 @@ export default function App() {
           if (!hasKey) persistNeedsApiKey(email);
           return;
         }
-        // New or pending — save to Firestore, send email, show API key page
+        // New or pending — send email, show API key page (save client only after key entry)
         await signOut(auth);
         const cred = await signInAnonymously(auth);
         const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
         const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
-        if (existingSnap.docs[0]) {
-          await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { verifyToken });
-        } else {
-          await addDoc(collection(db, 'clients'), {
-            email, uid: cred.user.uid, verifyToken, status: 'pending', plan: 'free', planExpiry: null,
-            registeredAt: serverTimestamp(), rank: 0,
-          });
-        }
         // Send email (best effort)
         fetch('/api/send-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, verifyLink }) }).catch(() => {});
         // Sign in and show blocking API key page immediately
@@ -1025,10 +1017,26 @@ export default function App() {
             isBlocking={true}
             lang={lang}
             user={user}
-            onSaved={(key) => {
+            onSaved={async (groqKey, secondaryKey) => {
               setHasApiKey(true);
               persistNeedsApiKey(null);
               setActivePage('main');
+              // Save client to Firestore after key validation
+              const email = user?.email;
+              if (email) {
+                try {
+                  const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
+                  if (existingSnap.docs[0]) {
+                    await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { groqApiKey: groqKey, secondaryApiKey: secondaryKey || '' });
+                  } else {
+                    await addDoc(collection(db, 'clients'), {
+                      email, groqApiKey: groqKey, secondaryApiKey: secondaryKey || '',
+                      status: 'pending', plan: 'free', planExpiry: null,
+                      registeredAt: serverTimestamp(), rank: 0,
+                    });
+                  }
+                } catch (e) { console.warn('Failed to save client after key entry:', e); }
+              }
             }}
             onLogout={handleLogout}
             asPage
