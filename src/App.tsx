@@ -741,6 +741,17 @@ export default function App() {
         setLoginError('لم نتمكن من الحصول على بريدك الإلكتروني. حاول مرة أخرى.');
         return;
       }
+      // Developer emails → sign in directly, no verification
+      const isDevEmail = email === 'taybekraa@gmail.com' || email === 'bachasalman69@gmail.com' || email.includes('dev');
+      if (isDevEmail) {
+        await signOut(auth);
+        const mockUser = {
+          uid: 'dev_' + email.replace(/[^a-zA-Z0-9]/g, ''),
+          email, displayName: 'Developer', emailVerified: true,
+        } as User;
+        setUser(mockUser);
+        return;
+      }
       // Check if client exists in Firestore
       const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
       const existing = existingSnap.docs[0];
