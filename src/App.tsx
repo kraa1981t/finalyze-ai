@@ -3,7 +3,7 @@ import { onAuthStateChanged, User, signInWithPopup, getRedirectResult, GoogleAut
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, Activity, ArrowLeft, Users, Mail } from 'lucide-react';
+import { TrendingUp, Activity, ArrowLeft, Users } from 'lucide-react';
 import Header from './components/Header';
 import AnalysisForm from './components/AnalysisForm';
 import AnalysisResultView from './components/AnalysisResultView';
@@ -39,7 +39,6 @@ export default function App() {
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [needsApiKey, setNeedsApiKey] = useState<string | null>(null);
-  const [pendingVerifyLink, setPendingVerifyLink] = useState<string | null>(null);
   const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor' => {
     const hash = window.location.hash.slice(1);
     if (['settings', 'apiKey', 'plans', 'paymentSettings', 'clientMonitor'].includes(hash)) return hash as any;
@@ -751,41 +750,27 @@ export default function App() {
         return;
       }
 
-      // Try to save as pending client and send email
+      // Save client to Firestore and show API key page
       try {
         const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
-        const existing = existingSnap.docs[0]?.data();
-        if (existing?.status === 'verified') {
-          // Already verified — sign in directly
-          await signOut(auth);
-          const cred = await signInAnonymously(auth);
-          localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-          setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
-          const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
-          setHasApiKey(hasKey);
-          if (!hasKey) setNeedsApiKey(email);
-          return;
-        }
-        // New or pending — save to Firestore, send email, show blocking verification
+        const existing = existingSnap.docs[0];
         await signOut(auth);
         const cred = await signInAnonymously(auth);
-        const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
-        const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
-        if (existingSnap.docs[0]) {
-          await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { verifyToken });
+        if (existing) {
+          await updateDoc(doc(db, 'clients', existing.id), { lastLogin: serverTimestamp() });
         } else {
           await addDoc(collection(db, 'clients'), {
-            email, uid: cred.user.uid, verifyToken, status: 'pending', plan: 'free', planExpiry: null,
+            email, uid: cred.user.uid, status: 'active', plan: 'free', planExpiry: null,
             registeredAt: serverTimestamp(), rank: 0,
           });
         }
-        // Send email (best effort)
-        fetch('/api/send-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, verifyLink }) }).catch(() => {});
-        // Show blocking verification message (Step 1)
-        localStorage.setItem('finalyze_verify_link', verifyLink);
-        setPendingVerifyLink(verifyLink);
+        localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+        localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
+        // Show blocking API key page
+        const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+        setHasApiKey(hasKey);
+        if (!hasKey) setNeedsApiKey(email);
         return;
       } catch (innerErr) {
         // Firestore/anon auth failed — still sign user in with basic session
@@ -793,7 +778,6 @@ export default function App() {
         localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         setUser({ uid: 'fallback_' + Date.now(), email, displayName: result.user.displayName || 'Client', emailVerified: true } as User);
-        // Even if Firestore fails, require API key
         const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
         setHasApiKey(hasKey);
         if (!hasKey) setNeedsApiKey(email);
@@ -999,47 +983,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Blocking verification overlay (Step 1: check email before API key) */}
-      {user && pendingVerifyLink && !needsApiKey && user.email && !user.email.includes('dev') && user.email !== 'bachasalman69@gmail.com' && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="max-w-lg w-full bg-brand-alt border border-white/10 rounded-[32px] p-8 shadow-[0_32px_128px_-12px_rgba(0,0,0,0.85)] text-center space-y-6">
-            <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto">
-              <Mail size={32} className="text-amber-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-white">
-              {lang === 'ar' ? '📧 تحقق من بريدك Gmail' : '📧 Check Your Gmail'}
-            </h2>
-            <p className="text-slate-300 text-sm leading-relaxed">
-              {lang === 'ar'
-                ? 'تم إرسال رابط التفعيل إلى بريدك الإلكتروني. افتح Gmail واضغط على زر "تأكيد الحساب" الأخضر داخل الرسالة.'
-                : 'A verification link has been sent to your email. Open Gmail and click the green "Confirm Account" button.'}
-            </p>
-            <a
-              href="https://mail.google.com/mail/u/0/#inbox"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-2xl text-sm transition-all"
-            >
-              <Mail size={16} />
-              {lang === 'ar' ? 'فتح Gmail' : 'Open Gmail'}
-            </a>
-            <details className="text-center">
-              <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300">
-                {lang === 'ar' ? 'رابط التفعيل (إذا لم تصل الرسالة)' : 'Verification link (if email not received)'}
-              </summary>
-              <a
-                href={pendingVerifyLink}
-                target="_blank" rel="noopener noreferrer"
-                className="inline-block mt-2 text-[10px] text-emerald-400 underline break-all"
-              >
-                {pendingVerifyLink}
-              </a>
-            </details>
-          </div>
-        </div>
-      )}
-
-      {/* Blocking API Key setup for verified clients (Step 2) */}
+      {/* Blocking API Key setup for newly verified clients */}
       {needsApiKey && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
           <ApiKeyModal

@@ -192,24 +192,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         {t.desc}
       </p>
 
-      {/* Verification message for unverified clients */}
-      {typeof window !== 'undefined' && localStorage.getItem('finalyze_verify_link') && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6 text-center space-y-2">
-          <p className="text-xs text-amber-400 font-bold">
-            {lang === 'ar'
-              ? '📧 تم إرسال رابط التفعيل إلى بريدك Gmail. اضغط على "تأكيد الحساب" في الرسالة.'
-              : '📧 Verification link sent to your Gmail. Click "Confirm Account" in the email.'}
-          </p>
-          <a
-            href={(() => { try { return localStorage.getItem('finalyze_verify_link') || '#'; } catch { return '#'; } })()}
-            target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-400 transition-all"
-          >
-            {lang === 'ar' ? 'فتح Gmail' : 'Open Gmail'}
-          </a>
-        </div>
-      )}
-
       <div className="space-y-3 mb-6 bg-white/5 border border-white/5 rounded-2xl p-5">
         <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
