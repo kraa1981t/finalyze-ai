@@ -620,10 +620,12 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       // Don't let state changes override custom persistent session if it is set
       if (localStorage.getItem('finalyze_auth_user')) {
+        setLoading(false);
         return;
       }
       // Skip user setup during Google registration processing
       if (isProcessingRef.current) {
+        setLoading(false);
         return;
       }
       
@@ -743,8 +745,11 @@ export default function App() {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
-      if (result?.user?.email) {
-        const email = result.user.email;
+      console.log("=== Google sign-in result ===", result?.user?.email, result?.user?.uid, result?.user?.providerData);
+      // Try to get email from various sources
+      const googleEmail = result?.user?.email || result?.user?.providerData?.[0]?.email || '';
+      if (result?.user && googleEmail) {
+        const email = googleEmail;
         // Check if client already exists in Firestore
         const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
         const existing = existingSnap.docs[0];
@@ -794,6 +799,10 @@ export default function App() {
         localStorage.setItem('finalyze_verify_link', verifyLink);
         isProcessingRef.current = false;
         setPendingVerification(verifyLink);
+      } else if (result?.user && !googleEmail) {
+        // Google user but no email — sign in directly as fallback
+        isProcessingRef.current = false;
+        setUser(result.user);
       }
     } catch (error: any) {
       console.error("=== signInWithPopup ERROR ===", error);
