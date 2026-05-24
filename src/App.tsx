@@ -38,7 +38,18 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [needsApiKey, setNeedsApiKey] = useState<string | null>(null);
+  const [needsApiKey, setNeedsApiKeyState] = useState<string | null>(() => localStorage.getItem('finalyze_needs_api_key') || null);
+  const [pendingVerifyLink, setPendingVerifyLink] = useState<string | null>(localStorage.getItem('finalyze_verify_link') || null);
+  const persistNeedsApiKey = (email: string | null) => {
+    if (email) {
+      localStorage.setItem('finalyze_needs_api_key', email);
+      localStorage.setItem('finalyze_needs_api_key_timestamp', Date.now().toString());
+    } else {
+      localStorage.removeItem('finalyze_needs_api_key');
+      localStorage.removeItem('finalyze_needs_api_key_timestamp');
+    }
+    setNeedsApiKeyState(email);
+  };
   const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor' => {
     const hash = window.location.hash.slice(1);
     if (['settings', 'apiKey', 'plans', 'paymentSettings', 'clientMonitor'].includes(hash)) return hash as any;
@@ -717,7 +728,7 @@ export default function App() {
               emailVerified: true,
             } as User;
             setUser(mockUser);
-            setNeedsApiKey(vEmail);
+            persistNeedsApiKey(vEmail);
           } else {
             alert(lang === 'ar' ? '❌ رابط التفعيل غير صالح أو منتهي.' : '❌ Invalid or expired verification link.');
             window.history.replaceState({}, '', window.location.pathname);
@@ -750,27 +761,43 @@ export default function App() {
         return;
       }
 
-      // Save client to Firestore and show API key page
+      // Try to save as pending client and send email
       try {
         const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
-        const existing = existingSnap.docs[0];
+        const existing = existingSnap.docs[0]?.data();
+        if (existing?.status === 'verified') {
+          // Already verified — sign in directly
+          await signOut(auth);
+          const cred = await signInAnonymously(auth);
+          localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+          setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
+          const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+          setHasApiKey(hasKey);
+          if (!hasKey) persistNeedsApiKey(email);
+          return;
+        }
+        // New or pending — save to Firestore, send email, show API key page
         await signOut(auth);
         const cred = await signInAnonymously(auth);
-        if (existing) {
-          await updateDoc(doc(db, 'clients', existing.id), { lastLogin: serverTimestamp() });
+        const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
+        const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
+        if (existingSnap.docs[0]) {
+          await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { verifyToken });
         } else {
           await addDoc(collection(db, 'clients'), {
-            email, uid: cred.user.uid, status: 'active', plan: 'free', planExpiry: null,
+            email, uid: cred.user.uid, verifyToken, status: 'pending', plan: 'free', planExpiry: null,
             registeredAt: serverTimestamp(), rank: 0,
           });
         }
+        // Send email (best effort)
+        fetch('/api/send-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, verifyLink }) }).catch(() => {});
+        // Sign in and show blocking API key page immediately
         localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+        localStorage.setItem('finalyze_verify_link', verifyLink);
         setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
-        // Show blocking API key page
-        const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
-        setHasApiKey(hasKey);
-        if (!hasKey) setNeedsApiKey(email);
+        persistNeedsApiKey(email);
         return;
       } catch (innerErr) {
         // Firestore/anon auth failed — still sign user in with basic session
@@ -778,9 +805,10 @@ export default function App() {
         localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         setUser({ uid: 'fallback_' + Date.now(), email, displayName: result.user.displayName || 'Client', emailVerified: true } as User);
+        // Even if Firestore fails, require API key
         const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
         setHasApiKey(hasKey);
-        if (!hasKey) setNeedsApiKey(email);
+        if (!hasKey) persistNeedsApiKey(email);
         return;
       }
     } catch (error: any) {
@@ -833,7 +861,7 @@ export default function App() {
           const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
           setHasApiKey(hasKey);
           if (!hasKey) {
-            setNeedsApiKey(email);
+            persistNeedsApiKey(email);
           }
           return;
         }
@@ -936,6 +964,7 @@ export default function App() {
     localStorage.removeItem('finalyze_auth_user');
     localStorage.removeItem('finalyze_auth_timestamp');
     localStorage.removeItem('finalyze_verify_link');
+    persistNeedsApiKey(null);
     setHasApiKey(false);
     setAnalysisResults(null);
     setUser(null);
@@ -994,7 +1023,7 @@ export default function App() {
             user={user}
             onSaved={(key) => {
               setHasApiKey(true);
-              setNeedsApiKey(null);
+              persistNeedsApiKey(null);
               setActivePage('main');
             }}
             asPage
