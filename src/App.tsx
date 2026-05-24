@@ -39,6 +39,7 @@ export default function App() {
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [pendingVerification, setPendingVerification] = useState<string | null>(null);
+  const [showVerification, setShowVerification] = useState(false);
   const [needsApiKey, setNeedsApiKey] = useState<string | null>(null);
   const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor' => {
     const hash = window.location.hash.slice(1);
@@ -807,7 +808,7 @@ export default function App() {
       }
       // Show blocking verification message
       setManualAuthUrl(`https://mail.google.com/mail/u/0/#inbox`);
-      setLoginError('verify_email');
+      setShowVerification(true);
       localStorage.setItem('finalyze_verify_link', verifyLink);
     } catch (error: any) {
       console.error("=== signInWithPopup ERROR ===", error);
@@ -857,7 +858,7 @@ export default function App() {
         // Not verified — resend verification
         if (data.verifyToken) {
           const link = `${window.location.origin}/verify?email=${encodeURIComponent(email)}&token=${data.verifyToken}`;
-          setLoginError('verify_email');
+          setShowVerification(true);
           return;
         }
       }
@@ -885,8 +886,8 @@ export default function App() {
         registeredAt: serverTimestamp(), rank: 0,
       });
 
-      // Show verification link in the UI
-      setLoginError('verify_email');
+      // Show verification message
+      setShowVerification(true);
       // Store the link so LoginOverlay can display it
       localStorage.setItem('finalyze_verify_link', verifyLink);
     } catch (err: any) {
@@ -982,39 +983,13 @@ export default function App() {
             onClientAuth={handleClientAuth}
             lang={lang} 
             loginError={loginError}
-            onClearError={() => setLoginError(null)}
+            onClearError={() => { setLoginError(null); setShowVerification(false); }}
             redirecting={redirecting}
             manualAuthUrl={manualAuthUrl}
+            showVerification={showVerification}
           />
         )}
       </AnimatePresence>
-
-      {/* Pending verification message */}
-      {pendingVerification && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="max-w-lg w-full bg-brand-alt border border-white/10 rounded-[32px] p-8 shadow-[0_32px_128px_-12px_rgba(0,0,0,0.85)] text-center">
-            <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-3">
-              {lang === 'ar' ? 'تحقق من بريدك الإلكتروني' : 'Check Your Email'}
-            </h2>
-            <p className="text-slate-400 text-sm leading-relaxed mb-6">
-              {lang === 'ar'
-                ? 'تم إرسال رابط التفعيل إلى بريدك الإلكتروني. اضغط على الرابط لتفعيل حسابك وإعداد مفتاح API.'
-                : 'A verification link has been sent to your email. Click the link to activate your account and set up your API key.'}
-            </p>
-            <a
-              href={pendingVerification}
-              className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-brand-bg font-black px-6 py-3 rounded-xl transition-all text-sm"
-            >
-              {lang === 'ar' ? 'فتح رابط التفعيل' : 'Open Verification Link'}
-            </a>
-          </div>
-        </div>
-      )}
 
       {/* Blocking API Key setup for newly verified clients */}
       {needsApiKey && (
