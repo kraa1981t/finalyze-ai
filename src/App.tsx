@@ -736,9 +736,65 @@ export default function App() {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
-      if (result?.user) {
-        setUser(result.user);
+      const email = result?.user?.email || result?.user?.providerData?.[0]?.email || '';
+      if (!email) {
+        setLoginError('لم نتمكن من الحصول على بريدك الإلكتروني. حاول مرة أخرى.');
+        return;
       }
+      // Check if client exists in Firestore
+      const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
+      const existing = existingSnap.docs[0];
+      if (existing) {
+        const data = existing.data();
+        if (data.status === 'verified') {
+          // Already verified — sign in directly
+          localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+          await signOut(auth);
+          const cred = await signInAnonymously(auth);
+          const mockUser = {
+            uid: cred.user.uid, email,
+            displayName: result.user.displayName || 'Client',
+            photoURL: result.user.photoURL || '',
+            emailVerified: true,
+          } as User;
+          setUser(mockUser);
+          const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+          setHasApiKey(hasKey);
+          if (!hasKey) setNeedsApiKey(email);
+          return;
+        }
+      }
+      // New client or pending — save as pending
+      const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
+      const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
+      await signOut(auth);
+      const cred = await signInAnonymously(auth);
+      if (existing) {
+        // Update existing pending record with new token
+        await updateDoc(doc(db, 'clients', existing.id), { verifyToken });
+      } else {
+        // New record
+        await addDoc(collection(db, 'clients'), {
+          email, uid: cred.user.uid, verifyToken,
+          status: 'pending', plan: 'free', planExpiry: null,
+          registeredAt: serverTimestamp(), rank: 0,
+        });
+      }
+      // Send verification email via API
+      try {
+        await fetch('/api/send-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, verifyLink }),
+        });
+      } catch (e) {
+        console.warn('Email send failed, showing link directly:', e);
+      }
+      // Show blocking verification message
+      setManualAuthUrl(`https://mail.google.com/mail/u/0/#inbox`);
+      setLoginError('verify_email');
+      localStorage.setItem('finalyze_verify_link', verifyLink);
     } catch (error: any) {
       console.error("=== signInWithPopup ERROR ===", error);
       if (error.code === 'auth/unauthorized-domain') {

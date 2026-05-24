@@ -1,4 +1,5 @@
 import express from "express";
+import nodemailer from "nodemailer";
 
 const FALLBACK_PRICES = {
   bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 },
@@ -11,6 +12,49 @@ app.use(express.json());
 // API Route: Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", version: "4.0-Institutional", node: process.version });
+});
+
+// API Route: Send verification email
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'taybemohamed10@gmail.com',
+    pass: process.env.EMAIL_APP_PASSWORD || 'chxq jkcg wcia isgi',
+  },
+});
+
+app.post("/api/send-verification", async (req, res) => {
+  try {
+    const { email, verifyLink } = req.body;
+    if (!email || !verifyLink) {
+      return res.status(400).json({ error: "email and verifyLink required" });
+    }
+    await transporter.sendMail({
+      from: '"Finalyze AI" <taybemohamed10@gmail.com>',
+      to: email,
+      subject: '✅ تأكيد حسابك في Finalyze AI',
+      html: `
+        <div dir="rtl" style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;background:#f9fafb;border-radius:16px;">
+          <h2 style="color:#1e293b;text-align:center;">مرحباً بك في Finalyze AI</h2>
+          <p style="color:#475569;text-align:center;font-size:15px;">
+            اضغط على الزر أدناه لتأكيد حسابك وتفعيل المنصة:
+          </p>
+          <div style="text-align:center;margin:24px 0;">
+            <a href="${verifyLink}" style="display:inline-block;background:#10b981;color:white;padding:14px 32px;border-radius:12px;text-decoration:none;font-size:16px;font-weight:bold;">
+              ✅ تأكيد الحساب
+            </a>
+          </div>
+          <p style="color:#94a3b8;text-align:center;font-size:12px;">
+            إذا لم تطلب هذا، تجاهل هذه الرسالة.
+          </p>
+        </div>
+      `,
+    });
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Email send error:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // API Route: Market Context - Fear & Greed Index

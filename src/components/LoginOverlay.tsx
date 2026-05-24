@@ -326,8 +326,8 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
             </div>
 
             {/* Client Sign-In - Two Options */}
-            {!pendingVerification ? (
-              <div className="mb-6 p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 relative z-10 text-right space-y-4">
+            {pendingVerification || loginError === 'verify_email' ? (
+              <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-right space-y-5">
                 <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
                   <span>{lang === 'ar' ? 'تسجيل الدخول' : 'Client Sign-In'}</span>
                   <ShieldCheck size={18} />
@@ -395,22 +395,6 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
                             ? (lang === 'ar' ? '❌ مشكلة في الاتصال بالإنترنت' : '❌ Network error')
                             : loginError}
                         </p>
-                      </div>
-                    )}
-
-                    {loginError === 'verify_email' && (
-                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-center">
-                        <p className="text-xs text-amber-400 font-bold mb-2">
-                          {lang === 'ar'
-                            ? '📧 تم إنشاء الحساب! اضغط على الرابط لتفعيل حسابك:'
-                            : '📧 Account created! Click the link to verify:'}
-                        </p>
-                        <a href={(() => { try { return localStorage.getItem('finalyze_verify_link') || '#'; } catch { return '#'; } })()}
-                          target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-400 transition-all shadow-lg">
-                          <ShieldCheck size={16} />
-                          {lang === 'ar' ? 'تفعيل الحساب ✓' : 'Verify Account ✓'}
-                        </a>
                       </div>
                     )}
 
@@ -517,37 +501,43 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
             ) : (
               <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-right space-y-5">
                 <div className="flex items-center gap-2 text-amber-400 justify-end font-bold text-sm">
-                  <span>{lang === 'ar' ? 'تأكيد البريد الإلكتروني معلق' : 'Email Verification Pending'}</span>
-                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                  <span>{lang === 'ar' ? 'تأكيد البريد الإلكتروني' : 'Email Verification'}</span>
+                  <Mail size={18} />
                 </div>
                 
                 <h4 className="text-md font-bold text-white leading-snug">
-                  {lang === 'ar' ? '📧 قم بتأكيد بريدك الإلكتروني لتنشيط الحساب' : '📧 Confirm Your Email to Activate Account'}
+                  {lang === 'ar' ? '📧 تحقق من بريدك Gmail' : '📧 Check Your Gmail Inbox'}
                 </h4>
                 
                 <p className="text-slate-300 text-xs leading-relaxed">
                   {lang === 'ar'
-                    ? `لقد أرسلنا رسالة تنشيط أمنية إلى البريد المسجل: ${verificationEmail}. يرجى النقر على زر "تأكيد التحقق" الأخضر الموجود داخل الرسالة للدخول المباشر.`
-                    : `We have sent a secure activation email to: ${verificationEmail}. Please click the green "Confirm Verification" button inside the message to log in.`}
+                    ? 'تم إرسال رابط التفعيل إلى بريدك الإلكتروني. افتح Gmail واضغط على زر "تأكيد الحساب" الأخضر داخل الرسالة.'
+                    : 'A verification link has been sent to your email. Open Gmail and click the green "Confirm Account" button inside the message.'}
                 </p>
 
-                <div className="bg-black/30 p-3 rounded-2xl border border-white/5 space-y-2">
-                  <div className="text-[10px] text-slate-400 font-bold">
-                    {lang === 'ar' ? '🛡️ حالة المحاكاة الأمنية:' : '🛡️ Security Simulation Status:'}
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] text-amber-400 justify-end font-semibold">
-                    <span>{lang === 'ar' ? 'بانتظار وصول إشعار البريد الإلكتروني (خلال ثانيتين)...' : 'Waiting for email notification (2s)...'}</span>
-                    <Loader2 size={10} className="animate-spin" />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setPendingVerification(false)}
-                  className="w-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[11px] font-bold py-2.5 rounded-xl transition-all cursor-pointer text-center"
+                <a
+                  href="https://mail.google.com/mail/u/0/#inbox"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-2xl text-sm transition-all cursor-pointer"
                 >
-                  {lang === 'ar' ? '← العودة وتغيير البريد الإلكتروني' : '← Go Back & Change Email'}
-                </button>
+                  <Mail size={16} />
+                  {lang === 'ar' ? 'فتح Gmail' : 'Open Gmail'}
+                </a>
+
+                <details className="text-center">
+                  <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300">
+                    {lang === 'ar' ? 'رابط التفعيل (إذا لم تصل الرسالة)' : 'Verification link (if email not received)'}
+                  </summary>
+                  <a
+                    href={(() => { try { return localStorage.getItem('finalyze_verify_link') || '#'; } catch { return '#'; } })()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-2 text-[10px] text-emerald-400 underline break-all"
+                  >
+                    {(() => { try { return localStorage.getItem('finalyze_verify_link') || ''; } catch { return ''; } })()}
+                  </a>
+                </details>
               </div>
             )}
 
