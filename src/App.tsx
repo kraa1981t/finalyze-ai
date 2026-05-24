@@ -745,8 +745,9 @@ export default function App() {
     setLoginError(null);
     setManualAuthUrl(null);
     setRedirecting(true);
-    // Clear any previously saved API key so each client starts fresh
+    // Clear any previously saved API keys so each client starts fresh
     localStorage.removeItem('finalyze_user_groq_api_key');
+    localStorage.removeItem('finalyze_user_deepseek_api_key');
     setHasApiKey(false);
     let googleUserEmail = '';
     try {
@@ -955,6 +956,7 @@ export default function App() {
       console.warn("SignOut firebase warning:", e);
     }
     localStorage.removeItem('finalyze_user_groq_api_key');
+    localStorage.removeItem('finalyze_user_deepseek_api_key');
     localStorage.removeItem('finalyze_dev_bypass_active');
     localStorage.removeItem('finalyze_auth_user');
     localStorage.removeItem('finalyze_auth_timestamp');
@@ -1017,7 +1019,7 @@ export default function App() {
             isBlocking={true}
             lang={lang}
             user={user}
-            onSaved={async (groqKey, secondaryKey) => {
+            onSaved={async (groqKey, deepseekKey) => {
               setHasApiKey(true);
               persistNeedsApiKey(null);
               setActivePage('main');
@@ -1027,10 +1029,10 @@ export default function App() {
                 try {
                   const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
                   if (existingSnap.docs[0]) {
-                    await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { groqApiKey: groqKey, secondaryApiKey: secondaryKey || '' });
+                    await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { groqApiKey: groqKey, deepseekApiKey: deepseekKey || '' });
                   } else {
                     await addDoc(collection(db, 'clients'), {
-                      email, groqApiKey: groqKey, secondaryApiKey: secondaryKey || '',
+                      email, groqApiKey: groqKey, deepseekApiKey: deepseekKey || '',
                       status: 'pending', plan: 'free', planExpiry: null,
                       registeredAt: serverTimestamp(), rank: 0,
                     });

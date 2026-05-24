@@ -217,40 +217,49 @@ app.get("/api/market-data", async (req, res) => {
   }
 });
 
-// API Route: AI Analysis Proxy (for Groq API)
+// API Route: AI Analysis Proxy (for Groq and DeepSeek)
 app.post("/api/ai-analysis", async (req, res) => {
   try {
-    const { prompt, userApiKey } = req.body;
+    const { prompt, userApiKey, provider } = req.body;
+    const isDeepSeek = provider === 'deepseek';
     const devBypassKey = '__dev_bypass__';
-    const apiKey = (userApiKey && userApiKey !== devBypassKey) ? userApiKey : process.env.GROQ_API_KEY;
-    const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+    const apiKey = (userApiKey && userApiKey !== devBypassKey) ? userApiKey : process.env[isDeepSeek ? 'DEEPSEEK_API_KEY' : 'GROQ_API_KEY'];
+    const model = isDeepSeek ? 'deepseek-chat' : (process.env.GROQ_MODEL || "llama-3.3-70b-versatile");
 
     if (!apiKey) {
-      return res.status(400).json({ error: "Groq API Key is required. Please set your key in the top-right toolbar." });
+      return res.status(400).json({ error: `API Key is required for ${isDeepSeek ? 'DeepSeek' : 'Groq'}.` });
     }
 
-    const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
+    const apiUrl = isDeepSeek
+      ? "https://api.deepseek.com/v1/chat/completions"
+      : "https://api.groq.com/openai/v1/chat/completions";
+
+    const body: any = {
+      model,
+      messages: [
+        { role: "system", content: "You are a professional financial analyst AI. You provide strict, math-based technical analysis. Always respond in valid JSON format." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.1,
+    };
+
+    // Only Groq supports response_format
+    if (!isDeepSeek) {
+      body.response_format = { type: "json_object" };
+    }
 
     let retries = 3;
     let response;
     let data;
 
     while (retries > 0) {
-      response = await fetch(groqUrl, {
+      response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            { role: "system", content: "You are a professional financial analyst AI. You provide strict, math-based technical analysis. Always respond in valid JSON format." },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.1,
-          response_format: { type: "json_object" }
-        })
+        body: JSON.stringify(body)
       });
 
       if (response.status === 429) {

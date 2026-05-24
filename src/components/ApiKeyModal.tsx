@@ -49,19 +49,22 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
 
   const isAr = lang === 'ar';
   const t = {
-    title: isAr ? 'مفتاح API' : 'Set Your Groq API Key',
+    title: isAr ? 'مفتاح API' : 'Set Your API Keys',
     desc: isAr
-      ? 'للوصول إلى التحليلات المتقدمة، يلزمك إدخال مفتاح API من Groq. المفتاح يُخزن بشكل آمن في متصفحك.'
-      : 'To access advanced AI analysis, you need a Groq API key. It is stored safely in your browser.',
-    step1: isAr ? 'الخطوة 1: إنشاء المفتاح' : 'Step 1: Create a key',
+      ? 'يلزمك إدخال مفتاح API واحد على الأقل. المفاتيح تُخزن بشكل آمن في متصفحك.'
+      : 'You need at least one API key. Keys are stored safely in your browser.',
+    step1: isAr ? 'المفتاح الأساسي (Groq)' : 'Primary Key (Groq)',
     step1Desc: isAr
-      ? 'توجه إلى منصة Groq Console وأنشئ مفتاح API مجاني.'
-      : 'Go to the Groq Console and generate a free API key.',
+      ? 'مفتاح Groq API مجاني للتحليلات المتقدمة.'
+      : 'Free Groq API key for advanced analysis.',
     btnAlibaba: isAr ? 'فتح منصة Groq' : 'Open Groq Console',
-    step2: isAr ? 'الخطوة 2: لصق المفتاح' : 'Step 2: Paste your key',
-    placeholder: isAr ? 'gsk_... الصق المفتاح هنا' : 'gsk_... paste your key here',
-    placeholder2: isAr ? 'مفتاح ثانوي (اختياري)' : 'Secondary API key (optional)',
-    subtitle2: isAr ? 'يمكنك إضافة مفتاح ثانوي لمزود آخر (اختياري)' : 'Add a secondary key for another provider (optional)',
+    placeholder: isAr ? 'gsk_... الصق مفتاح Groq' : 'gsk_... paste Groq key',
+    step2: isAr ? 'المفتاح الاحتياطي (DeepSeek)' : 'Fallback Key (DeepSeek)',
+    placeholder2: isAr ? 'sk-... الصق مفتاح DeepSeek' : 'sk-... paste DeepSeek key',
+    subtitle2: isAr
+      ? 'إذا تعطل Groq، ينتقل الموقع تلقائياً إلى DeepSeek (مجاني)'
+      : 'If Groq fails, the site auto-switches to DeepSeek (free)',
+    deepseekLink: isAr ? 'فتح منصة DeepSeek' : 'Open DeepSeek Console',
     btnVerify: isAr ? 'تحقق وحفظ' : 'Verify & Save',
     btnVerifying: isAr ? 'جارٍ التحقق...' : 'Verifying...',
     btnSaved: isAr ? '✓ تم الحفظ بنجاح!' : '✓ Saved Successfully!',
@@ -151,9 +154,9 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
       localStorage.setItem('finalyze_user_groq_api_key', trimmedKey);
       const trimmedKey2 = keyInput2.trim();
       if (trimmedKey2) {
-        localStorage.setItem('finalyze_user_secondary_api_key', trimmedKey2);
+        localStorage.setItem('finalyze_user_deepseek_api_key', trimmedKey2);
       } else {
-        localStorage.removeItem('finalyze_user_secondary_api_key');
+        localStorage.removeItem('finalyze_user_deepseek_api_key');
       }
 
       // Save to Firestore (best effort — don't block on failure)
@@ -162,7 +165,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           const userDocRef = doc(db, 'users', user.uid);
           await setDoc(userDocRef, {
             groqApiKey: trimmedKey,
-            secondaryApiKey: trimmedKey2 || '',
+            deepseekApiKey: trimmedKey2 || '',
             updatedAt: new Date().toISOString()
           }, { merge: true });
         }
@@ -246,13 +249,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           <span>{t.btnAlibaba}</span>
           <ExternalLink size={16} />
         </a>
-      </div>
-
-      <div className="space-y-4 mb-6">
-        <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          {t.step2}
-        </h4>
 
         <div className="relative">
           <input
@@ -271,16 +267,33 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
+      </div>
 
-        <p className="text-[10px] text-slate-500 mt-1">{t.subtitle2}</p>
+      <div className="space-y-4 mb-6">
+        <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          {t.step2}
+        </h4>
 
-        <div className="relative mt-3">
+        <p className="text-[10px] text-slate-500">{t.subtitle2}</p>
+
+        <a
+          href="https://platform.deepseek.com/api_keys"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-brand-bg font-black px-6 py-4.5 rounded-xl transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 hover:-translate-y-0.5 active:translate-y-0 text-sm"
+        >
+          <span>{t.deepseekLink}</span>
+          <ExternalLink size={16} />
+        </a>
+
+        <div className="relative">
           <input
             type={showKey2 ? 'text' : 'password'}
             value={keyInput2}
             onChange={(e) => setKeyInput2(e.target.value)}
             placeholder={t.placeholder2}
-            className="w-full bg-black/40 border border-white/10 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
+            className="w-full bg-black/40 border border-white/10 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
             dir="ltr"
             disabled={isLoading || success}
           />

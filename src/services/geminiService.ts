@@ -238,12 +238,28 @@ export async function analyzeMarket(params: {
       }
     `;
 
-    const userApiKey = localStorage.getItem('finalyze_user_groq_api_key') || '';
-    const aiResponse = await fetch('/api/ai-analysis', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: technicalPrompt, userApiKey })
-    }).then(r => r.json());
+    let aiResponse: any;
+    const groqKey = localStorage.getItem('finalyze_user_groq_api_key') || '';
+    const deepseekKey = localStorage.getItem('finalyze_user_deepseek_api_key') || '';
+
+    // Try Groq first
+    if (groqKey) {
+      aiResponse = await fetch('/api/ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: technicalPrompt, userApiKey: groqKey, provider: 'groq' })
+      }).then(r => r.json());
+    }
+
+    // If Groq failed and DeepSeek is available, fall back
+    if ((aiResponse?.error || !aiResponse?.choices?.[0]?.message?.content) && deepseekKey) {
+      console.warn('Groq failed, falling back to DeepSeek:', aiResponse?.error);
+      aiResponse = await fetch('/api/ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: technicalPrompt, userApiKey: deepseekKey, provider: 'deepseek' })
+      }).then(r => r.json());
+    }
 
     if (aiResponse?.error) {
       throw new Error(aiResponse.error);
