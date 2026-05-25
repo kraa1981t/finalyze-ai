@@ -813,7 +813,11 @@ export default function App() {
           setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
           const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
           setHasApiKey(hasKey);
-          if (!hasKey) persistNeedsApiKey(email);
+          if (!hasKey) {
+            persistNeedsApiKey(email);
+          } else {
+            persistNeedsApiKey(null);
+          }
           return;
         }
 
@@ -868,6 +872,8 @@ export default function App() {
         const existingKey = localStorage.getItem('finalyze_user_groq_api_key');
         if (!existingKey) {
           persistNeedsApiKey(email);
+        } else {
+          persistNeedsApiKey(null);
         }
         return;
       } catch (innerErr) {
@@ -879,7 +885,11 @@ export default function App() {
         // Even if Firestore fails, require API key
         const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
         setHasApiKey(hasKey);
-        if (!hasKey) persistNeedsApiKey(email);
+        if (!hasKey) {
+          persistNeedsApiKey(email);
+        } else {
+          persistNeedsApiKey(null);
+        }
         return;
       }
     } catch (error: any) {
