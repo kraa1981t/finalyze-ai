@@ -620,6 +620,7 @@ export default function App() {
           // Keep developer session active forever
           setUser(savedUser);
           setHasApiKey(true);
+          persistNeedsApiKey(null);
           setLoading(false);
           return;
         } else {
@@ -631,6 +632,7 @@ export default function App() {
             const localKey = localStorage.getItem('finalyze_user_groq_api_key');
             if (localKey) {
               setHasApiKey(true);
+              persistNeedsApiKey(null);
             } else {
               setHasApiKey(false);
             }
@@ -949,6 +951,8 @@ export default function App() {
           setHasApiKey(hasKey);
           if (!hasKey) {
             persistNeedsApiKey(email);
+          } else {
+            persistNeedsApiKey(null);
           }
           return;
         }
@@ -1100,8 +1104,8 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Blocking API Key setup for newly verified clients (only if user is logged in) */}
-      {user && needsApiKey && (
+      {/* Blocking API Key — only if user truly has no saved key */}
+      {user && needsApiKey && !localStorage.getItem('finalyze_user_groq_api_key') && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
           <ApiKeyModal
             isOpen={true}
