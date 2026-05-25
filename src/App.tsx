@@ -766,10 +766,6 @@ export default function App() {
     setLoginError(null);
     setManualAuthUrl(null);
     setRedirecting(true);
-    // Clear any previously saved API keys so each client starts fresh
-    localStorage.removeItem('finalyze_user_groq_api_key');
-    localStorage.removeItem('finalyze_user_deepseek_api_key');
-    setHasApiKey(false);
     let googleUserEmail = '';
     try {
       const provider = new GoogleAuthProvider();
@@ -790,8 +786,16 @@ export default function App() {
       try {
         const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
         const existing = existingSnap.docs[0]?.data();
+
+        // Check if banned
+        if (existing?.status === 'banned') {
+          setLoginError(isAr ? 'هذا الحساب محظور. لا يمكنك تسجيل الدخول.' : 'This account is banned. You cannot log in.');
+          setRedirecting(false);
+          return;
+        }
+
         if (existing?.status === 'verified') {
-          // Already verified — sign in directly
+          // Already verified — sign in directly (keep existing API keys)
           await signOut(auth);
           const cred = await signInAnonymously(auth);
           localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
@@ -801,6 +805,14 @@ export default function App() {
           setHasApiKey(hasKey);
           if (!hasKey) persistNeedsApiKey(email);
           return;
+        }
+
+        // New or existing pending — only clear API keys for truly new users
+        const isNewUser = !existingSnap.docs[0];
+        if (isNewUser) {
+          localStorage.removeItem('finalyze_user_groq_api_key');
+          localStorage.removeItem('finalyze_user_deepseek_api_key');
+          setHasApiKey(false);
         }
         // New or pending — save to localStorage + Firestore, send email, show API key page
         await signOut(auth);
@@ -842,7 +854,11 @@ export default function App() {
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         localStorage.setItem('finalyze_verify_link', verifyLink);
         setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
-        persistNeedsApiKey(email);
+        // Only show API key page if they don't already have a saved key
+        const existingKey = localStorage.getItem('finalyze_user_groq_api_key');
+        if (!existingKey) {
+          persistNeedsApiKey(email);
+        }
         return;
       } catch (innerErr) {
         // Firestore/anon auth failed — still sign user in with basic session
@@ -1177,7 +1193,7 @@ export default function App() {
                 isOpen={true}
                 onClose={() => setActivePage('main')}
                 settings={settings}
-                onSettingsChange={(s) => { setSettings(s); setActivePage('main'); }}
+                onSettingsChange={(s) => { setSettings(s); }}
                 user={user}
                 asPage
                 lang={lang}
