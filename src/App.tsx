@@ -713,6 +713,16 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Load clients from localStorage on mount (always, regardless of auth state)
+  useEffect(() => {
+    const localClients = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+    if (localClients.length > 0) {
+      setClients(localClients);
+    }
+    // Also try Firestore in background
+    fetchClients();
+  }, []);
+
   // Fetch clients on mount if developer bypass is active
   useEffect(() => {
     if (!loading && isDeveloperSession()) {
@@ -1006,6 +1016,7 @@ export default function App() {
     
     if (isDeveloper) {
       localStorage.setItem('finalyze_dev_bypass_active', 'true');
+      fetchClients();
     } else {
       localStorage.removeItem('finalyze_dev_bypass_active');
     }
