@@ -797,6 +797,12 @@ export default function App() {
         const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
         const existing = existingSnap.docs[0]?.data();
 
+        // Restore API key from Firestore if missing from localStorage
+        if (existing?.groqApiKey && !localStorage.getItem('finalyze_user_groq_api_key')) {
+          localStorage.setItem('finalyze_user_groq_api_key', existing.groqApiKey);
+          if (existing.deepseekApiKey) localStorage.setItem('finalyze_user_deepseek_api_key', existing.deepseekApiKey);
+        }
+
         // Check if banned
         if (existing?.status === 'banned') {
           setLoginError(isAr ? 'هذا الحساب محظور. لا يمكنك تسجيل الدخول.' : 'This account is banned. You cannot log in.');
@@ -1041,8 +1047,6 @@ export default function App() {
     } catch (e) {
       console.warn("SignOut firebase warning:", e);
     }
-    localStorage.removeItem('finalyze_user_groq_api_key');
-    localStorage.removeItem('finalyze_user_deepseek_api_key');
     localStorage.removeItem('finalyze_dev_bypass_active');
     localStorage.removeItem('finalyze_auth_user');
     localStorage.removeItem('finalyze_auth_timestamp');
