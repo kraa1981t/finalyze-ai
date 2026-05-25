@@ -789,7 +789,7 @@ export default function App() {
           if (!hasKey) persistNeedsApiKey(email);
           return;
         }
-        // New or pending — send email, show API key page (save client only after key entry)
+        // New or pending — save to localStorage + Firestore, send email, show API key page
         await signOut(auth);
         const cred = await signInAnonymously(auth);
         // Save to localStorage immediately so Client Monitor shows all registered users
@@ -808,6 +808,18 @@ export default function App() {
           existingLocal.push(pendingClient);
           localStorage.setItem('finalyze_clients', JSON.stringify(existingLocal));
         }
+        // Save to Firestore as well (rules now published)
+        try {
+          const existingFs = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
+          if (existingFs.docs[0]) {
+            await updateDoc(doc(db, 'clients', existingFs.docs[0].id), { uid: cred.user.uid, status: 'pending' });
+          } else {
+            await addDoc(collection(db, 'clients'), {
+              email, uid: cred.user.uid, status: 'pending', plan: 'free', planExpiry: null,
+              registeredAt: serverTimestamp(), rank: 0,
+            });
+          }
+        } catch (e) { console.warn('Firestore save on login failed:', e); }
         const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
         const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
         // Send email (best effort)
