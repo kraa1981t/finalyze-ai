@@ -507,6 +507,19 @@ export default function App() {
 
         for (const symbol of symbols) {
           if (!isSubscribed || !autoSettingsRef.current.isEnabled || isAnalyzing) break;
+          // Check if client is banned (via API key / email)
+          if (user?.email) {
+            try {
+              const statusSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', user.email)));
+              const clientData = statusSnap.docs[0]?.data();
+              if (clientData?.status === 'banned') {
+                localStorage.removeItem('finalyze_user_groq_api_key');
+                localStorage.removeItem('finalyze_user_deepseek_api_key');
+                setHasApiKey(false);
+                break;
+              }
+            } catch {}
+          }
           try {
             const result = await analyzeMarket({
               symbol, type: mType, timeframe: currentSettings.timeframe,
