@@ -51,6 +51,9 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
+  useEffect(() => {
+    localStorage.setItem('language', lang);
+  }, [lang]);
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [freemiumDisabled, setFreemiumDisabled] = useState(() => localStorage.getItem('finalyze_freemium_disabled') === 'true');
@@ -371,6 +374,10 @@ export default function App() {
     if (isDark) document.body.classList.remove('light');
     else document.body.classList.add('light');
   }, [isDark]);
+
+  useEffect(() => {
+    localStorage.setItem('strategy_settings', JSON.stringify(settings));
+  }, [settings]);
 
   const saveStrategySettings = () => {
     localStorage.setItem('strategy_settings', JSON.stringify(settings));
