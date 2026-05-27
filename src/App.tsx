@@ -467,9 +467,20 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (!autoSettings.isEnabled) {
+    const saved = localStorage.getItem('auto_settings');
+    const savedIsEnabled = saved ? (() => { try { return JSON.parse(saved).isEnabled === true; } catch { return false; } })() : false;
+    // Respect user toggle-off even if localStorage still has enabled=true
+    if (!autoSettings.isEnabled && prevEnabledRef.current) {
       prevEnabledRef.current = false;
       return;
+    }
+    if (!autoSettings.isEnabled && !savedIsEnabled) {
+      prevEnabledRef.current = false;
+      return;
+    }
+    // Override ref from localStorage on mount to bypass state initialization bug
+    if (!autoSettings.isEnabled && savedIsEnabled && !prevEnabledRef.current) {
+      autoSettingsRef.current = { ...autoSettingsRef.current, isEnabled: true };
     }
 
     let isSubscribed = true;
