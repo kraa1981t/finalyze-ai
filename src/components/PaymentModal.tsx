@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalLink, ShieldOff, Shield } from 'lucide-react';
+
+const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
+const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
 
 const DEFAULT_ADDRESSES = [
   { id: 'btc', name: 'Bitcoin (BTC)', address: '1QFZMm37yh15jy3dKgMWqmPj2MNvNqnsHe' },
@@ -47,6 +50,8 @@ interface PaymentModalProps {
   manageMode?: boolean;
   onConfirm?: () => void;
   lang?: 'en' | 'ar';
+  freemiumDisabled?: boolean;
+  onFreemiumToggle?: (v: boolean) => void;
 }
 
 const TIMER_STORAGE_KEY = 'payment_timer_minutes';
@@ -56,7 +61,7 @@ const BLOCKCYPHER_CHAINS: Record<string, string> = {
   btc: 'btc/main', eth: 'eth/main', ltc: 'ltc/main',
 };
 
-export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle }: PaymentModalProps) {
   const isAr = lang === 'ar';
   const [addresses, setAddresses] = useState<CryptoAddress[]>(() => {
     try {
@@ -89,6 +94,12 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [pollingActive, setPollingActive] = useState(false);
   const [paymentDetected, setPaymentDetected] = useState(false);
   const [pollingStatus, setPollingStatus] = useState('');
+  const [subPrices, setSubPrices] = useState(() => {
+    try { const s = localStorage.getItem(SUBSCRIPTION_STORAGE_KEY); return s ? JSON.parse(s) : DEFAULT_PRICES; }
+    catch { return DEFAULT_PRICES; }
+  });
+  const [editSubPrices, setEditSubPrices] = useState({ ...subPrices });
+  const [freemiumDisabled, setFreemiumDisabled] = useState(externalFreemium ?? localStorage.getItem('finalyze_freemium_disabled') === 'true');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -108,6 +119,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setTimerRunning(false);
       setTimerSeconds(0);
       if (!manageMode) setIsAdmin(false);
+      setEditSubPrices({ ...subPrices });
     }
   }, [isOpen]);
 
@@ -204,6 +216,16 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     if (!manageMode) setIsAdmin(false);
   };
 
+  const saveSubPrices = () => {
+    const clean = {
+      weekly: Math.max(0.01, Number(editSubPrices.weekly) || DEFAULT_PRICES.weekly),
+      monthly: Math.max(0.01, Number(editSubPrices.monthly) || DEFAULT_PRICES.monthly),
+      yearly: Math.max(0.01, Number(editSubPrices.yearly) || DEFAULT_PRICES.yearly),
+    };
+    setSubPrices(clean);
+    localStorage.setItem(SUBSCRIPTION_STORAGE_KEY, JSON.stringify(clean));
+  };
+
   const addNewAddress = () => {
     if (!newAddress.name || !newAddress.address) return;
     const id = 'custom_' + Date.now();
@@ -259,7 +281,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         </div>
       )}
 
-      <div className="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+      <div className="relative">
+        <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
         {addresses.length === 0 && !isAdmin && (
           <p className="text-center text-slate-500 py-8">No payment addresses configured.</p>
         )}
@@ -269,7 +292,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           const usdPrice = coin ? prices[coin]?.usd : undefined;
 
           return (
-            <div key={item.id} className={`bg-white/5 border rounded-2xl p-4 transition-all hover:border-white/20 ${selectedCoinId === item.id ? 'border-emerald-500/50 ring-1 ring-emerald-500/30' : 'border-white/10'}`}>
+            <div key={item.id} className={`bg-white/5 border rounded-2xl p-4 transition-all hover:border-white/20 ${selectedCoinId === item.id ? 'border-emerald-500/70 ring-2 ring-emerald-500/40' : 'border-white/10'}`}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-black text-xs shadow-lg">
@@ -341,12 +364,12 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             </div>
           );
         })}
+        </div>
 
-        {/* Payment confirmation panel (client mode) */}
+        {/* Payment confirmation OVERLAY — covers the selected address */}
         {!manageMode && selectedCoinId && (() => {
           const item = addresses.find(a => a.id === selectedCoinId);
           if (!item) return null;
-          const coin = COINGECKO_MAP[item.id];
           const ticker = item.name.split(' ').pop()?.replace(/[()]/g, '') || '';
           const cryptoAmount = calcCryptoAmount(item.id, item.name);
           const formatTime = (secs: number) => {
@@ -356,17 +379,35 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           };
           return (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4 bg-emerald-500/5 border border-emerald-500/30 rounded-2xl p-5 space-y-4"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="absolute inset-0 z-10 bg-brand-bg/95 backdrop-blur-xl rounded-2xl border-2 border-emerald-500/40 p-5 flex flex-col justify-center shadow-[0_0_60px_-12px_rgba(16,185,129,0.4)]"
             >
-              <h5 className="text-xs font-black uppercase text-emerald-400 tracking-widest text-center">
-                {planLabel} Plan — ${amount} USD
-              </h5>
-              <div className="bg-black/40 rounded-xl px-5 py-4 text-center">
-                <div className="text-2xl font-black text-white font-mono">
+              <button
+                onClick={() => { setSelectedCoinId(null); setTimerRunning(false); }}
+                className="absolute top-3 right-3 p-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+              >
+                <X size={16} />
+              </button>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-black text-xs shadow-lg">
+                    {ticker}
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-white">{item.name}</span>
+                    <span className="text-[10px] text-slate-400 block">{item.address.slice(0, 16)}...</span>
+                  </div>
+                </div>
+                <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">{planLabel}</span>
+              </div>
+
+              <div className="bg-black/40 rounded-2xl px-5 py-4 text-center border border-emerald-500/20 mb-4">
+                <div className="text-3xl font-black text-white font-mono">
                   {cryptoAmount === '...' ? '...' : cryptoAmount} {ticker}
                 </div>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">≈ ${amount} USD</p>
                 <button
                   onClick={() => copyAmount(`${cryptoAmount} ${ticker}`, 'confirm_amt')}
                   className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
@@ -376,15 +417,17 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 </button>
               </div>
 
-              <div className="text-center">
-                <div className="text-3xl font-black font-mono text-white tabular-nums">
-                  {formatTime(timerSeconds)}
+              <div className="flex items-center justify-center mb-4">
+                <div className="text-center">
+                  <div className={`text-5xl font-black font-mono tabular-nums ${timerSeconds <= 60 ? 'text-red-400' : 'text-white'}`}>
+                    {formatTime(timerSeconds)}
+                  </div>
+                  <p className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">{isAr ? 'الوقت المتبقي' : 'Time Remaining'}</p>
                 </div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Time Remaining</p>
               </div>
 
               {pollingStatus && !paymentDetected && (
-                <p className="text-[10px] text-amber-400 text-center animate-pulse">{pollingStatus}</p>
+                <p className="text-[10px] text-amber-400 text-center animate-pulse mb-2">{pollingStatus}</p>
               )}
 
               <button
@@ -392,19 +435,20 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 disabled={!paymentConfirmed}
                 className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
                   paymentConfirmed
-                    ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer'
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
                     : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
                 }`}
               >
                 {paymentConfirmed ? '🟢 Activate Plan' : (isAr ? '🔴 في انتظار الدفع...' : '🔴 Awaiting payment...')}
               </button>
+
               {paymentDetected && (
-                <p className="text-[10px] text-emerald-400 text-center">
+                <p className="text-[10px] text-emerald-400 text-center font-bold mt-2">
                   {isAr ? '✅ تم اكتشاف وصول المبلغ! اضغط "Activate Plan" لتفعيل خطتك.' : '✅ Payment received! Press "Activate Plan" to activate your plan.'}
                 </p>
               )}
               {timerSeconds <= 0 && !paymentDetected && (
-                <div className="text-center">
+                <div className="text-center mt-2">
                   <p className="text-[10px] text-red-400 mb-2">{isAr ? 'انتهت المهلة. يمكنك إعادة المحاولة.' : 'Time expired. You can try again.'}</p>
                   <button
                     onClick={() => { setSelectedCoinId(null); setTimerRunning(false); }}
@@ -417,6 +461,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             </motion.div>
           );
         })()}
+      </div>
 
         <AnimatePresence>
           {isAdmin && (
@@ -468,7 +513,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
 
       <AnimatePresence>
         {isAdmin && (
@@ -489,6 +533,59 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       </AnimatePresence>
 
       {manageMode && (<>
+        <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-4">
+          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">{isAr ? 'أسعار الخطط' : 'Plan Prices'}</h5>
+          <div className="space-y-4">
+            {['weekly', 'monthly', 'yearly'].map((key) => (
+              <div key={key} className="flex items-center gap-3">
+                <span className="text-xs font-black text-slate-400 w-20 uppercase">{key}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-black text-white">$</span>
+                  <input
+                    type="number"
+                    value={editSubPrices[key]}
+                    onChange={(e) => setEditSubPrices({ ...editSubPrices, [key]: e.target.value })}
+                    className="w-24 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-emerald-500"
+                    min="0.01" step="0.01"
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={saveSubPrices}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
+            >
+              <Check size={14} /> {isAr ? 'حفظ الأسعار' : 'Save Prices'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 bg-white/5 border border-white/10 rounded-2xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest">{isAr ? 'نظام الخطط المجانية' : 'Freemium System'}</h5>
+              <p className="text-[10px] text-slate-500 mt-1">{freemiumDisabled ? (isAr ? 'الكل وصول كامل - الخطط مرئية للعملاء' : 'All full access - plans visible to clients') : (isAr ? 'القيود مفعلة - الخطط مخفية عن العملاء' : 'Restrictions active - plans hidden from clients')}</p>
+            </div>
+            <button
+              onClick={() => {
+                const newVal = !freemiumDisabled;
+                setFreemiumDisabled(newVal);
+                localStorage.setItem('finalyze_freemium_disabled', newVal ? 'true' : 'false');
+                localStorage.setItem('finalyze_hide_plans', newVal ? 'false' : 'true');
+                onFreemiumToggle?.(newVal);
+              }}
+              className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg ${
+                freemiumDisabled
+                  ? 'bg-emerald-500 text-white shadow-emerald-500/40'
+                  : 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+              }`}
+            >
+              {freemiumDisabled ? <Shield size={16} /> : <ShieldOff size={16} />}
+              {freemiumDisabled ? (isAr ? 'مفعل: وصول كامل' : 'ON: Full Access') : (isAr ? 'معطل: قيود مفعلة' : 'OFF: Restricted')}
+            </button>
+          </div>
+        </div>
+
         <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-4">
           <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">Timer Duration</h5>
           <div className="flex items-center gap-3">

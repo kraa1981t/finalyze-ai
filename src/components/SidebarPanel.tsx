@@ -1,33 +1,30 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Key, DollarSign, Wallet, Users } from 'lucide-react';
+import { Settings, Key, DollarSign, Wallet, Users, Zap, User } from 'lucide-react';
 import { Language } from '../lib/i18n';
 
 interface SidebarPanelProps {
   lang: Language;
   onClose: () => void;
-  onNavigate: (page: 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor') => void;
+  onNavigate: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile') => void;
   isDeveloper?: boolean;
+  freemiumDisabled?: boolean;
 }
 
-export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper }: SidebarPanelProps) {
+export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, freemiumDisabled }: SidebarPanelProps) {
   const isRTL = lang === 'ar';
   const panelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
-
   const items = [
-    { icon: Settings, label: lang === 'ar' ? 'الإعدادات' : 'Settings', page: 'settings' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: Zap, label: lang === 'ar' ? 'إعدادات التحليل التلقائي' : 'Auto Analysis Settings', page: 'radar' as const, color: 'from-amber-400 to-amber-600' },
     { icon: Key, label: lang === 'ar' ? 'مفتاح API' : 'API Key', page: 'apiKey' as const, color: 'from-amber-400 to-amber-600' },
-    { icon: DollarSign, label: lang === 'ar' ? 'الخطط' : 'Plans', page: 'plans' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: User, label: lang === 'ar' ? 'الملف الشخصي' : 'Profile', page: 'profile' as const, color: 'from-amber-400 to-amber-600' },
+    ...(isDeveloper ? [
+      { icon: Settings, label: lang === 'ar' ? 'الإعدادات' : 'Settings', page: 'settings' as const, color: 'from-amber-400 to-amber-600' },
+    ] : []),
+    ...(freemiumDisabled || isDeveloper ? [
+      { icon: DollarSign, label: lang === 'ar' ? 'الخطط' : 'Plans', page: 'plans' as const, color: 'from-amber-400 to-amber-600' },
+    ] : []),
     ...(isDeveloper ? [
       { icon: Wallet, label: lang === 'ar' ? 'عناوين الدفع' : 'Payment Addresses', page: 'paymentSettings' as const, color: 'from-amber-400 to-amber-600' },
       { icon: Users, label: lang === 'ar' ? 'مراقبة العملاء' : 'Client Monitor', page: 'clientMonitor' as const, color: 'from-amber-400 to-amber-600' },
@@ -41,18 +38,16 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper }:
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: isRTL ? 100 : -100, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className={`fixed top-24 bottom-0 w-56 z-40 bg-[#D1FAE5]/95 backdrop-blur-xl border-l border-black/10 shadow-2xl flex flex-col ${isRTL ? 'right-0 border-l' : 'left-0 border-r'}`}
+      className={`fixed top-24 bottom-0 w-56 z-40 bg-[#D1FAE5]/95 backdrop-blur-xl border-l border-black/10 shadow-2xl flex flex-col overflow-hidden ${isRTL ? 'right-0 border-l' : 'left-0 border-r'}`}
       style={{ direction: isRTL ? 'rtl' : 'ltr' }}
     >
-      {/* Header */}
       <div className="px-5 py-4 border-b border-black/5">
         <h3 className="text-xs font-black uppercase tracking-widest text-black/50">
           {lang === 'ar' ? 'لوحة التحكم' : 'Dashboard'}
         </h3>
       </div>
 
-      {/* Icons */}
-      <div className="flex-1 flex flex-col gap-2 p-4">
+      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-2 p-4">
         {items.map((item, i) => {
           const Icon = item.icon;
           return (
@@ -75,7 +70,6 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper }:
         })}
       </div>
 
-      {/* Footer */}
       <div className="px-5 py-3 border-t border-black/5">
         <p className="text-[9px] text-black/30 font-black uppercase tracking-widest text-center">
           Joseph.Trading

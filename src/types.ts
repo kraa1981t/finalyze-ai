@@ -55,6 +55,10 @@ export interface StrategySettings {
   useIndicators: boolean;
   minConfidence: number;
   minStrongConfidence: number;
+  minTrendAge: number;
+  minInfantAge: number;
+  minMatureAge: number;
+  maxMatureAge: number;
 }
 
 export interface AutoAnalysisSettings {

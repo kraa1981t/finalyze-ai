@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, DollarSign, Edit3, Check, Lock, Unlock, Star, Crown, Sparkles } from 'lucide-react';
+import React from 'react';
+import { motion } from 'motion/react';
+import { X, DollarSign, Star, Crown, Sparkles } from 'lucide-react';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const STORAGE_KEY = 'subscription_prices';
@@ -13,29 +13,12 @@ interface SubscriptionModalProps {
 }
 
 export default function SubscriptionModal({ isOpen, onClose, onSelectPlan, asPage }: SubscriptionModalProps) {
-  const [prices, setPrices] = useState(() => {
+  const [prices, setPrices] = React.useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       return saved ? JSON.parse(saved) : DEFAULT_PRICES;
     } catch { return DEFAULT_PRICES; }
   });
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [editPrices, setEditPrices] = useState({ ...prices });
-
-  useEffect(() => {
-    if (isOpen) setEditPrices({ ...prices });
-  }, [isOpen]);
-
-  const savePrices = () => {
-    const clean = {
-      weekly: Math.max(0.01, Number(editPrices.weekly) || DEFAULT_PRICES.weekly),
-      monthly: Math.max(0.01, Number(editPrices.monthly) || DEFAULT_PRICES.monthly),
-      yearly: Math.max(0.01, Number(editPrices.yearly) || DEFAULT_PRICES.yearly),
-    };
-    setPrices(clean);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-    setIsAdmin(false);
-  };
 
   if (!isOpen) return null;
 
@@ -57,18 +40,9 @@ export default function SubscriptionModal({ isOpen, onClose, onSelectPlan, asPag
             <p className="text-sm text-slate-400">Unlock full institutional analysis</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsAdmin(!isAdmin)}
-            className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-            title={isAdmin ? 'Lock prices' : 'Unlock to edit prices'}
-          >
-            {isAdmin ? <Lock size={16} /> : <Unlock size={16} />}
-          </button>
-          <button onClick={onClose} className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all">
-            <X size={20} />
-          </button>
-        </div>
+        <button onClick={onClose} className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+          <X size={20} />
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -97,59 +71,21 @@ export default function SubscriptionModal({ isOpen, onClose, onSelectPlan, asPag
               <h4 className="text-lg font-black text-white uppercase tracking-wider mb-1">{plan.label}</h4>
               <p className="text-xs text-slate-400 mb-6 leading-relaxed">{plan.desc}</p>
 
-              {isAdmin ? (
-                <div className="mb-6">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1 block">Price (USD)</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl font-black text-white">$</span>
-                    <input
-                      type="number"
-                      value={editPrices[plan.key]}
-                      onChange={(e) => setEditPrices({ ...editPrices, [plan.key]: e.target.value })}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-white outline-none focus:border-emerald-500"
-                      min="0.01" step="0.01"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="mb-6">
-                  <span className="text-4xl font-black text-white">${Number(plan.price).toFixed(2)}</span>
-                  <span className="text-sm text-slate-400 ml-1">/ {plan.key === 'yearly' ? 'yr' : plan.key === 'monthly' ? 'mo' : 'wk'}</span>
-                </div>
-              )}
+              <div className="mb-6">
+                <span className="text-4xl font-black text-white">${Number(plan.price).toFixed(2)}</span>
+                <span className="text-sm text-slate-400 ml-1">/ {plan.key === 'yearly' ? 'yr' : plan.key === 'monthly' ? 'mo' : 'wk'}</span>
+              </div>
 
               <button
-                onClick={() => {
-                  if (!isAdmin) onSelectPlan(plan.price, plan.label, plan.durationDays);
-                }}
-                disabled={isAdmin}
-                className={`mt-auto w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg bg-gradient-to-r ${plan.color} text-white hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+                onClick={() => onSelectPlan(plan.price, plan.label, plan.durationDays)}
+                className={`mt-auto w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg bg-gradient-to-r ${plan.color} text-white hover:opacity-90 active:scale-95`}
               >
-                {isAdmin ? 'Save to lock' : `Subscribe $${Number(plan.price).toFixed(2)}`}
+                Subscribe ${Number(plan.price).toFixed(2)}
               </button>
             </div>
           );
         })}
       </div>
-
-      <AnimatePresence>
-        {isAdmin && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="mt-6 flex justify-center"
-          >
-            <button
-              onClick={savePrices}
-              className="flex items-center gap-2 bg-emerald-500 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-emerald-400 transition-all active:scale-95"
-            >
-              <Check size={18} />
-              Save All Prices
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <p className="text-center text-[10px] text-slate-500 mt-6">
         All plans auto-renew. Cancel anytime. Crypto payment only.

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, Eye, EyeOff, CheckCircle2, AlertTriangle, ExternalLink, LogOut, Loader2, Info, ArrowRight } from 'lucide-react';
+import { Key, Eye, EyeOff, CheckCircle2, AlertTriangle, LogOut, Loader2, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
 import { doc, setDoc } from 'firebase/firestore';
@@ -13,20 +13,45 @@ interface ApiKeyModalProps {
   isBlocking: boolean;
   lang: Language;
   user: User | null;
-  onSaved: (groqKey: string, secondaryKey?: string) => void;
+  onSaved: (key: string) => void;
   onLogout?: () => void;
   asPage?: boolean;
 }
 
+function loadKey(): { value: string; enabled: boolean } {
+  try {
+    return {
+      value: localStorage.getItem('finalyze_key1_value') || '',
+      enabled: localStorage.getItem('finalyze_key1_enabled') !== 'false',
+    };
+  } catch {
+    return { value: '', enabled: true };
+  }
+}
+
+function saveKey(value: string) {
+  localStorage.setItem('finalyze_key1_value', value);
+  localStorage.setItem('finalyze_key1_enabled', 'true');
+}
+
 export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, onSaved, onLogout, asPage }: ApiKeyModalProps) {
-  const [keyInput, setKeyInput] = useState('');
-  const [keyInput2, setKeyInput2] = useState('');
-  const [showKey, setShowKey] = useState(false);
-  const [showKey2, setShowKey2] = useState(false);
+  const [keyValue, setKeyValue] = useState(() => loadKey().value);
+  const [show, setShow] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [logoClicks, setLogoClicks] = useState(0);
+
+  const isAr = lang === 'ar';
+
+  // Migrate old key on first mount
+  useEffect(() => {
+    const k = loadKey();
+    if (!k.value) {
+      const oldKey = localStorage.getItem('finalyze_user_groq_api_key');
+      if (oldKey) setKeyValue(oldKey);
+    }
+  }, []);
 
   const isDeveloperSession = () => {
     if (typeof window !== 'undefined') {
@@ -47,33 +72,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
            email.includes('dev');
   };
 
-  const isAr = lang === 'ar';
-  const t = {
-    title: isAr ? 'مفتاح API' : 'Set Your API Keys',
-    desc: isAr
-      ? 'يلزمك إدخال مفتاح API واحد على الأقل. المفاتيح تُخزن بشكل آمن في متصفحك.'
-      : 'You need at least one API key. Keys are stored safely in your browser.',
-    step1: isAr ? 'المفتاح الأساسي (Groq)' : 'Primary Key (Groq)',
-    step1Desc: isAr
-      ? 'مفتاح Groq API مجاني للتحليلات المتقدمة.'
-      : 'Free Groq API key for advanced analysis.',
-    btnAlibaba: isAr ? 'فتح منصة Groq' : 'Open Groq Console',
-    placeholder: isAr ? 'gsk_... الصق مفتاح Groq' : 'gsk_... paste Groq key',
-    step2: isAr ? 'المفتاح الاحتياطي (DeepSeek)' : 'Fallback Key (DeepSeek)',
-    placeholder2: isAr ? 'sk-... الصق مفتاح DeepSeek' : 'sk-... paste DeepSeek key',
-    subtitle2: isAr
-      ? 'إذا تعطل Groq، ينتقل الموقع تلقائياً إلى DeepSeek (مجاني)'
-      : 'If Groq fails, the site auto-switches to DeepSeek (free)',
-    deepseekLink: isAr ? 'فتح منصة DeepSeek' : 'Open DeepSeek Console',
-    btnVerify: isAr ? 'تحقق وحفظ' : 'Verify & Save',
-    btnVerifying: isAr ? 'جارٍ التحقق...' : 'Verifying...',
-    btnSaved: isAr ? '✓ تم الحفظ بنجاح!' : '✓ Saved Successfully!',
-    emptyKey: isAr ? 'يرجى إدخال مفتاح API' : 'Please enter an API key',
-    errorInvalid: isAr ? 'المفتاح غير صحيح. يرجى التحقق والمحاولة مجدداً.' : 'Invalid API key. Please check and try again.',
-    logoutText: isAr ? 'تسجيل خروج' : 'Logout',
-    adminBypassInfo: isAr ? 'وضع المطور نشط — تم تجاوز المفتاح.' : 'Developer mode active — API key bypassed.',
-  };
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'D') {
@@ -90,8 +88,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
 
   useEffect(() => {
     if (isOpen) {
-      setKeyInput('');
-      setKeyInput2('');
+      setKeyValue(loadKey().value);
       setError(null);
       setSuccess(false);
       setLogoClicks(0);
@@ -113,78 +110,43 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     if (onLogout) {
       onLogout();
     } else {
-      try {
-        await signOut(auth);
-      } catch {}
+      try { await signOut(auth); } catch {}
     }
     onClose();
   };
 
-  const handleVerifyAndSave = async () => {
+  const handleSave = async () => {
     setError(null);
     setSuccess(false);
-    
-    const trimmedKey = keyInput.trim();
-    if (!trimmedKey) {
-      setError(t.emptyKey);
+
+    const val = keyValue.trim();
+    if (!val) {
+      setError(isAr ? 'الرجاء إدخال مفتاح API.' : 'Please enter an API key.');
       return;
     }
 
     setIsLoading(true);
 
+    saveKey(val);
+    localStorage.removeItem('finalyze_user_groq_api_key');
+    localStorage.removeItem('finalyze_key2_value');
+    localStorage.removeItem('finalyze_key2_provider');
+    localStorage.removeItem('finalyze_key2_enabled');
+
     try {
-      const response = await fetch('/api/ai-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: "Return JSON strictly: {\"status\": \"ok\"}",
-          userApiKey: trimmedKey
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error("Invalid Key");
+      if (user && user.uid && user.uid !== 'developer') {
+        const userDocRef = doc(db, 'users', user.uid);
+        await setDoc(userDocRef, {
+          groqApiKey: val,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
       }
+    } catch {}
 
-      const resData = await response.json();
-      if (!resData?.choices?.[0]?.message?.content) {
-        throw new Error("Invalid Response structure");
-      }
-
-      localStorage.setItem('finalyze_user_groq_api_key', trimmedKey);
-      const trimmedKey2 = keyInput2.trim();
-      if (trimmedKey2) {
-        localStorage.setItem('finalyze_user_deepseek_api_key', trimmedKey2);
-      } else {
-        localStorage.removeItem('finalyze_user_deepseek_api_key');
-      }
-
-      // Save to Firestore (best effort — don't block on failure)
-      try {
-        if (user && user.uid && user.uid !== 'developer') {
-          const userDocRef = doc(db, 'users', user.uid);
-          await setDoc(userDocRef, {
-            groqApiKey: trimmedKey,
-            deepseekApiKey: trimmedKey2 || '',
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
-        }
-      } catch (fsErr) {
-        console.warn('Failed to save API key to Firestore (rules may not be published):', fsErr);
-      }
-
-      setSuccess(true);
-      onSaved(trimmedKey, trimmedKey2 || undefined);
-      
-      setTimeout(() => {
-        onClose();
-      }, 1500);
-
-    } catch (e: any) {
-      setError(t.errorInvalid);
-    } finally {
-      setIsLoading(false);
-    }
+    setSuccess(true);
+    onSaved(val);
+    setTimeout(() => onClose(), 1500);
+    setIsLoading(false);
   };
 
   if (!isOpen) return null;
@@ -192,7 +154,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
   const pageInner = (
     <>
       <div className="flex items-center gap-4 mb-6 border-b border-white/5 pb-5">
-        <div 
+        <div
           className="w-12 h-12 bg-sky-500/10 rounded-2xl flex items-center justify-center text-sky-400 border border-sky-500/20 cursor-pointer select-none"
           onClick={handleLogoClick}
           title={logoClicks > 0 ? `${5 - logoClicks} more clicks...` : ''}
@@ -200,7 +162,9 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           <Key size={24} />
         </div>
         <div>
-          <h3 className="text-xl font-bold text-white leading-tight">{t.title}</h3>
+          <h3 className="text-xl font-bold text-white leading-tight">
+            {isAr ? 'مفتاح API' : 'API Key'}
+          </h3>
           {isDeveloperSession() && (
             <span className="text-[10px] bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 rounded-full px-2.5 py-0.5 font-bold uppercase tracking-wider mt-1 inline-block">
               Admin Account
@@ -210,101 +174,53 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
       </div>
 
       <p className="text-slate-400 text-sm leading-relaxed mb-6">
-        {t.desc}
+        {isAr
+          ? 'أدخل مفتاح API للتحليل. يدعم جميع المزودات (Groq, DeepSeek, Google Gemini وغيرها).'
+          : 'Enter your API key. Supports all providers (Groq, DeepSeek, Google Gemini, etc).'}
       </p>
 
-      {/* Verification message for unverified clients */}
       {typeof window !== 'undefined' && localStorage.getItem('finalyze_verify_link') && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6 text-center space-y-2">
           <p className="text-xs text-amber-400 font-bold">
-            {lang === 'ar'
-              ? '📧 تم إرسال رابط التفعيل إلى بريدك Gmail. اضغط على "تأكيد الحساب" في الرسالة.'
-              : '📧 Verification link sent to your Gmail. Click "Confirm Account" in the email.'}
+            {isAr ? '📧 تم إرسال رابط التفعيل إلى بريدك Gmail.' : '📧 Verification link sent to your Gmail.'}
           </p>
           <a
             href={(() => { try { return localStorage.getItem('finalyze_verify_link') || '#'; } catch { return '#'; } })()}
             target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-400 transition-all"
           >
-            {lang === 'ar' ? 'فتح Gmail' : 'Open Gmail'}
+            {isAr ? 'فتح Gmail' : 'Open Gmail'}
           </a>
         </div>
       )}
 
-      <div className="space-y-3 mb-6 bg-white/5 border border-white/5 rounded-2xl p-5">
-        <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-          {t.step1}
-        </h4>
-        <p className="text-xs text-slate-400 leading-relaxed">
-          {t.step1Desc}
-        </p>
-        
-        <a
-          href="https://console.groq.com/keys"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 text-brand-bg font-black px-6 py-4.5 rounded-xl transition-all shadow-lg shadow-sky-500/20 hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0 text-sm"
-        >
-          <span>{t.btnAlibaba}</span>
-          <ExternalLink size={16} />
-        </a>
+      <div className="mb-6">
+        <div className="space-y-3 p-5 rounded-2xl bg-white/5 border border-white/5">
+          <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-2 text-sky-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+            {isAr ? 'مفتاح API' : 'API Key'}
+          </h4>
 
-        <div className="relative">
-          <input
-            type={showKey ? 'text' : 'password'}
-            value={keyInput}
-            onChange={(e) => setKeyInput(e.target.value)}
-            placeholder={t.placeholder}
-            autoComplete="off"
-            className="w-full bg-black/40 border border-white/10 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
-            dir="ltr"
-            disabled={isLoading || success}
-          />
-          <button
-            onClick={() => setShowKey(!showKey)}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-          >
-            {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-4 mb-6">
-        <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-          {t.step2}
-        </h4>
-
-        <p className="text-[10px] text-slate-500">{t.subtitle2}</p>
-
-        <a
-          href="https://platform.deepseek.com/api_keys"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-brand-bg font-black px-6 py-4.5 rounded-xl transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 hover:-translate-y-0.5 active:translate-y-0 text-sm"
-        >
-          <span>{t.deepseekLink}</span>
-          <ExternalLink size={16} />
-        </a>
-
-        <div className="relative">
-          <input
-            type={showKey2 ? 'text' : 'password'}
-            value={keyInput2}
-            onChange={(e) => setKeyInput2(e.target.value)}
-            placeholder={t.placeholder2}
-            autoComplete="off"
-            className="w-full bg-black/40 border border-white/10 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
-            dir="ltr"
-            disabled={isLoading || success}
-          />
-          <button
-            onClick={() => setShowKey2(!showKey2)}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-          >
-            {showKey2 ? <EyeOff size={18} /> : <Eye size={18} />}
-          </button>
+          <div className="relative">
+            <input
+              type={show ? 'text' : 'password'}
+              value={keyValue}
+              onChange={(e) => setKeyValue(e.target.value)}
+              placeholder={isAr ? 'الصق مفتاح API...' : 'Paste API key...'}
+              autoComplete="off"
+              className="w-full bg-black/40 border border-white/10 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
+              dir="ltr"
+              disabled={isLoading || success}
+            />
+            <div className="absolute left-2 top-1/2 -translate-y-1/2">
+              <button
+                onClick={() => setShow(!show)}
+                className="p-2 text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                {show ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -329,14 +245,16 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-start gap-3 mb-6"
           >
             <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
-            <span className="text-xs text-emerald-400 leading-normal">{t.btnSaved}</span>
+            <span className="text-xs text-emerald-400 leading-normal">
+              {isAr ? '✓ تم الحفظ بنجاح!' : '✓ Saved Successfully!'}
+            </span>
           </motion.div>
         )}
       </AnimatePresence>
 
       <div className="flex flex-col gap-3">
         <button
-          onClick={handleVerifyAndSave}
+          onClick={handleSave}
           disabled={isLoading || success}
           className={`w-full flex items-center justify-center gap-2 py-4.5 rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-95 shadow-xl ${
             success
@@ -349,15 +267,12 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           {isLoading ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              <span>{t.btnVerifying}</span>
+              <span>{isAr ? 'جارٍ الحفظ...' : 'Saving...'}</span>
             </>
           ) : success ? (
-            <span>{t.btnSaved}</span>
+            <span>{isAr ? '✓ تم الحفظ!' : '✓ Saved!'}</span>
           ) : (
-            <>
-              <span>{t.btnVerify}</span>
-              <ArrowRight size={18} className={isAr ? "rotate-180" : ""} />
-            </>
+            <span>{isAr ? 'حفظ' : 'Save'}</span>
           )}
         </button>
 
@@ -367,7 +282,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             className="w-full flex items-center justify-center gap-2 py-3 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/25 hover:text-red-300 font-bold rounded-xl transition-all text-xs tracking-wider uppercase"
           >
             <LogOut size={14} />
-            <span>{t.logoutText}</span>
+            <span>{isAr ? 'تسجيل خروج' : 'Logout'}</span>
           </button>
         ) : (
           <button
@@ -383,18 +298,14 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
       {isDeveloperSession() && (
         <div className="flex items-center gap-2 mt-4 text-[10px] text-emerald-400/60 justify-center">
           <Info size={12} />
-          <span>{t.adminBypassInfo}</span>
+          <span>{isAr ? 'وضع المطور نشط — تم تجاوز المفتاح.' : 'Developer mode active — API key bypassed.'}</span>
         </div>
       )}
     </>
   );
 
   if (asPage) {
-    return (
-      <div>
-        {pageInner}
-      </div>
-    );
+    return <div>{pageInner}</div>;
   }
 
   return (

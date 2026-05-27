@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, ShieldOff, Trash2, RefreshCw, RotateCcw, X, CheckCircle, AlertTriangle, Clock, Ban } from 'lucide-react';
+import { Users, ShieldOff, Trash2, RefreshCw, RotateCcw, X, CheckCircle, Clock, Ban, Shield } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Language } from '../lib/i18n';
 
@@ -21,12 +21,15 @@ interface ClientMonitorProps {
   onBan: (clientId: string) => void;
   onDelete: (clientId: string) => void;
   onRenew: (clientId: string, days: number) => void;
+  freemiumDisabled?: boolean;
+  onFreemiumToggle?: (v: boolean) => void;
 }
 
-export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelete, onRenew }: ClientMonitorProps) {
+export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelete, onRenew, freemiumDisabled: externalFreemium, onFreemiumToggle }: ClientMonitorProps) {
   const isAr = lang === 'ar';
   const [renewing, setRenewing] = useState<string | null>(null);
   const [renewDays, setRenewDays] = useState(30);
+  const [freemiumDisabled, setFreemiumDisabled] = useState(externalFreemium ?? localStorage.getItem('finalyze_freemium_disabled') === 'true');
 
   const daysLeft = (expiry: string | null): number => {
     if (!expiry) return 0;
@@ -65,6 +68,39 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
             <div className="text-xs text-white/80 font-bold tracking-wider mt-1">{stat.label}</div>
           </div>
         ))}
+      </div>
+
+      {/* Freemium System Toggle */}
+      <div className="bg-brand-alt rounded-2xl p-4 border border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {freemiumDisabled ? <Shield size={20} className="text-emerald-400" /> : <ShieldOff size={20} className="text-amber-400" />}
+          <div>
+            <span className="text-sm font-bold text-white">
+              {isAr ? 'نظام الخطط المجانية' : 'Freemium System'}
+            </span>
+            <p className="text-xs text-white/60 mt-0.5">
+              {freemiumDisabled
+                ? (isAr ? 'الكل وصول كامل - الخطط مرئية للعملاء' : 'All full access - plans visible to clients')
+                : (isAr ? 'القيود مفعلة - الخطط مخفية عن العملاء' : 'Restrictions active - plans hidden from clients')}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            const newVal = !freemiumDisabled;
+            setFreemiumDisabled(newVal);
+            localStorage.setItem('finalyze_freemium_disabled', newVal ? 'true' : 'false');
+            localStorage.setItem('finalyze_hide_plans', newVal ? 'false' : 'true');
+            onFreemiumToggle?.(newVal);
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            freemiumDisabled
+              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+              : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+          }`}
+        >
+          {freemiumDisabled ? (isAr ? 'ON: وصول كامل' : 'ON: Full Access') : (isAr ? 'OFF: مقفلة' : 'OFF: Locked')}
+        </button>
       </div>
 
       {/* Client Table */}

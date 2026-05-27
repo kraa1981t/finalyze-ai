@@ -9,6 +9,10 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   useIndicators: true,
   minConfidence: 55,
   minStrongConfidence: 80,
+  minTrendAge: 2,
+  minInfantAge: 10,
+  minMatureAge: 25,
+  maxMatureAge: 50,
 };
 
 export const DEFAULT_AUTO_SETTINGS = {
@@ -62,6 +66,13 @@ export const DEFAULT_FAIL_SOUNDS = [
   { id: 'soft_notice', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3', label: 'Soft Notice' },
   { id: 'alert', url: 'https://assets.mixkit.co/active_storage/sfx/431/431-preview.mp3', label: 'Alert' }
 ];
+
+export const FREE_SYMBOLS: Record<string, string[]> = {
+  forex: ['EURUSD', 'GBPUSD', 'USDJPY', 'EURJPY', 'GBPJPY'],
+  crypto: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'XRPUSD', 'ADAUSD'],
+  stocks: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'],
+  metals: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD'],
+};
 
 export const TIMEFRAMES = [
   { id: '1m', label: '1m' },

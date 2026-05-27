@@ -12,18 +12,26 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   const len = closes.length;
   
   // 1. RSI (14)
-  let avgGain = 0;
-  let avgLoss = 0;
+  let sumGain = 0;
+  let sumLoss = 0;
   for (let i = 1; i < Math.min(len, 15); i++) {
     const diff = closes[len - i] - closes[len - i - 1];
-    if (diff >= 0) avgGain += diff; else avgLoss -= diff;
+    if (diff >= 0) sumGain += diff; else sumLoss -= diff;
   }
-  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  const rs = sumLoss === 0 ? 100 : sumGain / sumLoss;
   const rsi = 100 - (100 / (1 + rs));
 
-  // 2. EMA Cross (9 vs 21)
-  const ema9 = closes.slice(-9).reduce((a, b) => a + b, 0) / 9;
-  const ema21 = closes.slice(-21).reduce((a, b) => a + b, 0) / 21;
+  // 2. EMA Cross (9 vs 21) — true Exponential Moving Average
+  const calcEMA = (data: number[], period: number): number => {
+    const multiplier = 2 / (period + 1);
+    let ema = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < data.length; i++) {
+      ema = (data[i] - ema) * multiplier + ema;
+    }
+    return ema;
+  };
+  const ema9 = calcEMA(closes, 9);
+  const ema21 = calcEMA(closes, 21);
   const emaCross = ema9 > ema21 ? 'bullish' : 'bearish';
 
   // 3. Trend Direction
@@ -50,6 +58,29 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     else break;
   }
 
+  // 4b. Total Trend Age — structural trend length (last 2+ consecutive opposite candles)
+  let totalAge = 0;
+  if (direction !== 'sideways') {
+    let consecutiveAgainst = 0;
+    for (let i = 1; i < len; i++) {
+      const curr = len - i;
+      const prev = curr - 1;
+      const isAgainst = direction === 'uptrend'
+        ? closes[curr] < closes[prev]
+        : closes[curr] > closes[prev];
+      if (isAgainst) {
+        consecutiveAgainst++;
+        if (consecutiveAgainst >= 2) {
+          totalAge = i - consecutiveAgainst;
+          break;
+        }
+      } else {
+        consecutiveAgainst = 0;
+      }
+    }
+    if (consecutiveAgainst < 2) totalAge = len;
+  }
+
   // 5. Volume Surge
   let volSurge = false;
   if (volumes && volumes.length > 5) {
@@ -58,7 +89,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     volSurge = lastVol > avgVol * 1.5;
   }
 
-  return { direction, age, rsi, emaCross, volSurge, momentumScore: upScore / (upScore + downScore) * 100 };
+  return { direction, age, totalAge, rsi, emaCross, volSurge, momentumScore: upScore / (upScore + downScore) * 100 };
 }
 
 export async function analyzeMarket(params: {
@@ -133,136 +164,61 @@ export async function analyzeMarket(params: {
       ? contextEcon.map(e => `• ${e.country} | ${e.title} | Impact: ${e.impact} | Forecast: ${e.forecast} | Previous: ${e.previous}`).join('\n')
       : 'No major economic events this week.';
 
-    const technicalPrompt = `
-      You are an Elite Institutional Trader and Quantitative Analyst (ICT/SMC Expert).
-      Your task is to analyze the following asset and provide a definitive trading decision.
+    const technicalPrompt = `You are an Elite Institutional Trader (ICT/SMC). Analyze ${symbol} (${type}, ${timeframe}, ${tradingStyle}) and return a JSON trading decision.
 
-      **MARKET DATA**:
-      - Symbol: ${symbol}
-      - Market Type: ${type}
-      - Primary Timeframe (Macro): ${timeframe}
-      - Trading Style: ${tradingStyle}
-      - Macro RSI: ${metrics?.rsi?.toFixed(1)}
-      - Macro Trend Direction: ${metrics?.direction}
-      - Macro EMA Cross (9/21): ${metrics?.emaCross}
-      - Volume Surge: ${metrics?.volSurge ? 'Yes' : 'No'}
-      - Trend Age (Candles): ${metrics?.age}
+MARKET DATA: RSI ${metrics?.rsi?.toFixed(1)}, Trend ${metrics?.direction}, EMA Cross ${metrics?.emaCross}, Vol Surge ${metrics?.volSurge}, Trend Length ${metrics?.totalAge}c, Momentum ${metrics?.age}c.
 
-      **LOWER TIMEFRAME CONFIRMATION DATA (MICRO WAVE)**:
-      - Micro Timeframe: ${microTF}
-      - Micro Calculated RSI: ${microMetrics?.rsi ? microMetrics.rsi.toFixed(1) : 'N/A'}
-      - Micro Trend Direction: ${microMetrics?.direction || 'sideways'}
-      - Micro EMA Cross (9/21): ${microMetrics?.emaCross || 'unknown'}
+MICRO (${microTF}): RSI ${microMetrics?.rsi ? microMetrics.rsi.toFixed(1) : 'N/A'}, Trend ${microMetrics?.direction || 'sideways'}, EMA ${microMetrics?.emaCross || 'unknown'}.
 
-      **⚠️ REAL-TIME MARKET CONTEXT (LIVE DATA - NOT GUESSED)**:
-      - Fear & Greed Index: ${contextFearGreed?.value ?? 'N/A'}/100 (${contextFearGreed?.classification ?? 'Unknown'})
-      - Recent News Headlines:
-        ${newsText}
-      - Upcoming Economic Events (High/Medium Impact):
-        ${eventsText}
+CONTEXT: Fear&Greed ${contextFearGreed?.value ?? 'N/A'}/100 (${contextFearGreed?.classification ?? 'Unknown'}). News: ${newsText.substring(0, 200)}. Events: ${eventsText.substring(0, 200)}.
 
-      **USER STRATEGY SETTINGS**:
-      - News & Volatility Guard: ${settings.useNewsGuard ? 'ENABLED' : 'DISABLED'}
-      - Volume Confirmation: ${settings.useVolumeAnalysis ? 'ENABLED' : 'DISABLED'}
-      - Higher Timeframe Trend Alignment: ${settings.useHigherTimeframe ? 'ENABLED' : 'DISABLED'}
-      - Technical Indicator Alignment (EMA/RSI): ${settings.useIndicators ? 'ENABLED' : 'DISABLED'}
+SETTINGS: NewsGuard ${settings.useNewsGuard ? 'ON' : 'OFF'}, Volume ${settings.useVolumeAnalysis ? 'ON' : 'OFF'}, HigherTF ${settings.useHigherTimeframe ? 'ON' : 'OFF'}, Indicators ${settings.useIndicators ? 'ON' : 'OFF'}.
 
-      **TOP-DOWN WAVE CONFIRMATION RULES (DIRECT ENTRY OPTIMIZATION)**:
-      Your primary goal is to optimize entries to avoid initial drawdowns (e.g. buying at the peak of a bullish leg just as a local pullback starts).
-      - Analyze if the lower timeframe (${microTF}) is currently in a "pullback" state or an "aligned" state relative to the Primary Timeframe (${timeframe}):
-        * **PULLBACK State**: If the macro trend is "uptrend" but the micro trend (${microTF}) is "downtrend" or has a "bearish" EMA cross or RSI is falling, it means the price is currently correcting. The user should wait!
-        * **ALIGNED State**: If the macro trend is "uptrend" and the micro trend (${microTF}) has completed its pullback and is turning bullish (e.g., micro trend is "uptrend" or EMA cross is "bullish" or RSI is rebounding from oversold), it means the pullback is completed. It is the PERFECT moment for direct Market Order entry!
-      
-      - **Enforce Signal Strictness**:
-        * You should ONLY output a signal of "strong_buy" or "strong_sell" if the Micro Timeframe (${microTF}) is **fully ALIGNED** with the macro trend. This guarantees a safe direct Market Order entry for the user with minimal drawdown!
-        * If the macro trend is strong but the Micro Timeframe is still actively in a **PULLBACK** state, you MUST downgrade the signal to "buy" (with lower confidence) or "neutral", and clearly flag in "microSignal" that it is a "pullback".
+RULES:
+- ONLY "strong_buy"/"strong_sell" if micro (${microTF}) is ALIGNED with macro. If micro is in pullback → downgrade to "buy"/"sell".
+- INFANCY (1-5): moderate risk. YOUTH (6-25): optimal. AGING (>25): exhaustion risk.
+- Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
+- If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
+- Write summary and microTrend in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Professional financial tone.
 
-      **STRATEGY EVALUATION & SUPPORTIVE WEIGHTS**:
-      1. **REAL NEWS IMPACT (Dynamic Support Factor)**:
-         * Use the REAL news headlines provided above (NOT guessed data). Do NOT make up or imagine news.
-         * TECHNICAL CRITERION: If News Guard is ENABLED, evaluate if the recent candles show high volatility or price expansion (confirming news-driven move).
-         * If REAL news is bullish (positive earnings, regulatory approval, adoption) AND price action shows a clean Break of Structure (BOS), treat the news as **SUPPORTIVE** and **ADD +5% to +10% to the confidence score**.
-         * If REAL news is bearish (regulatory crackdown, hack, rate hikes) AND price shows distribution, **REDUCE confidence by -5% to -10%** or issue "no_entry".
-         * If news is mixed or no relevant news, **do not adjust confidence** (neutral).
-         * CRITICAL: If volatility is chaotic with extreme spreads, downgrade signal regardless of news.
-      2. **REAL FEAR & GREED INDEX (تصويت الجمهور والمؤسسات)**:
-         * Use the REAL Fear & Greed Index value provided above (${contextFearGreed?.value ?? 'N/A'}/100).
-         * **EXTREME FEAR (0-25)**: Market is oversold. Retail is panicking. Institutions are accumulating. If technicals show bullish structure, this is a STRONG contrarian buy signal. Boost confidence by +5%.
-         * **FEAR (25-45)**: Caution dominates. Retail is bearish. Await technical confirmation before entry.
-         * **NEUTRAL (45-55)**: Low conviction. Only trade if technical setup is exceptionally clear (confidence ≥ 70).
-         * **GREED (55-75)**: Retail is bullish. Trend-following works well. If technicals align, this confirms momentum.
-         * **EXTREME GREED (75-100)**: Market is overbought. Euphoria. Danger of correction. If you give a buy signal, cap confidence at 75 max. For sell signals, this is supportive.
-         * Adjust the "sentimentScore" field to reflect this REAL index value.
-      3. **REAL ECONOMIC EVENTS IMPACT**:
-         * Use the REAL economic events listed above. 
-         * If a HIGH impact event is coming within 24 hours (e.g., FOMC, NFP, CPI, interest rate decision), **warn in the summary** that volatility is expected.
-         * If a high-impact event just passed and caused a clean breakout, treat it as a valid technical signal.
-         * If NEWS GUARD is ENABLED and a major event is imminent, **reduce confidence by -10%** (uncertainty penalty) or flag as "no_entry".
-      4. **VOLUME CONFIRMATION**: If Volume Confirmation is ENABLED, look for supportive volume. A breakout or strong reversal should ideally be backed by average or above-average volume.
-      5. **MACRO ALIGNMENT**: If Higher Timeframe Alignment is ENABLED, ensure the trade aligns with the overall macro trend (e.g., higher timeframes are in a similar direction or consolidating support/resistance).
-      6. **TECHNICAL INDICATORS**: If Indicator Alignment is ENABLED, verify that EMA cross (9/21) or RSI are supportive (e.g., not extremely overbought >75 for Buy, or oversold <25 for Sell).
-
-      **INSTITUTIONAL ANALYSIS INSTRUCTIONS**:
-      1. MARKET STRUCTURE (SMC): Identify if there is a Break of Structure (BOS) or Change of Character (CHOCH) on the ${timeframe} timeframe.
-      2. LIQUIDITY POOLS: Identify where retail stop-losses are resting (Buy Side/Sell Side Liquidity). Is the market currently sweeping liquidity or expanding away from it?
-      3. FAIR VALUE GAPS (FVG) / IMBALANCES: Are there unfilled FVGs acting as magnets for price?
-      4. ORDER BLOCKS (OB): Is the price mitigating a valid Institutional Order Block?
-      5. TREND MATURITY: Analyze the lifecycle (age=${metrics?.age}).
-         - INFANCY (1-5 candles): Just started. Moderate risk of false breakout.
-         - YOUTH (6-25 candles): Optimal entry window.
-         - AGING (>25 candles): Exhaustion risk.
-      
-      **CONFIDENCE & SIGNAL RULES**:
-      Calculate a realistic final "confidence" percentage (0-100) based on your analysis. Your goal is to find active setups:
-      - Bullish + Confidence >= 80%: "strong_buy"
-      - Bullish + Confidence 50-79%: "buy"
-      - Bearish + Confidence >= 80%: "strong_sell"
-      - Bearish + Confidence 50-79%: "sell"
-      - Below 50% or conflicting: "no_entry"
-
-      **CRITICAL LANGUAGE INSTRUCTION (ABSOLUTE REQUIREMENT)**:
-      You MUST write the ENTIRE "summary" and "microTrend" fields strictly and exclusively in ${lang === 'ar' ? 'ARABIC (اللغة العربية)' : lang === 'fr' ? 'FRENCH (Français)' : 'ENGLISH'}. 
-      Do NOT output these text fields in any other language. If the user interface is Arabic, your analysis MUST be in Arabic.
-      - Maintain a professional financial tone.
-
-      Return ONLY a VALID JSON object:
-      {
-        "signal": "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" | "no_entry",
-        "confidence": number,
-        "summary": "Detailed report...",
-        "technicalScore": number,
-        "sentimentScore": number,
-        "historicalMatch": "Pattern description",
-        "microSignal": "pullback" | "aligned" | "unknown",
-        "microTrend": "Brief structural wave status (e.g. 'M15 Pullback Completed - Ready for Direct Entry' in Arabic or English)"
-      }
-    `;
+Return ONLY valid JSON:
+{
+  "signal": "strong_buy"|"buy"|"neutral"|"sell"|"strong_sell"|"no_entry",
+  "confidence": number (0-100),
+  "summary": "string",
+  "technicalScore": number,
+  "sentimentScore": number,
+  "historicalMatch": "string",
+  "microSignal": "pullback"|"aligned"|"unknown",
+  "microTrend": "string"
+}`;
 
     let aiResponse: any;
-    const groqKey = localStorage.getItem('finalyze_user_groq_api_key') || '';
-    const deepseekKey = localStorage.getItem('finalyze_user_deepseek_api_key') || '';
+    let lastError: string | null = null;
 
-    // Try Groq first
-    if (groqKey) {
-      aiResponse = await fetch('/api/ai-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: technicalPrompt, userApiKey: groqKey, provider: 'groq' })
-      }).then(r => r.json());
+    // Load key from localStorage
+    const keyValue = localStorage.getItem('finalyze_key1_value') || localStorage.getItem('finalyze_user_groq_api_key') || '';
+    if (!keyValue) throw new Error(lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.');
+
+    // Single request — server tries all providers internally (Groq→DeepSeek→Google→OpenAI)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    aiResponse = await fetch('/api/ai-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: technicalPrompt, userApiKey: keyValue, provider: 'groq' }),
+      signal: controller.signal
+    }).then(r => r.json()).catch(e => ({ error: e.name === 'AbortError' ? 'Request timed out' : e.message }));
+    clearTimeout(timeoutId);
+
+    if (!aiResponse?.error && aiResponse?.choices?.[0]?.message?.content) {
+      lastError = null;
+    } else {
+      lastError = aiResponse?.error || 'All providers failed';
     }
 
-    // If Groq failed and DeepSeek is available, fall back
-    if ((aiResponse?.error || !aiResponse?.choices?.[0]?.message?.content) && deepseekKey) {
-      console.warn('Groq failed, falling back to DeepSeek:', aiResponse?.error);
-      aiResponse = await fetch('/api/ai-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: technicalPrompt, userApiKey: deepseekKey, provider: 'deepseek' })
-      }).then(r => r.json());
-    }
-
-    if (aiResponse?.error) {
-      throw new Error(aiResponse.error);
+    if (lastError) {
+      throw new Error(lastError);
     }
 
     if (!aiResponse?.choices?.[0]?.message?.content) {
@@ -292,12 +248,40 @@ export async function analyzeMarket(params: {
     let finalSignal = rawSignal as SignalType;
     let finalConfidence = Number(resultData.confidence) || 50;
 
-    // RELAXED ENFORCEMENT for Crypto & Live conditions
+    // TREND AGE ZONE ENFORCEMENT
+    const totalAge = metrics?.totalAge || 0;
     const age = metrics?.age || 0;
     const isCrypto = type === MarketType.CRYPTO;
+    const minAge = settings?.minTrendAge ?? 2;
+    const infantAgeThreshold = settings?.minInfantAge ?? 10;
+    const matureAgeThreshold = settings?.minMatureAge ?? 25;
+    const oldAgeThreshold = settings?.maxMatureAge ?? 50;
+    const infantLimit = isCrypto ? infantAgeThreshold * 2 : infantAgeThreshold;
+    const matureLimit = isCrypto ? matureAgeThreshold * 2 : matureAgeThreshold;
+    const oldLimit = isCrypto ? oldAgeThreshold * 2 : oldAgeThreshold;
 
-    if (age < 2 || (isCrypto ? age > 60 : age > 35)) {
-      if (finalConfidence > 70) finalConfidence = 65; // Soft downgrade instead of hard block
+    // Zone 1: Too young — confidence cap
+    if (totalAge < infantLimit) {
+      if (finalConfidence > 65) finalConfidence = 65;
+    }
+    // Zone 2: Infant — downgrade strong signals to normal
+    else if (totalAge < matureLimit) {
+      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
+      else if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
+      if (finalConfidence > 70) finalConfidence = 70;
+    }
+    // Zone 3: Mature — full strength allowed (no modification)
+    else if (totalAge <= oldLimit) {
+      // Strong signals pass through at full confidence
+    }
+    // Zone 4: Old/Exhaustion — confidence cap
+    else {
+      if (finalConfidence > 65) finalConfidence = 65;
+    }
+
+    // Also cap confidence if consecutive momentum (age) is too short
+    if (age < minAge && finalConfidence > 65) {
+      finalConfidence = 65;
     }
 
     // STRICT MATHEMATICAL ENFORCEMENT OF SETTINGS
@@ -329,8 +313,8 @@ export async function analyzeMarket(params: {
       summary: resultData.summary,
       technicalScore: metrics?.momentumScore || 50,
       sentimentScore: contextFearGreed?.value ?? 50,
-      trendMaturity: age <= 8 ? 'infancy' : (age <= 30 ? 'youth' : 'aging'),
-      trendAge: age,
+      trendMaturity: totalAge < infantAgeThreshold ? 'infancy' : (totalAge < matureAgeThreshold ? 'youth' : (totalAge <= oldAgeThreshold ? 'mature' : 'aging')),
+      trendAge: totalAge,
       microTF,
       microSignal: resultData.microSignal || 'unknown',
       microTrend: resultData.microTrend || "",

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Settings2, Activity, LayoutTemplate, Layers, ShieldCheck, Mail, MessageSquare } from 'lucide-react';
+import { X, Settings2, Activity, LayoutTemplate, Layers, ShieldCheck, Mail, MessageSquare, CheckCircle } from 'lucide-react';
 import { StrategySettings } from '../types';
 import { DEFAULT_STRATEGY_SETTINGS } from '../constants';
 import { User } from 'firebase/auth';
@@ -11,6 +11,7 @@ interface SettingsModalProps {
   onClose: () => void;
   settings: StrategySettings;
   onSettingsChange: (newSettings: StrategySettings) => void;
+  onSave?: () => void;
   user: User | null;
   asPage?: boolean;
   lang: Language;
@@ -51,6 +52,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
   const [otpError, setOtpError] = useState('');
   const [otpSuccess, setOtpSuccess] = useState('');
   const [notification, setNotification] = useState<{ type: 'sms' | 'email'; title: string; body: string } | null>(null);
+  const [saved, setSaved] = useState(false);
 
   // Auto close notification after 8 seconds
   useEffect(() => {
@@ -59,6 +61,12 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
       return () => clearTimeout(t);
     }
   }, [notification]);
+
+  const handleSave = () => {
+    onSave?.();
+    setSaved(true);
+    setTimeout(() => { setSaved(false); onClose(); }, 600);
+  };
 
   const handleRequestChange = (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,7 +249,105 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         </div>
       </div>
 
-      {/* Section 4: Developer Dynamic Credentials Security (Only visible to the developer) */}
+      {/* Section 4: Developer Trend Age Settings (مطور فقط) */}
+      {user && (user.email === currentDevEmail || user.email === 'bachasalman69@gmail.com' || localStorage.getItem('finalyze_dev_bypass_active') === 'true') && (
+        <div className="space-y-4 pt-6 border-t border-white/10">
+          <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+            <Activity size={16} /> {isAr ? '🛠 إعدادات مناطق عمر الاتجاه (مطور)' : '🛠 Trend Age Zones (Developer)'}
+          </h3>
+          <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-5 space-y-6">
+
+            {/* Zone Visualization */}
+            <div className="bg-black/30 rounded-xl p-4">
+              <div className="text-[10px] text-brand-text/40 font-mono mb-2 text-center">
+                {isAr ? 'مناطق عمر الاتجاه (Total Age)' : 'Trend Age Zones (Total Age)'}
+              </div>
+              <div className="flex h-6 rounded-lg overflow-hidden text-[9px] font-black">
+                <div className="flex-1 bg-red-500/30 border-r border-black/30 flex items-center justify-center text-red-300">
+                  {isAr ? 'رضيع <10' : 'Infant <10'}
+                </div>
+                <div className="flex-1 bg-amber-500/30 border-r border-black/30 flex items-center justify-center text-amber-300">
+                  {isAr ? 'طفل 10-25' : 'Youth 10-25'}
+                </div>
+                <div className="flex-1 bg-emerald-500/30 border-r border-black/30 flex items-center justify-center text-emerald-300">
+                  {isAr ? 'ناضج 25-50' : 'Mature 25-50'}
+                </div>
+                <div className="flex-1 bg-red-500/30 flex items-center justify-center text-red-300">
+                  {isAr ? 'عجوز >50' : 'Aging >50'}
+                </div>
+              </div>
+              <div className="flex justify-between mt-1 text-[8px] text-brand-text/30 font-mono px-1">
+                <span>0</span>
+                <span>{settings.minInfantAge}</span>
+                <span>{settings.minMatureAge}</span>
+                <span>{settings.maxMatureAge}</span>
+              </div>
+            </div>
+
+            {/* Min Consecutive Momentum (Age) */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-semibold text-brand-text">{isAr ? 'حد أدنى لاندفاع الاتجاه (Age)' : 'Min Consecutive Momentum (Age)'}</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleChange('minTrendAge', Math.max(1, settings.minTrendAge - 1))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
+                  <span className="w-8 text-center text-lg font-black text-amber-400 font-mono">{settings.minTrendAge}</span>
+                  <button onClick={() => handleChange('minTrendAge', Math.min(10, settings.minTrendAge + 1))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
+                </div>
+              </div>
+              <p className="text-xs text-brand-text/40">{isAr ? 'عدد الشموع المتتالية المطلوب قبل السماح بدخول الصفقة. افتراضي: 2' : 'Required consecutive candles before allowing entry. Default: 2'}</p>
+            </div>
+
+            {/* Infant Age Threshold */}
+            <div className="pt-2 border-t border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-semibold text-red-400">{isAr ? 'بداية مرحلة الطفل (Infant)' : 'Infant Zone Start'}</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleChange('minInfantAge', Math.max(3, settings.minInfantAge - 1))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
+                  <span className="w-10 text-center text-lg font-black text-red-400 font-mono">{settings.minInfantAge}</span>
+                  <button onClick={() => handleChange('minInfantAge', Math.min(settings.minMatureAge - 1, settings.minInfantAge + 1))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
+                </div>
+              </div>
+              <p className="text-xs text-brand-text/40">{isAr ? 'أقل من هذه القيمة ← اتجاه رضيع (تخفيف الثقة). افتراضي: 10' : 'Below this → infant trend (confidence cap). Default: 10'}</p>
+            </div>
+
+            {/* Mature Age Start */}
+            <div className="pt-2 border-t border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-semibold text-emerald-400">{isAr ? 'بداية مرحلة النضج (Mature)' : 'Mature Zone Start'}</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleChange('minMatureAge', Math.max(settings.minInfantAge + 1, settings.minMatureAge - 1))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
+                  <span className="w-10 text-center text-lg font-black text-emerald-400 font-mono">{settings.minMatureAge}</span>
+                  <button onClick={() => handleChange('minMatureAge', Math.min(settings.maxMatureAge - 1, settings.minMatureAge + 1))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
+                </div>
+              </div>
+              <p className="text-xs text-brand-text/40">{isAr ? 'من هذه القيمة يبدأ الاتجاه الناضج (يُسمح بالإشارات القوية). افتراضي: 25' : 'From this value the trend is mature (strong signals allowed). Default: 25'}</p>
+            </div>
+
+            {/* Old Age Threshold */}
+            <div className="pt-2 border-t border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-semibold text-red-400">{isAr ? 'بداية مرحلة الشيخوخة (Aging)' : 'Aging Zone Start'}</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleChange('maxMatureAge', Math.max(settings.minMatureAge + 1, settings.maxMatureAge - 5))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
+                  <span className="w-10 text-center text-lg font-black text-red-400 font-mono">{settings.maxMatureAge}</span>
+                  <button onClick={() => handleChange('maxMatureAge', Math.min(100, settings.maxMatureAge + 5))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
+                </div>
+              </div>
+              <p className="text-xs text-brand-text/40">{isAr ? 'فوق هذه القيمة ← اتجاه عجوز (خطر انعكاس، تخفيف الثقة). للكريبتو: ×2. افتراضي: 50' : 'Above this → aging trend (reversal risk, confidence cap). For crypto: ×2. Default: 50'}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section 5: Developer Dynamic Credentials Security (Only visible to the developer) */}
       {user && (user.email === currentDevEmail || user.email === 'bachasalman69@gmail.com' || localStorage.getItem('finalyze_dev_bypass_active') === 'true') && (
         <div className="space-y-4 pt-6 border-t border-white/10">
           <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
@@ -373,8 +479,15 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
       <button onClick={resetToDefault} className="px-4 py-2 text-sm text-brand-text/50 hover:text-brand-text font-semibold transition-colors">
         {isAr ? 'استعادة الافتراضي' : 'Restore Default'}
       </button>
-      <button onClick={onClose} className="px-6 py-2 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all">
-        {isAr ? 'تطبيق وحفظ' : 'Apply & Save'}
+      <button onClick={handleSave} className="px-6 py-2 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-2">
+        {saved ? (
+          <>
+            <CheckCircle size={16} />
+            {isAr ? 'تم الحفظ ✓' : 'Saved ✓'}
+          </>
+        ) : (
+          isAr ? 'تطبيق وحفظ' : 'Apply & Save'
+        )}
       </button>
     </div>
   );

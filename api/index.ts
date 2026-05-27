@@ -217,86 +217,121 @@ app.get("/api/market-data", async (req, res) => {
   }
 });
 
-// API Route: AI Analysis Proxy (for Groq and DeepSeek)
+// API Route: AI Analysis Proxy — tries ALL providers IN PARALLEL for speed
 app.post("/api/ai-analysis", async (req, res) => {
   try {
-    const { prompt, userApiKey, provider } = req.body;
-    const isDeepSeek = provider === 'deepseek';
-    const devBypassKey = '__dev_bypass__';
-    const apiKey = (userApiKey && userApiKey !== devBypassKey) ? userApiKey : process.env[isDeepSeek ? 'DEEPSEEK_API_KEY' : 'GROQ_API_KEY'];
-    const model = isDeepSeek ? 'deepseek-chat' : (process.env.GROQ_MODEL || "llama-3.3-70b-versatile");
+    const { prompt, userApiKey } = req.body;
+    const key = userApiKey || '';
 
-    if (!apiKey) {
-      return res.status(400).json({ error: `API Key is required for ${isDeepSeek ? 'DeepSeek' : 'Groq'}.` });
-    }
+    // Try all providers in parallel — return the first success
+    const results = await Promise.allSettled([
+      callGroq(key, prompt),
+      callDeepSeek(key, prompt),
+      callQwen(key, prompt),
+      callGoogle(key, prompt),
+    ]);
 
-    const apiUrl = isDeepSeek
-      ? "https://api.deepseek.com/v1/chat/completions"
-      : "https://api.groq.com/openai/v1/chat/completions";
-
-    const body: any = {
-      model,
-      messages: [
-        { role: "system", content: "You are a professional financial analyst AI. You provide strict, math-based technical analysis. Always respond in valid JSON format." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.1,
-    };
-
-    // Only Groq supports response_format
-    if (!isDeepSeek) {
-      body.response_format = { type: "json_object" };
-    }
-
-    let retries = 3;
-    let response;
-    let data;
-
-    while (retries > 0) {
-      response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (response.status === 429) {
-        retries--;
-        if (retries === 0) break;
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        continue;
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value.content) {
+        return res.json({ choices: [{ message: { content: r.value.content } }] });
       }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = `AI API returned ${response.status}`;
-        try {
-          const errJson = JSON.parse(errorText);
-          errorMessage = errJson?.error?.message || errJson?.error?.code || errorMessage;
-        } catch {}
-        return res.status(response.status).json({ error: errorMessage });
-      }
-
-      data = await response.json();
-      break;
     }
 
-    if (!data) {
-      return res.status(503).json({ error: "AI service temporarily unavailable. Please try again." });
-    }
-
-    // Groq returns OpenAI-compatible format directly
-    const content = data?.choices?.[0]?.message?.content || '';
-    res.json({
-      choices: [{
-        message: { content }
-      }]
-    });
+    // All failed — return the first error
+    const firstError = results.find(r => r.status === 'fulfilled') as any;
+    res.status(503).json({ error: firstError?.value?.error || 'All providers failed' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
+
+async function callGroq(apiKey: string, prompt: string) {
+  const body = {
+    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    messages: [
+      { role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." },
+      { role: "user", content: prompt }
+    ],
+    temperature: 0.1,
+    response_format: { type: "json_object" }
+  };
+  try {
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) return { error: `Groq: ${resp.status}` };
+    const data = await resp.json();
+    return { content: data?.choices?.[0]?.message?.content || '' };
+  } catch (e: any) { return { error: e.message }; }
+}
+
+async function callDeepSeek(apiKey: string, prompt: string) {
+  const body = {
+    model: 'deepseek-chat',
+    messages: [
+      { role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." },
+      { role: "user", content: prompt }
+    ],
+    temperature: 0.1,
+  };
+  try {
+    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) return { error: `DeepSeek: ${resp.status}` };
+    const data = await resp.json();
+    return { content: data?.choices?.[0]?.message?.content || '' };
+  } catch (e: any) { return { error: e.message }; }
+}
+
+async function callQwen(apiKey: string, prompt: string) {
+  for (const model of ['qwen-plus', 'qwen-turbo', 'qwen-max']) {
+    try {
+      const resp = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.1,
+        })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data?.choices?.[0]?.message?.content || '';
+        if (content) return { content };
+      }
+    } catch {}
+  }
+  return { error: 'Qwen failed' };
+}
+
+async function callGoogle(apiKey: string, prompt: string) {
+  for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro']) {
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
+          generationConfig: { temperature: 0.1 }
+        })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (text) return { content: text };
+      }
+    } catch {}
+  }
+  return { error: 'Google failed' };
+}
 
 export default app;

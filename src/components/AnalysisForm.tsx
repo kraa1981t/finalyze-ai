@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { User } from 'firebase/auth';
-import { ChevronDown, Search, ArrowRight, TrendingUp, Bitcoin, DollarSign, Gem, Briefcase, Play, ListFilter, Plus, Zap, X, Clock } from 'lucide-react';
+import { ChevronDown, Search, ArrowRight, TrendingUp, Bitcoin, DollarSign, Gem, Briefcase, Play, ListFilter, Plus, Zap, X, Clock, Sparkles, Star, Crown } from 'lucide-react';
 import { MarketType, AnalysisResult, TradingStyle, StrategySettings } from '../types';
-import { MARKET_CATEGORIES, TIMEFRAMES, SYMBOL_GROUPS, TRADING_STYLES, ALL_SYMBOLS_DB } from '../constants';
+import { MARKET_CATEGORIES, TIMEFRAMES, SYMBOL_GROUPS, TRADING_STYLES, ALL_SYMBOLS_DB, FREE_SYMBOLS } from '../constants';
 import { analyzeMarket } from '../services/geminiService';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -16,9 +16,11 @@ interface AnalysisFormProps {
   onBegin: () => void;
   onProgress: (current: string, total: number, index: number) => void;
   onResult: (res: AnalysisResult[]) => void;
-  onError: () => void;
+  onError: (msg?: string) => void;
   lang: Language;
   settings: StrategySettings;
+  hasActivePlan: boolean;
+  onUpgrade: () => void;
 }
 
 interface FormValues {
@@ -38,7 +40,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Clock: <Clock size={18} />,
 };
 
-export default function AnalysisForm({ user, onBegin, onProgress, onResult, onError, lang, settings }: AnalysisFormProps) {
+export default function AnalysisForm({ user, onBegin, onProgress, onResult, onError, lang, settings, hasActivePlan, onUpgrade }: AnalysisFormProps) {
   const t = translations[lang];
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
   const [analyzingIndex, setAnalyzingIndex] = useState<number | null>(null);
@@ -46,6 +48,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
   const [searchTerm, setSearchTerm] = useState("");
   const [dropdownSearch, setDropdownSearch] = useState("");
   const [showAllSymbols, setShowAllSymbols] = useState(false);
+  const [showUpgradeOverlay, setShowUpgradeOverlay] = useState(false);
   const [hiddenSymbols, setHiddenSymbols] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('finalyze_hidden_symbols');
@@ -88,12 +91,20 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
   }, [selectedSymbols, setValue]);
 
   const toggleSymbol = (sym: string) => {
+    if (!hasActivePlan && !FREE_SYMBOLS[selectedType]?.includes(sym)) {
+      setShowUpgradeOverlay(true);
+      return;
+    }
     setSelectedSymbols(prev => 
       prev.includes(sym) ? prev.filter(s => s !== sym) : [...prev, sym]
     );
   };
 
   const selectAllInCategory = () => {
+    if (!hasActivePlan) {
+      setShowUpgradeOverlay(true);
+      return;
+    }
     const allGroupsSymbols = SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols) || [];
     const customForType = customSymbols.filter(s => 
       (ALL_SYMBOLS_DB[selectedType] || []).includes(s) &&
@@ -112,6 +123,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
 
   const removeSymbol = (sym: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!hasActivePlan && FREE_SYMBOLS[selectedType]?.includes(sym)) return;
     if (customSymbols.includes(sym)) {
       setCustomSymbols(prev => prev.filter(s => s !== sym));
     } else {
@@ -127,11 +139,20 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
     return true;
   };
 
-  const clearAll = () => setSelectedSymbols([]);
+  const clearAll = () => {
+    if (!hasActivePlan) { setShowUpgradeOverlay(true); return; }
+    setSelectedSymbols([]);
+  };
 
   const onSubmit = async (data: FormValues) => {
     setFormError(null);
     
+    if (!hasActivePlan) {
+      // Force day_trading + 1d for free users
+      data.timeframe = '1d';
+      data.tradingStyle = TradingStyle.DAY_TRADING;
+    }
+
     // Radical Market Blocking
     if (!isMarketOpen(data.type)) {
       setFormError(lang === 'ar' ? 'عفواً.. هذه الأسواق مغلقة حالياً ولا يمكن تحليلها' : 'Sorry.. These markets are currently closed and cannot be analyzed');
@@ -179,14 +200,16 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
           
           if (!result) throw new Error("Result is null");
 
-          result.userId = user.uid;
+          result.userId = user?.uid || 'anonymous';
           results.push(result);
 
-          // Save to Firestore background (don't block UI if it fails)
-          addDoc(collection(db, "analysisResults"), {
-            ...result,
-            timestamp: serverTimestamp(),
-          }).catch(err => console.error("History storage error:", err));
+          // Save to Firestore silently, never block or error the UI
+          if (user?.uid) {
+            addDoc(collection(db, "analysisResults"), {
+              ...result,
+              timestamp: serverTimestamp(),
+            }).catch(() => {});
+          }
 
         } catch (symbolError: any) {
           console.error(`[Analysis Error] ${currentSymbol}:`, symbolError);
@@ -206,12 +229,12 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
       if (results.length > 0) {
         onResult(results);
       } else {
-        onError();
+        onError(formError || (lang === 'ar' ? 'فشل التحليل لجميع الرموز' : 'Analysis failed for all symbols'));
       }
     } catch (error: any) {
       console.error("[Global Form Error]:", error);
       setAnalyzingIndex(null);
-      onError();
+      onError(error.message || "Unknown error occurred.");
       setFormError(error.message || "Unknown error occurred.");
     }
   };
@@ -334,7 +357,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                                     ].filter(sym => !hiddenSymbols.includes(sym));
 
                                     const results = ALL_SYMBOLS_DB[cat.id]
-                                      ?.filter(s => s.toLowerCase().includes(dropdownSearch.toLowerCase()) && !dropdownDisplayed.includes(s)) || [];
+                                      ?.filter(s => s.toLowerCase().includes(dropdownSearch.toLowerCase())) || [];
 
                                     return (
                                       <>
@@ -343,6 +366,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                                             key={sym}
                                             type="button"
                                             onClick={() => {
+                                              if (!hasActivePlan) { setShowUpgradeOverlay(true); return; }
                                               setHiddenSymbols(prev => prev.filter(s => s !== sym));
                                               if (!customSymbols.includes(sym)) {
                                                 setCustomSymbols(prev => [...prev, sym]);
@@ -351,10 +375,13 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                                               setActiveDropdown(null);
                                               setValue("type", cat.id);
                                             }}
-                                            className="flex items-center justify-between p-3 rounded-xl text-sm font-black transition-all border bg-brand-text/5 border-brand-text/10 text-brand-text hover:text-brand-text hover:bg-brand-text/10"
+                                            className={cn(
+                                              "flex items-center justify-between p-3 rounded-xl text-sm font-black transition-all border bg-brand-text/5 border-brand-text/10 text-brand-text hover:text-brand-text hover:bg-brand-text/10",
+                                              !hasActivePlan && "opacity-50 cursor-not-allowed"
+                                            )}
                                           >
                                             <span>{sym}</span>
-                                            <Plus size={10} className="opacity-100" />
+                                            {hasActivePlan ? <Plus size={10} className="opacity-100" /> : <Zap size={10} className="text-amber-400" />}
                                           </button>
                                         ))}
                                         {results.length === 0 && (
@@ -396,6 +423,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
         <div className="space-y-4 bg-brand-alt p-8 rounded-[3rem] border border-brand-text/10 shadow-2xl transition-all">
           <div className={cn("flex items-center justify-between border-b border-brand-text/10 pb-6", isRTL ? "flex-row-reverse" : "flex-row")}>
              <label className="text-base font-black text-brand-text opacity-100 uppercase tracking-[0.2em]">{t.selectSymbols}</label>
+             {hasActivePlan ? (
              <div className="flex gap-3">
                <button 
                   type="button" 
@@ -419,16 +447,24 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                  {t.clear}
                </button>
              </div>
+             ) : (
+               <span className="text-xs font-black text-amber-400 uppercase tracking-widest">
+                 {lang === 'ar' ? `5/${FREE_SYMBOLS[selectedType]?.length || 5}` : `${selectedSymbols.filter(s => FREE_SYMBOLS[selectedType]?.includes(s)).length}/${FREE_SYMBOLS[selectedType]?.length || 5}`}
+               </span>
+             )}
           </div>
 
           <div className="space-y-6 pt-6 h-[400px] overflow-y-auto px-2 custom-scrollbar">
             {/* Symbol Groups & Browse */}
             <div className="space-y-8">
-              {SYMBOL_GROUPS[selectedType]?.map((group, index, arr) => {
-                let groupSymbols = group.symbols.filter(sym => !hiddenSymbols.includes(sym));
+              {(!hasActivePlan ? (() => {
+                const freeSyms = FREE_SYMBOLS[selectedType] || [];
+                return [{ label: lang === 'ar' ? 'أشهر الرموز' : 'Popular Free', symbols: freeSyms }];
+              })() : SYMBOL_GROUPS[selectedType])?.map((group, index, arr) => {
+                let groupSymbols = hasActivePlan ? group.symbols.filter(sym => !hiddenSymbols.includes(sym)) : [...group.symbols];
                 
-                // Append custom symbols to the last group of the category
-                if (index === arr.length - 1) {
+                // Append custom symbols to the last group of the category (only for active plan)
+                if (index === arr.length - 1 && hasActivePlan) {
                   const allGroupsSymbols = SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols) || [];
                   const customForType = customSymbols.filter(s => 
                     (ALL_SYMBOLS_DB[selectedType] || []).includes(s) &&
@@ -460,6 +496,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                           >
                             {sym}
                           </button>
+                          {hasActivePlan && (
                           <button
                             type="button"
                             onClick={(e) => removeSymbol(sym, e)}
@@ -467,6 +504,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                           >
                             <X size={8} />
                           </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -478,81 +516,83 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             {/* Global Symbol Search */}
             <div className="space-y-4 pt-8 border-t border-brand-text/10">
                <div className="relative">
-                 <Search className={cn("absolute top-1/2 -translate-y-1/2 text-brand-muted", isRTL ? "right-4" : "left-4")} size={16} />
-                 <input 
-                   type="text"
-                   placeholder={t.searchSymbol}
-                   value={searchTerm}
-                   onChange={(e) => setSearchTerm(e.target.value)}
-                   className={cn(
-                     "w-full bg-brand-text/5 border border-brand-text/10 rounded-2xl py-4 text-sm font-bold text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
-                     isRTL ? "pr-12 pl-4" : "pl-12 pr-4"
-                   )}
-                 />
-                 {searchTerm && (
-                   <button 
-                     onClick={() => setSearchTerm("")}
-                     className={cn("absolute top-1/2 -translate-y-1/2 text-brand-text hover:text-brand-text", isRTL ? "left-4" : "right-4")}
-                   >
-                     <X size={14} />
-                   </button>
+                  <Search className={cn("absolute top-1/2 -translate-y-1/2 text-brand-muted", isRTL ? "right-4" : "left-4")} size={16} />
+                  <input 
+                    type="text"
+                    placeholder={t.searchSymbol}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={cn(
+                      "w-full bg-brand-text/5 border border-brand-text/10 rounded-2xl py-4 text-sm font-bold text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
+                      isRTL ? "pr-12 pl-4" : "pl-12 pr-4"
+                    )}
+                  />
+                  {searchTerm && (
+                    <button 
+                      onClick={() => setSearchTerm("")}
+                      className={cn("absolute top-1/2 -translate-y-1/2 text-brand-text hover:text-brand-text", isRTL ? "left-4" : "right-4")}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {searchTerm && (
+                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-black/20 rounded-2xl border border-white/5">
+                    {(() => {
+                      const results = ALL_SYMBOLS_DB[selectedType]
+                        ?.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase())) || [];
+
+                      return (
+                        <>
+                          {results.slice(0, 50).map((sym) => (
+                            <button
+                              key={sym}
+                              type="button"
+                              onClick={() => {
+                                if (!hasActivePlan) { setShowUpgradeOverlay(true); return; }
+                                setHiddenSymbols(prev => prev.filter(s => s !== sym));
+                                if (!customSymbols.includes(sym)) {
+                                  setCustomSymbols(prev => [...prev, sym]);
+                                }
+                                setSearchTerm("");
+                              }}
+                              className={cn(
+                                "px-4 py-2 rounded-xl text-sm font-black border transition-all",
+                                !hasActivePlan && "opacity-50 cursor-not-allowed",
+                                selectedSymbols.includes(sym)
+                                  ? "bg-primary border-primary text-brand-text"
+                                  : "bg-brand-text/5 border-brand-text/10 text-brand-text hover:border-white/30"
+                              )}
+                            >
+                              {sym}
+                            </button>
+                          ))}
+                          {results.length === 0 && (
+                            <p className="text-sm text-brand-muted w-full text-center py-2 italic">No matching symbols found</p>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
                  )}
-               </div>
-
-               {searchTerm && (
-                 <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-black/20 rounded-2xl border border-white/5">
-                   {(() => {
-                     const globalDisplayed = [
-                       ...(SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols) || []),
-                       ...customSymbols
-                     ].filter(sym => !hiddenSymbols.includes(sym));
-
-                     const results = ALL_SYMBOLS_DB[selectedType]
-                       ?.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase()) && !globalDisplayed.includes(s)) || [];
-
-                     return (
-                       <>
-                         {results.slice(0, 50).map((sym) => (
-                           <button
-                             key={sym}
-                             type="button"
-                             onClick={() => {
-                               setHiddenSymbols(prev => prev.filter(s => s !== sym));
-                               if (!customSymbols.includes(sym)) {
-                                 setCustomSymbols(prev => [...prev, sym]);
-                               }
-                               setSearchTerm("");
-                             }}
-                             className={cn(
-                               "px-4 py-2 rounded-xl text-sm font-black border transition-all",
-                               selectedSymbols.includes(sym)
-                                 ? "bg-primary border-primary text-brand-text"
-                                 : "bg-brand-text/5 border-brand-text/10 text-brand-text hover:border-white/30"
-                             )}
-                           >
-                             {sym}
-                           </button>
-                         ))}
-                         {results.length === 0 && (
-                           <p className="text-sm text-brand-muted w-full text-center py-2 italic">No matching symbols found</p>
-                         )}
-                       </>
-                     );
-                   })()}
-                 </div>
-               )}
-            </div>
+             </div>
 
 
-            
             <div className="pt-8 border-t border-brand-text/10">
                <label className="text-sm font-black text-brand-text opacity-100 uppercase mb-3 block pl-2">{t.manualInput}</label>
                <input
                  {...register("symbol")}
                  dir="ltr"
                  placeholder="BTCUSD, SOLUSD, ETHUSD..."
-                 className="w-full p-5 bg-black/40 border border-brand-text/10 rounded-2xl text-base font-mono focus:ring-4 ring-primary/20 focus:outline-none text-brand-text placeholder:text-brand-muted"
+                 disabled={!hasActivePlan}
+                 className="w-full p-5 bg-black/40 border border-brand-text/10 rounded-2xl text-base font-mono focus:ring-4 ring-primary/20 focus:outline-none text-brand-text placeholder:text-brand-muted disabled:opacity-40 disabled:cursor-not-allowed"
                />
+               {!hasActivePlan && (
+                 <p className="text-[10px] text-amber-400 mt-2 font-bold">
+                   {lang === 'ar' ? 'متاح فقط للمشتركين. اشترك لتحليل رموز إضافية.' : 'Available only for subscribers. Subscribe to analyze more symbols.'}
+                 </p>
+               )}
             </div>
           </div>
         </div>
@@ -561,16 +601,22 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
            <div className="space-y-4">
             <label className="text-base font-black text-brand-text opacity-100 uppercase tracking-widest pl-2">{t.tradingStyle}</label>
             <div className="grid grid-cols-1 gap-3">
-              {TRADING_STYLES.map((style) => (
+              {TRADING_STYLES.map((style) => {
+                const isLocked = !hasActivePlan && style.id !== 'day_trading';
+                return (
                 <button
                   key={style.id}
                   type="button"
-                  onClick={() => setValue("tradingStyle", style.id as TradingStyle)}
+                  onClick={() => {
+                    if (isLocked) { setShowUpgradeOverlay(true); return; }
+                    setValue("tradingStyle", style.id as TradingStyle);
+                  }}
                   className={cn(
                     "flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left",
                     selectedStyle === style.id 
                       ? "border-primary bg-primary/30 text-brand-text shadow-lg" 
-                      : "border-brand-text/10 bg-brand-alt text-brand-text hover:border-brand-text/20"
+                      : "border-brand-text/10 bg-brand-alt text-brand-text hover:border-brand-text/20",
+                    isLocked && "opacity-40 cursor-not-allowed"
                   )}
                 >
                   <div className={cn("p-2 rounded-lg", selectedStyle === style.id ? "bg-primary" : "bg-brand-text/10")}>
@@ -583,30 +629,43 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                       {style.id === 'day_trading' ? (lang === 'ar' ? 'تحركات اليوم الحالي فقط' : 'Current day moves only') : ''}
                       {style.id === 'scalping' ? (lang === 'ar' ? 'تحركات لحظية سريعة جداً' : 'Very fast intraday moves') : ''}
                     </span>
+                    {isLocked && (
+                      <span className="text-[10px] text-amber-400 font-black uppercase tracking-widest">
+                        {lang === 'ar' ? '🔒 مميز • اشترك' : '🔒 Premium • Subscribe'}
+                      </span>
+                    )}
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           <div className="space-y-4">
             <label className="text-base font-black text-brand-text opacity-100 uppercase tracking-widest pl-2">{t.timeframe}</label>
             <div className="grid grid-cols-3 gap-3">
-              {TIMEFRAMES.map((tf) => (
+              {TIMEFRAMES.map((tf) => {
+                const isLocked = !hasActivePlan && tf.id !== '1d';
+                return (
                 <button
                   key={tf.id}
                   type="button"
-                  onClick={() => setValue("timeframe", tf.id)}
+                  onClick={() => {
+                    if (isLocked) { setShowUpgradeOverlay(true); return; }
+                    setValue("timeframe", tf.id);
+                  }}
                   className={cn(
                     "p-5 rounded-2xl border-2 transition-all text-base font-black uppercase",
                     selectedTimeframe === tf.id 
                       ? "border-primary bg-primary/30 text-brand-text shadow-lg" 
-                      : "border-brand-text/10 bg-brand-alt text-brand-text/60 hover:border-brand-text/20 hover:text-brand-text"
+                      : "border-brand-text/10 bg-brand-alt text-brand-text/60 hover:border-brand-text/20 hover:text-brand-text",
+                    isLocked && "opacity-30 cursor-not-allowed"
                   )}
                 >
                   {tf.label}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -632,6 +691,110 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             )}
           </motion.button>
         </div>
+
+        {/* Upgrade Overlay */}
+        <AnimatePresence>
+          {showUpgradeOverlay && (() => {
+            const subPrices = (() => { try { return JSON.parse(localStorage.getItem('subscription_prices') || '{}'); } catch { return {}; } })();
+            const prices = { weekly: subPrices.weekly ?? 2, monthly: subPrices.monthly ?? 6, yearly: subPrices.yearly ?? 60 };
+            const plans = [
+              { key: 'weekly', label: lang === 'ar' ? 'أسبوعي' : 'Weekly', price: prices.weekly, desc: lang === 'ar' ? 'تحليل مؤسسي لمدة 7 أيام' : '7 days analysis', icon: 'Weekly', color: 'from-sky-500 to-sky-600', border: 'border-sky-500/30' },
+              { key: 'monthly', label: lang === 'ar' ? 'شهري' : 'Monthly', price: prices.monthly, desc: lang === 'ar' ? 'وصول كامل للسوق' : 'Full market access', color: 'from-emerald-500 to-emerald-600', border: 'border-emerald-500/30', popular: true },
+              { key: 'yearly', label: lang === 'ar' ? 'سنوي' : 'Yearly', price: prices.yearly, desc: lang === 'ar' ? 'أفضل قيمة + دعم VIP' : 'Best value + VIP', color: 'from-amber-500 to-orange-600', border: 'border-amber-500/30', best: true },
+            ];
+            return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowUpgradeOverlay(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                className="bg-brand-alt border border-white/10 rounded-[32px] p-6 md:p-8 max-w-lg w-full text-center space-y-6 shadow-[0_32px_128px_-12px_rgba(0,0,0,0.85)]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
+                      <Zap size={22} className="text-white" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-lg font-black text-white">{lang === 'ar' ? 'ميزة مميزة' : 'Premium Feature'}</h3>
+                      <p className="text-xs text-slate-400">{lang === 'ar' ? 'هذه الميزة متاحة فقط للمشتركين' : 'Available for subscribers only'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowUpgradeOverlay(false)}
+                    className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all shrink-0"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {plans.map((plan) => (
+                    <div
+                      key={plan.key}
+                      className={`relative bg-white/5 border ${plan.border} rounded-2xl p-4 flex flex-col items-center text-center transition-all hover:-translate-y-0.5 ${plan.popular ? 'ring-1 ring-emerald-500/40' : ''} ${plan.best ? 'ring-1 ring-amber-500/40' : ''}`}
+                    >
+                      {plan.popular && (
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[8px] font-black uppercase tracking-widest px-3 py-0.5 rounded-full shadow-lg">Popular</div>
+                      )}
+                      {plan.best && (
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest px-3 py-0.5 rounded-full shadow-lg">Best</div>
+                      )}
+                      <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${plan.color} flex items-center justify-center mb-2 shadow-md`}>
+                        {plan.key === 'weekly' ? <Sparkles size={14} className="text-white" /> : plan.key === 'monthly' ? <Star size={14} className="text-white" /> : <Crown size={14} className="text-white" />}
+                      </div>
+                      <h4 className="text-sm font-black text-white uppercase tracking-wider">{plan.label}</h4>
+                      <p className="text-[9px] text-slate-500 mt-1 leading-tight">{plan.desc}</p>
+                      <div className="mt-2">
+                        <span className="text-xl font-black text-white">${Number(plan.price).toFixed(2)}</span>
+                        <span className="text-[9px] text-slate-500 ml-0.5">/{plan.key === 'yearly' ? 'yr' : plan.key === 'monthly' ? 'mo' : 'wk'}</span>
+                      </div>
+                      {plan.popular && (
+                        <span className="mt-2 text-[9px] text-emerald-400 font-black uppercase tracking-widest flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          {lang === 'ar' ? 'للوصول الكامل' : 'Full Access'}
+                        </span>
+                      )}
+                      {plan.best && (
+                        <span className="mt-2 text-[9px] text-amber-400 font-black uppercase tracking-widest flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                          {lang === 'ar' ? 'الوصول الكامل' : 'Full Access'}
+                        </span>
+                      )}
+                      {plan.key === 'weekly' && (
+                        <span className="mt-2 text-[9px] text-sky-400 font-black uppercase tracking-widest flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                          {lang === 'ar' ? 'جرب لمدة أسبوع' : 'Try for a week'}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => { setShowUpgradeOverlay(false); onUpgrade(); }}
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-black text-sm uppercase tracking-widest shadow-lg hover:opacity-90 transition-all active:scale-95"
+                >
+                  {lang === 'ar' ? 'اشترك الآن وتمتع بكامل الصلاحية' : 'Subscribe Now & Unlock All Features'}
+                </button>
+                <button
+                  onClick={() => setShowUpgradeOverlay(false)}
+                  className="text-xs text-slate-500 hover:text-white underline transition-colors"
+                >
+                  {lang === 'ar' ? 'لا شكراً، استمر مع الخطة المجانية' : 'No thanks, continue with free plan'}
+                </button>
+              </motion.div>
+            </motion.div>
+            );
+          })()}
+        </AnimatePresence>
       </form>
     </div>
   );

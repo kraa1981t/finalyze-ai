@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { onAuthStateChanged, User, signInWithPopup, getRedirectResult, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, Activity, ArrowLeft, Users } from 'lucide-react';
+import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
 import Header from './components/Header';
 import AnalysisForm from './components/AnalysisForm';
 import AnalysisResultView from './components/AnalysisResultView';
@@ -14,15 +14,25 @@ import SidebarPanel from './components/SidebarPanel';
 import TopSignals from './components/TopSignals';
 import PortfolioPanel from './components/PortfolioPanel';
 
-import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType } from './types';
-import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS } from './constants';
+import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType, TradingStyle } from './types';
+import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS, FREE_SYMBOLS } from './constants';
 import { Language, translations } from './lib/i18n';
 import { analyzeMarket } from './services/geminiService';
 import { resolveConflicts } from './services/portfolioRiskService';
 import ApiKeyModal from './components/ApiKeyModal';
 import SubscriptionModal from './components/SubscriptionModal';
 import PaymentModal from './components/PaymentModal';
+
+function hasAnyStoredKey(): boolean {
+  try {
+    const k1 = localStorage.getItem('finalyze_key1_value');
+    const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
+    const oldKey = localStorage.getItem('finalyze_user_groq_api_key');
+    return (!!k1 && k1en) || !!oldKey;
+  } catch { return false; }
+}
 import ClientMonitor from './components/ClientMonitor';
+import RadarSettingsPage from './components/RadarSettingsPage';
 
 
 export default function App() {
@@ -32,16 +42,30 @@ export default function App() {
   const [redirecting, setRedirecting] = useState(false);
   const [manualAuthUrl, setManualAuthUrl] = useState<string | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string; durationDays: number } | null>(null);
-  const [hasApiKey, setHasApiKey] = useState<boolean>(() => !!localStorage.getItem('finalyze_user_groq_api_key'));
+  const [hasApiKey, setHasApiKey] = useState<boolean>(() => {
+    const k1 = localStorage.getItem('finalyze_key1_value');
+    const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
+    return (!!k1 && k1en) || hasAnyStoredKey();
+  });
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [needsApiKey, setNeedsApiKeyState] = useState<string | null>(() => localStorage.getItem('finalyze_needs_api_key') || null);
+  const [freemiumDisabled, setFreemiumDisabled] = useState(() => localStorage.getItem('finalyze_freemium_disabled') === 'true');
+  const [needsApiKey, setNeedsApiKeyState] = useState<string | null>(null);
   const [pendingVerifyLink, setPendingVerifyLink] = useState<string | null>(localStorage.getItem('finalyze_verify_link') || null);
   const persistNeedsApiKey = (email: string | null) => {
     if (email) {
+      // Safety net: never block registered clients (those already in finalyze_clients)
+      const allClients: any[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+      if (email && allClients.some((c: any) => c.email === email)) {
+        localStorage.removeItem('finalyze_needs_api_key');
+        localStorage.removeItem('finalyze_needs_api_key_timestamp');
+        setNeedsApiKeyState(null);
+        return;
+      }
       localStorage.setItem('finalyze_needs_api_key', email);
       localStorage.setItem('finalyze_needs_api_key_timestamp', Date.now().toString());
     } else {
@@ -50,12 +74,12 @@ export default function App() {
     }
     setNeedsApiKeyState(email);
   };
-  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor' => {
+  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' => {
     const hash = window.location.hash.slice(1);
-    if (['settings', 'apiKey', 'plans', 'paymentSettings', 'clientMonitor'].includes(hash)) return hash as any;
+    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor'].includes(hash)) return hash as any;
     return 'main';
   };
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'paymentSettings' | 'clientMonitor'>(getPageFromHash);
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile'>(getPageFromHash);
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
@@ -92,6 +116,15 @@ export default function App() {
            email === 'taybekraa@gmail.com' ||
            email.includes('dev');
   };
+
+  const hasActivePlan = useMemo((): boolean => {
+    if (isDeveloperSession()) return true;
+    if (activeSubscription && new Date(activeSubscription.expiryDate) > new Date()) return true;
+    if (freemiumDisabled) return true;
+    // Double-check localStorage directly as failsafe
+    if (localStorage.getItem('finalyze_freemium_disabled') === 'true') return true;
+    return false;
+  }, [user, activeSubscription, freemiumDisabled]);
   
   
   interface ClientRecord {
@@ -168,7 +201,7 @@ export default function App() {
   const [settings, setSettings] = useState<StrategySettings>(() => {
     const saved = localStorage.getItem('strategy_settings');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return DEFAULT_STRATEGY_SETTINGS; }
+      try { return { ...DEFAULT_STRATEGY_SETTINGS, ...JSON.parse(saved) }; } catch (e) { return DEFAULT_STRATEGY_SETTINGS; }
     }
     return DEFAULT_STRATEGY_SETTINGS;
   });
@@ -332,13 +365,12 @@ export default function App() {
     else document.body.classList.add('light');
   }, [isDark]);
 
-  useEffect(() => {
+  const saveStrategySettings = () => {
     localStorage.setItem('strategy_settings', JSON.stringify(settings));
-  }, [settings]);
-
-  useEffect(() => {
+  };
+  const saveAutoSettings = () => {
     localStorage.setItem('auto_settings', JSON.stringify(autoSettings));
-  }, [autoSettings]);
+  };
 
   const updateTopSignals = (results: AnalysisResult[]) => {
     let changed = false;
@@ -492,14 +524,18 @@ export default function App() {
       }
 
       for (const cat of openCategories) {
-        // UNIFY LOGIC: Combine SYMBOL_GROUPS with customSymbols exactly like the manual AnalysisForm
-        const allGroupsSymbols = SYMBOL_GROUPS[cat]?.flatMap(g => g.symbols) || [];
-        const customForType = customSymbols.filter(s => 
-          (ALL_SYMBOLS_DB[cat] || []).includes(s) &&
-          !allGroupsSymbols.includes(s)
-        );
-        const allSymbolsCombined = [...allGroupsSymbols, ...customForType];
-        const symbols = allSymbolsCombined.filter(s => !hiddenSymbols.includes(s));
+        // FREE plan: only scan FREE_SYMBOLS, otherwise unify like manual form
+        const symbols = hasActivePlan
+          ? (() => {
+              const allGroupsSymbols = SYMBOL_GROUPS[cat]?.flatMap(g => g.symbols) || [];
+              const customForType = customSymbols.filter(s => 
+                (ALL_SYMBOLS_DB[cat] || []).includes(s) &&
+                !allGroupsSymbols.includes(s)
+              );
+              const allSymbolsCombined = [...allGroupsSymbols, ...customForType];
+              return allSymbolsCombined.filter(s => !hiddenSymbols.includes(s));
+            })()
+          : (FREE_SYMBOLS[cat] || []);
         
         const mType = cat === 'crypto' ? MarketType.CRYPTO : 
                       cat === 'stocks' ? MarketType.STOCKS :
@@ -513,17 +549,18 @@ export default function App() {
               const statusSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', user.email)));
               const clientData = statusSnap.docs[0]?.data();
               if (clientData?.status === 'banned') {
-                localStorage.removeItem('finalyze_user_groq_api_key');
-                localStorage.removeItem('finalyze_user_deepseek_api_key');
+                try { localStorage.removeItem('finalyze_key1_value'); localStorage.removeItem('finalyze_user_groq_api_key'); } catch {}
                 setHasApiKey(false);
                 break;
               }
             } catch {}
           }
           try {
+            const tf = !hasActivePlan ? '1d' : currentSettings.timeframe;
+            const ts = !hasActivePlan ? TradingStyle.DAY_TRADING : currentSettings.tradingStyle;
             const result = await analyzeMarket({
-              symbol, type: mType, timeframe: currentSettings.timeframe,
-              tradingStyle: currentSettings.tradingStyle, settings, lang
+              symbol, type: mType, timeframe: tf,
+              tradingStyle: ts, settings, lang
             });
             if (result && isSubscribed) {
               const sig = result.signal || '';
@@ -536,10 +573,10 @@ export default function App() {
                 updateTopSignals([result]);
               }
             }
-            await new Promise(r => setTimeout(r, 4000));
+            await new Promise(r => setTimeout(r, 6000));
           } catch (e) { 
             console.error("Analysis Loop Error:", e);
-            await new Promise(r => setTimeout(r, 5000));
+            await new Promise(r => setTimeout(r, 8000));
           }
         }
       }
@@ -629,13 +666,17 @@ export default function App() {
           const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
           if (elapsed < threeDaysInMs) {
             setUser(savedUser);
-            const localKey = localStorage.getItem('finalyze_user_groq_api_key');
+            const localKey = (() => {
+              const k1 = localStorage.getItem('finalyze_key1_value');
+              if (k1 && localStorage.getItem('finalyze_key1_enabled') !== 'false') return k1;
+              return localStorage.getItem('finalyze_user_groq_api_key') || '';
+            })();
             if (localKey) {
               setHasApiKey(true);
-              persistNeedsApiKey(null);
             } else {
               setHasApiKey(false);
             }
+            persistNeedsApiKey(null);
             setLoading(false);
             return;
           } else {
@@ -643,7 +684,6 @@ export default function App() {
             localStorage.removeItem('finalyze_auth_user');
             localStorage.removeItem('finalyze_auth_timestamp');
             localStorage.removeItem('finalyze_dev_bypass_active');
-            localStorage.removeItem('finalyze_user_groq_api_key');
           }
         }
       } catch (e) {
@@ -684,7 +724,7 @@ export default function App() {
           localStorage.setItem('finalyze_dev_bypass_active', 'true');
         }
 
-        const localKey = localStorage.getItem('finalyze_user_groq_api_key');
+        const localKey = localStorage.getItem('finalyze_key1_value') || localStorage.getItem('finalyze_user_groq_api_key');
         if (localKey) {
           setHasApiKey(true);
         } else {
@@ -694,6 +734,8 @@ export default function App() {
               const data = userDoc.data();
               if (data?.groqApiKey || data?.geminiApiKey) {
                 localStorage.setItem('finalyze_user_groq_api_key', data.groqApiKey || data.geminiApiKey);
+                localStorage.setItem('finalyze_key1_value', data.groqApiKey || data.geminiApiKey);
+                localStorage.setItem('finalyze_key1_provider', 'groq');
                 setHasApiKey(true);
               } else {
                 setHasApiKey(false);
@@ -732,6 +774,14 @@ export default function App() {
     }
   }, [loading]);
 
+  // Sync freemium state from localStorage (when PaymentModal toggles it)
+  useEffect(() => {
+    const sync = () => setFreemiumDisabled(localStorage.getItem('finalyze_freemium_disabled') === 'true');
+    window.addEventListener('freemium-toggle', sync);
+    window.addEventListener('storage', sync);
+    return () => { window.removeEventListener('freemium-toggle', sync); window.removeEventListener('storage', sync); };
+  }, []);
+
   // Handle email verification from URL params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -761,7 +811,7 @@ export default function App() {
               emailVerified: true,
             } as User;
             setUser(mockUser);
-            persistNeedsApiKey(vEmail);
+            persistNeedsApiKey(null);
           } else {
             alert(lang === 'ar' ? '❌ رابط التفعيل غير صالح أو منتهي.' : '❌ Invalid or expired verification link.');
             window.history.replaceState({}, '', window.location.pathname);
@@ -775,6 +825,10 @@ export default function App() {
   }, [loading]);
 
   const handleLogin = async () => {
+    setActivePage('main');
+    setPaymentPlan(null);
+    setAnalysisResults(null);
+    setIsSidebarOpen(false);
     setLoginError(null);
     setManualAuthUrl(null);
     setRedirecting(true);
@@ -800,9 +854,10 @@ export default function App() {
         const existing = existingSnap.docs[0]?.data();
 
         // Restore API key from Firestore if missing from localStorage
-        if (existing?.groqApiKey && !localStorage.getItem('finalyze_user_groq_api_key')) {
+        if (existing?.groqApiKey && !hasAnyStoredKey()) {
           localStorage.setItem('finalyze_user_groq_api_key', existing.groqApiKey);
-          if (existing.deepseekApiKey) localStorage.setItem('finalyze_user_deepseek_api_key', existing.deepseekApiKey);
+          localStorage.setItem('finalyze_key1_value', existing.groqApiKey);
+          localStorage.setItem('finalyze_key1_provider', 'groq');
         }
 
         // Check if banned
@@ -819,42 +874,23 @@ export default function App() {
           localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
           localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
           setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
-          const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+          const hasKey = hasAnyStoredKey();
           setHasApiKey(hasKey);
-          if (!hasKey) {
-            persistNeedsApiKey(email);
-          } else {
-            persistNeedsApiKey(null);
-          }
+          persistNeedsApiKey(null);
           return;
         }
 
         // New or existing pending — only clear API keys for truly new users
         const isNewUser = !existingSnap.docs[0];
         if (isNewUser) {
+          localStorage.removeItem('finalyze_key1_value');
           localStorage.removeItem('finalyze_user_groq_api_key');
-          localStorage.removeItem('finalyze_user_deepseek_api_key');
           setHasApiKey(false);
         }
         // New or pending — save to localStorage + Firestore, send email, show API key page
         await signOut(auth);
         const cred = await signInAnonymously(auth);
         // Save to localStorage immediately so Client Monitor shows all registered users
-        const pendingClient: any = {
-          id: 'local_' + Date.now(),
-          email,
-          uid: cred.user.uid,
-          status: 'pending',
-          plan: 'free',
-          planExpiry: null,
-          registeredAt: new Date().toISOString(),
-          rank: 0,
-        };
-        const existingLocal: any[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
-        if (!existingLocal.find((c: any) => c.email === email)) {
-          existingLocal.push(pendingClient);
-          localStorage.setItem('finalyze_clients', JSON.stringify(existingLocal));
-        }
         // Save to Firestore as well (rules now published)
         try {
           const existingFs = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
@@ -876,13 +912,8 @@ export default function App() {
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         localStorage.setItem('finalyze_verify_link', verifyLink);
         setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
-        // Only show API key page if they don't already have a saved key
-        const existingKey = localStorage.getItem('finalyze_user_groq_api_key');
-        if (!existingKey) {
-          persistNeedsApiKey(email);
-        } else {
-          persistNeedsApiKey(null);
-        }
+        // Only show blocking for truly new users without a saved key
+        persistNeedsApiKey(isNewUser && !hasAnyStoredKey() ? email : null);
         return;
       } catch (innerErr) {
         // Firestore/anon auth failed — still sign user in with basic session
@@ -890,8 +921,7 @@ export default function App() {
         localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         setUser({ uid: 'fallback_' + Date.now(), email, displayName: result.user.displayName || 'Client', emailVerified: true } as User);
-        // Even if Firestore fails, require API key
-        const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+        const hasKey = hasAnyStoredKey();
         setHasApiKey(hasKey);
         if (!hasKey) {
           persistNeedsApiKey(email);
@@ -907,6 +937,13 @@ export default function App() {
         localStorage.setItem('finalyze_auth_user', JSON.stringify({ email: googleUserEmail, placeholder: true }));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         setUser({ uid: 'fallback_' + Date.now(), email: googleUserEmail, displayName: 'Client', emailVerified: true } as User);
+        const hasKey = hasAnyStoredKey();
+        setHasApiKey(hasKey);
+        if (!hasKey) {
+          persistNeedsApiKey(googleUserEmail);
+        } else {
+          persistNeedsApiKey(null);
+        }
         return;
       }
       if (error.code === 'auth/unauthorized-domain') {
@@ -924,6 +961,10 @@ export default function App() {
   };
 
   const handleClientAuth = async (email: string, password?: string) => {
+    setActivePage('main');
+    setPaymentPlan(null);
+    setAnalysisResults(null);
+    setIsSidebarOpen(false);
     setLoginError(null);
     try {
       // Check if client is already registered in Firestore
@@ -947,13 +988,11 @@ export default function App() {
           localStorage.setItem('finalyze_auth_user', JSON.stringify(mockUser));
           localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
           localStorage.removeItem('finalyze_dev_bypass_active');
-          const hasKey = !!localStorage.getItem('finalyze_user_groq_api_key');
+          localStorage.removeItem('active_subscription');
+          setActiveSubscription(null);
+          const hasKey = hasAnyStoredKey();
           setHasApiKey(hasKey);
-          if (!hasKey) {
-            persistNeedsApiKey(email);
-          } else {
-            persistNeedsApiKey(null);
-          }
+          persistNeedsApiKey(null);
           return;
         }
         // Not verified — resend verification
@@ -1012,6 +1051,10 @@ export default function App() {
   };
 
   const handleBypassLogin = (email?: string) => {
+    setActivePage('main');
+    setPaymentPlan(null);
+    setAnalysisResults(null);
+    setIsSidebarOpen(false);
     const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
     const finalEmail = email || activeDevEmail;
     
@@ -1039,9 +1082,14 @@ export default function App() {
       fetchClients();
     } else {
       localStorage.removeItem('finalyze_dev_bypass_active');
+      // Grant premium access for bypass login clients
+      const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000 * 10).toISOString();
+      const premiumSub = { label: 'Premium', amount: 0, expiryDate: farFuture };
+      localStorage.setItem('active_subscription', JSON.stringify(premiumSub));
+      setActiveSubscription(premiumSub);
     }
     
-    setHasApiKey(!!localStorage.getItem('finalyze_user_groq_api_key'));
+    setHasApiKey(hasAnyStoredKey());
     setLoginError(null);
   };
 
@@ -1058,6 +1106,8 @@ export default function App() {
     persistNeedsApiKey(null);
     setNeedsApiKeyState(null);
     setHasApiKey(false);
+    setPaymentPlan(null);
+    setActiveSubscription(null);
     setAnalysisResults(null);
     setUser(null);
     setPendingVerifyLink(null);
@@ -1104,20 +1154,21 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Blocking API Key — only if user truly has no saved key */}
-      {user && needsApiKey && !localStorage.getItem('finalyze_user_groq_api_key') && (
+      {/* Blocking API Key overlay — only for NEW users (not in finalyze_clients) */}
+      {user && user.email && !hasApiKey && !isDeveloperSession() && !JSON.parse(localStorage.getItem('finalyze_clients') || '[]').some((c: any) => c.email === user.email) && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
           <ApiKeyModal
+            key={user?.uid || 'no-session'}
             isOpen={true}
             onClose={() => {}}
             isBlocking={true}
             lang={lang}
             user={user}
-            onSaved={async (groqKey, deepseekKey) => {
+            onSaved={async (apiKey) => {
               setHasApiKey(true);
               persistNeedsApiKey(null);
               setActivePage('main');
-              // Save client to Firestore after key validation
+              // Save client to Firestore + localStorage after key validation
               const email = user?.email;
               if (email) {
                 const newClient = {
@@ -1129,14 +1180,13 @@ export default function App() {
                   planExpiry: null,
                   registeredAt: new Date().toISOString(),
                   rank: 0,
-                  groqApiKey: groqKey,
-                  deepseekApiKey: deepseekKey || '',
+                  groqApiKey: apiKey,
                 };
-                // Save to localStorage as fallback
+                // Save to localStorage as the permanent record
                 const localClients: any[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
                 const existingIdx = localClients.findIndex(c => c.email === email);
                 if (existingIdx >= 0) {
-                  localClients[existingIdx] = { ...localClients[existingIdx], groqApiKey: groqKey, deepseekApiKey: deepseekKey || '' };
+                  localClients[existingIdx] = { ...localClients[existingIdx], groqApiKey: apiKey };
                 } else {
                   localClients.push(newClient);
                 }
@@ -1146,10 +1196,10 @@ export default function App() {
                 try {
                   const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
                   if (existingSnap.docs[0]) {
-                    await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { groqApiKey: groqKey, deepseekApiKey: deepseekKey || '' });
+                    await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { groqApiKey: apiKey });
                   } else {
                     await addDoc(collection(db, 'clients'), {
-                      email, groqApiKey: groqKey, deepseekApiKey: deepseekKey || '',
+                      email, groqApiKey: apiKey,
                       status: 'pending', plan: 'free', planExpiry: null,
                       registeredAt: serverTimestamp(), rank: 0,
                     });
@@ -1170,8 +1220,6 @@ export default function App() {
         showBack={!!analysisResults} onBack={() => setAnalysisResults(null)}
         autoSettings={autoSettings} onAutoSettingsChange={setAutoSettings}
         isWaiting={isScanningFinished}
-        isRadarUnlocked={isRadarUnlocked}
-        onUnlockRadar={handleUnlockRadar}
         hasApiKey={hasApiKey || isDeveloperSession()}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
       />
@@ -1184,6 +1232,7 @@ export default function App() {
             onClose={() => setIsSidebarOpen(false)}
             onNavigate={(page) => { setActivePage(page); setIsSidebarOpen(false); }}
             isDeveloper={isDeveloperSession()}
+            freemiumDisabled={freemiumDisabled}
           />
         )}
       </AnimatePresence>
@@ -1217,12 +1266,14 @@ export default function App() {
               </span>
             </button>
 
-            {activePage === 'settings' && (
+             {activePage === 'settings' && (
               <SettingsModal
+                key={user?.uid || 'no-session'}
                 isOpen={true}
                 onClose={() => setActivePage('main')}
                 settings={settings}
                 onSettingsChange={(s) => { setSettings(s); }}
+                onSave={saveStrategySettings}
                 user={user}
                 asPage
                 lang={lang}
@@ -1231,6 +1282,7 @@ export default function App() {
 
             {activePage === 'apiKey' && (
               <ApiKeyModal
+                key={user?.uid || 'no-session'}
                 isOpen={true}
                 onClose={() => setActivePage('main')}
                 isBlocking={false}
@@ -1244,6 +1296,7 @@ export default function App() {
 
             {activePage === 'plans' && !paymentPlan && (
               <SubscriptionModal
+                key={user?.uid || 'no-session'}
                 isOpen={true}
                 onClose={() => setActivePage('main')}
                 onSelectPlan={(amount, label, durationDays) => { setPaymentPlan({ amount, label, durationDays }); }}
@@ -1253,6 +1306,7 @@ export default function App() {
 
             {activePage === 'plans' && paymentPlan && (
               <PaymentModal
+                key={user?.uid || 'no-session'}
                 isOpen={true}
                 onClose={() => { setPaymentPlan(null); setActivePage('main'); }}
                 planLabel={paymentPlan?.label || ''}
@@ -1277,8 +1331,22 @@ export default function App() {
               />
             )}
 
+            {activePage === 'radar' && (
+              <RadarSettingsPage
+                key={user?.uid || 'no-session'}
+                autoSettings={autoSettings}
+                onAutoSettingsChange={setAutoSettings}
+                onSave={saveAutoSettings}
+                isWaiting={isScanningFinished}
+                lang={lang}
+                hasActivePlan={hasActivePlan}
+                onUpgrade={() => setActivePage('plans')}
+              />
+            )}
+
             {activePage === 'paymentSettings' && (
               <PaymentModal
+                key={user?.uid || 'no-session'}
                 isOpen={true}
                 onClose={() => setActivePage('main')}
                 planLabel=""
@@ -1286,18 +1354,60 @@ export default function App() {
                 asPage
                 manageMode
                 lang={lang}
+                freemiumDisabled={freemiumDisabled}
+                onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); }}
               />
             )}
 
-            {activePage === 'clientMonitor' && (
+            {activePage === 'clientMonitor' && isDeveloperSession() && (
               <ClientMonitor
+                key={user?.uid || 'no-session'}
                 clients={clients}
                 lang={lang}
                 onRefresh={fetchClients}
                 onBan={banClient}
                 onDelete={deleteClientRecord}
                 onRenew={renewClientPlan}
+                freemiumDisabled={freemiumDisabled}
+                onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); }}
               />
+            )}
+
+            {activePage === 'profile' && (
+              <div className="bg-brand-alt border border-white/10 rounded-[32px] p-6 md:p-8 max-w-lg mx-auto">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white font-black text-xl shadow-lg">
+                    {user?.email?.charAt(0).toUpperCase() || '?'}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white">{lang === 'ar' ? 'الملف الشخصي' : 'Profile'}</h3>
+                    <p className="text-sm text-slate-400">{user?.email || (lang === 'ar' ? 'زائر' : 'Guest')}</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                    <span className="text-xs text-slate-500 font-bold block mb-1">{lang === 'ar' ? 'البريد الإلكتروني' : 'Email'}</span>
+                    <span className="text-sm font-bold text-white">{user?.email || (lang === 'ar' ? 'غير مسجل' : 'Not logged in')}</span>
+                  </div>
+                  <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                    <span className="text-xs text-slate-500 font-bold block mb-1">{lang === 'ar' ? 'المعرف' : 'User ID'}</span>
+                    <span className="text-sm font-mono text-white/70 break-all">{user?.uid || '—'}</span>
+                  </div>
+                  <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                    <span className="text-xs text-slate-500 font-bold block mb-1">{lang === 'ar' ? 'الخطة' : 'Plan'}</span>
+                    <span className="text-sm font-bold text-emerald-400">{activeSubscription ? `${activeSubscription.label}` : (lang === 'ar' ? 'مجانية' : 'Free')}</span>
+                  </div>
+                  {activeSubscription && (
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                      <span className="text-xs text-slate-500 font-bold block mb-1">{lang === 'ar' ? 'تاريخ الانتهاء' : 'Expiry'}</span>
+                      <span className="text-sm font-bold text-white">{new Date(activeSubscription.expiryDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => setActivePage('main')} className="mt-6 w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-sm hover:bg-white/10 transition-all">
+                  {lang === 'ar' ? 'العودة للرئيسية' : 'Back to Home'}
+                </button>
+              </div>
             )}
           </motion.div>
         )}
@@ -1333,7 +1443,9 @@ export default function App() {
 
           <AnalysisForm 
              user={user} lang={lang} settings={settings}
-             onBegin={() => setIsAnalyzing(true)}
+             hasActivePlan={hasActivePlan}
+             onUpgrade={() => setActivePage('plans')}
+              onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); }}
              onProgress={(current, total, index) => setProgress({ current, total, index })}
              onResult={(results) => {
                const day = new Date().getDay();
@@ -1346,13 +1458,14 @@ export default function App() {
                    })
                  : results;
                
-               setAnalysisResults(filtered);
-               setIsAnalyzing(false);
-               setProgress(null);
+                setAnalysisResults(filtered);
+                setIsAnalyzing(false);
+                setAnalysisError(null);
+                setProgress(null);
                updateTopSignals(filtered);
                playAudio('fail');
              }} 
-             onError={() => { setIsAnalyzing(false); setProgress(null); }}
+              onError={(errMsg) => { setAnalysisResults([]); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); }}
           />
           <ConnectionStatus lang={lang} />
         </div>
@@ -1380,7 +1493,15 @@ export default function App() {
         {/* Results */}
         {analysisResults && !isAnalyzing && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <AnalysisResultView results={analysisResults || []} lang={lang} settings={settings} />
+            {analysisError && (
+              <div className="max-w-4xl mx-auto mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <p className="text-red-400 text-sm font-medium">{analysisError}</p>
+                <button onClick={() => { setAnalysisResults(null); setAnalysisError(null); }} className="mt-2 text-xs text-red-400 hover:text-red-300 underline">
+                  {lang === 'ar' ? 'حاول مرة أخرى' : 'Try again'}
+                </button>
+              </div>
+            )}
+            {!analysisError && <AnalysisResultView results={analysisResults} lang={lang} settings={settings} />}
           </motion.div>
         )}
       </main>
