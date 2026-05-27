@@ -81,7 +81,7 @@ export default function App() {
   };
   const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile'>(getPageFromHash);
   const [showForm, setShowForm] = useState(true);
-  const [isScanningFinished, setIsScanningFinished] = useState(false);
+  const [isScanningFinished, setIsScanningFinished] = useState(() => localStorage.getItem('radar_scan_finished') === 'true');
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
   const [activeSubscription, setActiveSubscription] = useState<{ label: string; amount: number; expiryDate: string } | null>(() => {
     try {
@@ -210,15 +210,19 @@ export default function App() {
     const saved = localStorage.getItem('auto_settings');
     let base = DEFAULT_AUTO_SETTINGS;
     if (saved) {
-      try { base = JSON.parse(saved); } catch (e) { base = DEFAULT_AUTO_SETTINGS; }
+      try { base = { ...base, ...JSON.parse(saved) }; } catch (e) { base = DEFAULT_AUTO_SETTINGS; }
     }
-    return { ...base, isEnabled: false };
+    return base;
   });
 
   const autoSettingsRef = useRef(autoSettings);
   useEffect(() => {
     autoSettingsRef.current = autoSettings;
   }, [autoSettings]);
+
+  useEffect(() => {
+    localStorage.setItem('radar_scan_finished', isScanningFinished.toString());
+  }, [isScanningFinished]);
 
   const [isRadarUnlocked, setIsRadarUnlocked] = useState(false);
 
