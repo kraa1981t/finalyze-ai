@@ -217,17 +217,22 @@ app.get("/api/market-data", async (req, res) => {
   }
 });
 
-// API Route: AI Analysis Proxy — Groq only (free, fast, reliable)
+// API Route: AI Analysis Proxy — Groq (gsk_) or Google Gemini (AIzaSy)
 app.post("/api/ai-analysis", async (req, res) => {
   try {
     const { prompt, userApiKey } = req.body;
     const key = userApiKey || '';
 
-    const result = await callGroq(key, prompt);
+    let result;
+    if (key.startsWith('AIzaSy')) {
+      result = await callGoogle(key, prompt);
+    } else {
+      result = await callGroq(key, prompt);
+    }
     if (result.content) {
       return res.json({ choices: [{ message: { content: result.content } }] });
     }
-    res.status(503).json({ error: result.error || 'Groq failed' });
+    res.status(503).json({ error: result.error || 'Provider failed' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -314,21 +319,28 @@ async function callQwen(apiKey: string, prompt: string) {
 
 async function callGoogle(apiKey: string, prompt: string) {
   for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro']) {
-    try {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
-          generationConfig: { temperature: 0.1 }
-        })
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (text) return { content: text };
-      }
-    } catch {}
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 8000);
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
+            generationConfig: { temperature: 0.1 }
+          }),
+          signal: ac.signal
+        });
+        clearTimeout(timeout);
+        if (resp.status === 429 && attempt < 2) { await new Promise(r => setTimeout(r, 1000)); continue; }
+        if (resp.ok) {
+          const data = await resp.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (text) return { content: text };
+        }
+      } catch {}
+    }
   }
   return { error: 'Google failed' };
 }
