@@ -223,13 +223,21 @@ app.post("/api/ai-analysis", async (req, res) => {
     const { prompt, userApiKey } = req.body;
     const key = userApiKey || '';
 
-    // Try all providers in parallel — return the first success
-    const results = await Promise.allSettled([
-      callGroq(key, prompt),
-      callDeepSeek(key, prompt),
-      callQwen(key, prompt),
-      callGoogle(key, prompt),
-    ]);
+    // Try all relevant providers in parallel — return the first success
+    const providers: (() => Promise<{ content?: string; error?: string }>)[] = [];
+
+    if (key.startsWith('gsk_')) providers.push(() => callGroq(key, prompt));
+    if (key.startsWith('sk-')) { providers.push(() => callDeepSeek(key, prompt)); providers.push(() => callQwen(key, prompt)); }
+    if (key.startsWith('AIzaSy')) providers.push(() => callGoogle(key, prompt));
+    // Fallback: if no format matched, try all
+    if (providers.length === 0) {
+      providers.push(() => callGroq(key, prompt));
+      providers.push(() => callDeepSeek(key, prompt));
+      providers.push(() => callQwen(key, prompt));
+      providers.push(() => callGoogle(key, prompt));
+    }
+
+    const results = await Promise.allSettled(providers.map(p => p()));
 
     for (const r of results) {
       if (r.status === 'fulfilled' && r.value.content) {
@@ -237,15 +245,18 @@ app.post("/api/ai-analysis", async (req, res) => {
       }
     }
 
-    // All failed — return the first error
-    const firstError = results.find(r => r.status === 'fulfilled') as any;
-    res.status(503).json({ error: firstError?.value?.error || 'All providers failed' });
+    // All failed — return all error messages
+    const errors = results
+      .filter(r => r.status === 'fulfilled' && r.value.error)
+      .map(r => (r as any).value.error)
+      .join('; ');
+    res.status(503).json({ error: errors || 'All providers failed' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-async function callGroq(apiKey: string, prompt: string) {
+async function callGroq(apiKey: string, prompt: string, retries = 2) {
   const body = {
     model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
     messages: [
@@ -255,16 +266,23 @@ async function callGroq(apiKey: string, prompt: string) {
     temperature: 0.1,
     response_format: { type: "json_object" }
   };
-  try {
-    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify(body)
-    });
-    if (!resp.ok) return { error: `Groq: ${resp.status}` };
-    const data = await resp.json();
-    return { content: data?.choices?.[0]?.message?.content || '' };
-  } catch (e: any) { return { error: e.message }; }
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify(body)
+      });
+      if (resp.status === 429 && attempt < retries) {
+        await new Promise(r => setTimeout(r, attempt * 2000));
+        continue;
+      }
+      if (!resp.ok) return { error: `Groq: ${resp.status}` };
+      const data = await resp.json();
+      return { content: data?.choices?.[0]?.message?.content || '' };
+    } catch (e: any) { return { error: e.message }; }
+  }
+  return { error: 'Groq: all retries exhausted' };
 }
 
 async function callDeepSeek(apiKey: string, prompt: string) {
