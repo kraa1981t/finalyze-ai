@@ -83,6 +83,31 @@ export default function App() {
     return 'main';
   };
   const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile'>(getPageFromHash);
+  const navStackRef = useRef<string[]>([]);
+
+  const navigateTo = (page: any) => {
+    if (page === activePage) return;
+    window.history.pushState({ page: activePage }, '');
+    navStackRef.current = [...navStackRef.current, activePage];
+    setActivePage(page);
+  };
+
+  const goBack = () => {
+    window.history.back();
+  };
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.page) {
+        navStackRef.current = navStackRef.current.slice(0, -1);
+        setActivePage(e.state.page);
+      } else {
+        navStackRef.current = [];
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(() => localStorage.getItem('radar_scan_finished') === 'true');
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
@@ -1242,7 +1267,7 @@ export default function App() {
         user={user} onLogin={handleLogin} onLogout={handleLogout} 
         isDark={isDark} toggleTheme={() => setIsDark(!isDark)}
         lang={lang} onLangChange={setLang}
-        showBack={!!analysisResults} onBack={() => { setAnalysisResults(null); setAnalysisError(null); window.history.back(); }}
+        showBack={!!analysisResults} onBack={() => { setAnalysisResults(null); setAnalysisError(null); goBack(); }}
         autoSettings={autoSettings} onAutoSettingsChange={setAutoSettings}
         isWaiting={isScanningFinished}
         hasApiKey={hasApiKey || isDeveloperSession()}
@@ -1255,7 +1280,7 @@ export default function App() {
           <SidebarPanel
             lang={lang}
             onClose={() => setIsSidebarOpen(false)}
-            onNavigate={(page) => { setActivePage(page); setIsSidebarOpen(false); }}
+            onNavigate={(page) => { navigateTo(page); setIsSidebarOpen(false); }}
             isDeveloper={isDeveloperSession()}
             freemiumDisabled={freemiumDisabled}
           />
@@ -1282,7 +1307,7 @@ export default function App() {
         {activePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <button
-              onClick={() => { window.history.back(); }}
+              onClick={goBack}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-alt border border-white/10 text-brand-muted hover:text-brand-text transition-colors mb-6"
             >
               <ArrowLeft size={18} />
@@ -1295,7 +1320,7 @@ export default function App() {
               <SettingsModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => { window.history.back(); }}
+                onClose={goBack}
                 settings={settings}
                 onSettingsChange={(s) => { setSettings(s); }}
                 onSave={saveStrategySettings}
@@ -1309,11 +1334,11 @@ export default function App() {
               <ApiKeyModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => { window.history.back(); }}
+                onClose={goBack}
                 isBlocking={false}
                 lang={lang}
                 user={user}
-                onSaved={() => { setHasApiKey(true); window.history.back(); }}
+                onSaved={() => { setHasApiKey(true); goBack(); }}
                 onLogout={handleLogout}
                 asPage
               />
@@ -1323,7 +1348,7 @@ export default function App() {
               <SubscriptionModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => { window.history.back(); }}
+                onClose={goBack}
                 onSelectPlan={(amount, label, durationDays) => { setPaymentPlan({ amount, label, durationDays }); }}
                 asPage
               />
@@ -1333,7 +1358,7 @@ export default function App() {
               <PaymentModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => { setPaymentPlan(null); window.history.back(); }}
+                onClose={() => { setPaymentPlan(null); goBack(); }}
                 planLabel={paymentPlan?.label || ''}
                 amount={paymentPlan?.amount || 0}
                 asPage
@@ -1350,8 +1375,8 @@ export default function App() {
                   };
                   localStorage.setItem('active_subscription', JSON.stringify(sub));
                   setActiveSubscription(sub);
-                  setPaymentPlan(null);
-                  setActivePage('main');
+                   setPaymentPlan(null);
+                   navigateTo('main');
                 }}
               />
             )}
@@ -1365,7 +1390,7 @@ export default function App() {
                 isWaiting={isScanningFinished}
                 lang={lang}
                 hasActivePlan={hasActivePlan}
-                onUpgrade={() => setActivePage('plans')}
+                onUpgrade={() => navigateTo('plans')}
               />
             )}
 
@@ -1373,7 +1398,7 @@ export default function App() {
               <PaymentModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => { window.history.back(); }}
+                onClose={goBack}
                 planLabel=""
                 amount={0}
                 asPage
@@ -1429,7 +1454,7 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <button onClick={() => { window.history.back(); }} className="mt-6 w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-sm hover:bg-white/10 transition-all">
+                <button onClick={goBack} className="mt-6 w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-sm hover:bg-white/10 transition-all">
                   {lang === 'ar' ? 'رجوع لخلف' : 'Go back'}
                 </button>
               </div>
@@ -1469,7 +1494,7 @@ export default function App() {
           <AnalysisForm 
              user={user} lang={lang} settings={settings}
              hasActivePlan={hasActivePlan}
-             onUpgrade={() => setActivePage('plans')}
+              onUpgrade={() => navigateTo('plans')}
               onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); }}
              onProgress={(current, total, index) => setProgress({ current, total, index })}
              onResult={(results) => {
@@ -1533,7 +1558,7 @@ export default function App() {
         {/* Floating back button — always visible when scrolling */}
         {analysisResults && !isAnalyzing && (
           <button
-            onClick={() => { setAnalysisResults(null); setAnalysisError(null); window.history.back(); }}
+            onClick={() => { setAnalysisResults(null); setAnalysisError(null); goBack(); }}
             className="fixed bottom-8 left-8 z-50 flex items-center gap-3 bg-brand-bg/90 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-4 shadow-2xl hover:bg-brand-alt transition-all group"
           >
             <ArrowLeft size={22} className="text-white group-hover:-translate-x-1 transition-transform" />
