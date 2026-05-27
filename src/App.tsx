@@ -1529,6 +1529,17 @@ export default function App() {
             {!analysisError && <AnalysisResultView results={analysisResults} lang={lang} settings={settings} />}
           </motion.div>
         )}
+
+        {/* Floating back button — always visible when scrolling */}
+        {analysisResults && !isAnalyzing && (
+          <button
+            onClick={() => { setAnalysisResults(null); setAnalysisError(null); window.history.back(); }}
+            className="fixed bottom-8 left-8 z-50 bg-brand-bg/90 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl hover:bg-brand-alt transition-all"
+            title={lang === 'ar' ? 'العودة للخلف' : 'Go back'}
+          >
+            <ArrowLeft size={24} className="text-white" />
+          </button>
+        )}
       </main>
 
       <footer className="py-8 border-t border-white/5 bg-brand-alt/30">
