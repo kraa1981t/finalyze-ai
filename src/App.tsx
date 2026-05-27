@@ -1282,12 +1282,12 @@ export default function App() {
         {activePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <button
-              onClick={() => setActivePage('main')}
+              onClick={() => { window.history.back(); }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-alt border border-white/10 text-brand-muted hover:text-brand-text transition-colors mb-6"
             >
               <ArrowLeft size={18} />
               <span className="text-xs font-black uppercase tracking-widest">
-                {lang === 'ar' ? 'العودة للرئيسية' : 'Back to Main'}
+                {lang === 'ar' ? 'رجوع لخلف' : 'Go back'}
               </span>
             </button>
 
@@ -1295,7 +1295,7 @@ export default function App() {
               <SettingsModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => setActivePage('main')}
+                onClose={() => { window.history.back(); }}
                 settings={settings}
                 onSettingsChange={(s) => { setSettings(s); }}
                 onSave={saveStrategySettings}
@@ -1309,11 +1309,11 @@ export default function App() {
               <ApiKeyModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => setActivePage('main')}
+                onClose={() => { window.history.back(); }}
                 isBlocking={false}
                 lang={lang}
                 user={user}
-                onSaved={() => { setHasApiKey(true); setActivePage('main'); }}
+                onSaved={() => { setHasApiKey(true); window.history.back(); }}
                 onLogout={handleLogout}
                 asPage
               />
@@ -1323,7 +1323,7 @@ export default function App() {
               <SubscriptionModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => setActivePage('main')}
+                onClose={() => { window.history.back(); }}
                 onSelectPlan={(amount, label, durationDays) => { setPaymentPlan({ amount, label, durationDays }); }}
                 asPage
               />
@@ -1333,7 +1333,7 @@ export default function App() {
               <PaymentModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => { setPaymentPlan(null); setActivePage('main'); }}
+                onClose={() => { setPaymentPlan(null); window.history.back(); }}
                 planLabel={paymentPlan?.label || ''}
                 amount={paymentPlan?.amount || 0}
                 asPage
@@ -1373,7 +1373,7 @@ export default function App() {
               <PaymentModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => setActivePage('main')}
+                onClose={() => { window.history.back(); }}
                 planLabel=""
                 amount={0}
                 asPage
@@ -1429,8 +1429,8 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <button onClick={() => setActivePage('main')} className="mt-6 w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-sm hover:bg-white/10 transition-all">
-                  {lang === 'ar' ? 'العودة للرئيسية' : 'Back to Home'}
+                <button onClick={() => { window.history.back(); }} className="mt-6 w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-sm hover:bg-white/10 transition-all">
+                  {lang === 'ar' ? 'رجوع لخلف' : 'Go back'}
                 </button>
               </div>
             )}
@@ -1534,10 +1534,10 @@ export default function App() {
         {analysisResults && !isAnalyzing && (
           <button
             onClick={() => { setAnalysisResults(null); setAnalysisError(null); window.history.back(); }}
-            className="fixed bottom-8 left-8 z-50 bg-brand-bg/90 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl hover:bg-brand-alt transition-all"
-            title={lang === 'ar' ? 'العودة للخلف' : 'Go back'}
+            className="fixed bottom-8 left-8 z-50 flex items-center gap-3 bg-brand-bg/90 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-4 shadow-2xl hover:bg-brand-alt transition-all group"
           >
-            <ArrowLeft size={24} className="text-white" />
+            <ArrowLeft size={22} className="text-white group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm font-bold text-white">{lang === 'ar' ? 'رجوع لخلف' : 'Go back'}</span>
           </button>
         )}
       </main>
