@@ -217,40 +217,17 @@ app.get("/api/market-data", async (req, res) => {
   }
 });
 
-// API Route: AI Analysis Proxy — tries ALL providers IN PARALLEL for speed
+// API Route: AI Analysis Proxy — Groq only (free, fast, reliable)
 app.post("/api/ai-analysis", async (req, res) => {
   try {
     const { prompt, userApiKey } = req.body;
     const key = userApiKey || '';
 
-    // Try all relevant providers in parallel — return the first success
-    const providers: (() => Promise<{ content?: string; error?: string }>)[] = [];
-
-    if (key.startsWith('gsk_')) providers.push(() => callGroq(key, prompt));
-    if (key.startsWith('sk-')) { providers.push(() => callDeepSeek(key, prompt)); providers.push(() => callQwen(key, prompt)); }
-    if (key.startsWith('AIzaSy')) providers.push(() => callGoogle(key, prompt));
-    // Fallback: if no format matched, try all
-    if (providers.length === 0) {
-      providers.push(() => callGroq(key, prompt));
-      providers.push(() => callDeepSeek(key, prompt));
-      providers.push(() => callQwen(key, prompt));
-      providers.push(() => callGoogle(key, prompt));
+    const result = await callGroq(key, prompt);
+    if (result.content) {
+      return res.json({ choices: [{ message: { content: result.content } }] });
     }
-
-    const results = await Promise.allSettled(providers.map(p => p()));
-
-    for (const r of results) {
-      if (r.status === 'fulfilled' && r.value.content) {
-        return res.json({ choices: [{ message: { content: r.value.content } }] });
-      }
-    }
-
-    // All failed — return all error messages
-    const errors = results
-      .filter(r => r.status === 'fulfilled' && r.value.error)
-      .map(r => (r as any).value.error)
-      .join('; ');
-    res.status(503).json({ error: errors || 'All providers failed' });
+    res.status(503).json({ error: result.error || 'Groq failed' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

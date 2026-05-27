@@ -44,12 +44,12 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
         <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center p-20 text-center space-y-6 bg-brand-bg rounded-[2.5rem] shadow-2xl border border-brand-text/5 min-h-[400px]">
           <ShieldAlert size={64} className="text-red-500/50" />
           <h3 className="text-2xl font-black text-brand-text uppercase tracking-widest">
-            {isRTL ? 'لا توجد فرص قوية تلبي شروطك حالياً' : 'No strong opportunities currently meet your criteria'}
+            {isRTL ? 'لا توجد نتائج تحليل' : 'No analysis results'}
           </h3>
           <p className="text-brand-muted text-lg max-w-lg">
             {isRTL 
-              ? 'قمنا بتحليل السوق ولكن لم نجد أي إشارات شراء أو بيع قوية بنسبة ثقة تتجاوز العتبة المحددة.' 
-              : 'We analyzed the market but found no strong buy or sell signals exceeding your confidence threshold.'}
+              ? 'تعذر الحصول على نتائج التحليل من المزود. حاول مرة أخرى.' 
+              : 'Could not get analysis results from the provider. Try again.'}
           </p>
         </div>
       </div>

@@ -173,10 +173,20 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         </div>
       </div>
 
+      <a
+        href="https://console.groq.com/keys"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 text-xs text-sky-400 hover:text-sky-300 mb-4 transition-colors"
+      >
+        <Info size={14} />
+        {isAr ? 'أنشئ مفتاح Groq مجاني' : 'Create a free Groq API key'}
+      </a>
+
       <p className="text-slate-400 text-sm leading-relaxed mb-6">
         {isAr
-          ? 'أدخل مفتاح API للتحليل. يدعم جميع المزودات (Groq, DeepSeek, Google Gemini وغيرها).'
-          : 'Enter your API key. Supports all providers (Groq, DeepSeek, Google Gemini, etc).'}
+          ? 'أدخل مفتاح Groq API للتحليل.'
+          : 'Enter your Groq API key for analysis.'}
       </p>
 
       {typeof window !== 'undefined' && localStorage.getItem('finalyze_verify_link') && (

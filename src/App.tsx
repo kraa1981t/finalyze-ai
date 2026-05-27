@@ -1242,7 +1242,7 @@ export default function App() {
         user={user} onLogin={handleLogin} onLogout={handleLogout} 
         isDark={isDark} toggleTheme={() => setIsDark(!isDark)}
         lang={lang} onLangChange={setLang}
-        showBack={!!analysisResults} onBack={() => setAnalysisResults(null)}
+        showBack={!!analysisResults} onBack={() => { setAnalysisResults(null); setAnalysisError(null); window.history.back(); }}
         autoSettings={autoSettings} onAutoSettingsChange={setAutoSettings}
         isWaiting={isScanningFinished}
         hasApiKey={hasApiKey || isDeveloperSession()}
