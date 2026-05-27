@@ -256,7 +256,7 @@ app.post("/api/ai-analysis", async (req, res) => {
   }
 });
 
-async function callGroq(apiKey: string, prompt: string, retries = 2) {
+async function callGroq(apiKey: string, prompt: string, retries = 1) {
   const body = {
     model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
     messages: [
@@ -268,11 +268,15 @@ async function callGroq(apiKey: string, prompt: string, retries = 2) {
   };
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 8000);
       const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: ac.signal
       });
+      clearTimeout(timeout);
       if (resp.status === 429 && attempt < retries) {
         await new Promise(r => setTimeout(r, attempt * 2000));
         continue;
