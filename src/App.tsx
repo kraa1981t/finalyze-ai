@@ -86,7 +86,11 @@ export default function App() {
   const navStackRef = useRef<string[]>([]);
 
   const navigateTo = (page: any) => {
-    if (page === activePage) return;
+    if (page === activePage) {
+      window.history.pushState({ page: activePage }, '');
+      navStackRef.current = [...navStackRef.current, activePage];
+      return;
+    }
     window.history.pushState({ page: activePage }, '');
     navStackRef.current = [...navStackRef.current, activePage];
     setActivePage(page);
@@ -1349,7 +1353,7 @@ export default function App() {
                 key={user?.uid || 'no-session'}
                 isOpen={true}
                 onClose={goBack}
-                onSelectPlan={(amount, label, durationDays) => { setPaymentPlan({ amount, label, durationDays }); }}
+                onSelectPlan={(amount, label, durationDays) => { navigateTo('plans'); setPaymentPlan({ amount, label, durationDays }); }}
                 asPage
               />
             )}
