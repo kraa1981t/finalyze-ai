@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { User } from 'firebase/auth';
-import { ChevronDown, Search, ArrowRight, TrendingUp, Bitcoin, DollarSign, Gem, Briefcase, Play, ListFilter, Plus, Zap, X, Clock, Sparkles, Star, Crown } from 'lucide-react';
+import { ChevronDown, Search, ArrowRight, TrendingUp, Bitcoin, DollarSign, Gem, Briefcase, Play, ListFilter, Plus, Zap, X, Clock, Sparkles, Star, Crown, Activity, Ban } from 'lucide-react';
 import { MarketType, AnalysisResult, TradingStyle, StrategySettings } from '../types';
 import { MARKET_CATEGORIES, TIMEFRAMES, SYMBOL_GROUPS, TRADING_STYLES, ALL_SYMBOLS_DB, FREE_SYMBOLS } from '../constants';
 import { analyzeMarket } from '../services/geminiService';
@@ -10,6 +10,7 @@ import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
+import { getStatus, subscribe } from '../services/rateLimitTracker';
 
 interface AnalysisFormProps {
   user: User | null;
@@ -69,6 +70,26 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
   useEffect(() => {
     localStorage.setItem('finalyze_custom_symbols', JSON.stringify(customSymbols));
   }, [customSymbols]);
+
+  const [rateLimitActive, setRateLimitActive] = useState(false);
+  const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
+  useEffect(() => {
+    const u = subscribe(() => {
+      const s = getStatus();
+      setRateLimitActive(!s.active);
+      setRateLimitCountdown(s.remainingSec);
+    });
+    return u;
+  }, []);
+  useEffect(() => {
+    if (!rateLimitActive) return;
+    const interval = setInterval(() => {
+      const s = getStatus();
+      setRateLimitActive(!s.active);
+      setRateLimitCountdown(s.remainingSec);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [rateLimitActive]);
 
   const [activeDropdown, setActiveDropdown] = useState<MarketType | null>(null);
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues>({
@@ -257,6 +278,18 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
         </AnimatePresence>
         
         <div className="space-y-4">
+          {rateLimitActive && (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-2 text-red-400 text-xs font-bold">
+              <Ban size={14} />
+              <span>{lang === 'ar' ? `معدل الطلبات ممتلئ — يعود بعد ${rateLimitCountdown} ثانية` : `Rate limit exceeded — resets in ${rateLimitCountdown}s`}</span>
+            </div>
+          )}
+          {!rateLimitActive && (
+            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2 text-emerald-400 text-xs font-bold">
+              <Activity size={14} />
+              <span>{lang === 'ar' ? 'الطلبات نشطة' : 'Requests active'}</span>
+            </div>
+          )}
           <label className="text-base font-black text-brand-text opacity-100 uppercase tracking-widest pl-2">{t.selectMarket}</label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {MARKET_CATEGORIES.map((cat) => (

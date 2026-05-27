@@ -1,6 +1,7 @@
 import { MarketType, AnalysisResult, TradingStyle, SignalType, StrategySettings } from "../types";
 import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 import { fetchMarketContext } from "./marketContextService";
+import { onRateLimited } from "./rateLimitTracker";
 
 /**
  * ROBUST TECHNICAL ENGINE (VERSION 2.0)
@@ -215,6 +216,7 @@ Return ONLY valid JSON:
       lastError = null;
     } else {
       lastError = aiResponse?.error || 'All providers failed';
+      if (/429|rate.?limit|too many requests/i.test(lastError)) onRateLimited();
     }
 
     if (lastError) {
