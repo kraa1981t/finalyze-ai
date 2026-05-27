@@ -215,6 +215,9 @@ export default function App() {
     return base;
   });
 
+  useEffect(() => {
+    localStorage.setItem('auto_settings', JSON.stringify(autoSettings));
+  }, [autoSettings]);
   const autoSettingsRef = useRef(autoSettings);
   useEffect(() => {
     autoSettingsRef.current = autoSettings;
