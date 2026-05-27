@@ -233,7 +233,7 @@ app.post("/api/ai-analysis", async (req, res) => {
   }
 });
 
-async function callGroq(apiKey: string, prompt: string, retries = 1) {
+async function callGroq(apiKey: string, prompt: string, retries = 2) {
   const body = {
     model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
     messages: [
@@ -255,7 +255,7 @@ async function callGroq(apiKey: string, prompt: string, retries = 1) {
       });
       clearTimeout(timeout);
       if (resp.status === 429 && attempt < retries) {
-        await new Promise(r => setTimeout(r, attempt * 2000));
+        await new Promise(r => setTimeout(r, 1000));
         continue;
       }
       if (!resp.ok) return { error: `Groq: ${resp.status}` };
