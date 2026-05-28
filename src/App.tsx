@@ -213,13 +213,41 @@ export default function App() {
     } catch (e) { console.warn('Failed to update client status:', e); }
   };
 
+  const isBannedEmail = (email: string): boolean => {
+    const banned: string[] = JSON.parse(localStorage.getItem('finalyze_banned_emails') || '[]');
+    return banned.includes(email.toLowerCase().trim());
+  };
+
   const banClient = async (clientId: string) => {
-    await updateDoc(doc(db, 'clients', clientId), { status: 'banned' });
+    const target = clients.find(c => c.id === clientId);
+    if (!target) return;
+    const email = target.email.toLowerCase().trim();
+    // Add to banned emails list
+    const banned: string[] = JSON.parse(localStorage.getItem('finalyze_banned_emails') || '[]');
+    if (!banned.includes(email)) {
+      banned.push(email);
+      localStorage.setItem('finalyze_banned_emails', JSON.stringify(banned));
+    }
+    // Update Firestore
+    try { await updateDoc(doc(db, 'clients', clientId), { status: 'banned' }); } catch (e) { console.warn('Firestore ban failed:', e); }
+    // Update localStorage clients
+    const localClients: ClientRecord[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+    localStorage.setItem('finalyze_clients', JSON.stringify(localClients.map(c => c.id === clientId ? { ...c, status: 'banned' as const } : c)));
     fetchClients();
   };
 
   const deleteClientRecord = async (clientId: string) => {
-    await deleteDoc(doc(db, 'clients', clientId));
+    const target = clients.find(c => c.id === clientId);
+    // Remove from Firestore
+    try { await deleteDoc(doc(db, 'clients', clientId)); } catch (e) { console.warn('Firestore delete failed:', e); }
+    // Remove from localStorage clients
+    const localClients: ClientRecord[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+    localStorage.setItem('finalyze_clients', JSON.stringify(localClients.filter(c => c.id !== clientId)));
+    // Remove from banned list (delete = unban + make email available again)
+    if (target) {
+      const banned: string[] = JSON.parse(localStorage.getItem('finalyze_banned_emails') || '[]');
+      localStorage.setItem('finalyze_banned_emails', JSON.stringify(banned.filter(e => e !== target.email.toLowerCase().trim())));
+    }
     fetchClients();
   };
 
@@ -921,9 +949,14 @@ export default function App() {
           localStorage.setItem('finalyze_key1_provider', 'groq');
         }
 
-        // Check if banned
+        // Check if banned (Firestore or localStorage list)
+        if (isBannedEmail(email)) {
+          setLoginError(lang === 'ar' ? 'هذا الحساب محظور. لا يمكنك تسجيل الدخول.' : 'This account is banned. You cannot log in.');
+          setRedirecting(false);
+          return;
+        }
         if (existing?.status === 'banned') {
-          setLoginError(isAr ? 'هذا الحساب محظور. لا يمكنك تسجيل الدخول.' : 'This account is banned. You cannot log in.');
+          setLoginError(lang === 'ar' ? 'هذا الحساب محظور. لا يمكنك تسجيل الدخول.' : 'This account is banned. You cannot log in.');
           setRedirecting(false);
           return;
         }
@@ -1028,6 +1061,11 @@ export default function App() {
     setIsSidebarOpen(false);
     setLoginError(null);
     try {
+      // Check if banned
+      if (isBannedEmail(email)) {
+        setLoginError(lang === 'ar' ? 'هذا البريد محظور. لا يمكنك التسجيل.' : 'This email is banned. You cannot register.');
+        return;
+      }
       // Check if client is already registered in Firestore
       const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
       const existing = existingSnap.docs[0];
@@ -1232,6 +1270,11 @@ export default function App() {
               // Save client to Firestore + localStorage after key validation
               const email = user?.email;
               if (email) {
+                if (isBannedEmail(email)) {
+                  alert(lang === 'ar' ? 'هذا البريد محظور. لا يمكنك التسجيل.' : 'This email is banned. You cannot register.');
+                  handleLogout();
+                  return;
+                }
                 const newClient = {
                   id: 'local_' + Date.now(),
                   email,
@@ -1319,7 +1362,7 @@ export default function App() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <button
               onClick={() => { if (activePage === 'plans' && paymentPlan) setPaymentPlan(null); goBack(); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-alt border border-white/10 text-brand-muted hover:text-brand-text transition-colors mb-6"
+              className="sticky top-28 z-30 flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-alt/90 backdrop-blur-xl border border-white/10 text-brand-muted hover:text-brand-text transition-colors mb-6"
             >
               <ArrowLeft size={18} />
               <span className="text-xs font-black uppercase tracking-widest">
