@@ -98,7 +98,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
     defaultValues: {
       type: MarketType.FOREX,
       timeframe: "1d",
-      tradingStyle: TradingStyle.SWING_TRADING,
+      tradingStyle: TradingStyle.DAY_TRADING,
       symbol: ""
     }
   });
