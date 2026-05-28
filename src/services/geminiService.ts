@@ -3,6 +3,53 @@ import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 import { fetchMarketContext } from "./marketContextService";
 import { onRateLimited, waitIfRateLimited } from "./rateLimitTracker";
 
+async function callGroqDirect(prompt: string, apiKey: string, signal: AbortSignal) {
+  try {
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+      }),
+      signal
+    });
+    if (resp.status === 429) return { error: 'rate_limited' };
+    if (!resp.ok) return { error: `Groq: ${resp.status}` };
+    return await resp.json();
+  } catch (e: any) {
+    return { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
+  }
+}
+
+async function callGoogleDirect(prompt: string, apiKey: string, signal: AbortSignal) {
+  for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
+          generationConfig: { temperature: 0.1 }
+        }),
+        signal
+      });
+      if (resp.status === 429) continue;
+      if (resp.ok) {
+        const data = await resp.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (text) return { choices: [{ message: { content: text } }] };
+      }
+    } catch {}
+  }
+  return { error: 'Google failed' };
+}
+
 /**
  * ROBUST TECHNICAL ENGINE (VERSION 2.0)
  * Works with minimal data (10+ candles) and handles gaps gracefully.
@@ -194,35 +241,28 @@ Return ONLY valid JSON:
   "microTrend": "string"
 }`;
 
-    let aiResponse: any;
-    let lastError: string | null = null;
-
-    // Load key from localStorage
     const keyValue = localStorage.getItem('finalyze_key1_value') || localStorage.getItem('finalyze_user_groq_api_key') || '';
     if (!keyValue) throw new Error(lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.');
 
-    // Wait if globally rate limited before making the API call
     await waitIfRateLimited();
 
-    // Single request — server tries all providers internally (Groq→DeepSeek→Google→OpenAI)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
-    aiResponse = await fetch('/api/ai-analysis', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: technicalPrompt, userApiKey: keyValue, provider: 'groq' }),
-      signal: controller.signal
-    }).then(r => r.json()).catch(e => ({ error: e.name === 'AbortError' ? 'Request timed out' : e.message }));
+    // Direct browser-to-API call (bypasses Vercel 10s server timeout)
+    const isGoogle = keyValue.startsWith('AIzaSy');
+    const ac = new AbortController();
+    const timeoutId = setTimeout(() => ac.abort(), 15000);
+
+    let aiResponse: any;
+    if (isGoogle) {
+      aiResponse = await callGoogleDirect(technicalPrompt, keyValue, ac.signal);
+    } else {
+      aiResponse = await callGroqDirect(technicalPrompt, keyValue, ac.signal);
+    }
     clearTimeout(timeoutId);
 
-    if (!aiResponse?.error && aiResponse?.choices?.[0]?.message?.content) {
-      lastError = null;
-    } else {
-      lastError = aiResponse?.error || 'All providers failed';
+    let lastError: string | null = null;
+    if (aiResponse?.error) {
+      lastError = aiResponse.error;
       if (/429|rate.?limit|too many requests/i.test(lastError)) onRateLimited();
-    }
-
-    if (lastError) {
       throw new Error(lastError);
     }
 
