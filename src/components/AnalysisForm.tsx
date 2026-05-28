@@ -4,7 +4,7 @@ import { User } from 'firebase/auth';
 import { ChevronDown, Search, ArrowRight, TrendingUp, Bitcoin, DollarSign, Gem, Briefcase, Play, ListFilter, Plus, Zap, X, Clock, Sparkles, Star, Crown, Activity, Ban } from 'lucide-react';
 import { MarketType, AnalysisResult, TradingStyle, StrategySettings } from '../types';
 import { MARKET_CATEGORIES, TIMEFRAMES, SYMBOL_GROUPS, TRADING_STYLES, ALL_SYMBOLS_DB, FREE_SYMBOLS } from '../constants';
-import { analyzeMarket } from '../services/geminiService';
+import { analyzeMarket, getApiKey } from '../services/geminiService';
 import { waitIfRateLimited } from '../services/rateLimitTracker';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -249,7 +249,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
 
         // Adaptive delay based on provider to prevent rate limiting
         if (i < allSymbolsToAnalyze.length - 1) {
-          const key = localStorage.getItem('finalyze_key1_value') || '';
+          const key = getApiKey();
           const delay = key.startsWith('AIzaSy') ? 3500 : 2500;
           await new Promise(resolve => setTimeout(resolve, delay));
         }

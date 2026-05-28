@@ -32,6 +32,7 @@ function loadKey(): { value: string; enabled: boolean } {
 function saveKey(value: string) {
   localStorage.setItem('finalyze_key1_value', value);
   localStorage.setItem('finalyze_key1_enabled', 'true');
+  try { sessionStorage.setItem('finalyze_key_mirror', value); } catch {}
 }
 
 export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, onSaved, onLogout, asPage }: ApiKeyModalProps) {

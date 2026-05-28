@@ -3,6 +3,29 @@ import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 import { fetchMarketContext } from "./marketContextService";
 import { onRateLimited, waitIfRateLimited } from "./rateLimitTracker";
 
+export function getApiKey(): string {
+  try {
+    // 1. Primary key (enabled check)
+    const k1 = localStorage.getItem('finalyze_key1_value');
+    const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
+    if (k1 && k1en) return k1;
+    // 2. Legacy key
+    const oldKey = localStorage.getItem('finalyze_user_groq_api_key');
+    if (oldKey) return oldKey;
+    // 3. Secondary key (fallback)
+    const k2 = localStorage.getItem('finalyze_key2_value');
+    if (k2) return k2;
+    // 4. SessionStorage mirror (survives cross-tab navigation)
+    const ss = sessionStorage.getItem('finalyze_key_mirror');
+    if (ss) return ss;
+  } catch {}
+  return '';
+}
+
+export function mirrorApiKey(key: string): void {
+  try { sessionStorage.setItem('finalyze_key_mirror', key); } catch {}
+}
+
 async function callGroqDirect(prompt: string, apiKey: string, signal: AbortSignal) {
   try {
     const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -241,8 +264,9 @@ Return ONLY valid JSON:
   "microTrend": "string"
 }`;
 
-    const keyValue = localStorage.getItem('finalyze_key1_value') || localStorage.getItem('finalyze_user_groq_api_key') || '';
+    const keyValue = getApiKey();
     if (!keyValue) throw new Error(lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.');
+    mirrorApiKey(keyValue);
 
     await waitIfRateLimited();
 
