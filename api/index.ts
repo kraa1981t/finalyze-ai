@@ -238,7 +238,7 @@ app.post("/api/ai-analysis", async (req, res) => {
   }
 });
 
-async function callGroq(apiKey: string, prompt: string, retries = 2) {
+async function callGroq(apiKey: string, prompt: string, retries = 3) {
   const body = {
     model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
     messages: [
@@ -251,7 +251,7 @@ async function callGroq(apiKey: string, prompt: string, retries = 2) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), 8000);
+      const timeout = setTimeout(() => ac.abort(), 9000);
       const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -259,14 +259,24 @@ async function callGroq(apiKey: string, prompt: string, retries = 2) {
         signal: ac.signal
       });
       clearTimeout(timeout);
-      if (resp.status === 429 && attempt < retries) {
-        await new Promise(r => setTimeout(r, 1000));
-        continue;
+      if (resp.status === 429) {
+        if (attempt < retries) {
+          const wait = Math.min(2000 * attempt, 5000);
+          await new Promise(r => setTimeout(r, wait));
+          continue;
+        }
+        return { error: 'Groq: rate limited', rateLimited: true };
       }
       if (!resp.ok) return { error: `Groq: ${resp.status}` };
       const data = await resp.json();
       return { content: data?.choices?.[0]?.message?.content || '' };
-    } catch (e: any) { return { error: e.message }; }
+    } catch (e: any) {
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      return { error: e.message };
+    }
   }
   return { error: 'Groq: all retries exhausted' };
 }
@@ -319,10 +329,10 @@ async function callQwen(apiKey: string, prompt: string) {
 
 async function callGoogle(apiKey: string, prompt: string) {
   for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro']) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const ac = new AbortController();
-        const timeout = setTimeout(() => ac.abort(), 8000);
+        const timeout = setTimeout(() => ac.abort(), 9000);
         const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -333,7 +343,14 @@ async function callGoogle(apiKey: string, prompt: string) {
           signal: ac.signal
         });
         clearTimeout(timeout);
-        if (resp.status === 429 && attempt < 2) { await new Promise(r => setTimeout(r, 1000)); continue; }
+        if (resp.status === 429) {
+          if (attempt < 3) {
+            const wait = Math.min(2000 * attempt, 5000);
+            await new Promise(r => setTimeout(r, wait));
+            continue;
+          }
+          break;
+        }
         if (resp.ok) {
           const data = await resp.json();
           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';

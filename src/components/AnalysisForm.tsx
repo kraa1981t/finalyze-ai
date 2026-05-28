@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { User } from 'firebase/auth';
 import { ChevronDown, Search, ArrowRight, TrendingUp, Bitcoin, DollarSign, Gem, Briefcase, Play, ListFilter, Plus, Zap, X, Clock, Sparkles, Star, Crown, Activity, Ban } from 'lucide-react';
 import { MarketType, AnalysisResult, TradingStyle, StrategySettings } from '../types';
 import { MARKET_CATEGORIES, TIMEFRAMES, SYMBOL_GROUPS, TRADING_STYLES, ALL_SYMBOLS_DB, FREE_SYMBOLS } from '../constants';
 import { analyzeMarket } from '../services/geminiService';
+import { waitIfRateLimited } from '../services/rateLimitTracker';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,6 +47,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
   const [analyzingIndex, setAnalyzingIndex] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dropdownSearch, setDropdownSearch] = useState("");
   const [showAllSymbols, setShowAllSymbols] = useState(false);
@@ -202,9 +204,16 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
     console.log("[Form] Beginning analysis for:", allSymbolsToAnalyze);
     onBegin();
     const results: AnalysisResult[] = [];
+    const ac = new AbortController();
+    abortRef.current = ac;
 
     try {
       for (let i = 0; i < allSymbolsToAnalyze.length; i++) {
+        if (ac.signal.aborted) { setAnalyzingIndex(null); onError(lang === 'ar' ? 'تم إلغاء التحليل' : 'Analysis cancelled'); return; }
+
+        // Wait if globally rate limited before processing next symbol
+        await waitIfRateLimited();
+
         const currentSymbol = allSymbolsToAnalyze[i];
         setAnalyzingIndex(i);
         onProgress(currentSymbol, allSymbolsToAnalyze.length, i);
@@ -236,15 +245,17 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
           console.error(`[Analysis Error] ${currentSymbol}:`, symbolError);
           const msg = symbolError.message || (lang === 'ar' ? "فشل التحليل بسبب خطأ غير معروف" : "Analysis failed due to unknown error");
           setFormError(`${currentSymbol}: ${msg}`);
-          // REMOVED: alert() popup as it is annoying for the user.
         }
 
-        // Add 4.5-second delay between requests to prevent API Rate Limiting (429 errors)
+        // Adaptive delay based on provider to prevent rate limiting
         if (i < allSymbolsToAnalyze.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 4500));
+          const key = localStorage.getItem('finalyze_key1_value') || '';
+          const delay = key.startsWith('AIzaSy') ? 3500 : 2500;
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
 
+      abortRef.current = null;
       setAnalyzingIndex(null);
       
       if (results.length > 0) {
@@ -253,6 +264,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
         onError(formError || (lang === 'ar' ? 'فشل التحليل لجميع الرموز' : 'Analysis failed for all symbols'));
       }
     } catch (error: any) {
+      abortRef.current = null;
       console.error("[Global Form Error]:", error);
       setAnalyzingIndex(null);
       onError(error.message || "Unknown error occurred.");
@@ -712,10 +724,17 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             className="w-full h-20 bg-brand-text text-brand-bg rounded-[2rem] font-display font-black text-2xl flex items-center justify-center gap-4 shadow-2xl hover:bg-primary hover:text-brand-text transition-all group disabled:opacity-100"
           >
             {analyzingIndex !== null ? (
-              <>
+              <div className="flex items-center justify-center gap-4 w-full">
                 <div className="w-6 h-6 border-4 border-brand-bg border-t-transparent rounded-full animate-spin" />
                 <span>{t.analyzing}</span>
-              </>
+                <button
+                  type="button"
+                  onClick={() => abortRef.current?.abort()}
+                  className="px-5 py-2 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-black uppercase tracking-widest transition-all ml-4"
+                >
+                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
             ) : (
               <>
                 <Zap size={28} className="fill-secondary text-secondary group-hover:fill-white group-hover:text-brand-text transition-colors" />

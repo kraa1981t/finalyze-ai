@@ -1,7 +1,7 @@
 import { MarketType, AnalysisResult, TradingStyle, SignalType, StrategySettings } from "../types";
 import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 import { fetchMarketContext } from "./marketContextService";
-import { onRateLimited } from "./rateLimitTracker";
+import { onRateLimited, waitIfRateLimited } from "./rateLimitTracker";
 
 /**
  * ROBUST TECHNICAL ENGINE (VERSION 2.0)
@@ -201,9 +201,12 @@ Return ONLY valid JSON:
     const keyValue = localStorage.getItem('finalyze_key1_value') || localStorage.getItem('finalyze_user_groq_api_key') || '';
     if (!keyValue) throw new Error(lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.');
 
+    // Wait if globally rate limited before making the API call
+    await waitIfRateLimited();
+
     // Single request — server tries all providers internally (Groq→DeepSeek→Google→OpenAI)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
     aiResponse = await fetch('/api/ai-analysis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
