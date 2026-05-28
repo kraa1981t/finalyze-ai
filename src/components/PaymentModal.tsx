@@ -564,14 +564,14 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           <div className="flex items-center justify-between">
             <div>
               <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest">{isAr ? 'نظام الخطط المجانية' : 'Freemium System'}</h5>
-              <p className="text-[10px] text-slate-500 mt-1">{freemiumDisabled ? (isAr ? 'الكل وصول كامل - الخطط مرئية للعملاء' : 'All full access - plans visible to clients') : (isAr ? 'القيود مفعلة - الخطط مخفية عن العملاء' : 'Restrictions active - plans hidden from clients')}</p>
+              <p className="text-[10px] text-slate-500 mt-1">{freemiumDisabled ? (isAr ? 'الكل وصول كامل - الخطط مخفية عن العملاء' : 'All full access - plans hidden from clients') : (isAr ? 'القيود مفعلة - الخطط مرئية للعملاء' : 'Restrictions active - plans visible to clients')}</p>
             </div>
             <button
               onClick={() => {
                 const newVal = !freemiumDisabled;
                 setFreemiumDisabled(newVal);
                 localStorage.setItem('finalyze_freemium_disabled', newVal ? 'true' : 'false');
-                localStorage.setItem('finalyze_hide_plans', newVal ? 'false' : 'true');
+                localStorage.setItem('finalyze_hide_plans', newVal ? 'true' : 'false');
                 onFreemiumToggle?.(newVal);
               }}
               className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg ${

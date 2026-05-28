@@ -80,8 +80,8 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
             </span>
             <p className="text-xs text-white/60 mt-0.5">
               {freemiumDisabled
-                ? (isAr ? 'الكل وصول كامل - الخطط مرئية للعملاء' : 'All full access - plans visible to clients')
-                : (isAr ? 'القيود مفعلة - الخطط مخفية عن العملاء' : 'Restrictions active - plans hidden from clients')}
+                ? (isAr ? 'الكل وصول كامل - الخطط مخفية عن العملاء' : 'All full access - plans hidden from clients')
+                : (isAr ? 'القيود مفعلة - الخطط مرئية للعملاء' : 'Restrictions active - plans visible to clients')}
             </p>
           </div>
         </div>
@@ -90,7 +90,7 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
             const newVal = !freemiumDisabled;
             setFreemiumDisabled(newVal);
             localStorage.setItem('finalyze_freemium_disabled', newVal ? 'true' : 'false');
-            localStorage.setItem('finalyze_hide_plans', newVal ? 'false' : 'true');
+            localStorage.setItem('finalyze_hide_plans', newVal ? 'true' : 'false');
             onFreemiumToggle?.(newVal);
           }}
           className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${

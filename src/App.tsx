@@ -836,6 +836,13 @@ export default function App() {
     return () => { window.removeEventListener('freemium-toggle', sync); window.removeEventListener('storage', sync); };
   }, []);
 
+  // Redirect away from plans page when freemium is ON (full free access)
+  useEffect(() => {
+    if (activePage === 'plans' && freemiumDisabled && !isDeveloperSession()) {
+      setActivePage('main');
+    }
+  }, [activePage, freemiumDisabled]);
+
   // Handle email verification from URL params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1348,7 +1355,7 @@ export default function App() {
               />
             )}
 
-            {activePage === 'plans' && !paymentPlan && (
+            {activePage === 'plans' && !paymentPlan && !(freemiumDisabled && !isDeveloperSession()) && (
               <SubscriptionModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
@@ -1358,7 +1365,7 @@ export default function App() {
               />
             )}
 
-            {activePage === 'plans' && paymentPlan && (
+            {activePage === 'plans' && paymentPlan && !(freemiumDisabled && !isDeveloperSession()) && (
               <PaymentModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
