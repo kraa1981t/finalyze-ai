@@ -18,9 +18,9 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
 export const DEFAULT_AUTO_SETTINGS = {
   isEnabled: false,
   interval: 15,
-  timeframe: '1h',
+  timeframe: '4h',
   category: 'all',
-  tradingStyle: TradingStyle.SWING_TRADING,
+  tradingStyle: TradingStyle.DAY_TRADING,
   volume: 0.8,
   showAllSignals: false,
 };

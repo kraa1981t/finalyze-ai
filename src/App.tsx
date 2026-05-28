@@ -815,9 +815,11 @@ export default function App() {
             if (userDoc.exists()) {
               const data = userDoc.data();
               if (data?.groqApiKey || data?.geminiApiKey) {
-                localStorage.setItem('finalyze_user_groq_api_key', data.groqApiKey || data.geminiApiKey);
-                localStorage.setItem('finalyze_key1_value', data.groqApiKey || data.geminiApiKey);
+                const ak = data.groqApiKey || data.geminiApiKey;
+                localStorage.setItem('finalyze_user_groq_api_key', ak);
+                localStorage.setItem('finalyze_key1_value', ak);
                 localStorage.setItem('finalyze_key1_provider', 'groq');
+                try { sessionStorage.setItem('finalyze_key_mirror', ak); } catch {}
                 setHasApiKey(true);
               } else {
                 setHasApiKey(false);
@@ -944,9 +946,11 @@ export default function App() {
 
         // Restore API key from Firestore if missing from localStorage
         if (existing?.groqApiKey && !hasAnyStoredKey()) {
-          localStorage.setItem('finalyze_user_groq_api_key', existing.groqApiKey);
-          localStorage.setItem('finalyze_key1_value', existing.groqApiKey);
+          const ak = existing.groqApiKey;
+          localStorage.setItem('finalyze_user_groq_api_key', ak);
+          localStorage.setItem('finalyze_key1_value', ak);
           localStorage.setItem('finalyze_key1_provider', 'groq');
+          try { sessionStorage.setItem('finalyze_key_mirror', ak); } catch {}
         }
 
         // Check if banned (Firestore or localStorage list)
@@ -974,9 +978,9 @@ export default function App() {
           return;
         }
 
-        // New or existing pending — only clear API keys for truly new users
+        // New or existing pending — protect existing API keys
         const isNewUser = !existingSnap.docs[0];
-        if (isNewUser) {
+        if (isNewUser && !hasAnyStoredKey()) {
           localStorage.removeItem('finalyze_key1_value');
           localStorage.removeItem('finalyze_user_groq_api_key');
           setHasApiKey(false);

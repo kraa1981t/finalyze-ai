@@ -3,6 +3,25 @@ import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 import { fetchMarketContext } from "./marketContextService";
 import { onRateLimited, waitIfRateLimited } from "./rateLimitTracker";
 
+export function getApiKey(): string {
+  try {
+    const k1 = localStorage.getItem('finalyze_key1_value');
+    const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
+    if (k1 && k1en) return k1;
+    const oldKey = localStorage.getItem('finalyze_user_groq_api_key');
+    if (oldKey) return oldKey;
+    const k2 = localStorage.getItem('finalyze_key2_value');
+    if (k2) return k2;
+    const ss = sessionStorage.getItem('finalyze_key_mirror');
+    if (ss) return ss;
+  } catch {}
+  return '';
+}
+
+export function mirrorApiKey(key: string): void {
+  try { sessionStorage.setItem('finalyze_key_mirror', key); } catch {}
+}
+
 /**
  * ROBUST TECHNICAL ENGINE (VERSION 2.0)
  * Works with minimal data (10+ candles) and handles gaps gracefully.
@@ -197,14 +216,15 @@ Return ONLY valid JSON:
     let aiResponse: any;
     let lastError: string | null = null;
 
-    // Load key from localStorage
-    const keyValue = localStorage.getItem('finalyze_key1_value') || localStorage.getItem('finalyze_user_groq_api_key') || '';
+    // Load key from localStorage (multi-source)
+    const keyValue = getApiKey();
     if (!keyValue) throw new Error(lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.');
+    mirrorApiKey(keyValue);
 
     // Wait if globally rate limited before making the API call
     await waitIfRateLimited();
 
-    // Single request — server tries all providers internally (Groq→DeepSeek→Google→OpenAI)
+    // Single request — server proxies to available providers
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 25000);
     aiResponse = await fetch('/api/ai-analysis', {
