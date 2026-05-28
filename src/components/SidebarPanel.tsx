@@ -22,7 +22,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
     ...(isDeveloper ? [
       { icon: Settings, label: lang === 'ar' ? 'الإعدادات' : 'Settings', page: 'settings' as const, color: 'from-amber-400 to-amber-600' },
     ] : []),
-    ...(freemiumDisabled || isDeveloper ? [
+    ...(!freemiumDisabled || isDeveloper ? [
       { icon: DollarSign, label: lang === 'ar' ? 'الخطط' : 'Plans', page: 'plans' as const, color: 'from-amber-400 to-amber-600' },
     ] : []),
     ...(isDeveloper ? [
