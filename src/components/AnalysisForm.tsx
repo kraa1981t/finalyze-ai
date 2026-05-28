@@ -97,7 +97,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
       type: MarketType.FOREX,
-      timeframe: "1d",
+      timeframe: "1h",
       tradingStyle: TradingStyle.DAY_TRADING,
       symbol: ""
     }
@@ -172,7 +172,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
     
     if (!hasActivePlan) {
       // Force day_trading + 1d for free users
-      data.timeframe = '1d';
+      data.timeframe = '1h';
       data.tradingStyle = TradingStyle.DAY_TRADING;
     }
 
