@@ -819,7 +819,7 @@ export default function App() {
                 localStorage.setItem('finalyze_user_groq_api_key', ak);
                 localStorage.setItem('finalyze_key1_value', ak);
                 localStorage.setItem('finalyze_key1_provider', 'groq');
-                try { sessionStorage.setItem('finalyze_key_mirror', ak); } catch {}
+                try { sessionStorage.setItem('finalyze_key_mirror', ak); document.cookie = `finalyze_api_key=${encodeURIComponent(ak)}; path=/; max-age=31536000; SameSite=Lax`; } catch {}
                 setHasApiKey(true);
               } else {
                 setHasApiKey(false);
@@ -978,9 +978,10 @@ export default function App() {
           return;
         }
 
-        // New or existing pending — protect existing API keys
+        // New or existing pending — protect existing API keys, never clear
         const isNewUser = !existingSnap.docs[0];
-        if (isNewUser && !hasAnyStoredKey()) {
+        const savedKey = hasAnyStoredKey();
+        if (isNewUser && !savedKey) {
           localStorage.removeItem('finalyze_key1_value');
           localStorage.removeItem('finalyze_user_groq_api_key');
           setHasApiKey(false);

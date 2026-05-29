@@ -5,21 +5,91 @@ import { onRateLimited, waitIfRateLimited } from "./rateLimitTracker";
 
 export function getApiKey(): string {
   try {
+    // 1. Primary key (enabled check)
     const k1 = localStorage.getItem('finalyze_key1_value');
     const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
     if (k1 && k1en) return k1;
+    // 2. Legacy key
     const oldKey = localStorage.getItem('finalyze_user_groq_api_key');
     if (oldKey) return oldKey;
+    // 3. Secondary key (fallback)
     const k2 = localStorage.getItem('finalyze_key2_value');
     if (k2) return k2;
+    // 4. SessionStorage mirror (survives cross-tab navigation)
     const ss = sessionStorage.getItem('finalyze_key_mirror');
-    if (ss) return ss;
+    if (ss) {
+      localStorage.setItem('finalyze_key1_value', ss);
+      localStorage.setItem('finalyze_key1_enabled', 'true');
+      return ss;
+    }
+    // 5. Cookie (most persistent — survives redeploy, browser restart)
+    const cookie = document.cookie.split('; ').find(r => r.startsWith('finalyze_api_key='));
+    if (cookie) {
+      const val = decodeURIComponent(cookie.split('=')[1]);
+      if (val) {
+        localStorage.setItem('finalyze_key1_value', val);
+        localStorage.setItem('finalyze_key1_enabled', 'true');
+        sessionStorage.setItem('finalyze_key_mirror', val);
+        return val;
+      }
+    }
   } catch {}
   return '';
 }
 
 export function mirrorApiKey(key: string): void {
-  try { sessionStorage.setItem('finalyze_key_mirror', key); } catch {}
+  try {
+    sessionStorage.setItem('finalyze_key_mirror', key);
+    // Cookie: 1 year expiry — survives redeploy, browser restart
+    document.cookie = `finalyze_api_key=${encodeURIComponent(key)}; path=/; max-age=31536000; SameSite=Lax`;
+  } catch {}
+}
+
+async function callGroqDirect(prompt: string, apiKey: string, signal: AbortSignal) {
+  try {
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+      }),
+      signal
+    });
+    if (resp.status === 429) return { error: 'rate_limited' };
+    if (!resp.ok) return { error: `Groq: ${resp.status}` };
+    return await resp.json();
+  } catch (e: any) {
+    return { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
+  }
+}
+
+async function callGoogleDirect(prompt: string, apiKey: string, signal: AbortSignal) {
+  for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
+          generationConfig: { temperature: 0.1 }
+        }),
+        signal
+      });
+      if (resp.status === 429) continue;
+      if (resp.ok) {
+        const data = await resp.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (text) return { choices: [{ message: { content: text } }] };
+      }
+    } catch {}
+  }
+  return { error: 'Google failed' };
 }
 
 /**
@@ -213,36 +283,29 @@ Return ONLY valid JSON:
   "microTrend": "string"
 }`;
 
-    let aiResponse: any;
-    let lastError: string | null = null;
-
-    // Load key from localStorage (multi-source)
     const keyValue = getApiKey();
     if (!keyValue) throw new Error(lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.');
     mirrorApiKey(keyValue);
 
-    // Wait if globally rate limited before making the API call
     await waitIfRateLimited();
 
-    // Single request — server proxies to available providers
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
-    aiResponse = await fetch('/api/ai-analysis', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: technicalPrompt, userApiKey: keyValue, provider: 'groq' }),
-      signal: controller.signal
-    }).then(r => r.json()).catch(e => ({ error: e.name === 'AbortError' ? 'Request timed out' : e.message }));
+    // Direct browser-to-API call (bypasses Vercel 10s server timeout)
+    const isGoogle = keyValue.startsWith('AIzaSy');
+    const ac = new AbortController();
+    const timeoutId = setTimeout(() => ac.abort(), 15000);
+
+    let aiResponse: any;
+    if (isGoogle) {
+      aiResponse = await callGoogleDirect(technicalPrompt, keyValue, ac.signal);
+    } else {
+      aiResponse = await callGroqDirect(technicalPrompt, keyValue, ac.signal);
+    }
     clearTimeout(timeoutId);
 
-    if (!aiResponse?.error && aiResponse?.choices?.[0]?.message?.content) {
-      lastError = null;
-    } else {
-      lastError = aiResponse?.error || 'All providers failed';
+    let lastError: string | null = null;
+    if (aiResponse?.error) {
+      lastError = aiResponse.error;
       if (/429|rate.?limit|too many requests/i.test(lastError)) onRateLimited();
-    }
-
-    if (lastError) {
       throw new Error(lastError);
     }
 
