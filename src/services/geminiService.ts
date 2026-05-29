@@ -46,27 +46,34 @@ export function mirrorApiKey(key: string): void {
 }
 
 async function callGroqDirect(prompt: string, apiKey: string, signal: AbortSignal) {
-  try {
-    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const body: any = {
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." },
           { role: "user", content: prompt }
         ],
         temperature: 0.1,
-        response_format: { type: "json_object" }
-      }),
-      signal
-    });
-    if (resp.status === 429) return { error: 'rate_limited' };
-    if (!resp.ok) return { error: `Groq: ${resp.status}` };
-    return await resp.json();
-  } catch (e: any) {
-    return { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
+      };
+      // First attempt: use JSON mode. If 400, retry without it.
+      if (attempt === 0) body.response_format = { type: "json_object" };
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify(body),
+        signal
+      });
+      if (resp.status === 429) return { error: 'rate_limited' };
+      if (resp.status === 400 && attempt === 0) continue; // retry without json mode
+      if (!resp.ok) return { error: `Groq: ${resp.status}` };
+      return await resp.json();
+    } catch (e: any) {
+      if (attempt === 0 && e.name !== 'AbortError') continue;
+      return { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
+    }
   }
+  return { error: 'Groq failed' };
 }
 
 async function callGoogleDirect(prompt: string, apiKey: string, signal: AbortSignal) {

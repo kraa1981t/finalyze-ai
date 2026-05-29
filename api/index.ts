@@ -148,9 +148,12 @@ app.get("/api/crypto-prices", async (_req, res) => {
 
 // Helper for Market Data Fetching
 const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${rangeStr}&interval=${intervalStr}`;
     const response = await fetch(url, {
+      signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
         'Accept': 'application/json',
@@ -158,11 +161,13 @@ const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: strin
         'Referer': 'https://finance.yahoo.com/'
       }
     });
+    clearTimeout(timeout);
     if (!response.ok) return null;
     const data = await response.json();
     if (data.chart?.result?.[0]) return data;
     return null;
   } catch (e) {
+    clearTimeout(timeout);
     return null;
   }
 };
@@ -205,26 +210,30 @@ app.get("/api/market-data", async (req, res) => {
     else if (timeframe === '1d') { interval = '1d'; range = '6mo'; }
     else if (timeframe === '1w') { interval = '1wk'; range = '2y'; }
 
-    // Symbol Try-Loop
-    let attempts = [];
+    // Symbol Try-Loop — try forex =X suffix first, then fallback mappings
+    let attempts: string[] = [];
     if (yahooSymbol.length >= 6 && (yahooSymbol.includes('USD') || yahooSymbol.includes('EUR') || yahooSymbol.includes('JPY'))) {
       const base = yahooSymbol.replace('USD', '').replace('-USD', '').replace('=X', '');
-      attempts = [`${base}-USD`, `${yahooSymbol}=X`, `${base}USD=X`, yahooSymbol, `${base}=F`, `${base}USD`];
+      attempts = [`${yahooSymbol}=X`, `${base}-USD`, `${base}=F`, yahooSymbol];
     } else {
-      attempts = [yahooSymbol, `${yahooSymbol}=X`, `${yahooSymbol}-USD`].filter(Boolean);
+      attempts = [`${yahooSymbol}=X`, yahooSymbol, `${yahooSymbol}-USD`].filter(Boolean);
     }
 
     const uniqueAttempts = Array.from(new Set(attempts));
     let finalData = null;
-    const intervalsToTry = [interval, '5m', '15m', '60m', '1d'];
 
-    outer: for (const attempt of uniqueAttempts) {
-      for (const intv of intervalsToTry) {
-        finalData = await fetchMarketData(attempt, range, intv);
-        if (finalData) break outer;
+    // Try each symbol with the requested interval first, then fallback intervals
+    for (const attempt of uniqueAttempts) {
+      finalData = await fetchMarketData(attempt, range, interval);
+      if (finalData) break;
+      // Fallback: try with daily interval if not already
+      if (interval !== '1d') {
+        finalData = await fetchMarketData(attempt, range, '1d');
+        if (finalData) break;
       }
     }
 
+    // Final fallback: last month daily
     if (!finalData) {
       for (const attempt of uniqueAttempts) {
         finalData = await fetchMarketData(attempt, '1mo', '1d');
