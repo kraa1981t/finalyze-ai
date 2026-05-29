@@ -4,8 +4,7 @@ import { User } from 'firebase/auth';
 import { ChevronDown, Search, ArrowRight, TrendingUp, Bitcoin, DollarSign, Gem, Briefcase, Play, ListFilter, Plus, Zap, X, Clock, Sparkles, Star, Crown, Activity, Ban } from 'lucide-react';
 import { MarketType, AnalysisResult, TradingStyle, StrategySettings } from '../types';
 import { MARKET_CATEGORIES, TIMEFRAMES, SYMBOL_GROUPS, TRADING_STYLES, ALL_SYMBOLS_DB, FREE_SYMBOLS } from '../constants';
-import { analyzeMarket, getApiKey } from '../services/geminiService';
-import { waitIfRateLimited } from '../services/rateLimitTracker';
+import { analyzeMarket, analyzeMarketBatch, getApiKey } from '../services/geminiService';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -206,64 +205,39 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
     const ac = new AbortController();
     abortRef.current = ac;
 
-    let i = 0;
     try {
-      while (i < allSymbolsToAnalyze.length) {
-        if (ac.signal.aborted) { setAnalyzingIndex(null); onError(lang === 'ar' ? 'تم إلغاء التحليل' : 'Analysis cancelled'); return; }
+      // Batch analysis: ONE AI call for ALL symbols — eliminates rate limiting
+      onProgress(allSymbolsToAnalyze[0], allSymbolsToAnalyze.length, 0);
+      const batchResult = await analyzeMarketBatch(
+        allSymbolsToAnalyze.map(sym => ({
+          symbol: sym,
+          type: data.type,
+          timeframe: data.timeframe,
+          tradingStyle: data.tradingStyle
+        })),
+        settings,
+        lang,
+        (current, total, index) => onProgress(current, total, index)
+      );
 
-        await waitIfRateLimited();
-
-        const currentSymbol = allSymbolsToAnalyze[i];
-        setAnalyzingIndex(i);
-        onProgress(currentSymbol, allSymbolsToAnalyze.length, i);
-        
-        try {
-          const result = await analyzeMarket({
-            symbol: currentSymbol,
-            type: data.type,
-            timeframe: data.timeframe,
-            tradingStyle: data.tradingStyle,
-            settings: settings,
-            lang: lang
-          });
-          
-          if (!result) throw new Error("Result is null");
-
-          result.userId = user?.uid || 'anonymous';
-          results.push(result);
-
-          if (user?.uid) {
-            addDoc(collection(db, "analysisResults"), {
-              ...result,
-              timestamp: serverTimestamp(),
-            }).catch(() => {});
-          }
-
-          // Success delay between symbols
-          if (i < allSymbolsToAnalyze.length - 1) {
-            const key = getApiKey();
-            const delay = key.startsWith('AIzaSy') ? 3500 : 5000;
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-
-        } catch (symbolError: any) {
-          console.error(`[Analysis Error] ${currentSymbol}:`, symbolError);
-          const msg = symbolError.message || (lang === 'ar' ? "فشل التحليل بسبب خطأ غير معروف" : "Analysis failed due to unknown error");
-          failedSymbols.push({ symbol: currentSymbol, error: msg });
-          // Longer delay after failure to let API recover
-          await new Promise(resolve => setTimeout(resolve, 10000));
+      for (const r of batchResult.results) {
+        r.userId = user?.uid || 'anonymous';
+        results.push(r);
+        if (user?.uid) {
+          addDoc(collection(db, "analysisResults"), {
+            ...r,
+            timestamp: serverTimestamp(),
+          }).catch(() => {});
         }
+      }
+      for (const e of batchResult.errors) {
+        failedSymbols.push(e);
+      }
 
-        i++;
-
-      abortRef.current = null;
-      setAnalyzingIndex(null);
-      
       if (results.length > 0) {
         onResult(results);
       }
 
-      // Always report errors if any symbols failed
       if (failedSymbols.length > 0) {
         const failedList = failedSymbols.map(f => `${f.symbol}`).join(', ');
         const sampleErrors = [...new Set(failedSymbols.map(f => f.error))].slice(0, 3).join('; ');
@@ -276,12 +250,12 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
         onError(lang === 'ar' ? 'فشل التحليل لجميع الرموز' : 'Analysis failed for all symbols', true);
       }
     } catch (error: any) {
-      abortRef.current = null;
       console.error("[Global Form Error]:", error);
-      setAnalyzingIndex(null);
       onError(error.message || "Unknown error occurred.", true);
       setFormErrors([error.message || "Unknown error occurred."]);
     }
+    abortRef.current = null;
+    setAnalyzingIndex(null);
   };
 
   return (
