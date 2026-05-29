@@ -362,48 +362,22 @@ Symbol details:\n`;
   ]
 }`;
 
-  // Phase 3: Single AI call — direct browser (bypasses Vercel 10s)
+  // Phase 3: Single AI call via server proxy (same architecture as working old version)
   const keyValue = getApiKey();
   if (!keyValue) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.' }))] };
   mirrorApiKey(keyValue);
 
-  const isGoogle = keyValue.startsWith('AIzaSy') || keyValue.startsWith('AQ.');
-
   async function makeAICall(): Promise<any> {
     const ac = new AbortController();
-    const timeoutId = setTimeout(() => ac.abort(), 30000);
+    const timeoutId = setTimeout(() => ac.abort(), 25000);
     let resp: any;
     try {
-      if (isGoogle) {
-        const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
-        for (const model of models) {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyValue}`;
-          try {
-            const r = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: [{ parts: [{ text: `You are a financial analyst. ${batchPrompt}` }] }], generationConfig: { temperature: 0.1 } }),
-              signal: ac.signal
-            });
-            if (r.status === 429) continue;
-            if (!r.ok) continue;
-            resp = await r.json();
-            break;
-          } catch {}
-        }
-        if (!resp) resp = { error: 'rate_limited' };
-      } else {
-        const url = 'https://api.groq.com/openai/v1/chat/completions';
-        const r = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keyValue}` },
-          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." }, { role: "user", content: batchPrompt }], temperature: 0.1, response_format: { type: "json_object" } }),
-          signal: ac.signal
-        });
-        if (r.status === 429) resp = { error: 'rate_limited' };
-        else if (!r.ok) resp = { error: `Groq: ${r.status}` };
-        else resp = await r.json();
-      }
+      resp = await fetch('/api/ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: batchPrompt, userApiKey: keyValue }),
+        signal: ac.signal
+      }).then(r => r.json());
     } catch (e: any) {
       resp = { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
     }
@@ -415,26 +389,12 @@ Symbol details:\n`;
   let aiResponse = await makeAICall();
   if (aiResponse?.error === 'rate_limited') onRateLimited();
 
-  // Normalize Google Gemini response format → Groq format
-  if (isGoogle && aiResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
-    aiResponse = { choices: [{ message: { content: aiResponse.candidates[0].content.parts[0].text } }] };
-  }
-
+  // AI failed → fallback to local analysis
   if (aiResponse?.error || !aiResponse?.choices?.[0]?.message?.content) {
-    // AI failed → fallback to local analysis
     for (const s of validSymbols) {
       const d = s.data;
       const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
-      results.push({
-        symbol: s.symbol, type: s.type, timeframe: s.timeframe,
-        signal: local.signal, confidence: local.confidence, summary: local.summary,
-        detailedReasons: local.detailedReasons, newsSources: [],
-        technicalScore: local.technicalScore, sentimentScore: local.sentimentScore,
-        trendMaturity: (d.metrics?.totalAge || 0) < infantLimit ? 'infancy' : (d.metrics?.totalAge || 0) < matureLimit ? 'youth' : (d.metrics?.totalAge || 0) <= oldLimit ? 'mature' : 'aging',
-        trendAge: d.metrics?.totalAge || 0,
-        microTF: d.microTF, microSignal: 'unknown', microTrend: '', historicalMatch: '',
-        timestamp: new Date().toISOString(), userId: ''
-      });
+      results.push({ symbol: s.symbol, type: s.type, timeframe: s.timeframe, signal: local.signal, confidence: local.confidence, summary: local.summary, detailedReasons: local.detailedReasons, newsSources: [], technicalScore: local.technicalScore, sentimentScore: local.sentimentScore, trendMaturity: (d.metrics?.totalAge || 0) < infantLimit ? 'infancy' : (d.metrics?.totalAge || 0) < matureLimit ? 'youth' : (d.metrics?.totalAge || 0) <= oldLimit ? 'mature' : 'aging', trendAge: d.metrics?.totalAge || 0, microTF: d.microTF, microSignal: 'unknown', microTrend: '', historicalMatch: '', timestamp: new Date().toISOString(), userId: '' });
     }
     return { results, errors };
   }
@@ -681,43 +641,18 @@ Return ONLY valid JSON:
 
     await waitIfRateLimited();
 
-    // Direct browser call with model fallback (bypasses Vercel 10s)
-    const isGoogle = keyValue.startsWith('AIzaSy') || keyValue.startsWith('AQ.');
-
+    // Server proxy call (same architecture as working old version)
     async function makeSingleAICall(): Promise<any> {
       const ac = new AbortController();
-      const timeoutId = setTimeout(() => ac.abort(), 20000);
+      const timeoutId = setTimeout(() => ac.abort(), 25000);
       let resp: any;
       try {
-        if (isGoogle) {
-        const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
-          for (const model of models) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyValue}`;
-            try {
-              const r = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: `You are a financial analyst. ${technicalPrompt}` }] }], generationConfig: { temperature: 0.1 } }),
-                signal: ac.signal
-              });
-              if (r.status === 429) continue;
-              if (!r.ok) continue;
-              resp = await r.json();
-              break;
-            } catch {}
-          }
-          if (!resp) resp = { error: 'rate_limited' };
-        } else {
-          const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keyValue}` },
-            body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." }, { role: "user", content: technicalPrompt }], temperature: 0.1, response_format: { type: "json_object" } }),
-            signal: ac.signal
-          });
-          if (r.status === 429) resp = { error: 'rate_limited' };
-          else if (!r.ok) resp = { error: `Groq: ${r.status}` };
-          else resp = await r.json();
-        }
+        resp = await fetch('/api/ai-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: technicalPrompt, userApiKey: keyValue }),
+          signal: ac.signal
+        }).then(r => r.json());
       } catch (e: any) {
         resp = { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
       }
@@ -727,12 +662,6 @@ Return ONLY valid JSON:
 
     let aiResponse = await makeSingleAICall();
     if (aiResponse?.error === 'rate_limited') onRateLimited();
-
-    let lastError: string | null = null;
-  // Normalize Google Gemini response format → Groq format
-  if (isGoogle && aiResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
-    aiResponse = { choices: [{ message: { content: aiResponse.candidates[0].content.parts[0].text } }] };
-  }
 
     if (aiResponse?.error) {
       if (aiResponse.error === 'rate_limited') onRateLimited();
