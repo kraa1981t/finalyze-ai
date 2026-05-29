@@ -212,6 +212,78 @@ async function fetchAndPrepareSymbolData(
   }
 }
 
+function generateLocalAnalysis(
+  metrics: any, zonesText: string, supplyDemandZones: any[], microMetrics: any, microTF: string,
+  settings: StrategySettings, type: MarketType, lang: string, symbol: string, infantLimit: number, matureLimit: number, oldLimit: number
+): { signal: SignalType; confidence: number; summary: string; detailedReasons: any[]; microSignal: string; microTrend: string; technicalScore: number; sentimentScore: number; historicalMatch: string } {
+  const minAge = settings?.minTrendAge ?? 2;
+  const age = metrics?.age || 0;
+  const totalAge = metrics?.totalAge || 0;
+  let score = 0;
+  const reasons: any[] = [];
+
+  if (metrics?.rsi !== undefined) {
+    const rsi = metrics.rsi;
+    if (rsi < 30) { score += 2; reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'positive', impact: 'oversold, bounce potential' }); }
+    else if (rsi > 70) { score -= 2; reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'negative', impact: 'overbought, caution' }); }
+    else { reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'neutral', impact: 'neutral zone' }); }
+  }
+  if (metrics?.emaCross === 'bullish') { score += 1.5; reasons.push({ check: 'EMA Cross', value: 'bullish', status: 'positive', impact: 'supports upward bias' }); }
+  else if (metrics?.emaCross === 'bearish') { score -= 1.5; reasons.push({ check: 'EMA Cross', value: 'bearish', status: 'negative', impact: 'supports downward bias' }); }
+  if (metrics?.direction === 'uptrend') { score += 1; reasons.push({ check: 'Trend Direction', value: 'uptrend', status: 'positive', impact: 'price making higher highs' }); }
+  else if (metrics?.direction === 'downtrend') { score -= 1; reasons.push({ check: 'Trend Direction', value: 'downtrend', status: 'negative', impact: 'price making lower lows' }); }
+  else { reasons.push({ check: 'Trend Direction', value: 'sideways', status: 'neutral', impact: 'no clear direction' }); }
+  if (metrics?.volSurge) {
+    score += score >= 0 ? 0.5 : -0.5;
+    reasons.push({ check: 'Volume Surge', value: 'true', status: score >= 0 ? 'positive' : 'negative', impact: 'confirms momentum' });
+  }
+  if (supplyDemandZones?.length > 0) {
+    const z = supplyDemandZones[0];
+    reasons.push({ check: 'Supply/Demand Zone', value: `${z.type === 'supply' ? 'Supply' : 'Demand'} ${z.bottom.toFixed(2)}-${z.top.toFixed(2)}`, status: 'neutral', impact: `nearest ${z.type} zone` });
+    if (z.type === 'demand') score += 0.5;
+    else score -= 0.5;
+  }
+  if (microMetrics) {
+    let microScore = 0;
+    if (microMetrics.rsi !== undefined) { if (microMetrics.rsi < 30) microScore += 1; else if (microMetrics.rsi > 70) microScore -= 1; }
+    if (microMetrics.emaCross === 'bullish') microScore += 1;
+    else if (microMetrics.emaCross === 'bearish') microScore -= 1;
+    const microSignal = (microScore > 0 && score > 0) ? 'aligned' : (microScore < 0 && score < 0) ? 'aligned' : 'pullback';
+    reasons.push({ check: 'Micro TF Alignment', value: microSignal, status: microSignal === 'aligned' ? 'positive' : 'neutral', impact: microSignal === 'aligned' ? 'micro aligns with macro' : 'micro diverging' });
+  }
+
+  let rawSignal: SignalType;
+  let confidence: number;
+  if (score >= 3) { rawSignal = SignalType.STRONG_BUY; confidence = 85; }
+  else if (score >= 1.5) { rawSignal = SignalType.BUY; confidence = 70; }
+  else if (score <= -3) { rawSignal = SignalType.STRONG_SELL; confidence = 85; }
+  else if (score <= -1.5) { rawSignal = SignalType.SELL; confidence = 70; }
+  else { rawSignal = SignalType.NEUTRAL; confidence = 50; }
+
+  // Apply age zone caps
+  if (totalAge < infantLimit && confidence > 65) confidence = 65;
+  else if (totalAge < matureLimit) {
+    if (rawSignal === SignalType.STRONG_BUY) rawSignal = SignalType.BUY;
+    else if (rawSignal === SignalType.STRONG_SELL) rawSignal = SignalType.SELL;
+    if (confidence > 70) confidence = 70;
+  }
+  else if (totalAge > oldLimit && confidence > 65) confidence = 65;
+  if (age < minAge && confidence > 65) confidence = 65;
+  const minConf = settings?.minConfidence || 55;
+  if (confidence < minConf) rawSignal = SignalType.NEUTRAL;
+
+  const dir = metrics?.direction || 'sideways';
+  const summary = lang === 'ar'
+    ? `تحليل فني محلي: ${symbol} — ${dir === 'uptrend' ? 'اتجاه صاعد' : dir === 'downtrend' ? 'اتجاه هابط' : 'بدون اتجاه'}. RSI ${metrics?.rsi?.toFixed(1) || 'N/A'}. الثقة: ${confidence}%.`
+    : `Local analysis: ${symbol} — ${dir} trend. RSI ${metrics?.rsi?.toFixed(1) || 'N/A'}. Confidence: ${confidence}%.`;
+
+  return {
+    signal: rawSignal, confidence, summary, detailedReasons: reasons,
+    microSignal: 'unknown', microTrend: '', technicalScore: Math.round(score * 16.7 + 50),
+    sentimentScore: 50, historicalMatch: ''
+  };
+}
+
 export async function analyzeMarketBatch(
   paramsList: { symbol: string; type: MarketType; timeframe: string; tradingStyle: TradingStyle }[],
   settings: StrategySettings,
@@ -348,65 +420,28 @@ Symbol details:\n`;
     aiResponse = { choices: [{ message: { content: aiResponse.candidates[0].content.parts[0].text } }] };
   }
 
-  if (aiResponse?.error) {
-    if (aiResponse.error === 'rate_limited') onRateLimited();
-    // Fallback to local analysis when AI fails
-    results.push(...validSymbols.map(s => {
+  if (aiResponse?.error || !aiResponse?.choices?.[0]?.message?.content) {
+    // AI failed → fallback to local analysis
+    for (const s of validSymbols) {
       const d = s.data;
       const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
-      return {
+      results.push({
         symbol: s.symbol, type: s.type, timeframe: s.timeframe,
-        signal: local.signal, confidence: local.confidence,
-        summary: local.summary, detailedReasons: local.detailedReasons,
-        newsSources: [], technicalScore: local.technicalScore,
-        sentimentScore: local.sentimentScore, trendMaturity: 'unknown',
-        trendAge: d.metrics?.totalAge || 0, microTF: d.microTF,
-        microSignal: local.microSignal, microTrend: local.microTrend,
-        historicalMatch: local.historicalMatch, timestamp: new Date().toISOString(), userId: ''
-      };
-    }));
-    return { results, errors };
-  }
-
-  if (!aiResponse?.choices?.[0]?.message?.content) {
-    // Fallback to local analysis when AI response is empty
-    results.push(...validSymbols.map(s => {
-      const d = s.data;
-      const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
-      return {
-        symbol: s.symbol, type: s.type, timeframe: s.timeframe,
-        signal: local.signal, confidence: local.confidence,
-        summary: local.summary, detailedReasons: local.detailedReasons,
-        newsSources: [], technicalScore: local.technicalScore,
-        sentimentScore: local.sentimentScore, trendMaturity: 'unknown',
-        trendAge: d.metrics?.totalAge || 0, microTF: d.microTF,
-        microSignal: local.microSignal, microTrend: local.microTrend,
-        historicalMatch: local.historicalMatch, timestamp: new Date().toISOString(), userId: ''
-      };
-    }));
+        signal: local.signal, confidence: local.confidence, summary: local.summary,
+        detailedReasons: local.detailedReasons, newsSources: [],
+        technicalScore: local.technicalScore, sentimentScore: local.sentimentScore,
+        trendMaturity: (d.metrics?.totalAge || 0) < infantLimit ? 'infancy' : (d.metrics?.totalAge || 0) < matureLimit ? 'youth' : (d.metrics?.totalAge || 0) <= oldLimit ? 'mature' : 'aging',
+        trendAge: d.metrics?.totalAge || 0,
+        microTF: d.microTF, microSignal: 'unknown', microTrend: '', historicalMatch: '',
+        timestamp: new Date().toISOString(), userId: ''
+      });
+    }
     return { results, errors };
   }
 
   const rawText = aiResponse.choices[0].message.content;
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    // Fallback to local analysis when AI JSON is invalid
-    results.push(...validSymbols.map(s => {
-      const d = s.data;
-      const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
-      return {
-        symbol: s.symbol, type: s.type, timeframe: s.timeframe,
-        signal: local.signal, confidence: local.confidence,
-        summary: local.summary, detailedReasons: local.detailedReasons,
-        newsSources: [], technicalScore: local.technicalScore,
-        sentimentScore: local.sentimentScore, trendMaturity: 'unknown',
-        trendAge: d.metrics?.totalAge || 0, microTF: d.microTF,
-        microSignal: local.microSignal, microTrend: local.microTrend,
-        historicalMatch: local.historicalMatch, timestamp: new Date().toISOString(), userId: ''
-      };
-    }));
-    return { results, errors };
-  }
+  if (!jsonMatch) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: 'AI returned invalid JSON' }))] };
 
   let parsedBatch: any[];
   try {
@@ -414,22 +449,7 @@ Symbol details:\n`;
     parsedBatch = parsed.results || (Array.isArray(parsed) ? parsed : []);
     if (!Array.isArray(parsedBatch)) throw new Error('Not an array');
   } catch {
-    // Fallback to local analysis when JSON parsing fails
-    results.push(...validSymbols.map(s => {
-      const d = s.data;
-      const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
-      return {
-        symbol: s.symbol, type: s.type, timeframe: s.timeframe,
-        signal: local.signal, confidence: local.confidence,
-        summary: local.summary, detailedReasons: local.detailedReasons,
-        newsSources: [], technicalScore: local.technicalScore,
-        sentimentScore: local.sentimentScore, trendMaturity: 'unknown',
-        trendAge: d.metrics?.totalAge || 0, microTF: d.microTF,
-        microSignal: local.microSignal, microTrend: local.microTrend,
-        historicalMatch: local.historicalMatch, timestamp: new Date().toISOString(), userId: ''
-      };
-    }));
-    return { results, errors };
+    return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: 'AI returned invalid JSON array' }))] };
   }
 
   // Phase 4: Process each result with enforcement
@@ -438,18 +458,7 @@ Symbol details:\n`;
     const d = s.data;
 
     if (!aiResult) {
-      // Fallback to local analysis for symbols AI didn't cover
-      const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
-      results.push({
-        symbol: s.symbol, type: s.type, timeframe: s.timeframe,
-        signal: local.signal, confidence: local.confidence,
-        summary: local.summary, detailedReasons: local.detailedReasons,
-        newsSources: [], technicalScore: local.technicalScore,
-        sentimentScore: local.sentimentScore, trendMaturity: 'unknown',
-        trendAge: d.metrics?.totalAge || 0, microTF: d.microTF,
-        microSignal: local.microSignal, microTrend: local.microTrend,
-        historicalMatch: local.historicalMatch, timestamp: new Date().toISOString(), userId: ''
-      });
+      errors.push({ symbol: s.symbol, error: 'AI did not return analysis for this symbol' });
       continue;
     }
 
@@ -725,10 +734,9 @@ Return ONLY valid JSON:
     aiResponse = { choices: [{ message: { content: aiResponse.candidates[0].content.parts[0].text } }] };
   }
 
-  if (aiResponse?.error) {
-      lastError = aiResponse.error;
+    if (aiResponse?.error) {
       if (aiResponse.error === 'rate_limited') onRateLimited();
-      throw new Error(lastError);
+      throw new Error(aiResponse.error);
     }
 
     if (!aiResponse?.choices?.[0]?.message?.content) {
