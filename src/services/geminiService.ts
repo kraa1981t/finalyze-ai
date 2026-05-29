@@ -350,16 +350,63 @@ Symbol details:\n`;
 
   if (aiResponse?.error) {
     if (aiResponse.error === 'rate_limited') onRateLimited();
-    return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: aiResponse.error }))] };
+    // Fallback to local analysis when AI fails
+    results.push(...validSymbols.map(s => {
+      const d = s.data;
+      const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
+      return {
+        symbol: s.symbol, type: s.type, timeframe: s.timeframe,
+        signal: local.signal, confidence: local.confidence,
+        summary: local.summary, detailedReasons: local.detailedReasons,
+        newsSources: [], technicalScore: local.technicalScore,
+        sentimentScore: local.sentimentScore, trendMaturity: 'unknown',
+        trendAge: d.metrics?.totalAge || 0, microTF: d.microTF,
+        microSignal: local.microSignal, microTrend: local.microTrend,
+        historicalMatch: local.historicalMatch, timestamp: new Date().toISOString(), userId: ''
+      };
+    }));
+    return { results, errors };
   }
 
   if (!aiResponse?.choices?.[0]?.message?.content) {
-    return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: 'AI Synthesis Error: No response content.' }))] };
+    // Fallback to local analysis when AI response is empty
+    results.push(...validSymbols.map(s => {
+      const d = s.data;
+      const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
+      return {
+        symbol: s.symbol, type: s.type, timeframe: s.timeframe,
+        signal: local.signal, confidence: local.confidence,
+        summary: local.summary, detailedReasons: local.detailedReasons,
+        newsSources: [], technicalScore: local.technicalScore,
+        sentimentScore: local.sentimentScore, trendMaturity: 'unknown',
+        trendAge: d.metrics?.totalAge || 0, microTF: d.microTF,
+        microSignal: local.microSignal, microTrend: local.microTrend,
+        historicalMatch: local.historicalMatch, timestamp: new Date().toISOString(), userId: ''
+      };
+    }));
+    return { results, errors };
   }
 
   const rawText = aiResponse.choices[0].message.content;
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: 'AI returned invalid JSON' }))] };
+  if (!jsonMatch) {
+    // Fallback to local analysis when AI JSON is invalid
+    results.push(...validSymbols.map(s => {
+      const d = s.data;
+      const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
+      return {
+        symbol: s.symbol, type: s.type, timeframe: s.timeframe,
+        signal: local.signal, confidence: local.confidence,
+        summary: local.summary, detailedReasons: local.detailedReasons,
+        newsSources: [], technicalScore: local.technicalScore,
+        sentimentScore: local.sentimentScore, trendMaturity: 'unknown',
+        trendAge: d.metrics?.totalAge || 0, microTF: d.microTF,
+        microSignal: local.microSignal, microTrend: local.microTrend,
+        historicalMatch: local.historicalMatch, timestamp: new Date().toISOString(), userId: ''
+      };
+    }));
+    return { results, errors };
+  }
 
   let parsedBatch: any[];
   try {
@@ -367,7 +414,22 @@ Symbol details:\n`;
     parsedBatch = parsed.results || (Array.isArray(parsed) ? parsed : []);
     if (!Array.isArray(parsedBatch)) throw new Error('Not an array');
   } catch {
-    return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: 'AI returned invalid JSON array' }))] };
+    // Fallback to local analysis when JSON parsing fails
+    results.push(...validSymbols.map(s => {
+      const d = s.data;
+      const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
+      return {
+        symbol: s.symbol, type: s.type, timeframe: s.timeframe,
+        signal: local.signal, confidence: local.confidence,
+        summary: local.summary, detailedReasons: local.detailedReasons,
+        newsSources: [], technicalScore: local.technicalScore,
+        sentimentScore: local.sentimentScore, trendMaturity: 'unknown',
+        trendAge: d.metrics?.totalAge || 0, microTF: d.microTF,
+        microSignal: local.microSignal, microTrend: local.microTrend,
+        historicalMatch: local.historicalMatch, timestamp: new Date().toISOString(), userId: ''
+      };
+    }));
+    return { results, errors };
   }
 
   // Phase 4: Process each result with enforcement
@@ -376,7 +438,18 @@ Symbol details:\n`;
     const d = s.data;
 
     if (!aiResult) {
-      errors.push({ symbol: s.symbol, error: 'AI did not return analysis for this symbol' });
+      // Fallback to local analysis for symbols AI didn't cover
+      const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
+      results.push({
+        symbol: s.symbol, type: s.type, timeframe: s.timeframe,
+        signal: local.signal, confidence: local.confidence,
+        summary: local.summary, detailedReasons: local.detailedReasons,
+        newsSources: [], technicalScore: local.technicalScore,
+        sentimentScore: local.sentimentScore, trendMaturity: 'unknown',
+        trendAge: d.metrics?.totalAge || 0, microTF: d.microTF,
+        microSignal: local.microSignal, microTrend: local.microTrend,
+        historicalMatch: local.historicalMatch, timestamp: new Date().toISOString(), userId: ''
+      });
       continue;
     }
 
