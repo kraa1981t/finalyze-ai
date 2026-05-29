@@ -363,9 +363,8 @@ Symbol details:\n`;
 }`;
 
   // Phase 3: Single AI call via server proxy (same architecture as working old version)
-  const keyValue = getApiKey();
-  if (!keyValue) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.' }))] };
-  mirrorApiKey(keyValue);
+  const keyValue = getApiKey() || '';
+  if (keyValue) mirrorApiKey(keyValue);
 
   async function makeAICall(): Promise<any> {
     const ac = new AbortController();
@@ -635,9 +634,8 @@ Return ONLY valid JSON:
   "microTrend": "string"
 }`;
 
-    const keyValue = getApiKey();
-    if (!keyValue) throw new Error(lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.');
-    mirrorApiKey(keyValue);
+    const keyValue = getApiKey() || '';
+    if (keyValue) mirrorApiKey(keyValue);
 
     await waitIfRateLimited();
 
