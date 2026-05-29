@@ -290,27 +290,48 @@ Symbol details:\n`;
   ]
 }`;
 
-  // Phase 3: Single AI call — direct browser with response_format (bypasses Vercel 10s)
+  // Phase 3: Single AI call — direct browser (bypasses Vercel 10s)
   const keyValue = getApiKey();
   if (!keyValue) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.' }))] };
   mirrorApiKey(keyValue);
+
+  const isGoogle = keyValue.startsWith('AIzaSy') || keyValue.startsWith('AQ.');
 
   async function makeAICall(): Promise<any> {
     const ac = new AbortController();
     const timeoutId = setTimeout(() => ac.abort(), 30000);
     let resp: any;
     try {
-      const isGoogle = keyValue.startsWith('AIzaSy') || keyValue.startsWith('AQ.');
-      const body = isGoogle
-        ? { contents: [{ parts: [{ text: `You are a financial analyst. ${batchPrompt}` }] }], generationConfig: { temperature: 0.1 } }
-        : { model: 'llama-3.3-70b-versatile', messages: [{ role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." }, { role: "user", content: batchPrompt }], temperature: 0.1, response_format: { type: "json_object" } };
-      const url = isGoogle ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${keyValue}` : 'https://api.groq.com/openai/v1/chat/completions';
-      const headers = isGoogle ? { 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keyValue}` };
-      resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: ac.signal }).then(async r => {
-        if (r.status === 429) return { error: 'rate_limited' };
-        if (!r.ok) return { error: `Groq: ${r.status}` };
-        return r.json();
-      });
+      if (isGoogle) {
+        const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+        for (const model of models) {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyValue}`;
+          try {
+            const r = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: `You are a financial analyst. ${batchPrompt}` }] }], generationConfig: { temperature: 0.1 } }),
+              signal: ac.signal
+            });
+            if (r.status === 429) continue;
+            if (!r.ok) continue;
+            resp = await r.json();
+            break;
+          } catch {}
+        }
+        if (!resp) resp = { error: 'rate_limited' };
+      } else {
+        const url = 'https://api.groq.com/openai/v1/chat/completions';
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keyValue}` },
+          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." }, { role: "user", content: batchPrompt }], temperature: 0.1, response_format: { type: "json_object" } }),
+          signal: ac.signal
+        });
+        if (r.status === 429) resp = { error: 'rate_limited' };
+        else if (!r.ok) resp = { error: `Groq: ${r.status}` };
+        else resp = await r.json();
+      }
     } catch (e: any) {
       resp = { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
     }
@@ -580,23 +601,43 @@ Return ONLY valid JSON:
 
     await waitIfRateLimited();
 
-    // Direct browser call with response_format (bypasses Vercel 10s)
+    // Direct browser call with model fallback (bypasses Vercel 10s)
+    const isGoogle = keyValue.startsWith('AIzaSy') || keyValue.startsWith('AQ.');
+
     async function makeSingleAICall(): Promise<any> {
       const ac = new AbortController();
       const timeoutId = setTimeout(() => ac.abort(), 20000);
       let resp: any;
       try {
-        const isGoogle = keyValue.startsWith('AIzaSy') || keyValue.startsWith('AQ.');
-        const body = isGoogle
-          ? { contents: [{ parts: [{ text: `You are a financial analyst. ${technicalPrompt}` }] }], generationConfig: { temperature: 0.1 } }
-          : { model: 'llama-3.3-70b-versatile', messages: [{ role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." }, { role: "user", content: technicalPrompt }], temperature: 0.1, response_format: { type: "json_object" } };
-        const url = isGoogle ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${keyValue}` : 'https://api.groq.com/openai/v1/chat/completions';
-        const headers = isGoogle ? { 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keyValue}` };
-        resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: ac.signal }).then(async r => {
-          if (r.status === 429) return { error: 'rate_limited' };
-          if (!r.ok) return { error: `Groq: ${r.status}` };
-          return r.json();
-        });
+        if (isGoogle) {
+          const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+          for (const model of models) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyValue}`;
+            try {
+              const r = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: `You are a financial analyst. ${technicalPrompt}` }] }], generationConfig: { temperature: 0.1 } }),
+                signal: ac.signal
+              });
+              if (r.status === 429) continue;
+              if (!r.ok) continue;
+              resp = await r.json();
+              break;
+            } catch {}
+          }
+          if (!resp) resp = { error: 'rate_limited' };
+        } else {
+          const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keyValue}` },
+            body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." }, { role: "user", content: technicalPrompt }], temperature: 0.1, response_format: { type: "json_object" } }),
+            signal: ac.signal
+          });
+          if (r.status === 429) resp = { error: 'rate_limited' };
+          else if (!r.ok) resp = { error: `Groq: ${r.status}` };
+          else resp = await r.json();
+        }
       } catch (e: any) {
         resp = { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
       }

@@ -55,6 +55,17 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('language', lang);
   }, [lang]);
+  // Cleanup old API key artifacts on mount
+  useEffect(() => {
+    try {
+      const k1 = localStorage.getItem('finalyze_key1_value');
+      const old = localStorage.getItem('finalyze_user_groq_api_key');
+      if (old && old === k1) localStorage.removeItem('finalyze_user_groq_api_key');
+      if (old && !old.startsWith('gsk_') && !old.startsWith('AIzaSy') && !old.startsWith('AQ.')) localStorage.removeItem('finalyze_user_groq_api_key');
+      localStorage.removeItem('finalyze_key1_provider');
+      localStorage.removeItem('finalyze_key2_value');
+    } catch {}
+  }, []);
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [freemiumDisabled, setFreemiumDisabled] = useState(() => localStorage.getItem('finalyze_freemium_disabled') === 'true');
