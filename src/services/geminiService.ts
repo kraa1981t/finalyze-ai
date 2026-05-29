@@ -303,7 +303,7 @@ Symbol details:\n`;
     let resp: any;
     try {
       if (isGoogle) {
-        const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+        const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
         for (const model of models) {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyValue}`;
           try {
@@ -341,14 +341,7 @@ Symbol details:\n`;
 
   await waitIfRateLimited();
   let aiResponse = await makeAICall();
-
-  // Auto-retry once on rate limit
-  if (aiResponse?.error === 'rate_limited') {
-    console.warn('[Batch] Rate limited, waiting 60s then retrying...');
-    onRateLimited();
-    await waitIfRateLimited();
-    aiResponse = await makeAICall();
-  }
+  if (aiResponse?.error === 'rate_limited') onRateLimited();
 
   // Normalize Google Gemini response format → Groq format
   if (isGoogle && aiResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -615,7 +608,7 @@ Return ONLY valid JSON:
       let resp: any;
       try {
         if (isGoogle) {
-          const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+        const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
           for (const model of models) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyValue}`;
             try {
@@ -651,14 +644,7 @@ Return ONLY valid JSON:
     }
 
     let aiResponse = await makeSingleAICall();
-
-    // Auto-retry once on rate limit
-    if (aiResponse?.error === 'rate_limited') {
-      console.warn('[Single] Rate limited, waiting 60s then retrying...');
-      onRateLimited();
-      await waitIfRateLimited();
-      aiResponse = await makeSingleAICall();
-    }
+    if (aiResponse?.error === 'rate_limited') onRateLimited();
 
     let lastError: string | null = null;
   // Normalize Google Gemini response format → Groq format
