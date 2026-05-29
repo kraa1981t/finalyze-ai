@@ -328,7 +328,7 @@ RULES (apply to ALL symbols):
 - Trend age zones: <${infantLimit} infancy (cap 65), <${matureLimit} youth (downgrade strong, cap 70), ${infantLimit}-${oldLimit} mature (full), >${oldLimit} old (cap 65).
 - Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
 - If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
-- Write summary and each reason in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Professional financial tone.
+- Write summary and each reason in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Professional financial tone. Keep the summary under 2-3 sentences max. Do NOT write long paragraphs.
 - Return ONE object per symbol with: symbol, signal, confidence, summary, detailedReasons, microSignal, microTrend, technicalScore, sentimentScore, historicalMatch.
 
 Symbol details:\n`;
@@ -608,7 +608,7 @@ RULES:
 - Trend age zones: <10 infancy (cap 65), <25 youth (downgrade strong, cap 70), 25-50 mature (full), >50 old (cap 65).
 - Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
 - If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
-- Write summary and each reason in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Professional financial tone.
+- Write summary and each reason in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Professional financial tone. Keep the summary under 2-3 sentences max. Do NOT write long paragraphs.
 - In detailedReasons, list EVERY condition you checked and its outcome.
 
 Return ONLY valid JSON:

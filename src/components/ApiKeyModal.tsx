@@ -177,20 +177,32 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         </div>
       </div>
 
-      <a
-        href="https://console.groq.com/keys"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 text-xs text-sky-400 hover:text-sky-300 mb-4 transition-colors"
-      >
-        <Info size={14} />
-        {isAr ? 'أنشئ مفتاح Groq مجاني' : 'Create a free Groq API key'}
-      </a>
+      <div className="flex flex-col gap-2.5 mb-5 select-none">
+        <a
+          href="https://aistudio.google.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 text-xs text-emerald-400 hover:text-emerald-300 transition-all bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 py-2.5 rounded-xl font-bold w-full"
+        >
+          <Info size={14} className="shrink-0" />
+          {isAr ? 'أنشئ مفتاح Google Gemini مجاني (موصى به)' : 'Create free Google Gemini key (recommended)'}
+        </a>
+
+        <a
+          href="https://console.groq.com/keys"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 text-xs text-sky-400 hover:text-sky-300 transition-all bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/15 py-2.5 rounded-xl font-bold w-full"
+        >
+          <Info size={14} className="shrink-0" />
+          {isAr ? 'أنشئ مفتاح Groq مجاني' : 'Create free Groq API key'}
+        </a>
+      </div>
 
       <p className="text-slate-400 text-sm leading-relaxed mb-6">
         {isAr
-          ? 'أدخل مفتاح Groq API للتحليل.'
-          : 'Enter your Groq API key for analysis.'}
+          ? 'أدخل مفتاح Google Gemini (موصى به لسرعته واستقراره في تحليل اللغة العربية) أو مفتاح Groq للبدء بالتحليل الاحترافي.'
+          : 'Enter your Google Gemini key (recommended for speed and stability) or Groq key to start professional analysis.'}
       </p>
 
       {typeof window !== 'undefined' && localStorage.getItem('finalyze_verify_link') && (

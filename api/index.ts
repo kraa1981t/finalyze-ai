@@ -247,16 +247,38 @@ app.get("/api/market-data", async (req, res) => {
 app.post("/api/ai-analysis", async (req, res) => {
   try {
     const { prompt, userApiKey } = req.body;
-    const key = userApiKey || '';
+    
+    // Use user-provided API key if available, otherwise check for system fallbacks
+    let key = (userApiKey && userApiKey !== '__dev_bypass__') ? userApiKey.trim() : '';
 
     let result;
-    if (key.startsWith('AIzaSy') || key.startsWith('AQ.')) {
-      result = await callGoogle(key, prompt);
+    if (key) {
+      if (key.startsWith('AIzaSy') || key.startsWith('AQ.')) {
+        result = await callGoogle(key, prompt);
+      } else {
+        result = await callGroq(key, prompt);
+      }
     } else {
-      result = await callGroq(key, prompt);
+      // Server-side fallback hierarchy:
+      // 1. Google Gemini key (GEMINI_API_KEY or GOOGLE_API_KEY)
+      // 2. Groq key (GROQ_API_KEY)
+      const systemGeminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      const systemGroqKey = process.env.GROQ_API_KEY;
+
+      if (systemGeminiKey) {
+        result = await callGoogle(systemGeminiKey, prompt);
+      } else if (systemGroqKey) {
+        result = await callGroq(systemGroqKey, prompt);
+      } else {
+        return res.status(400).json({ error: 'No API key provided by user, and no server fallback API keys are configured.' });
+      }
     }
+
     if (result.content) {
       return res.json({ choices: [{ message: { content: result.content } }] });
+    }
+    if (result.rateLimited) {
+      return res.status(429).json({ error: 'rate_limited', rateLimited: true });
     }
     res.status(503).json({ error: result.error || 'Provider failed' });
   } catch (error: any) {
@@ -277,7 +299,7 @@ async function callGroq(apiKey: string, prompt: string) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), 8000);
+      const timeout = setTimeout(() => ac.abort(), 20000);
       const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -301,29 +323,47 @@ async function callGroq(apiKey: string, prompt: string) {
 }
 
 async function callGoogle(apiKey: string, prompt: string) {
-  for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
-    try {
-      const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), 8000);
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
-          generationConfig: { temperature: 0.1 }
-        }),
-        signal: ac.signal
-      });
-      clearTimeout(timeout);
-      if (resp.status === 429) continue;
-      if (resp.ok) {
-        const data = await resp.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (text) return { content: text };
+  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+  for (const model of models) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 20000);
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
+            generationConfig: { 
+              temperature: 0.1,
+              responseMimeType: "application/json"
+            }
+          }),
+          signal: ac.signal
+        });
+        clearTimeout(timeout);
+        if (resp.status === 429) {
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 1500));
+            continue;
+          }
+          return { error: 'Google: rate limited', rateLimited: true };
+        }
+        if (resp.ok) {
+          const data = await resp.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (text) return { content: text };
+        }
+        break;
+      } catch {
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 500));
+          continue;
+        }
       }
-    } catch {}
+    }
   }
-  return { error: 'Google failed' };
+  return { error: 'Google: all models exhausted' };
 }
 
 export default app;
