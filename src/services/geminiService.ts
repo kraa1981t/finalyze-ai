@@ -246,7 +246,7 @@ async function fetchAndPrepareSymbolData(
     } catch {}
     let contextFearGreed = null, contextNews: any[] = [], contextEcon: any[] = [];
     try {
-      const { default: m } = await import('./marketContextService');
+      const m = await import('./marketContextService');
       const ctx = await m.fetchMarketContext(symbol);
       contextFearGreed = ctx.fearGreed; contextNews = ctx.news; contextEcon = ctx.econEvents;
     } catch {}
@@ -334,23 +334,36 @@ Symbol details:\n`;
   }
 ]`;
 
-  // Phase 3: Single AI call
+  // Phase 3: Single AI call with auto-retry on 429
   const keyValue = getApiKey();
-  if (!keyValue) return { results, errors: [...errors, { symbol: 'ALL', error: lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.' }] };
+  if (!keyValue) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.' }))] };
   mirrorApiKey(keyValue);
 
-  await waitIfRateLimited();
-
   const isGoogle = keyValue.startsWith('AIzaSy');
-  const ac = new AbortController();
-  const timeoutId = setTimeout(() => ac.abort(), 30000); // 30s for batch
-  let aiResponse: any;
-  if (isGoogle) {
-    aiResponse = await callGoogleDirect(batchPrompt, keyValue, ac.signal);
-  } else {
-    aiResponse = await callGroqDirect(batchPrompt, keyValue, ac.signal);
+  
+  async function makeAICall(): Promise<any> {
+    const ac = new AbortController();
+    const timeoutId = setTimeout(() => ac.abort(), 30000); // 30s for batch
+    let resp: any;
+    if (isGoogle) {
+      resp = await callGoogleDirect(batchPrompt, keyValue, ac.signal);
+    } else {
+      resp = await callGroqDirect(batchPrompt, keyValue, ac.signal);
+    }
+    clearTimeout(timeoutId);
+    return resp;
   }
-  clearTimeout(timeoutId);
+
+  await waitIfRateLimited();
+  let aiResponse = await makeAICall();
+
+  // Auto-retry once on rate limit
+  if (aiResponse?.error && /429|rate.?limit|too many requests/i.test(aiResponse.error)) {
+    console.warn('[Batch] Rate limited, waiting 60s then retrying...');
+    onRateLimited();
+    await waitIfRateLimited();
+    aiResponse = await makeAICall();
+  }
 
   if (aiResponse?.error) {
     if (/429|rate.?limit|too many requests/i.test(aiResponse.error)) onRateLimited();
@@ -602,18 +615,31 @@ Return ONLY valid JSON:
 
     await waitIfRateLimited();
 
-    // Direct browser-to-API call (bypasses Vercel 10s server timeout)
+    // Direct browser-to-API call with auto-retry on 429
     const isGoogle = keyValue.startsWith('AIzaSy');
-    const ac = new AbortController();
-    const timeoutId = setTimeout(() => ac.abort(), 15000);
-
-    let aiResponse: any;
-    if (isGoogle) {
-      aiResponse = await callGoogleDirect(technicalPrompt, keyValue, ac.signal);
-    } else {
-      aiResponse = await callGroqDirect(technicalPrompt, keyValue, ac.signal);
+    
+    async function makeSingleAICall(): Promise<any> {
+      const ac = new AbortController();
+      const timeoutId = setTimeout(() => ac.abort(), 15000);
+      let resp: any;
+      if (isGoogle) {
+        resp = await callGoogleDirect(technicalPrompt, keyValue, ac.signal);
+      } else {
+        resp = await callGroqDirect(technicalPrompt, keyValue, ac.signal);
+      }
+      clearTimeout(timeoutId);
+      return resp;
     }
-    clearTimeout(timeoutId);
+
+    let aiResponse = await makeSingleAICall();
+
+    // Auto-retry once on rate limit
+    if (aiResponse?.error && /429|rate.?limit|too many requests/i.test(aiResponse.error)) {
+      console.warn('[Single] Rate limited, waiting 60s then retrying...');
+      onRateLimited();
+      await waitIfRateLimited();
+      aiResponse = await makeSingleAICall();
+    }
 
     let lastError: string | null = null;
     if (aiResponse?.error) {
