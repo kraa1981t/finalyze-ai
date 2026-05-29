@@ -3,8 +3,10 @@ let observers: (() => void)[] = [];
 const RATE_LIMIT_COOLDOWN = 120000; // 2 minutes for API key rate limits
 
 export function onRateLimited(durationMs = RATE_LIMIT_COOLDOWN) {
-  const candidate = Date.now() + durationMs;
-  if (candidate > rateLimitedUntil) rateLimitedUntil = candidate;
+  const now = Date.now();
+  if (rateLimitedUntil <= now) {
+    rateLimitedUntil = now + durationMs;
+  }
   notify();
 }
 
