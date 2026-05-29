@@ -1,7 +1,8 @@
 let rateLimitedUntil = 0;
 let observers: (() => void)[] = [];
+const RATE_LIMIT_COOLDOWN = 120000; // 2 minutes for API key rate limits
 
-export function onRateLimited(durationMs = 60000) {
+export function onRateLimited(durationMs = RATE_LIMIT_COOLDOWN) {
   const candidate = Date.now() + durationMs;
   if (candidate > rateLimitedUntil) rateLimitedUntil = candidate;
   notify();

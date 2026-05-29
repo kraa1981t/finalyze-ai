@@ -239,59 +239,22 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             }).catch(() => {});
           }
 
-          // Success delay — shorter when most symbols succeed
-          const key = getApiKey();
-          const baseDelay = key.startsWith('AIzaSy') ? 3500 : 2500;
-          const hasFailures = failedSymbols.length > 0;
-          // Use longer delay if there were recent failures (cool-down)
-          const delay = hasFailures ? Math.max(baseDelay, 5000) : baseDelay;
-          if (i < allSymbolsToAnalyze.length - 1 || hasFailures) {
+          // Success delay between symbols
+          if (i < allSymbolsToAnalyze.length - 1) {
+            const key = getApiKey();
+            const delay = key.startsWith('AIzaSy') ? 3500 : 5000;
             await new Promise(resolve => setTimeout(resolve, delay));
           }
 
         } catch (symbolError: any) {
           console.error(`[Analysis Error] ${currentSymbol}:`, symbolError);
           const msg = symbolError.message || (lang === 'ar' ? "فشل التحليل بسبب خطأ غير معروف" : "Analysis failed due to unknown error");
-          
-          // Check if this was a rate limit error — retry once after cooling
-          const isRateLimit = /429|rate.?limit|too many requests/i.test(msg);
-          if (isRateLimit) {
-            // Wait longer for rate limit recovery, then retry
-            await new Promise(resolve => setTimeout(resolve, 12000));
-            try {
-              const result = await analyzeMarket({
-                symbol: currentSymbol,
-                type: data.type,
-                timeframe: data.timeframe,
-                tradingStyle: data.tradingStyle,
-                settings: settings,
-                lang: lang
-              });
-              if (result) {
-                result.userId = user?.uid || 'anonymous';
-                results.push(result);
-                if (user?.uid) {
-                  addDoc(collection(db, "analysisResults"), {
-                    ...result,
-                    timestamp: serverTimestamp(),
-                  }).catch(() => {});
-                }
-                // Skip adding to failedSymbols — retry worked
-                continue;
-              }
-            } catch (retryError: any) {
-              console.error(`[Retry Failed] ${currentSymbol}:`, retryError);
-            }
-          }
-
           failedSymbols.push({ symbol: currentSymbol, error: msg });
-
           // Longer delay after failure to let API recover
-          await new Promise(resolve => setTimeout(resolve, 8000));
+          await new Promise(resolve => setTimeout(resolve, 10000));
         }
 
         i++;
-      }
 
       abortRef.current = null;
       setAnalyzingIndex(null);
