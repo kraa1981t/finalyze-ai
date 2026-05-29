@@ -312,7 +312,8 @@ app.post("/api/ai-analysis", async (req, res) => {
 });
 
 async function callGroq(apiKey: string, prompt: string) {
-  const models = [process.env.GROQ_MODEL || "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"];
+  const models = [process.env.GROQ_MODEL || "llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+  let lastError = 'Groq: all models exhausted due to rate limits or invalid key';
   for (const model of models) {
     const body = {
       model: model,
@@ -323,86 +324,76 @@ async function callGroq(apiKey: string, prompt: string) {
       temperature: 0.1,
       response_format: { type: "json_object" }
     };
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const ac = new AbortController();
-        const timeout = setTimeout(() => ac.abort(), 20000);
-        const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-          body: JSON.stringify(body),
-          signal: ac.signal
-        });
-        clearTimeout(timeout);
-        if (resp.status === 429) {
-          if (attempt < 2) { await new Promise(r => setTimeout(r, 1000)); continue; }
-          break; // Break the attempt loop to try the next fallback model!
+    try {
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 5000);
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify(body),
+        signal: ac.signal
+      });
+      clearTimeout(timeout);
+      
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        lastError = errData?.error?.message || `Groq: HTTP ${resp.status}`;
+        // If the key is invalid (400, 401, 403), abort immediately.
+        if (resp.status === 400 || resp.status === 401 || resp.status === 403) {
+          return { error: lastError };
         }
-        if (!resp.ok) {
-          const errData = await resp.json().catch(() => ({}));
-          const errMsg = errData?.error?.message || `Groq: HTTP ${resp.status}`;
-          return { error: errMsg };
-        }
-        const data = await resp.json().catch(() => ({}));
-        return { content: data?.choices?.[0]?.message?.content || '' };
-      } catch (e: any) {
-        if (attempt < 2) { await new Promise(r => setTimeout(r, 500)); continue; }
-        break; // Break to try the next model!
+        continue; // Try next model
       }
+      
+      const data = await resp.json().catch(() => ({}));
+      const text = data?.choices?.[0]?.message?.content || '';
+      if (text) return { content: text };
+    } catch (e: any) {
+      lastError = e.name === 'AbortError' ? 'Groq: Request timed out' : e.message;
     }
   }
-  return { error: 'Groq: all models exhausted due to rate limits or invalid key' };
+  return { error: lastError };
 }
 
 async function callGoogle(apiKey: string, prompt: string) {
-  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+  let lastError = 'Google: all models exhausted due to rate limits or invalid key';
   for (const model of models) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const ac = new AbortController();
-        const timeout = setTimeout(() => ac.abort(), 20000);
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
-            generationConfig: { 
-              temperature: 0.1,
-              responseMimeType: "application/json"
-            }
-          }),
-          signal: ac.signal
-        });
-        clearTimeout(timeout);
-        if (resp.status === 429) {
-          if (attempt < 2) {
-            await new Promise(r => setTimeout(r, 1500));
-            continue;
+    try {
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 5000);
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
+          generationConfig: { 
+            temperature: 0.1,
+            responseMimeType: "application/json"
           }
-          break; // Break the attempt loop to try the next model!
+        }),
+        signal: ac.signal
+      });
+      clearTimeout(timeout);
+      
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        lastError = errData?.error?.message || `Google: HTTP ${resp.status}`;
+        // If the key is invalid or expired (400, 401, 403), abort immediately.
+        if (resp.status === 400 || resp.status === 401 || resp.status === 403) {
+          return { error: lastError };
         }
-        if (resp.ok) {
-          const data = await resp.json().catch(() => ({}));
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (text) return { content: text };
-        } else {
-          const errData = await resp.json().catch(() => ({}));
-          const errMsg = errData?.error?.message || `Google: HTTP ${resp.status}`;
-          // If the key is invalid or expired (400, 403, 401), abort immediately.
-          if (resp.status === 400 || resp.status === 401 || resp.status === 403) {
-            return { error: errMsg };
-          }
-        }
-        break;
-      } catch {
-        if (attempt < 2) {
-          await new Promise(r => setTimeout(r, 500));
-          continue;
-        }
+        continue; // Try next model
       }
+      
+      const data = await resp.json().catch(() => ({}));
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      if (text) return { content: text };
+    } catch (e: any) {
+      lastError = e.name === 'AbortError' ? 'Google: Request timed out' : e.message;
     }
   }
-  return { error: 'Google: all models exhausted due to rate limits or invalid key' };
+  return { error: lastError };
 }
 
 export default app;
