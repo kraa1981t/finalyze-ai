@@ -437,13 +437,91 @@ Return ONLY valid JSON:
       }
     }
 
+    // ══════════════════════════════════════════════
+    // FALLBACK: Build detailedReasons from metrics if AI didn't provide them
+    // ══════════════════════════════════════════════
+    let detailedReasons = resultData.detailedReasons;
+    if (!detailedReasons || !Array.isArray(detailedReasons) || detailedReasons.length === 0) {
+      detailedReasons = [];
+      const addReason = (check: string, value: string, status: string, impact: string, source?: string) => {
+        detailedReasons.push({ check, value, status, impact, source });
+      };
+      // RSI
+      const rsiVal = metrics?.rsi;
+      if (rsiVal !== undefined) {
+        const rsiStatus = rsiVal > 70 ? 'negative' : rsiVal < 30 ? 'positive' : 'neutral';
+        addReason('RSI', rsiVal.toFixed(1), rsiStatus,
+          rsiStatus === 'negative' ? 'overbought, caution' :
+          rsiStatus === 'positive' ? 'oversold, bounce potential' : 'neutral zone');
+      }
+      // EMA Cross
+      if (metrics?.emaCross) {
+        const isBull = metrics.emaCross === 'bullish';
+        addReason('EMA Cross', metrics.emaCross, isBull ? 'positive' : 'negative',
+          isBull ? 'supports upward bias' : 'supports downward bias');
+      }
+      // Trend Direction
+      if (metrics?.direction) {
+        const isUp = metrics.direction === 'uptrend';
+        addReason('Trend Direction', metrics.direction,
+          isUp ? 'positive' : metrics.direction === 'downtrend' ? 'negative' : 'neutral',
+          isUp ? 'price making higher highs' :
+          metrics.direction === 'downtrend' ? 'price making lower lows' : 'no clear direction');
+      }
+      // Trend Age Zone
+      const ageZoneDesc = totalAge < infantLimit ? `infancy (<${infantLimit})` :
+        totalAge < matureLimit ? `youth (${infantLimit}-${matureLimit})` :
+        totalAge <= oldLimit ? `mature (${matureLimit}-${oldLimit})` : `old (>${oldLimit})`;
+      const zoneStatus = totalAge < infantLimit ? 'neutral' :
+        totalAge < matureLimit ? 'neutral' :
+        totalAge <= oldLimit ? 'positive' : 'neutral';
+      addReason('Trend Age Zone', `${totalAge}c — ${ageZoneDesc}`, zoneStatus,
+        totalAge < infantLimit ? 'confidence capped at 65' :
+        totalAge < matureLimit ? 'strong signals downgraded' :
+        totalAge <= oldLimit ? 'full confidence allowed' : 'confidence capped at 65');
+      // Volume Surge
+      if (metrics?.volSurge !== undefined) {
+        addReason('Volume Surge', metrics.volSurge ? 'true' : 'false',
+          metrics.volSurge ? 'positive' : 'neutral',
+          metrics.volSurge ? 'confirms momentum' : 'normal volume');
+      }
+      // Supply/Demand Zones
+      if (supplyDemandZones.length > 0) {
+        const nearestZone = supplyDemandZones[0];
+        addReason('Supply/Demand Zone',
+          `${nearestZone.type === 'supply' ? 'Supply' : 'Demand'} ${nearestZone.bottom.toFixed(2)}-${nearestZone.top.toFixed(2)} strength ${nearestZone.strength.toFixed(0)}%`,
+          'neutral', `nearest ${nearestZone.type} zone identified`);
+      }
+      // Micro TF
+      addReason('Micro TF Alignment', resultData.microSignal || 'unknown',
+        resultData.microSignal === 'aligned' ? 'positive' : resultData.microSignal === 'pullback' ? 'neutral' : 'neutral',
+        resultData.microSignal === 'aligned' ? 'micro aligns with macro' : 'micro diverging from macro');
+      // Fear&Greed
+      const fg = contextFearGreed;
+      if (fg?.value !== undefined) {
+        const fgStatus = fg.value <= 25 ? 'positive' : fg.value >= 75 ? 'negative' : 'neutral';
+        addReason('Fear & Greed', `${fg.value}/100 — ${fg.classification || ''}`, fgStatus,
+          fgStatus === 'positive' ? 'contrarian buy signal' :
+          fgStatus === 'negative' ? 'extreme greed, cap confidence' : 'neutral sentiment');
+      }
+      // News
+      if (contextNews.length > 0) {
+        const sources = [...new Set(contextNews.map(n => n.source).filter(Boolean))];
+        addReason('News Sentiment', `${contextNews.length} articles`, 'neutral', 'check summary for details', sources.join(', '));
+      }
+      // Economic Events
+      addReason('Economic Events', contextEcon.length > 0 ? `${contextEcon.length} events this week` : 'no major events',
+        contextEcon.some((e: any) => e.impact === 'High') ? 'negative' : 'neutral',
+        contextEcon.some((e: any) => e.impact === 'High') ? '-10% confidence penalty' : 'no penalty');
+    }
+
     return {
       symbol, type, timeframe,
       signal: finalSignal,
       confidence: finalConfidence,
       summary: resultData.summary,
-      detailedReasons: resultData.detailedReasons || [],
-      newsSources: [...new Set((resultData.detailedReasons || [])
+      detailedReasons,
+      newsSources: [...new Set(detailedReasons
         .filter((r: any) => r.check === 'News Sentiment' && r.source)
         .map((r: any) => r.source))],
       technicalScore: metrics?.momentumScore || 50,
