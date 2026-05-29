@@ -259,28 +259,34 @@ app.post("/api/ai-analysis", async (req, res) => {
         result = await callGroq(key, prompt);
       }
     } else {
-      // Server-side fallback hierarchy:
-      // 1. Google Gemini key (GEMINI_API_KEY or GOOGLE_API_KEY)
-      // 2. Groq key (GROQ_API_KEY)
+      // Server-side fallback hierarchy with active fallbacks:
       const systemGeminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
       const systemGroqKey = process.env.GROQ_API_KEY;
 
+      let fallbackSuccess = false;
+
       if (systemGeminiKey) {
         result = await callGoogle(systemGeminiKey, prompt);
-      } else if (systemGroqKey) {
+        if (result && result.content) {
+          fallbackSuccess = true;
+        }
+      }
+      
+      if (!fallbackSuccess && systemGroqKey) {
         result = await callGroq(systemGroqKey, prompt);
-      } else {
-        return res.status(400).json({ error: 'No API key provided by user, and no server fallback API keys are configured.' });
+        if (result && result.content) {
+          fallbackSuccess = true;
+        }
+      }
+
+      if (!fallbackSuccess) {
+        const errMsg = result?.error || 'No active server API keys could be successfully executed.';
+        return res.status(503).json({ error: errMsg });
       }
     }
 
-    if (result.content) {
-      return res.json({ choices: [{ message: { content: result.content } }] });
-    }
-    if (result.rateLimited) {
-      return res.status(429).json({ error: 'rate_limited', rateLimited: true });
-    }
-    res.status(503).json({ error: result.error || 'Provider failed' });
+    // If we reach here, we are guaranteed to have result.content
+    return res.json({ choices: [{ message: { content: result.content } }] });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
