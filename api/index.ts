@@ -362,7 +362,8 @@ async function callGoogle(apiKey: string, prompt: string) {
     try {
       const ac = new AbortController();
       const timeout = setTimeout(() => ac.abort(), 5000);
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+      
+      let resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -375,6 +376,32 @@ async function callGoogle(apiKey: string, prompt: string) {
         signal: ac.signal
       });
       clearTimeout(timeout);
+      
+      // If v1beta returns 404 (Not Found) or 400 (Bad Request), fallback immediately to stable v1 API endpoint!
+      if (!resp.ok && (resp.status === 404 || resp.status === 400)) {
+        const v1Ac = new AbortController();
+        const v1Timeout = setTimeout(() => v1Ac.abort(), 5000);
+        try {
+          const v1Resp = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
+              generationConfig: { 
+                temperature: 0.1,
+                responseMimeType: "application/json"
+              }
+            }),
+            signal: v1Ac.signal
+          });
+          clearTimeout(v1Timeout);
+          if (v1Resp.ok) {
+            resp = v1Resp;
+          }
+        } catch {
+          clearTimeout(v1Timeout);
+        }
+      }
       
       if (!resp.ok) {
         const errData = await resp.json().catch(() => ({}));
