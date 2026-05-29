@@ -149,9 +149,9 @@ app.get("/api/crypto-prices", async (_req, res) => {
 // Helper for Market Data Fetching
 const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2000);
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${rangeStr}&interval=${intervalStr}`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${rangeStr}&interval=${intervalStr}`;
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -179,24 +179,13 @@ app.get("/api/market-data", async (req, res) => {
     const timeframe = (req.query.timeframe as string) || '1d';
     if (!symbol) return res.status(400).json({ error: "Symbol is required" });
 
-    let yahooSymbol = symbol.toUpperCase().replace(/ /g, '');
-    
-    // Custom Yahoo Finance Mappings for Metals
+    const rawSymbol = symbol.toUpperCase().replace(/ /g, '');
     const customMappings: Record<string, string> = {
-      'XAUUSD': 'GC=F', // Gold Futures
-      'XAGUSD': 'SI=F', // Silver Futures
-      'XPTUSD': 'PL=F', // Platinum
-      'XPDUSD': 'PA=F', // Palladium
-      'XCUUSD': 'HG=F', // Copper
-      'XALUSD': 'ALI=F', // Aluminum
-      'XZNUSD': 'ZNC=F', // Zinc
-      'XNIUSD': 'NIC=F', // Nickel
-      'XPBUSD': 'LED=F', // Lead
+      'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F', 'XPDUSD': 'PA=F',
+      'XCUUSD': 'HG=F', 'XALUSD': 'ALI=F', 'XZNUSD': 'ZNC=F', 'XNIUSD': 'NIC=F', 'XPBUSD': 'LED=F',
     };
-    
-    if (customMappings[yahooSymbol]) {
-      yahooSymbol = customMappings[yahooSymbol];
-    }
+    const isMetal = !!customMappings[rawSymbol];
+    let yahooSymbol = isMetal ? customMappings[rawSymbol] : rawSymbol;
 
     let interval = '1d';
     let range = '14d';
@@ -210,27 +199,41 @@ app.get("/api/market-data", async (req, res) => {
     else if (timeframe === '1d') { interval = '1d'; range = '6mo'; }
     else if (timeframe === '1w') { interval = '1wk'; range = '2y'; }
 
-    // Fast symbol try: try =X suffix first, then dash format — max 2 attempts
+    // Determine symbol format based on type heuristics
+    const hasEquals = yahooSymbol.includes('=');
+    const isForex = !isMetal && yahooSymbol.length >= 6 && (
+      yahooSymbol.endsWith('USD') || yahooSymbol.endsWith('EUR') ||
+      yahooSymbol.endsWith('JPY') || yahooSymbol.endsWith('GBP') ||
+      yahooSymbol.endsWith('AUD') || yahooSymbol.endsWith('NZD') ||
+      yahooSymbol.endsWith('CAD') || yahooSymbol.endsWith('CHF')
+    );
+    
+    // For metals: use mapped futures symbol (e.g., GC=F)
+    // For forex: use =X suffix (e.g., EURUSD=X)
+    // For stocks/crypto: use symbol as-is (e.g., AAPL, BTC-USD)
     let attempts: string[] = [];
-    if (yahooSymbol.length >= 6 && (yahooSymbol.includes('USD') || yahooSymbol.includes('EUR') || yahooSymbol.includes('JPY'))) {
-      const base = yahooSymbol.replace('USD', '').replace('-USD', '').replace('=X', '');
-      attempts = [`${yahooSymbol}=X`, `${base}-USD`];
+    if (isMetal || hasEquals) {
+      attempts = [yahooSymbol];
+    } else if (isForex) {
+      attempts = [`${yahooSymbol}=X`];
+      // Fallback: try with dash for pairs like USDJPY → JPY-USD
+      const base = yahooSymbol.slice(0, 3);
+      const quote = yahooSymbol.slice(3);
+      if (base.length === 3 && quote.length === 3) {
+        attempts.push(`${quote}-${base}`);
+      }
     } else {
-      attempts = [`${yahooSymbol}=X`, yahooSymbol].filter(Boolean);
+      attempts = [yahooSymbol];
+      // Crypto fallback: append -USD or -BTC
+      if (!yahooSymbol.includes('-')) {
+        attempts.push(`${yahooSymbol}-USD`);
+      }
     }
 
-    // Only try the requested interval — single pass, max 2 fetches, total <4s
+    let finalData = null;
     for (const attempt of attempts) {
       finalData = await fetchMarketData(attempt, range, interval);
       if (finalData) break;
-    }
-
-    // One last fallback: daily data
-    if (!finalData) {
-      for (const attempt of attempts) {
-        finalData = await fetchMarketData(attempt, '1mo', '1d');
-        if (finalData) break;
-      }
     }
 
     if (!finalData) return res.status(404).json({ error: "No data found" });
