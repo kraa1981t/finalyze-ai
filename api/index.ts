@@ -149,7 +149,7 @@ app.get("/api/crypto-prices", async (_req, res) => {
 // Helper for Market Data Fetching
 const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), 9000);
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${rangeStr}&interval=${intervalStr}`;
     const response = await fetch(url, {
