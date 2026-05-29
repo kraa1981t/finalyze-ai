@@ -311,8 +311,12 @@ async function callGroq(apiKey: string, prompt: string) {
         if (attempt < 2) { await new Promise(r => setTimeout(r, 1000)); continue; }
         return { error: 'Groq: rate limited', rateLimited: true };
       }
-      if (!resp.ok) return { error: `Groq: ${resp.status}` };
-      const data = await resp.json();
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        const errMsg = errData?.error?.message || `Groq: HTTP ${resp.status}`;
+        return { error: errMsg };
+      }
+      const data = await resp.json().catch(() => ({}));
       return { content: data?.choices?.[0]?.message?.content || '' };
     } catch (e: any) {
       if (attempt < 2) { await new Promise(r => setTimeout(r, 500)); continue; }
@@ -350,14 +354,14 @@ async function callGoogle(apiKey: string, prompt: string) {
           return { error: 'Google: rate limited', rateLimited: true };
         }
         if (resp.ok) {
-          const data = await resp.json();
+          const data = await resp.json().catch(() => ({}));
           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
           if (text) return { content: text };
         } else {
           const errData = await resp.json().catch(() => ({}));
-          const errMsg = errData?.error?.message || `Google API error: ${resp.status}`;
-          if (resp.status === 400 || resp.status === 403 || resp.status === 429) {
-            return { error: errMsg, rateLimited: resp.status === 429 };
+          const errMsg = errData?.error?.message || `Google: HTTP ${resp.status}`;
+          if (resp.status === 400 || resp.status === 403 || resp.status === 401) {
+            return { error: errMsg };
           }
         }
         break;
