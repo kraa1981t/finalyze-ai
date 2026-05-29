@@ -28,6 +28,8 @@ export interface AnalysisResult {
   signal: SignalType;
   confidence: number; // New field for percentage
   summary: string;
+  detailedReasons?: { check: string; value: string; status: string; impact: string; source?: string }[];
+  newsSources?: string[];
   technicalScore: number;
   sentimentScore: number;
   historicalMatch?: string;

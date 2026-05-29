@@ -204,9 +204,40 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                            <MessageSquare size={20} />
                            <h4 className="text-sm font-black uppercase tracking-widest">{t.reasons}</h4>
                          </div>
-                         <div className="prose prose-invert prose-slate max-w-none text-brand-muted leading-relaxed text-lg">
-                            <Markdown>{selectedResult.summary}</Markdown>
-                         </div>
+                          <div className="prose prose-invert prose-slate max-w-none text-brand-muted leading-relaxed text-lg">
+                             <Markdown>{selectedResult.summary}</Markdown>
+                          </div>
+
+                          {selectedResult.detailedReasons && selectedResult.detailedReasons.length > 0 && (
+                            <div className="mt-6 space-y-2 border-t border-brand-text/10 pt-6">
+                              <h5 className="text-xs font-black uppercase tracking-widest text-brand-muted mb-4">
+                                {lang === 'ar' ? 'تفاصيل شروط التحليل' : 'Detailed Analysis Checks'}
+                              </h5>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {selectedResult.detailedReasons.map((reason, i) => (
+                                  <div key={i} className="flex items-start gap-3 p-3 bg-brand-text/[0.03] rounded-xl border border-brand-text/5">
+                                    <div className={cn(
+                                      "w-2 h-2 rounded-full mt-1.5 shrink-0",
+                                      reason.status === 'positive' ? "bg-emerald-500" :
+                                      reason.status === 'negative' ? "bg-red-500" : "bg-slate-500"
+                                    )} />
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-xs font-bold text-brand-text uppercase">{reason.check}</span>
+                                        <span className="text-[10px] font-mono text-brand-muted">{reason.value}</span>
+                                        {reason.source && (
+                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand-text/10 text-brand-muted font-mono">
+                                            {reason.source}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[11px] text-brand-muted/70 mt-0.5">{reason.impact}</div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                       </div>
 
                       {selectedResult.historicalMatch && (

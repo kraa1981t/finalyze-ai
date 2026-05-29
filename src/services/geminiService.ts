@@ -254,28 +254,40 @@ export async function analyzeMarket(params: {
       ? contextEcon.map(e => `• ${e.country} | ${e.title} | Impact: ${e.impact} | Forecast: ${e.forecast} | Previous: ${e.previous}`).join('\n')
       : 'No major economic events this week.';
 
-    const technicalPrompt = `You are an Elite Institutional Trader (ICT/SMC). Analyze ${symbol} (${type}, ${timeframe}, ${tradingStyle}) and return a JSON trading decision.
+    const technicalPrompt = `You are an Elite Institutional Trader (ICT/SMC). Analyze ${symbol} (${type}, ${timeframe}, ${tradingStyle}) and return a JSON trading decision with DETAILED step-by-step reasoning.
 
 MARKET DATA: RSI ${metrics?.rsi?.toFixed(1)}, Trend ${metrics?.direction}, EMA Cross ${metrics?.emaCross}, Vol Surge ${metrics?.volSurge}, Trend Length ${metrics?.totalAge}c, Momentum ${metrics?.age}c.
 
 MICRO (${microTF}): RSI ${microMetrics?.rsi ? microMetrics.rsi.toFixed(1) : 'N/A'}, Trend ${microMetrics?.direction || 'sideways'}, EMA ${microMetrics?.emaCross || 'unknown'}.
 
-CONTEXT: Fear&Greed ${contextFearGreed?.value ?? 'N/A'}/100 (${contextFearGreed?.classification ?? 'Unknown'}). News: ${newsText.substring(0, 200)}. Events: ${eventsText.substring(0, 200)}.
+CONTEXT: Fear&Greed ${contextFearGreed?.value ?? 'N/A'}/100 (${contextFearGreed?.classification ?? 'Unknown'}). News: ${newsText.substring(0, 300)}. Events: ${eventsText.substring(0, 200)}.
 
 SETTINGS: NewsGuard ${settings.useNewsGuard ? 'ON' : 'OFF'}, Volume ${settings.useVolumeAnalysis ? 'ON' : 'OFF'}, HigherTF ${settings.useHigherTimeframe ? 'ON' : 'OFF'}, Indicators ${settings.useIndicators ? 'ON' : 'OFF'}.
 
 RULES:
 - ONLY "strong_buy"/"strong_sell" if micro (${microTF}) is ALIGNED with macro. If micro is in pullback → downgrade to "buy"/"sell".
-- INFANCY (1-5): moderate risk. YOUTH (6-25): optimal. AGING (>25): exhaustion risk.
+- Trend age zones: <10 infancy (cap 65), <25 youth (downgrade strong, cap 70), 25-50 mature (full), >50 old (cap 65).
 - Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
 - If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
-- Write summary and microTrend in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Professional financial tone.
+- Write summary and each reason in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Professional financial tone.
+- In detailedReasons, list EVERY condition you checked and its outcome.
 
 Return ONLY valid JSON:
 {
   "signal": "strong_buy"|"buy"|"neutral"|"sell"|"strong_sell"|"no_entry",
   "confidence": number (0-100),
-  "summary": "string",
+  "summary": "string — comprehensive Arabic/English paragraph covering ALL factors: RSI, EMA, trend, age zone, volume, micro alignment, Fear&Greed, news sources, economic events",
+  "detailedReasons": [
+    {"check": "RSI", "value": "62.5", "status": "neutral", "impact": "no change"},
+    {"check": "EMA Cross", "value": "bullish", "status": "positive", "impact": "supports buy"},
+    {"check": "Trend Direction", "value": "uptrend", "status": "positive", "impact": "supports buy"},
+    {"check": "Trend Age Zone", "value": "mature (32 candles)", "status": "positive", "impact": "full confidence allowed"},
+    {"check": "Volume Surge", "value": "true", "status": "positive", "impact": "confirms momentum"},
+    {"check": "Micro TF Alignment", "value": "aligned", "status": "positive", "impact": "strong signal allowed"},
+    {"check": "Fear&Greed", "value": "45/100 Neutral", "status": "neutral", "impact": "no modification"},
+    {"check": "News Sentiment", "value": "2 positive articles", "status": "positive", "source": "Reuters, CNBC", "impact": "supports confidence"},
+    {"check": "Economic Events", "value": "no high impact events", "status": "neutral", "impact": "no penalty"}
+  ],
   "technicalScore": number,
   "sentimentScore": number,
   "historicalMatch": "string",
@@ -399,6 +411,10 @@ Return ONLY valid JSON:
       signal: finalSignal,
       confidence: finalConfidence,
       summary: resultData.summary,
+      detailedReasons: resultData.detailedReasons || [],
+      newsSources: [...new Set((resultData.detailedReasons || [])
+        .filter((r: any) => r.check === 'News Sentiment' && r.source)
+        .map((r: any) => r.source))],
       technicalScore: metrics?.momentumScore || 50,
       sentimentScore: contextFearGreed?.value ?? 50,
       trendMaturity: totalAge < infantAgeThreshold ? 'infancy' : (totalAge < matureAgeThreshold ? 'youth' : (totalAge <= oldAgeThreshold ? 'mature' : 'aging')),
