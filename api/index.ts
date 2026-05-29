@@ -151,7 +151,7 @@ const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: strin
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${rangeStr}&interval=${intervalStr}`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${rangeStr}&interval=${intervalStr}`;
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -216,11 +216,11 @@ app.get("/api/market-data", async (req, res) => {
       attempts = [yahooSymbol];
     } else if (isForex) {
       attempts = [`${yahooSymbol}=X`];
-      // Fallback: try with dash for pairs like USDJPY → JPY-USD
+      // Fallback: try with dash format (e.g., EUR-USD, GBP-JPY)
       const base = yahooSymbol.slice(0, 3);
       const quote = yahooSymbol.slice(3);
       if (base.length === 3 && quote.length === 3) {
-        attempts.push(`${quote}-${base}`);
+        attempts.push(`${base}-${quote}`);
       }
     } else {
       attempts = [yahooSymbol];
