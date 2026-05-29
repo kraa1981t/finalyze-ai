@@ -17,7 +17,8 @@ import PortfolioPanel from './components/PortfolioPanel';
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType, TradingStyle } from './types';
 import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS, FREE_SYMBOLS } from './constants';
 import { Language, translations } from './lib/i18n';
-import { analyzeMarket } from './services/geminiService';
+import { analyzeMarket, getApiKey } from './services/geminiService';
+import { waitIfRateLimited } from './services/rateLimitTracker';
 import { resolveConflicts } from './services/portfolioRiskService';
 import ApiKeyModal from './components/ApiKeyModal';
 import SubscriptionModal from './components/SubscriptionModal';
@@ -637,6 +638,7 @@ export default function App() {
               }
             } catch {}
           }
+          await waitIfRateLimited();
           try {
             const tf = !hasActivePlan ? '1d' : currentSettings.timeframe;
             const ts = !hasActivePlan ? TradingStyle.DAY_TRADING : currentSettings.tradingStyle;
@@ -646,16 +648,14 @@ export default function App() {
             });
             if (result && isSubscribed) {
               const sig = result.signal || '';
-              const threshold = settings?.minStrongConfidence || 80;
-              const isStrong = result.confidence >= threshold && (sig.includes('buy') || sig.includes('sell'));
-              
-              if (isStrong) {
-                if (sig === 'buy') result.signal = 'strong_buy' as any;
-                if (sig === 'sell') result.signal = 'strong_sell' as any;
-                updateTopSignals([result]);
-              }
+              const isStrong = sig.includes('strong_buy') || sig.includes('strong_sell');
+              if (isStrong) updateTopSignals([result]);
             }
-            await new Promise(r => setTimeout(r, 6000));
+            if (isSubscribed) {
+              const key = getApiKey();
+              const delay = key.startsWith('AIzaSy') ? 3500 : 2500;
+              await new Promise(r => setTimeout(r, delay));
+            }
           } catch (e) { 
             console.error("Analysis Loop Error:", e);
             await new Promise(r => setTimeout(r, 8000));
