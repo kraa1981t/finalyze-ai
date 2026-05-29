@@ -277,7 +277,7 @@ async function callGroq(apiKey: string, prompt: string) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), 4000);
+      const timeout = setTimeout(() => ac.abort(), 8000);
       const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -304,7 +304,7 @@ async function callGoogle(apiKey: string, prompt: string) {
   for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
     try {
       const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), 4000);
+      const timeout = setTimeout(() => ac.abort(), 8000);
       const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -45,52 +45,6 @@ export function mirrorApiKey(key: string): void {
   } catch {}
 }
 
-async function callGroqDirect(prompt: string, apiKey: string, signal: AbortSignal) {
-  try {
-    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.1,
-      }),
-      signal
-    });
-    if (resp.status === 429) return { error: 'rate_limited' };
-    if (!resp.ok) return { error: `Groq: ${resp.status}` };
-    return await resp.json();
-  } catch (e: any) {
-    return { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
-  }
-}
-
-async function callGoogleDirect(prompt: string, apiKey: string, signal: AbortSignal) {
-  for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
-    try {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `You are a financial analyst. ${prompt}` }] }],
-          generationConfig: { temperature: 0.1 }
-        }),
-        signal
-      });
-      if (resp.status === 429) continue;
-      if (resp.ok) {
-        const data = await resp.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (text) return { choices: [{ message: { content: text } }] };
-      }
-    } catch {}
-  }
-  return { error: 'Google failed' };
-}
-
 function calculateSupplyDemandZones(highs: number[], lows: number[], volumes: number[], closes: number[]) {
   const zones: { type: 'supply' | 'demand'; top: number; bottom: number; strength: number }[] = [];
   const len = highs.length;
@@ -334,21 +288,24 @@ Symbol details:\n`;
   }
 ]`;
 
-  // Phase 3: Single AI call with auto-retry on 429
+  // Phase 3: Single AI call via server proxy (same architecture as working old version)
   const keyValue = getApiKey();
   if (!keyValue) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.' }))] };
   mirrorApiKey(keyValue);
 
-  const isGoogle = keyValue.startsWith('AIzaSy');
-  
   async function makeAICall(): Promise<any> {
     const ac = new AbortController();
-    const timeoutId = setTimeout(() => ac.abort(), 30000); // 30s for batch
+    const timeoutId = setTimeout(() => ac.abort(), 25000);
     let resp: any;
-    if (isGoogle) {
-      resp = await callGoogleDirect(batchPrompt, keyValue, ac.signal);
-    } else {
-      resp = await callGroqDirect(batchPrompt, keyValue, ac.signal);
+    try {
+      resp = await fetch('/api/ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: batchPrompt, userApiKey: keyValue }),
+        signal: ac.signal
+      }).then(r => r.json());
+    } catch (e: any) {
+      resp = { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
     }
     clearTimeout(timeoutId);
     return resp;
@@ -358,7 +315,7 @@ Symbol details:\n`;
   let aiResponse = await makeAICall();
 
   // Auto-retry once on rate limit
-  if (aiResponse?.error && /429|rate.?limit|too many requests/i.test(aiResponse.error)) {
+  if (aiResponse?.error && (/429|rate.?limit|too many requests/i.test(aiResponse.error) || aiResponse.rateLimited)) {
     console.warn('[Batch] Rate limited, waiting 60s then retrying...');
     onRateLimited();
     await waitIfRateLimited();
@@ -366,7 +323,7 @@ Symbol details:\n`;
   }
 
   if (aiResponse?.error) {
-    if (/429|rate.?limit|too many requests/i.test(aiResponse.error)) onRateLimited();
+    if (/429|rate.?limit|too many requests/i.test(aiResponse.error) || aiResponse.rateLimited) onRateLimited();
     return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: aiResponse.error }))] };
   }
 
@@ -615,17 +572,20 @@ Return ONLY valid JSON:
 
     await waitIfRateLimited();
 
-    // Direct browser-to-API call with auto-retry on 429
-    const isGoogle = keyValue.startsWith('AIzaSy');
-    
+    // Server proxy call (same architecture as working old version)
     async function makeSingleAICall(): Promise<any> {
       const ac = new AbortController();
-      const timeoutId = setTimeout(() => ac.abort(), 15000);
+      const timeoutId = setTimeout(() => ac.abort(), 20000);
       let resp: any;
-      if (isGoogle) {
-        resp = await callGoogleDirect(technicalPrompt, keyValue, ac.signal);
-      } else {
-        resp = await callGroqDirect(technicalPrompt, keyValue, ac.signal);
+      try {
+        resp = await fetch('/api/ai-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: technicalPrompt, userApiKey: keyValue }),
+          signal: ac.signal
+        }).then(r => r.json());
+      } catch (e: any) {
+        resp = { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
       }
       clearTimeout(timeoutId);
       return resp;
@@ -634,7 +594,7 @@ Return ONLY valid JSON:
     let aiResponse = await makeSingleAICall();
 
     // Auto-retry once on rate limit
-    if (aiResponse?.error && /429|rate.?limit|too many requests/i.test(aiResponse.error)) {
+    if (aiResponse?.error && (/429|rate.?limit|too many requests/i.test(aiResponse.error) || aiResponse.rateLimited)) {
       console.warn('[Single] Rate limited, waiting 60s then retrying...');
       onRateLimited();
       await waitIfRateLimited();
@@ -644,7 +604,7 @@ Return ONLY valid JSON:
     let lastError: string | null = null;
     if (aiResponse?.error) {
       lastError = aiResponse.error;
-      if (/429|rate.?limit|too many requests/i.test(lastError)) onRateLimited();
+      if (/429|rate.?limit|too many requests/i.test(lastError) || aiResponse.rateLimited) onRateLimited();
       throw new Error(lastError);
     }
 
