@@ -350,6 +350,11 @@ Symbol details:\n`;
     aiResponse = await makeAICall();
   }
 
+  // Normalize Google Gemini response format → Groq format
+  if (isGoogle && aiResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
+    aiResponse = { choices: [{ message: { content: aiResponse.candidates[0].content.parts[0].text } }] };
+  }
+
   if (aiResponse?.error) {
     if (aiResponse.error === 'rate_limited') onRateLimited();
     return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: aiResponse.error }))] };
@@ -656,7 +661,12 @@ Return ONLY valid JSON:
     }
 
     let lastError: string | null = null;
-    if (aiResponse?.error) {
+  // Normalize Google Gemini response format → Groq format
+  if (isGoogle && aiResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
+    aiResponse = { choices: [{ message: { content: aiResponse.candidates[0].content.parts[0].text } }] };
+  }
+
+  if (aiResponse?.error) {
       lastError = aiResponse.error;
       if (aiResponse.error === 'rate_limited') onRateLimited();
       throw new Error(lastError);
