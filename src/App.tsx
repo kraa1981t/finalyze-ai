@@ -1408,7 +1408,7 @@ export default function App() {
                 isBlocking={false}
                 lang={lang}
                 user={user}
-                onSaved={() => { setHasApiKey(true); goBack(); }}
+                onSaved={(key) => { setHasApiKey(!!key); goBack(); }}
                 onLogout={handleLogout}
                 asPage
               />

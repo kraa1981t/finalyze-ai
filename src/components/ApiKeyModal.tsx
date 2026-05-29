@@ -124,13 +124,41 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     setSuccess(false);
 
     const val = keyValue.trim();
+    setIsLoading(true);
+
     if (!val) {
-      setError(isAr ? 'الرجاء إدخال مفتاح API.' : 'Please enter an API key.');
+      // Clear key action
+      try {
+        localStorage.removeItem('finalyze_key1_value');
+        localStorage.removeItem('finalyze_key1_enabled');
+        localStorage.removeItem('finalyze_user_groq_api_key');
+        localStorage.removeItem('finalyze_key2_value');
+        localStorage.removeItem('finalyze_key2_provider');
+        localStorage.removeItem('finalyze_key2_enabled');
+        sessionStorage.removeItem('finalyze_key_mirror');
+        // Clear the cookie by setting past expiry date
+        document.cookie = "finalyze_api_key=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        
+        if (user && user.uid && user.uid !== 'developer') {
+          const userDocRef = doc(db, 'users', user.uid);
+          await setDoc(userDocRef, {
+            groqApiKey: "",
+            geminiApiKey: "",
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+      } catch (e) {
+        console.error("Error clearing key:", e);
+      }
+
+      setSuccess(true);
+      onSaved("");
+      setTimeout(() => onClose(), 1500);
+      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-
+    // Normal save key action
     saveKey(val);
     localStorage.removeItem('finalyze_user_groq_api_key');
     localStorage.removeItem('finalyze_key2_value');

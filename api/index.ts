@@ -248,38 +248,50 @@ app.post("/api/ai-analysis", async (req, res) => {
   try {
     const { prompt, userApiKey } = req.body;
     
-    // Use user-provided API key if available, otherwise check for system fallbacks
+    // Use user-provided API key if available
     let key = (userApiKey && userApiKey !== '__dev_bypass__') ? userApiKey.trim() : '';
 
-    let result;
+    let result: any = null;
+    let keyTried = false;
+
     if (key) {
+      keyTried = true;
       if (key.startsWith('AIzaSy') || key.startsWith('AQ.')) {
         result = await callGoogle(key, prompt);
       } else {
         result = await callGroq(key, prompt);
       }
-    } else {
-      // Server-side fallback hierarchy with active fallbacks:
+    }
+
+    // If no custom key was provided, or the custom key failed/errored out, try the server's system keys!
+    if (!result || result.error || !result.content) {
       const systemGeminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
       const systemGroqKey = process.env.GROQ_API_KEY;
 
       let fallbackSuccess = false;
 
       if (systemGeminiKey) {
-        result = await callGoogle(systemGeminiKey, prompt);
-        if (result && result.content) {
+        const sysResult = await callGoogle(systemGeminiKey, prompt);
+        if (sysResult && sysResult.content) {
+          result = sysResult;
           fallbackSuccess = true;
+        } else if (!result && sysResult) {
+          result = sysResult; // capture error if it's the only one we have
         }
       }
       
       if (!fallbackSuccess && systemGroqKey) {
-        result = await callGroq(systemGroqKey, prompt);
-        if (result && result.content) {
+        const sysResult = await callGroq(systemGroqKey, prompt);
+        if (sysResult && sysResult.content) {
+          result = sysResult;
           fallbackSuccess = true;
+        } else if (!result && sysResult) {
+          result = sysResult;
         }
       }
 
       if (!fallbackSuccess) {
+        // Return the error from the custom key if we tried it, or the server fallback error
         const errMsg = result?.error || 'No active server API keys could be successfully executed.';
         return res.status(503).json({ error: errMsg });
       }
