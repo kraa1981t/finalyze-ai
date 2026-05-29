@@ -18,7 +18,7 @@ interface AnalysisFormProps {
   onBegin: () => void;
   onProgress: (current: string, total: number, index: number) => void;
   onResult: (res: AnalysisResult[]) => void;
-  onError: (msg?: string) => void;
+  onError: (msg?: string, allFailed?: boolean) => void;
   lang: Language;
   settings: StrategySettings;
   hasActivePlan: boolean;
@@ -46,7 +46,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
   const t = translations[lang];
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
   const [analyzingIndex, setAnalyzingIndex] = useState<number | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dropdownSearch, setDropdownSearch] = useState("");
@@ -168,24 +168,22 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
   };
 
   const onSubmit = async (data: FormValues) => {
-    setFormError(null);
+    setFormErrors([]);
     
     if (!hasActivePlan) {
-      // Force day_trading + 1d for free users
       data.timeframe = '1d';
       data.tradingStyle = TradingStyle.DAY_TRADING;
     }
 
-    // Radical Market Blocking
     if (!isMarketOpen(data.type)) {
-      setFormError(lang === 'ar' ? 'عفواً.. هذه الأسواق مغلقة حالياً ولا يمكن تحليلها' : 'Sorry.. These markets are currently closed and cannot be analyzed');
+      setFormErrors([lang === 'ar' ? 'عفواً.. هذه الأسواق مغلقة حالياً ولا يمكن تحليلها' : 'Sorry.. These markets are currently closed and cannot be analyzed']);
       return;
     }
 
     console.log("[Form] Submit clicked. Symbols:", selectedSymbols, "Manual:", data.symbol);
 
     if (!user) {
-      setFormError(t.loginRequired);
+      setFormErrors([t.loginRequired]);
       return;
     }
 
@@ -197,21 +195,22 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
       .filter(s => s && s.length > 1);
 
     if (allSymbolsToAnalyze.length === 0) {
-      setFormError(t.selectAtLeastOne);
+      setFormErrors([t.selectAtLeastOne]);
       return;
     }
 
     console.log("[Form] Beginning analysis for:", allSymbolsToAnalyze);
     onBegin();
     const results: AnalysisResult[] = [];
+    const failedSymbols: { symbol: string; error: string }[] = [];
     const ac = new AbortController();
     abortRef.current = ac;
 
+    let i = 0;
     try {
-      for (let i = 0; i < allSymbolsToAnalyze.length; i++) {
+      while (i < allSymbolsToAnalyze.length) {
         if (ac.signal.aborted) { setAnalyzingIndex(null); onError(lang === 'ar' ? 'تم إلغاء التحليل' : 'Analysis cancelled'); return; }
 
-        // Wait if globally rate limited before processing next symbol
         await waitIfRateLimited();
 
         const currentSymbol = allSymbolsToAnalyze[i];
@@ -233,7 +232,6 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
           result.userId = user?.uid || 'anonymous';
           results.push(result);
 
-          // Save to Firestore silently, never block or error the UI
           if (user?.uid) {
             addDoc(collection(db, "analysisResults"), {
               ...result,
@@ -241,18 +239,58 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             }).catch(() => {});
           }
 
+          // Success delay — shorter when most symbols succeed
+          const key = getApiKey();
+          const baseDelay = key.startsWith('AIzaSy') ? 3500 : 2500;
+          const hasFailures = failedSymbols.length > 0;
+          // Use longer delay if there were recent failures (cool-down)
+          const delay = hasFailures ? Math.max(baseDelay, 5000) : baseDelay;
+          if (i < allSymbolsToAnalyze.length - 1 || hasFailures) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+
         } catch (symbolError: any) {
           console.error(`[Analysis Error] ${currentSymbol}:`, symbolError);
           const msg = symbolError.message || (lang === 'ar' ? "فشل التحليل بسبب خطأ غير معروف" : "Analysis failed due to unknown error");
-          setFormError(`${currentSymbol}: ${msg}`);
+          
+          // Check if this was a rate limit error — retry once after cooling
+          const isRateLimit = /429|rate.?limit|too many requests/i.test(msg);
+          if (isRateLimit) {
+            // Wait longer for rate limit recovery, then retry
+            await new Promise(resolve => setTimeout(resolve, 12000));
+            try {
+              const result = await analyzeMarket({
+                symbol: currentSymbol,
+                type: data.type,
+                timeframe: data.timeframe,
+                tradingStyle: data.tradingStyle,
+                settings: settings,
+                lang: lang
+              });
+              if (result) {
+                result.userId = user?.uid || 'anonymous';
+                results.push(result);
+                if (user?.uid) {
+                  addDoc(collection(db, "analysisResults"), {
+                    ...result,
+                    timestamp: serverTimestamp(),
+                  }).catch(() => {});
+                }
+                // Skip adding to failedSymbols — retry worked
+                continue;
+              }
+            } catch (retryError: any) {
+              console.error(`[Retry Failed] ${currentSymbol}:`, retryError);
+            }
+          }
+
+          failedSymbols.push({ symbol: currentSymbol, error: msg });
+
+          // Longer delay after failure to let API recover
+          await new Promise(resolve => setTimeout(resolve, 8000));
         }
 
-        // Adaptive delay based on provider to prevent rate limiting
-        if (i < allSymbolsToAnalyze.length - 1) {
-          const key = getApiKey();
-          const delay = key.startsWith('AIzaSy') ? 3500 : 2500;
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
+        i++;
       }
 
       abortRef.current = null;
@@ -260,15 +298,26 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
       
       if (results.length > 0) {
         onResult(results);
-      } else {
-        onError(formError || (lang === 'ar' ? 'فشل التحليل لجميع الرموز' : 'Analysis failed for all symbols'));
+      }
+
+      // Always report errors if any symbols failed
+      if (failedSymbols.length > 0) {
+        const failedList = failedSymbols.map(f => `${f.symbol}`).join(', ');
+        const sampleErrors = [...new Set(failedSymbols.map(f => f.error))].slice(0, 3).join('; ');
+        const summary = lang === 'ar'
+          ? `نجح ${results.length} من ${allSymbolsToAnalyze.length}. فشل ${failedSymbols.length}: ${failedList}. (${sampleErrors})`
+          : `${results.length}/${allSymbolsToAnalyze.length} succeeded. ${failedSymbols.length} failed: ${failedList}. (${sampleErrors})`;
+        setFormErrors(failedSymbols.map(f => `${f.symbol}: ${f.error}`));
+        onError(summary, results.length === 0);
+      } else if (results.length === 0) {
+        onError(lang === 'ar' ? 'فشل التحليل لجميع الرموز' : 'Analysis failed for all symbols', true);
       }
     } catch (error: any) {
       abortRef.current = null;
       console.error("[Global Form Error]:", error);
       setAnalyzingIndex(null);
-      onError(error.message || "Unknown error occurred.");
-      setFormError(error.message || "Unknown error occurred.");
+      onError(error.message || "Unknown error occurred.", true);
+      setFormErrors([error.message || "Unknown error occurred."]);
     }
   };
 
@@ -277,14 +326,16 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         
         <AnimatePresence>
-          {formError && (
+          {formErrors.length > 0 && (
             <motion.div 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               className="bg-red-500/10 border border-red-500/50 p-4 rounded-2xl text-red-500 text-base font-black text-center mb-4"
             >
-              {formError}
+              {formErrors.map((err, idx) => (
+                <div key={idx}>{err}</div>
+              ))}
             </motion.div>
           )}
         </AnimatePresence>

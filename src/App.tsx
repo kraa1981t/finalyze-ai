@@ -1574,7 +1574,7 @@ export default function App() {
                updateTopSignals(filtered);
                playAudio('fail');
              }} 
-              onError={(errMsg) => { setAnalysisResults([]); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); }}
+              onError={(errMsg, allFailed) => { if (allFailed) setAnalysisResults([]); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); }}
           />
           <ConnectionStatus lang={lang} />
         </div>
@@ -1603,14 +1603,14 @@ export default function App() {
         {analysisResults && !isAnalyzing && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             {analysisError && (
-              <div className="max-w-4xl mx-auto mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                <p className="text-red-400 text-sm font-medium">{analysisError}</p>
-                <button onClick={() => { setAnalysisResults(null); setAnalysisError(null); }} className="mt-2 text-xs text-red-400 hover:text-red-300 underline">
+              <div className="max-w-4xl mx-auto mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <p className="text-amber-400 text-sm font-medium">{analysisError}</p>
+                <button onClick={() => { setAnalysisResults(null); setAnalysisError(null); }} className="mt-2 text-xs text-amber-400 hover:text-amber-300 underline">
                   {lang === 'ar' ? 'حاول مرة أخرى' : 'Try again'}
                 </button>
               </div>
             )}
-            {!analysisError && <AnalysisResultView results={analysisResults} lang={lang} settings={settings} />}
+            <AnalysisResultView results={analysisResults} lang={lang} settings={settings} />
           </motion.div>
         )}
 
