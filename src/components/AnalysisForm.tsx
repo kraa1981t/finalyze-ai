@@ -77,7 +77,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
   useEffect(() => {
     const u = subscribe(() => {
       const s = getStatus();
-      setRateLimitActive(!s.active);
+      setRateLimitActive(s.active);
       setRateLimitCountdown(s.remainingSec);
     });
     return u;
@@ -86,7 +86,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
     if (!rateLimitActive) return;
     const interval = setInterval(() => {
       const s = getStatus();
-      setRateLimitActive(!s.active);
+      setRateLimitActive(s.active);
       setRateLimitCountdown(s.remainingSec);
     }, 1000);
     return () => clearInterval(interval);

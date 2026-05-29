@@ -1,6 +1,6 @@
 let rateLimitedUntil = 0;
 let observers: (() => void)[] = [];
-const RATE_LIMIT_COOLDOWN = 120000; // 2 minutes for API key rate limits
+const RATE_LIMIT_COOLDOWN = 60000; // 1 minute (matches Groq/Google per-minute limits)
 
 export function onRateLimited(durationMs = RATE_LIMIT_COOLDOWN) {
   const now = Date.now();
@@ -13,9 +13,9 @@ export function onRateLimited(durationMs = RATE_LIMIT_COOLDOWN) {
 export function getStatus(): { active: boolean; remainingSec: number } {
   const now = Date.now();
   if (rateLimitedUntil > now) {
-    return { active: false, remainingSec: Math.ceil((rateLimitedUntil - now) / 1000) };
+    return { active: true, remainingSec: Math.ceil((rateLimitedUntil - now) / 1000) };
   }
-  return { active: true, remainingSec: 0 };
+  return { active: false, remainingSec: 0 };
 }
 
 export async function waitIfRateLimited(): Promise<void> {
