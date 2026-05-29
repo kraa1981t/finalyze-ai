@@ -272,38 +272,45 @@ Symbol details:\n`;
   Events: ${d.eventsText.substring(0, 150)}\n`;
   }
 
-  batchPrompt += `\nReturn ONLY valid JSON array:
-[
-  {
-    "symbol": "EURUSD",
-    "signal": "strong_buy"|"buy"|"neutral"|"sell"|"strong_sell"|"no_entry",
-    "confidence": number (0-100),
-    "summary": "string",
-    "detailedReasons": [{"check": "RSI", "value": "62.5", "status": "neutral", "impact": "no change"}],
-    "microSignal": "pullback"|"aligned"|"unknown",
-    "microTrend": "string",
-    "technicalScore": number,
-    "sentimentScore": number,
-    "historicalMatch": "string"
-  }
-]`;
+  batchPrompt += `\nReturn ONLY valid JSON object with a "results" array:
+{
+  "results": [
+    {
+      "symbol": "EURUSD",
+      "signal": "strong_buy"|"buy"|"neutral"|"sell"|"strong_sell"|"no_entry",
+      "confidence": number (0-100),
+      "summary": "string",
+      "detailedReasons": [{"check": "RSI", "value": "62.5", "status": "neutral", "impact": "no change"}],
+      "microSignal": "pullback"|"aligned"|"unknown",
+      "microTrend": "string",
+      "technicalScore": number,
+      "sentimentScore": number,
+      "historicalMatch": "string"
+    }
+  ]
+}`;
 
-  // Phase 3: Single AI call via server proxy (same architecture as working old version)
+  // Phase 3: Single AI call — direct browser with response_format (bypasses Vercel 10s)
   const keyValue = getApiKey();
   if (!keyValue) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: lang === 'ar' ? 'لا يوجد مفتاح API.' : 'No API key found.' }))] };
   mirrorApiKey(keyValue);
 
   async function makeAICall(): Promise<any> {
     const ac = new AbortController();
-    const timeoutId = setTimeout(() => ac.abort(), 25000);
+    const timeoutId = setTimeout(() => ac.abort(), 30000);
     let resp: any;
     try {
-      resp = await fetch('/api/ai-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: batchPrompt, userApiKey: keyValue }),
-        signal: ac.signal
-      }).then(r => r.json());
+      const isGoogle = keyValue.startsWith('AIzaSy');
+      const body = isGoogle
+        ? { contents: [{ parts: [{ text: `You are a financial analyst. ${batchPrompt}` }] }], generationConfig: { temperature: 0.1 } }
+        : { model: 'llama-3.3-70b-versatile', messages: [{ role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." }, { role: "user", content: batchPrompt }], temperature: 0.1, response_format: { type: "json_object" } };
+      const url = isGoogle ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${keyValue}` : 'https://api.groq.com/openai/v1/chat/completions';
+      const headers = isGoogle ? { 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keyValue}` };
+      resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: ac.signal }).then(async r => {
+        if (r.status === 429) return { error: 'rate_limited' };
+        if (!r.ok) return { error: `Groq: ${r.status}` };
+        return r.json();
+      });
     } catch (e: any) {
       resp = { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
     }
@@ -315,7 +322,7 @@ Symbol details:\n`;
   let aiResponse = await makeAICall();
 
   // Auto-retry once on rate limit
-  if (aiResponse?.error && (/429|rate.?limit|too many requests/i.test(aiResponse.error) || aiResponse.rateLimited)) {
+  if (aiResponse?.error === 'rate_limited') {
     console.warn('[Batch] Rate limited, waiting 60s then retrying...');
     onRateLimited();
     await waitIfRateLimited();
@@ -323,7 +330,7 @@ Symbol details:\n`;
   }
 
   if (aiResponse?.error) {
-    if (/429|rate.?limit|too many requests/i.test(aiResponse.error) || aiResponse.rateLimited) onRateLimited();
+    if (aiResponse.error === 'rate_limited') onRateLimited();
     return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: aiResponse.error }))] };
   }
 
@@ -332,12 +339,13 @@ Symbol details:\n`;
   }
 
   const rawText = aiResponse.choices[0].message.content;
-  const jsonMatch = rawText.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: 'AI returned invalid JSON array' }))] };
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: 'AI returned invalid JSON' }))] };
 
   let parsedBatch: any[];
   try {
-    parsedBatch = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonMatch[0]);
+    parsedBatch = parsed.results || (Array.isArray(parsed) ? parsed : []);
     if (!Array.isArray(parsedBatch)) throw new Error('Not an array');
   } catch {
     return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: 'AI returned invalid JSON array' }))] };
@@ -572,18 +580,23 @@ Return ONLY valid JSON:
 
     await waitIfRateLimited();
 
-    // Server proxy call (same architecture as working old version)
+    // Direct browser call with response_format (bypasses Vercel 10s)
     async function makeSingleAICall(): Promise<any> {
       const ac = new AbortController();
       const timeoutId = setTimeout(() => ac.abort(), 20000);
       let resp: any;
       try {
-        resp = await fetch('/api/ai-analysis', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: technicalPrompt, userApiKey: keyValue }),
-          signal: ac.signal
-        }).then(r => r.json());
+        const isGoogle = keyValue.startsWith('AIzaSy');
+        const body = isGoogle
+          ? { contents: [{ parts: [{ text: `You are a financial analyst. ${technicalPrompt}` }] }], generationConfig: { temperature: 0.1 } }
+          : { model: 'llama-3.3-70b-versatile', messages: [{ role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." }, { role: "user", content: technicalPrompt }], temperature: 0.1, response_format: { type: "json_object" } };
+        const url = isGoogle ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${keyValue}` : 'https://api.groq.com/openai/v1/chat/completions';
+        const headers = isGoogle ? { 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keyValue}` };
+        resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: ac.signal }).then(async r => {
+          if (r.status === 429) return { error: 'rate_limited' };
+          if (!r.ok) return { error: `Groq: ${r.status}` };
+          return r.json();
+        });
       } catch (e: any) {
         resp = { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
       }
@@ -594,7 +607,7 @@ Return ONLY valid JSON:
     let aiResponse = await makeSingleAICall();
 
     // Auto-retry once on rate limit
-    if (aiResponse?.error && (/429|rate.?limit|too many requests/i.test(aiResponse.error) || aiResponse.rateLimited)) {
+    if (aiResponse?.error === 'rate_limited') {
       console.warn('[Single] Rate limited, waiting 60s then retrying...');
       onRateLimited();
       await waitIfRateLimited();
@@ -604,7 +617,7 @@ Return ONLY valid JSON:
     let lastError: string | null = null;
     if (aiResponse?.error) {
       lastError = aiResponse.error;
-      if (/429|rate.?limit|too many requests/i.test(lastError) || aiResponse.rateLimited) onRateLimited();
+      if (aiResponse.error === 'rate_limited') onRateLimited();
       throw new Error(lastError);
     }
 
