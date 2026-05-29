@@ -353,6 +353,12 @@ async function callGoogle(apiKey: string, prompt: string) {
           const data = await resp.json();
           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
           if (text) return { content: text };
+        } else {
+          const errData = await resp.json().catch(() => ({}));
+          const errMsg = errData?.error?.message || `Google API error: ${resp.status}`;
+          if (resp.status === 400 || resp.status === 403 || resp.status === 429) {
+            return { error: errMsg, rateLimited: resp.status === 429 };
+          }
         }
         break;
       } catch {
