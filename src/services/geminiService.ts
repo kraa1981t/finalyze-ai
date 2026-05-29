@@ -92,6 +92,30 @@ async function callGoogleDirect(prompt: string, apiKey: string, signal: AbortSig
   return { error: 'Google failed' };
 }
 
+function calculateSupplyDemandZones(highs: number[], lows: number[], volumes: number[], closes: number[]) {
+  const zones: { type: 'supply' | 'demand'; top: number; bottom: number; strength: number }[] = [];
+  const len = highs.length;
+  if (len < 15) return zones;
+
+  for (let i = 5; i < len - 5; i++) {
+    const isPivotHigh = highs[i] > highs[i - 1] && highs[i] > highs[i - 2] && highs[i] > highs[i + 1] && highs[i] > highs[i + 2];
+    const isPivotLow = lows[i] < lows[i - 1] && lows[i] < lows[i - 2] && lows[i] < lows[i + 1] && lows[i] < lows[i + 2];
+    if (!isPivotHigh && !isPivotLow) continue;
+
+    const vol = volumes[i] || 0;
+    const avgVol = volumes.slice(Math.max(0, i - 5), i + 5).filter(v => v).reduce((a, b) => a + b, 0) / Math.max(volumes.slice(Math.max(0, i - 5), i + 5).filter(v => v).length, 1);
+    const volRatio = avgVol > 0 ? vol / avgVol : 1;
+
+    if (isPivotHigh && volRatio > 1.2) {
+      zones.push({ type: 'supply', top: highs[i] * 1.002, bottom: lows[i] * 0.998, strength: Math.min(100, volRatio * 50) });
+    }
+    if (isPivotLow && volRatio > 1.2) {
+      zones.push({ type: 'demand', top: highs[i] * 1.002, bottom: lows[i] * 0.998, strength: Math.min(100, volRatio * 50) });
+    }
+  }
+  return zones.slice(0, 6);
+}
+
 /**
  * ROBUST TECHNICAL ENGINE (VERSION 2.0)
  * Works with minimal data (10+ candles) and handles gaps gracefully.
@@ -215,6 +239,10 @@ export async function analyzeMarket(params: {
     }
 
     const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes);
+    const supplyDemandZones = calculateSupplyDemandZones(highs, lows, volumes || [], closes);
+    const zonesText = supplyDemandZones.length > 0 
+      ? supplyDemandZones.map(z => `${z.type === 'supply' ? 'Supply' : 'Demand'} zone: ${z.bottom.toFixed(2)}–${z.top.toFixed(2)} (strength ${z.strength.toFixed(0)}%)`).join('. ')
+      : 'No clear zones detected.';
 
     const macro2 = TF_PROGRESSION[Math.min(currentIndex + 2, TF_PROGRESSION.length - 1)];
     const microTF = currentIndex > 0 ? TF_PROGRESSION[currentIndex - 1] : TF_PROGRESSION[0];
@@ -264,6 +292,8 @@ CONTEXT: Fear&Greed ${contextFearGreed?.value ?? 'N/A'}/100 (${contextFearGreed?
 
 SETTINGS: NewsGuard ${settings.useNewsGuard ? 'ON' : 'OFF'}, Volume ${settings.useVolumeAnalysis ? 'ON' : 'OFF'}, HigherTF ${settings.useHigherTimeframe ? 'ON' : 'OFF'}, Indicators ${settings.useIndicators ? 'ON' : 'OFF'}.
 
+SUPPLY & DEMAND ZONES: ${zonesText}
+
 RULES:
 - ONLY "strong_buy"/"strong_sell" if micro (${microTF}) is ALIGNED with macro. If micro is in pullback → downgrade to "buy"/"sell".
 - Trend age zones: <10 infancy (cap 65), <25 youth (downgrade strong, cap 70), 25-50 mature (full), >50 old (cap 65).
@@ -283,6 +313,7 @@ Return ONLY valid JSON:
     {"check": "Trend Direction", "value": "uptrend", "status": "positive", "impact": "supports buy"},
     {"check": "Trend Age Zone", "value": "mature (32 candles)", "status": "positive", "impact": "full confidence allowed"},
     {"check": "Volume Surge", "value": "true", "status": "positive", "impact": "confirms momentum"},
+    {"check": "Supply/Demand Zone", "value": "demand 1.0850-1.0880 strength 72%", "status": "positive", "impact": "price near demand zone"},
     {"check": "Micro TF Alignment", "value": "aligned", "status": "positive", "impact": "strong signal allowed"},
     {"check": "Fear&Greed", "value": "45/100 Neutral", "status": "neutral", "impact": "no modification"},
     {"check": "News Sentiment", "value": "2 positive articles", "status": "positive", "source": "Reuters, CNBC", "impact": "supports confidence"},
