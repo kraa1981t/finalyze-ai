@@ -390,10 +390,15 @@ Symbol details:\n`;
 
   // AI failed → fallback to local analysis
   if (aiResponse?.error || !aiResponse?.choices?.[0]?.message?.content) {
+    const errorMsg = aiResponse?.error || 'AI Synthesis Error: No response content.';
+    const noticeAr = `⚠️ (تنبيه: فشل الاتصال بالذكاء الاصطناعي الخاص بـ Google/Groq. [السبب: ${errorMsg}]. تم استخدام التحليل الفني المحلي المؤقت كبديل).\n\n`;
+    const noticeEn = `⚠️ (Warning: AI connection failed. [Reason: ${errorMsg}]. Temporary local technical analysis was used as a fallback).\n\n`;
+    const notice = lang === 'ar' ? noticeAr : noticeEn;
+
     for (const s of validSymbols) {
       const d = s.data;
       const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
-      results.push({ symbol: s.symbol, type: s.type, timeframe: s.timeframe, signal: local.signal, confidence: local.confidence, summary: local.summary, detailedReasons: local.detailedReasons, newsSources: [], technicalScore: local.technicalScore, sentimentScore: local.sentimentScore, trendMaturity: (d.metrics?.totalAge || 0) < infantLimit ? 'infancy' : (d.metrics?.totalAge || 0) < matureLimit ? 'youth' : (d.metrics?.totalAge || 0) <= oldLimit ? 'mature' : 'aging', trendAge: d.metrics?.totalAge || 0, microTF: d.microTF, microSignal: 'unknown', microTrend: '', historicalMatch: '', timestamp: new Date().toISOString(), userId: '' });
+      results.push({ symbol: s.symbol, type: s.type, timeframe: s.timeframe, signal: local.signal, confidence: local.confidence, summary: notice + local.summary, detailedReasons: local.detailedReasons, newsSources: [], technicalScore: local.technicalScore, sentimentScore: local.sentimentScore, trendMaturity: (d.metrics?.totalAge || 0) < infantLimit ? 'infancy' : (d.metrics?.totalAge || 0) < matureLimit ? 'youth' : (d.metrics?.totalAge || 0) <= oldLimit ? 'mature' : 'aging', trendAge: d.metrics?.totalAge || 0, microTF: d.microTF, microSignal: 'unknown', microTrend: '', historicalMatch: '', timestamp: new Date().toISOString(), userId: '' });
     }
     return { results, errors };
   }
