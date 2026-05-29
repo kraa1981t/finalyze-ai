@@ -149,7 +149,7 @@ app.get("/api/crypto-prices", async (_req, res) => {
 // Helper for Market Data Fetching
 const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 9000);
+  const timeout = setTimeout(() => controller.abort(), 2000);
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${rangeStr}&interval=${intervalStr}`;
     const response = await fetch(url, {
@@ -210,32 +210,24 @@ app.get("/api/market-data", async (req, res) => {
     else if (timeframe === '1d') { interval = '1d'; range = '6mo'; }
     else if (timeframe === '1w') { interval = '1wk'; range = '2y'; }
 
-    // Symbol Try-Loop — try forex =X suffix first, then fallback mappings
+    // Fast symbol try: try =X suffix first, then dash format — max 2 attempts
     let attempts: string[] = [];
     if (yahooSymbol.length >= 6 && (yahooSymbol.includes('USD') || yahooSymbol.includes('EUR') || yahooSymbol.includes('JPY'))) {
       const base = yahooSymbol.replace('USD', '').replace('-USD', '').replace('=X', '');
-      attempts = [`${yahooSymbol}=X`, `${base}-USD`, `${base}=F`, yahooSymbol];
+      attempts = [`${yahooSymbol}=X`, `${base}-USD`];
     } else {
-      attempts = [`${yahooSymbol}=X`, yahooSymbol, `${yahooSymbol}-USD`].filter(Boolean);
+      attempts = [`${yahooSymbol}=X`, yahooSymbol].filter(Boolean);
     }
 
-    const uniqueAttempts = Array.from(new Set(attempts));
-    let finalData = null;
-
-    // Try each symbol with the requested interval first, then fallback intervals
-    for (const attempt of uniqueAttempts) {
+    // Only try the requested interval — single pass, max 2 fetches, total <4s
+    for (const attempt of attempts) {
       finalData = await fetchMarketData(attempt, range, interval);
       if (finalData) break;
-      // Fallback: try with daily interval if not already
-      if (interval !== '1d') {
-        finalData = await fetchMarketData(attempt, range, '1d');
-        if (finalData) break;
-      }
     }
 
-    // Final fallback: last month daily
+    // One last fallback: daily data
     if (!finalData) {
-      for (const attempt of uniqueAttempts) {
+      for (const attempt of attempts) {
         finalData = await fetchMarketData(attempt, '1mo', '1d');
         if (finalData) break;
       }
