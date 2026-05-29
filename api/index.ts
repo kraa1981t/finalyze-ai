@@ -73,7 +73,27 @@ app.get("/api/context-fear-greed", async (_req, res) => {
 app.get("/api/context-news", async (req, res) => {
   try {
     const query = (req.query.query as string) || "financial markets";
-    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+    const upper = query.toUpperCase();
+    let category = 'general';
+    if (upper.includes('BTC') || upper.includes('ETH') || upper.includes('SOL') || upper.includes('XRP') || upper.includes('DOGE') || upper.includes('CRYPTO')) category = 'crypto';
+    else if (upper.includes('EUR') || upper.includes('GBP') || upper.includes('JPY') || upper.includes('AUD') || upper.includes('CAD') || upper.includes('NZD') || upper.includes('CHF') || upper.includes('FOREX')) category = 'forex';
+    else if (upper.includes('XAU') || upper.includes('XAG') || upper.includes('XPT') || upper.includes('XPD') || upper.includes('XCU') || upper.includes('GOLD') || upper.includes('SILVER') || upper.includes('COPPER')) category = 'commodity';
+
+    const finnhubKey = process.env.FINNHUB_API_KEY || 'DEMO';
+    const finnhubUrl = `https://finnhub.io/api/v1/news?category=${category}&token=${finnhubKey}`;
+    const resp = await fetch(finnhubUrl);
+    if (resp.ok) {
+      const data = await resp.json();
+      const articles = (data || []).slice(0, 8).map((a: any) => ({
+        title: a.headline || '',
+        source: a.source || 'Finnhub'
+      })).filter((a: any) => a.title);
+      if (articles.length > 0) return res.json({ articles });
+    }
+  } catch {}
+  // Fallback: Google News RSS
+  try {
+    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(req.query.query as string || "financial markets")}&hl=en-US&gl=US&ceid=US:en`;
     const response = await fetch(rssUrl);
     const xml = await response.text();
     const titles = [...xml.matchAll(/<title>(.*?)<\/title>/g)].slice(1).map(m => m[1]);
@@ -82,7 +102,7 @@ app.get("/api/context-news", async (req, res) => {
       title,
       source: sources[i] || "News"
     }));
-    res.json({ articles });
+    return res.json({ articles });
   } catch {
     res.json({ articles: [] });
   }
