@@ -300,7 +300,7 @@ Symbol details:\n`;
     const timeoutId = setTimeout(() => ac.abort(), 30000);
     let resp: any;
     try {
-      const isGoogle = keyValue.startsWith('AIzaSy');
+      const isGoogle = keyValue.startsWith('AIzaSy') || keyValue.startsWith('AQ.');
       const body = isGoogle
         ? { contents: [{ parts: [{ text: `You are a financial analyst. ${batchPrompt}` }] }], generationConfig: { temperature: 0.1 } }
         : { model: 'llama-3.3-70b-versatile', messages: [{ role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." }, { role: "user", content: batchPrompt }], temperature: 0.1, response_format: { type: "json_object" } };
@@ -586,7 +586,7 @@ Return ONLY valid JSON:
       const timeoutId = setTimeout(() => ac.abort(), 20000);
       let resp: any;
       try {
-        const isGoogle = keyValue.startsWith('AIzaSy');
+        const isGoogle = keyValue.startsWith('AIzaSy') || keyValue.startsWith('AQ.');
         const body = isGoogle
           ? { contents: [{ parts: [{ text: `You are a financial analyst. ${technicalPrompt}` }] }], generationConfig: { temperature: 0.1 } }
           : { model: 'llama-3.3-70b-versatile', messages: [{ role: "system", content: "You are a professional financial analyst AI. Always respond in valid JSON format." }, { role: "user", content: technicalPrompt }], temperature: 0.1, response_format: { type: "json_object" } };

@@ -653,7 +653,7 @@ export default function App() {
             }
             if (isSubscribed) {
               const key = getApiKey();
-              const delay = key.startsWith('AIzaSy') ? 3500 : 2500;
+              const delay = (key.startsWith('AIzaSy') || key.startsWith('AQ.')) ? 3500 : 2500;
               await new Promise(r => setTimeout(r, delay));
             }
           } catch (e) { 

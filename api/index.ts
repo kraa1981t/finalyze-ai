@@ -250,7 +250,7 @@ app.post("/api/ai-analysis", async (req, res) => {
     const key = userApiKey || '';
 
     let result;
-    if (key.startsWith('AIzaSy')) {
+    if (key.startsWith('AIzaSy') || key.startsWith('AQ.')) {
       result = await callGoogle(key, prompt);
     } else {
       result = await callGroq(key, prompt);
