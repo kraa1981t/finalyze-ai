@@ -79,7 +79,9 @@ app.get("/api/context-news", async (req, res) => {
     else if (upper.includes('EUR') || upper.includes('GBP') || upper.includes('JPY') || upper.includes('AUD') || upper.includes('CAD') || upper.includes('NZD') || upper.includes('CHF') || upper.includes('FOREX')) category = 'forex';
     else if (upper.includes('XAU') || upper.includes('XAG') || upper.includes('XPT') || upper.includes('XPD') || upper.includes('XCU') || upper.includes('GOLD') || upper.includes('SILVER') || upper.includes('COPPER')) category = 'commodity';
 
-    const finnhubKey = process.env.FINNHUB_API_KEY || 'DEMO';
+    // Client sends its Finnhub key via header; fallback to env or DEMO
+    const clientKey = req.headers['x-finnhub-key'] as string;
+    const finnhubKey = clientKey || process.env.FINNHUB_API_KEY || 'DEMO';
     const finnhubUrl = `https://finnhub.io/api/v1/news?category=${category}&token=${finnhubKey}`;
     const resp = await fetch(finnhubUrl);
     if (resp.ok) {
