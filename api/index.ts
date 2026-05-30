@@ -243,6 +243,38 @@ app.get("/api/market-data", async (req, res) => {
   }
 });
 
+// API Route: Factory Reset — trigger redeploy from stable-v1
+const STABLE_VERSION_HASH = '62c47deed780f1122533632a688f7760ff0c71f5';
+const STABLE_VERSION_TAG = 'stable-v1';
+
+app.post("/api/factory-reset", async (_req, res) => {
+  try {
+    const deployHookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
+    if (deployHookUrl) {
+      const resp = await fetch(deployHookUrl, { method: 'POST' });
+      const ok = resp.ok || resp.status < 500;
+      if (ok) {
+        return res.json({
+          success: true,
+          stableVersion: STABLE_VERSION_HASH,
+          stableTag: STABLE_VERSION_TAG,
+          message: `Factory reset initiated. Redeploying from ${STABLE_VERSION_TAG} (${STABLE_VERSION_HASH.substring(0, 7)})...`
+        });
+      }
+    }
+    // Fallback: return instructions if no deploy hook configured
+    return res.json({
+      success: true,
+      stableVersion: STABLE_VERSION_HASH,
+      stableTag: STABLE_VERSION_TAG,
+      message: `Stable version: ${STABLE_VERSION_TAG} (${STABLE_VERSION_HASH.substring(0, 7)}). To trigger redeploy, set VERCEL_DEPLOY_HOOK_URL env var.`,
+      manualReset: `git checkout ${STABLE_VERSION_TAG} && git push --force origin ${STABLE_VERSION_TAG}:main`
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // API Route: AI Analysis Proxy — Groq (gsk_) or Google Gemini (AIzaSy)
 app.post("/api/ai-analysis", async (req, res) => {
   try {

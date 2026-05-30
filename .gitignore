@@ -4,15 +4,7 @@ dist
 *.local
 .env
 SUMMARY.md
-dist
 .vscode
-.DS_Store
-
-# Temporary scripts
-*.bat
-*.ps1
-*.sh
-*.cmd
 
 # Logs
 npm-debug.log*

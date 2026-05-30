@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Settings2, Activity, LayoutTemplate, Layers, ShieldCheck, Mail, MessageSquare, CheckCircle } from 'lucide-react';
+import { X, Settings2, Activity, LayoutTemplate, Layers, ShieldCheck, Mail, MessageSquare, CheckCircle, RotateCcw, AlertTriangle, Loader2 } from 'lucide-react';
 import { StrategySettings } from '../types';
 import { DEFAULT_STRATEGY_SETTINGS } from '../constants';
 import { User } from 'firebase/auth';
@@ -53,6 +53,32 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
   const [otpSuccess, setOtpSuccess] = useState('');
   const [notification, setNotification] = useState<{ type: 'sms' | 'email'; title: string; body: string } | null>(null);
   const [saved, setSaved] = useState(false);
+
+  // Factory Reset state
+  const [showFactoryReset, setShowFactoryReset] = useState(false);
+  const [factoryResetLoading, setFactoryResetLoading] = useState(false);
+  const [factoryResetDone, setFactoryResetDone] = useState(false);
+  const [factoryResetError, setFactoryResetError] = useState('');
+
+  const handleFactoryReset = async () => {
+    setFactoryResetLoading(true);
+    setFactoryResetError('');
+    try {
+      const resp = await fetch('/api/factory-reset', { method: 'POST' });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        setFactoryResetDone(true);
+        setTimeout(() => { setShowFactoryReset(false); setFactoryResetDone(false); }, 4000);
+      } else {
+        setFactoryResetError(data.error || 'فشلت عملية إعادة التعيين');
+        setTimeout(() => setFactoryResetError(''), 6000);
+      }
+    } catch {
+      setFactoryResetError('فشل الاتصال بالخادم');
+      setTimeout(() => setFactoryResetError(''), 6000);
+    }
+    setFactoryResetLoading(false);
+  };
 
   // Auto close notification after 8 seconds
   useEffect(() => {
@@ -471,6 +497,25 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         </div>
       )}
 
+      {/* Section 6: Factory Reset */}
+      <div className="space-y-4 pt-6 border-t border-red-500/20">
+        <h3 className="text-sm font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
+          <RotateCcw size={16} /> {isAr ? '🔴 إعادة تعيين المصنع (Factory Reset)' : '🔴 Factory Reset'}
+        </h3>
+        <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-5 space-y-3">
+          <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+            {isAr ? '⚠️ هذا الإجراء يعيد تعيين الموقع بالكامل إلى النسخة المستقرة (stable-v1). سيتم فقدان أي تغييرات لاحقة. يرجى التأكد قبل المتابعة.' : '⚠️ This resets the entire site to the stable version (stable-v1). Any subsequent changes will be lost. Please be certain before proceeding.'}
+          </p>
+          <button
+            onClick={() => setShowFactoryReset(true)}
+            className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+          >
+            <RotateCcw size={16} />
+            {isAr ? 'بدء إعادة تعيين المصنع' : 'Start Factory Reset'}
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 
@@ -521,12 +566,78 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
     </motion.div>
   );
 
+  const factoryResetOverlay = showFactoryReset && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+    >
+      <div onClick={() => { if (!factoryResetLoading) setShowFactoryReset(false); }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, y: 30 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        className="relative bg-brand-bg border border-red-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl text-center space-y-4"
+      >
+        {factoryResetDone ? (
+          <>
+            <div className="w-16 h-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center">
+              <CheckCircle size={36} className="text-green-400" />
+            </div>
+            <h3 className="text-lg font-black text-green-400">
+              {isAr ? '✅ تم بدء إعادة التعيين!' : '✅ Factory Reset Initiated!'}
+            </h3>
+            <p className="text-sm text-slate-300 font-semibold">
+              {isAr ? 'سيتم إعادة نشر النسخة المستقرة (stable-v1) خلال دقائق. قد تحتاج إلى تحديث الصفحة بعد اكتمال العملية.' : 'The stable version (stable-v1) will be redeployed within minutes. You may need to refresh the page after completion.'}
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
+              <AlertTriangle size={36} className="text-red-400" />
+            </div>
+            <h3 className="text-lg font-black text-red-400">
+              {isAr ? '⚠️ تأكيد إعادة تعيين المصنع' : '⚠️ Confirm Factory Reset'}
+            </h3>
+            <p className="text-sm text-slate-300 font-semibold">
+              {isAr ? 'هل أنت متأكد؟ سيتم إعادة تعيين الموقع إلى النسخة المستقرة (stable-v1). هذا الإجراء لا يمكن التراجع عنه.' : 'Are you sure? This will reset the site to the stable version (stable-v1). This action cannot be undone.'}
+            </p>
+            {factoryResetError && (
+              <p className="text-xs text-red-400 font-bold bg-red-500/10 rounded-xl p-3">{factoryResetError}</p>
+            )}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowFactoryReset(false)}
+                disabled={factoryResetLoading}
+                className="flex-1 bg-white/5 hover:bg-white/10 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all text-xs cursor-pointer"
+              >
+                {isAr ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                onClick={handleFactoryReset}
+                disabled={factoryResetLoading}
+                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+              >
+                {factoryResetLoading ? (
+                  <><Loader2 size={16} className="animate-spin" /> {isAr ? 'جاري...' : 'Resetting...'}</>
+                ) : (
+                  <>{isAr ? 'تأكيد' : 'Confirm'} <RotateCcw size={16} /></>
+                )}
+              </button>
+            </div>
+          </>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+
   if (asPage) {
     return (
       <div>
         {modalHeader}
         {modalBody}
         {modalFooter}
+        <AnimatePresence>{factoryResetOverlay}</AnimatePresence>
       </div>
     );
   }
@@ -555,6 +666,10 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
 
         <AnimatePresence>
           {notificationsOverlay}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {factoryResetOverlay}
         </AnimatePresence>
       </div>
     </AnimatePresence>
