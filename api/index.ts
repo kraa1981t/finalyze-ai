@@ -246,33 +246,58 @@ app.get("/api/market-data", async (req, res) => {
 // API Route: Factory Reset — trigger redeploy from stable-v1
 const STABLE_VERSION_HASH = '62c47deed780f1122533632a688f7760ff0c71f5';
 const STABLE_VERSION_TAG = 'stable-v1';
+const GITHUB_REPO = 'kraa1981t/finalyze-ai';
 
 app.post("/api/factory-reset", async (_req, res) => {
+  const errors: string[] = [];
+
   try {
+    // Strategy 1: Vercel Deploy Hook
     const deployHookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
     if (deployHookUrl) {
       const resp = await fetch(deployHookUrl, { method: 'POST' });
-      const ok = resp.ok || resp.status < 500;
-      if (ok) {
+      if (resp.ok || resp.status < 500) {
         return res.json({
-          success: true,
-          stableVersion: STABLE_VERSION_HASH,
-          stableTag: STABLE_VERSION_TAG,
-          message: `Factory reset initiated. Redeploying from ${STABLE_VERSION_TAG} (${STABLE_VERSION_HASH.substring(0, 7)})...`
+          success: true, method: 'vercel-hook',
+          stableVersion: STABLE_VERSION_HASH, stableTag: STABLE_VERSION_TAG,
+          message: `Factory reset via Vercel hook. Redeploying ${STABLE_VERSION_TAG}...`
         });
       }
+      errors.push(`Vercel hook returned ${resp.status}`);
     }
-    // Fallback: return instructions if no deploy hook configured
-    return res.json({
-      success: true,
-      stableVersion: STABLE_VERSION_HASH,
-      stableTag: STABLE_VERSION_TAG,
-      message: `Stable version: ${STABLE_VERSION_TAG} (${STABLE_VERSION_HASH.substring(0, 7)}). To trigger redeploy, set VERCEL_DEPLOY_HOOK_URL env var.`,
-      manualReset: `git checkout ${STABLE_VERSION_TAG} && git push --force origin ${STABLE_VERSION_TAG}:main`
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+
+    // Strategy 2: GitHub repository_dispatch
+    const githubToken = process.env.GITHUB_PAT;
+    if (githubToken) {
+      const ghResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/dispatches`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' },
+        body: JSON.stringify({ event_type: 'factory-reset' })
+      });
+      if (ghResp.ok) {
+        return res.json({
+          success: true, method: 'github-dispatch',
+          stableVersion: STABLE_VERSION_HASH, stableTag: STABLE_VERSION_TAG,
+          message: `Factory reset via GitHub Actions. Redeploying ${STABLE_VERSION_TAG}...`
+        });
+      }
+      errors.push(`GitHub dispatch returned ${ghResp.status}`);
+    }
+  } catch (e: any) {
+    errors.push(e.message);
   }
+
+  // Fallback: return instructions
+  return res.json({
+    success: true, stableVersion: STABLE_VERSION_HASH, stableTag: STABLE_VERSION_TAG,
+    message: `Factory reset requires configuration. Visit GitHub Actions to trigger manually.`,
+    methods: {
+      vercelHook: deployHookUrl ? 'configured' : 'missing (set VERCEL_DEPLOY_HOOK_URL)',
+      githubActions: `https://github.com/${GITHUB_REPO}/actions/workflows/factory-reset.yml`,
+      manual: `git fetch --tags && git push --force origin ${STABLE_VERSION_TAG}:main`
+    },
+    errors: errors.length > 0 ? errors : undefined
+  });
 });
 
 // API Route: AI Analysis Proxy — Groq (gsk_) or Google Gemini (AIzaSy)
