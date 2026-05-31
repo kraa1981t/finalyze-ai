@@ -1,3 +1,5 @@
+import { fetchFearGreedDirect, fetchNewsDirect, fetchEconCalendarDirect } from './apiDirect';
+
 interface FearGreedData {
   value: number;
   classification: string;
@@ -29,36 +31,20 @@ let ecCache: { data: EconEvent[]; ts: number } | null = null;
 
 async function getFearGreed(): Promise<FearGreedData> {
   if (fgCache && Date.now() - fgCache.ts < CACHE_TTL) return fgCache.data;
-  try {
-    const r = await fetch('/api/context-fear-greed');
-    const d = await r.json();
-    fgCache = { data: d, ts: Date.now() };
-    return d;
-  } catch {
-    return { value: 50, classification: 'Neutral' };
-  }
+  const d = await fetchFearGreedDirect();
+  fgCache = { data: d, ts: Date.now() };
+  return d;
 }
 
 async function getEconCalendar(): Promise<EconEvent[]> {
   if (ecCache && Date.now() - ecCache.ts < CACHE_TTL) return ecCache.data;
-  try {
-    const r = await fetch('/api/context-econ-calendar');
-    const d = await r.json();
-    ecCache = { data: d.events || [], ts: Date.now() };
-    return d.events || [];
-  } catch {
-    return [];
-  }
+  const events = await fetchEconCalendarDirect();
+  ecCache = { data: events, ts: Date.now() };
+  return events;
 }
 
 async function getNews(query: string): Promise<NewsArticle[]> {
-  try {
-    const r = await fetch(`/api/context-news?query=${encodeURIComponent(query)}`);
-    const d = await r.json();
-    return d.articles || [];
-  } catch {
-    return [];
-  }
+  return fetchNewsDirect(query);
 }
 
 function symbolToQuery(symbol: string): string {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalLink, ShieldOff, Shield } from 'lucide-react';
+import { fetchCryptoPricesDirect } from '../services/apiDirect';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
@@ -103,8 +104,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
   useEffect(() => {
     if (!isOpen) return;
-    fetch('/api/crypto-prices')
-      .then(r => r.json())
+    fetchCryptoPricesDirect()
       .then(data => { if (data?.bitcoin?.usd) setPrices(data); })
       .catch(() => {});
   }, [isOpen]);

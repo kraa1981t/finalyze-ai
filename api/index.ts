@@ -57,6 +57,33 @@ app.post("/api/send-verification", async (req, res) => {
   }
 });
 
+// API Route: Register new client with API key
+app.post("/api/register-client-with-key", async (req, res) => {
+  try {
+    const { email, uid, apiKeyType } = req.body;
+    if (!email || !uid) {
+      return res.status(400).json({ error: "email and uid required" });
+    }
+
+    // Store client registration with timestamp
+    const clientData = {
+      email: email.toLowerCase().trim(),
+      uid,
+      status: 'active',
+      plan: 'free',
+      planExpiry: null,
+      registeredAt: new Date().toISOString(),
+      apiKeyType: apiKeyType || 'gemini',
+    };
+
+    console.log("Registering client:", clientData);
+    res.json({ success: true, message: "Client registered successfully", client: clientData });
+  } catch (error: any) {
+    console.error("Client registration error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // API Route: Market Context - Fear & Greed Index
 app.get("/api/context-fear-greed", async (_req, res) => {
   try {

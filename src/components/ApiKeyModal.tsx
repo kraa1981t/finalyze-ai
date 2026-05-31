@@ -136,7 +136,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         localStorage.removeItem('finalyze_key2_provider');
         localStorage.removeItem('finalyze_key2_enabled');
         sessionStorage.removeItem('finalyze_key_mirror');
-        // Clear the cookie by setting past expiry date
         document.cookie = "finalyze_api_key=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         
         if (user && user.uid && user.uid !== 'developer') {
@@ -172,6 +171,26 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           groqApiKey: val,
           updatedAt: new Date().toISOString()
         }, { merge: true });
+
+        // Register client with API key when new user saves key
+        const userEmail = user.email || '';
+        const isGeminiKey = val.startsWith('AIzaSy');
+        try {
+          const response = await fetch('/api/register-client-with-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: userEmail,
+              uid: user.uid,
+              apiKeyType: isGeminiKey ? 'gemini' : 'groq'
+            })
+          });
+          if (response.ok) {
+            console.log("Client registered successfully with API key");
+          }
+        } catch (e) {
+          console.warn("Failed to register client:", e);
+        }
       }
     } catch {}
 

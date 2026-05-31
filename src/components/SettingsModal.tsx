@@ -68,27 +68,60 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
   const [saveStableDone, setSaveStableDone] = useState(false);
   const [saveStableError, setSaveStableError] = useState('');
 
+  const GITHUB_REPO = 'kraa1981t/finalyze-ai';
+  const STABLE_TAG = 'stable-v1';
+
+  const ghHeaders = () => {
+    const token = githubPat;
+    if (!token) throw new Error('GitHub PAT required — please paste your token above');
+    return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+  };
+
   const handleSaveStable = async () => {
     setSaveStableLoading(true);
     setSaveStableError('');
     setSaveStableDone(false);
     try {
-      const resp = await fetch('/api/save-stable', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pat: githubPat || undefined })
-      });
-      const data = await resp.json();
-      if (resp.ok && data.success) {
-        if (githubPat) localStorage.setItem('finalyze_github_pat', githubPat);
-        setSaveStableDone(true);
-        setTimeout(() => setSaveStableDone(false), 4000);
-      } else {
-        setSaveStableError(data.message || 'فشل الحفظ');
-        setTimeout(() => setSaveStableError(''), 6000);
+      if (githubPat) localStorage.setItem('finalyze_github_pat', githubPat);
+      const headers = ghHeaders();
+      const gh = (url: string, opts?: any) => fetch(`https://api.github.com/repos/${GITHUB_REPO}${url}`, { headers, ...opts });
+
+      const mainRef = await (await gh('/git/refs/heads/main')).json();
+      const latestSha = mainRef.object?.sha;
+      if (!latestSha) { setSaveStableError('Could not get latest commit'); setSaveStableLoading(false); return; }
+
+      const tagResp = await gh(`/git/refs/tags/${STABLE_TAG}`, { method: 'PATCH', body: JSON.stringify({ sha: latestSha, force: true }) });
+      if (!tagResp.ok && tagResp.status === 404) {
+        await gh('/git/refs', { method: 'POST', body: JSON.stringify({ ref: `refs/tags/${STABLE_TAG}`, sha: latestSha }) });
+      } else if (!tagResp.ok) {
+        const err = await tagResp.json().catch(() => ({}));
+        setSaveStableError(`Tag update failed: ${err.message || tagResp.status}`);
+        setSaveStableLoading(false); return;
       }
-    } catch {
-      setSaveStableError('فشل الاتصال بالخادم');
+
+      const dateStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
+      const commitMsg = await (await gh(`/git/commits/${latestSha}`)).json();
+      const refContent = JSON.stringify({
+        stableVersion: latestSha,
+        description: `${latestSha.substring(0, 7)} ${(commitMsg.message || '').split('\n')[0]}`,
+        savedAt: dateStr, autoUpdate: true
+      }, null, 2);
+
+      const existingResp = await gh('/contents/.backups/stable-ref.json');
+      let existingSha: string | null = null;
+      if (existingResp.ok) { const ex = await existingResp.json(); existingSha = ex.sha; }
+
+      await gh('/contents/.backups/stable-ref.json', {
+        method: 'PUT', body: JSON.stringify({
+          message: `Update stable-ref to ${latestSha.substring(0, 7)}`,
+          content: btoa(refContent), sha: existingSha
+        })
+      });
+
+      setSaveStableDone(true);
+      setTimeout(() => setSaveStableDone(false), 4000);
+    } catch (e: any) {
+      setSaveStableError('فشل الحفظ: ' + (e.message || 'خطأ'));
       setTimeout(() => setSaveStableError(''), 6000);
     }
     setSaveStableLoading(false);
@@ -98,28 +131,23 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
     setFactoryResetLoading(true);
     setFactoryResetError('');
     try {
-      const resp = await fetch('/api/factory-reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pat: githubPat || undefined })
+      if (githubPat) localStorage.setItem('finalyze_github_pat', githubPat);
+      const headers = ghHeaders();
+      const patchResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/refs/heads/main`, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ sha: '62c47deed780f1122533632a688f7760ff0c71f5', force: true })
       });
-      const data = await resp.json();
-      if (resp.ok && data.success) {
-        if (data.method === 'github-force-push' && githubPat) {
-          localStorage.setItem('finalyze_github_pat', githubPat);
-        }
+      if (patchResp.ok) {
         setFactoryResetDone(true);
         setTimeout(() => { setShowFactoryReset(false); setFactoryResetDone(false); }, 4000);
       } else {
-        if (data.redirectUrl) {
-          setFactoryResetRedirectUrl(data.redirectUrl);
-        } else {
-          setFactoryResetError(data.error || 'فشلت عملية إعادة التعيين');
-          setTimeout(() => setFactoryResetError(''), 6000);
-        }
+        const err = await patchResp.json().catch(() => ({}));
+        setFactoryResetRedirectUrl(`https://github.com/${GITHUB_REPO}/actions/new`);
+        setFactoryResetError(`GitHub force-push failed: ${err.message || patchResp.status}`);
+        setTimeout(() => setFactoryResetError(''), 6000);
       }
-    } catch {
-      setFactoryResetError('فشل الاتصال بالخادم');
+    } catch (e: any) {
+      setFactoryResetError('فشلت عملية إعادة التعيين: ' + (e.message || 'خطأ'));
       setTimeout(() => setFactoryResetError(''), 6000);
     }
     setFactoryResetLoading(false);

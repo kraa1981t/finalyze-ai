@@ -1016,7 +1016,7 @@ export default function App() {
           }
         } catch (e) { console.warn('Firestore save on login failed:', e); }
         const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
-        const verifyLink = `${window.location.origin}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
+        const verifyLink = `${window.location.origin}${window.location.pathname}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
         // Send email (best effort)
         fetch('/api/send-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, verifyLink }) }).catch(() => {});
         // Sign in and show blocking API key page immediately
@@ -1117,7 +1117,7 @@ export default function App() {
           // Sign in and show verification banner
           localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
           localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-          const vLink = `${window.location.origin}/verify?email=${encodeURIComponent(email)}&token=${data.verifyToken}`;
+          const vLink = `${window.location.origin}${window.location.pathname}?verify=true&email=${encodeURIComponent(email)}&token=${data.verifyToken}`;
           localStorage.setItem('finalyze_verify_link', vLink);
           setPendingVerifyLink(vLink);
           const cred = await signInAnonymously(auth);
@@ -1279,7 +1279,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Blocking API Key overlay — only for NEW users (not in finalyze_clients) */}
-      {user && user.email && !hasApiKey && !isDeveloperSession() && !JSON.parse(localStorage.getItem('finalyze_clients') || '[]').some((c: any) => c.email === user.email) && (
+      {user && user.email && !hasApiKey && !isDeveloperSession() && !clients.some((c: any) => c.email?.toLowerCase() === user.email?.toLowerCase()) && !JSON.parse(localStorage.getItem('finalyze_clients') || '[]').some((c: any) => c.email?.toLowerCase() === user.email?.toLowerCase()) && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
           <ApiKeyModal
             key={user?.uid || 'no-session'}
@@ -1304,7 +1304,7 @@ export default function App() {
                   id: 'local_' + Date.now(),
                   email,
                   uid: user?.uid || '',
-                  status: 'pending' as const,
+                  status: 'active' as const,
                   plan: 'free' as const,
                   planExpiry: null,
                   registeredAt: new Date().toISOString(),
@@ -1313,9 +1313,9 @@ export default function App() {
                 };
                 // Save to localStorage as the permanent record
                 const localClients: any[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
-                const existingIdx = localClients.findIndex(c => c.email === email);
+                const existingIdx = localClients.findIndex(c => c.email?.toLowerCase() === email.toLowerCase());
                 if (existingIdx >= 0) {
-                  localClients[existingIdx] = { ...localClients[existingIdx], groqApiKey: apiKey };
+                  localClients[existingIdx] = { ...localClients[existingIdx], groqApiKey: apiKey, status: 'active' };
                 } else {
                   localClients.push(newClient);
                 }
@@ -1325,11 +1325,11 @@ export default function App() {
                 try {
                   const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
                   if (existingSnap.docs[0]) {
-                    await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { groqApiKey: apiKey });
+                    await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { groqApiKey: apiKey, status: 'active' });
                   } else {
                     await addDoc(collection(db, 'clients'), {
                       email, groqApiKey: apiKey,
-                      status: 'pending', plan: 'free', planExpiry: null,
+                      status: 'active', plan: 'free', planExpiry: null,
                       registeredAt: serverTimestamp(), rank: 0,
                     });
                   }

@@ -2,6 +2,7 @@ import { MarketType, AnalysisResult, TradingStyle, SignalType, StrategySettings 
 import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 import { fetchMarketContext } from "./marketContextService";
 import { onRateLimited, waitIfRateLimited } from "./rateLimitTracker";
+import { fetchMarketDataDirect, callAIDirect } from './apiDirect';
 
 export function getApiKey(): string {
   try {
@@ -172,7 +173,7 @@ async function fetchAndPrepareSymbolData(
     const currentIndex = TF_PROGRESSION.indexOf(timeframe);
     const microTF = currentIndex > 0 ? TF_PROGRESSION[currentIndex - 1] : TF_PROGRESSION[0];
 
-    const rawData = await fetch(`/api/market-data?symbol=${symbol}&timeframe=${timeframe}`).then(r => r.json());
+    const rawData = await fetchMarketDataDirect(symbol, timeframe).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } }));
     const quotes = rawData.chart?.result?.[0]?.indicators?.quote?.[0];
     if (!quotes || !quotes.close) return { error: 'Market data currently unavailable from the source.' };
 
@@ -191,7 +192,7 @@ async function fetchAndPrepareSymbolData(
     let microMetrics = null;
     let microCloses: number[] = [];
     try {
-      const microData = await fetch(`/api/market-data?symbol=${symbol}&timeframe=${microTF}`).then(r => r.json());
+      const microData = await fetchMarketDataDirect(symbol, microTF).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } }));
       const microQuotes = microData.chart?.result?.[0]?.indicators?.quote?.[0];
       if (microQuotes && microQuotes.close) {
         microCloses = microQuotes.close.filter((c: any) => c != null);
@@ -367,20 +368,8 @@ Symbol details:\n`;
   if (keyValue) mirrorApiKey(keyValue);
 
   async function makeAICall(): Promise<any> {
-    const ac = new AbortController();
-    const timeoutId = setTimeout(() => ac.abort(), 25000);
-    let resp: any;
-    try {
-      resp = await fetch('/api/ai-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: batchPrompt, userApiKey: keyValue }),
-        signal: ac.signal
-      }).then(r => r.json());
-    } catch (e: any) {
-      resp = { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
-    }
-    clearTimeout(timeoutId);
+    const resp = await callAIDirect(batchPrompt, keyValue);
+    if (resp?.error) return resp;
     return resp;
   }
 
@@ -535,7 +524,7 @@ export async function analyzeMarket(params: {
     const macro1 = TF_PROGRESSION[Math.min(currentIndex + 1, TF_PROGRESSION.length - 1)];
     
     // Fetch Data
-    const rawData = await fetch(`/api/market-data?symbol=${symbol}&timeframe=${timeframe}`).then(r => r.json());
+    const rawData = await fetchMarketDataDirect(symbol, timeframe).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } }));
     const quotes = rawData.chart?.result?.[0]?.indicators?.quote?.[0];
     
     if (!quotes || !quotes.close) {
@@ -564,7 +553,7 @@ export async function analyzeMarket(params: {
     let microCloses: number[] = [];
     let microMetrics = null;
     try {
-      const microData = await fetch(`/api/market-data?symbol=${symbol}&timeframe=${microTF}`).then(r => r.json());
+      const microData = await fetchMarketDataDirect(symbol, microTF).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } }));
       const microQuotes = microData.chart?.result?.[0]?.indicators?.quote?.[0];
       if (microQuotes && microQuotes.close) {
         microCloses = microQuotes.close.filter((c: any) => c != null);
@@ -644,23 +633,8 @@ Return ONLY valid JSON:
 
     await waitIfRateLimited();
 
-    // Server proxy call (same architecture as working old version)
     async function makeSingleAICall(): Promise<any> {
-      const ac = new AbortController();
-      const timeoutId = setTimeout(() => ac.abort(), 25000);
-      let resp: any;
-      try {
-        resp = await fetch('/api/ai-analysis', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: technicalPrompt, userApiKey: keyValue }),
-          signal: ac.signal
-        }).then(r => r.json());
-      } catch (e: any) {
-        resp = { error: e.name === 'AbortError' ? 'Request timed out' : e.message };
-      }
-      clearTimeout(timeoutId);
-      return resp;
+      return callAIDirect(technicalPrompt, keyValue);
     }
 
     let aiResponse = await makeSingleAICall();
