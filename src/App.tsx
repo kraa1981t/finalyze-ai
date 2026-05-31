@@ -69,7 +69,9 @@ export default function App() {
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [freemiumDisabled, setFreemiumDisabled] = useState(() => localStorage.getItem('finalyze_freemium_disabled') === 'true');
-  const [needsApiKey, setNeedsApiKeyState] = useState<string | null>(null);
+  const [needsApiKey, setNeedsApiKeyState] = useState<string | null>(() => {
+    try { return localStorage.getItem('finalyze_needs_api_key'); } catch { return null; }
+  });
   const [pendingVerifyLink, setPendingVerifyLink] = useState<string | null>(localStorage.getItem('finalyze_verify_link') || null);
   const persistNeedsApiKey = (email: string | null) => {
     if (email) {
@@ -1137,6 +1139,18 @@ export default function App() {
       // Simple hash for password (client-side, for demo purposes)
       const pwdHash = btoa(password + ':finalyze_salt');
 
+      // New user must enter API key — clear old keys
+      localStorage.removeItem('finalyze_key1_value');
+      localStorage.removeItem('finalyze_user_groq_api_key');
+      setHasApiKey(false);
+
+      // Set session BEFORE anonymous auth to prevent auth listener overriding state
+      localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+      localStorage.setItem('finalyze_verify_link', verifyLink);
+      setPendingVerifyLink(verifyLink);
+      persistNeedsApiKey(email);
+
       // Save to Firestore
       const cred = await signInAnonymously(auth);
       await addDoc(collection(db, 'clients'), {
@@ -1145,11 +1159,6 @@ export default function App() {
         registeredAt: serverTimestamp(), rank: 0,
       });
 
-      // Sign in directly and show verification banner on main page
-      localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-      localStorage.setItem('finalyze_verify_link', verifyLink);
-      setPendingVerifyLink(verifyLink);
       const mockUser = {
         uid: cred.user.uid, email, displayName: '', emailVerified: true,
       } as User;
