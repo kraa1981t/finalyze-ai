@@ -1,0 +1,17 @@
+name: Factory Reset - Redeploy Stable Version
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [factory-reset]
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stable-v1
+          fetch-depth: 0
+      - run: |
+          git config user.name "factory-reset"
+          git config user.email "factory-reset@finalyze-ai"
+          git push origin HEAD:main --force
