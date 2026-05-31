@@ -7,6 +7,12 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/((?!api/).*)", "destination": "/" }
+    {
+      "source": "/(.*)",
+      "has": [
+        { "type": "header", "key": "accept", "value": "text/html" }
+      ],
+      "destination": "/"
+    }
   ]
 }
