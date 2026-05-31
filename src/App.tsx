@@ -1279,7 +1279,12 @@ export default function App() {
       </AnimatePresence>
 
       {/* Blocking API Key overlay — only for NEW users (not in finalyze_clients) */}
-      {user && user.email && !hasApiKey && !isDeveloperSession() && !clients.some((c: any) => c.email?.toLowerCase() === user.email?.toLowerCase()) && !JSON.parse(localStorage.getItem('finalyze_clients') || '[]').some((c: any) => c.email?.toLowerCase() === user.email?.toLowerCase()) && (
+      {user && user.email && !hasApiKey && !isDeveloperSession() && (() => {
+        const localClients = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+        const isNewClient = !clients.some((c: any) => c.email?.toLowerCase() === user.email?.toLowerCase()) && 
+                           !localClients.some((c: any) => c.email?.toLowerCase() === user.email?.toLowerCase());
+        return isNewClient;
+      })() && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
           <ApiKeyModal
             key={user?.uid || 'no-session'}
