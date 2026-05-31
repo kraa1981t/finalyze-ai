@@ -64,6 +64,35 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
     if (typeof window !== 'undefined') return localStorage.getItem('finalyze_github_pat') || '';
     return '';
   });
+  const [saveStableLoading, setSaveStableLoading] = useState(false);
+  const [saveStableDone, setSaveStableDone] = useState(false);
+  const [saveStableError, setSaveStableError] = useState('');
+
+  const handleSaveStable = async () => {
+    setSaveStableLoading(true);
+    setSaveStableError('');
+    setSaveStableDone(false);
+    try {
+      const resp = await fetch('/api/save-stable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pat: githubPat || undefined })
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        if (githubPat) localStorage.setItem('finalyze_github_pat', githubPat);
+        setSaveStableDone(true);
+        setTimeout(() => setSaveStableDone(false), 4000);
+      } else {
+        setSaveStableError(data.message || 'فشل الحفظ');
+        setTimeout(() => setSaveStableError(''), 6000);
+      }
+    } catch {
+      setSaveStableError('فشل الاتصال بالخادم');
+      setTimeout(() => setSaveStableError(''), 6000);
+    }
+    setSaveStableLoading(false);
+  };
 
   const handleFactoryReset = async () => {
     setFactoryResetLoading(true);
@@ -522,6 +551,24 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
           <p className="text-xs text-slate-300 leading-relaxed font-semibold">
             {isAr ? '⚠️ هذا الإجراء يعيد تعيين الموقع بالكامل إلى النسخة المستقرة (stable-v1). سيتم فقدان أي تغييرات لاحقة. يرجى التأكد قبل المتابعة.' : '⚠️ This resets the entire site to the stable version (stable-v1). Any subsequent changes will be lost. Please be certain before proceeding.'}
           </p>
+
+          {/* Save Current as Stable */}
+          <button
+            onClick={handleSaveStable}
+            disabled={saveStableLoading}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+          >
+            {saveStableLoading ? (
+              <><Loader2 size={16} className="animate-spin" /> {isAr ? 'جاري الحفظ...' : 'Saving...'}</>
+            ) : saveStableDone ? (
+              <><CheckCircle size={16} /> {isAr ? 'تم الحفظ كنسخة مستقرة ✅' : 'Saved as Stable ✅'}</>
+            ) : (
+              <><CheckCircle size={16} /> {isAr ? 'حفظ النسخة الحالية كمستقرة' : 'Save Current as Stable'}</>
+            )}
+          </button>
+          {saveStableError && <p className="text-xs text-red-400 font-bold">{saveStableError}</p>}
+
+          {/* Factory Reset */}
           <button
             onClick={() => setShowFactoryReset(true)}
             className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
@@ -529,6 +576,15 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             <RotateCcw size={16} />
             {isAr ? 'بدء إعادة تعيين المصنع' : 'Start Factory Reset'}
           </button>
+
+          {/* GitHub PAT input */}
+          <input
+            type="password"
+            placeholder={isAr ? 'GitHub PAT (للتشغيل التلقائي)' : 'GitHub PAT (for auto mode)'}
+            value={githubPat}
+            onChange={(e) => setGithubPat(e.target.value)}
+            className="w-full bg-brand-bg border border-white/10 rounded-xl px-3 py-2 text-xs text-white text-center focus:outline-none focus:border-emerald-500/50"
+          />
         </div>
       </div>
 
@@ -644,16 +700,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             <p className="text-sm text-slate-300 font-semibold">
               {isAr ? 'هل أنت متأكد؟ سيتم إعادة تعيين الموقع إلى النسخة المستقرة (stable-v1). هذا الإجراء لا يمكن التراجع عنه.' : 'Are you sure? This will reset the site to the stable version (stable-v1). This action cannot be undone.'}
             </p>
-            <div className="space-y-2">
-              <input
-                type="password"
-                placeholder={isAr ? 'GitHub Token (اختياري - للتشغيل التلقائي)' : 'GitHub Token (optional - for auto reset)'}
-                value={githubPat}
-                onChange={(e) => setGithubPat(e.target.value)}
-                className="w-full bg-brand-bg border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white text-left focus:outline-none focus:border-red-500/50"
-              />
-              <p className="text-[10px] text-slate-500">{isAr ? 'أدخل توكن GitHub للتفعيل التلقائي، أو اتركه فارغاً وسيتم توجيهك لصفحة GitHub Actions' : 'Enter GitHub token for auto-reset, or leave empty to be redirected to GitHub Actions'}</p>
-            </div>
             {factoryResetError && (
               <p className="text-xs text-red-400 font-bold bg-red-500/10 rounded-xl p-3">{factoryResetError}</p>
             )}

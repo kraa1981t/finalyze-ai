@@ -304,6 +304,75 @@ app.post("/api/factory-reset", async (req, res) => {
   });
 });
 
+// API Route: Save Current Version as Stable
+app.post("/api/save-stable", async (req, res) => {
+  try {
+    const githubToken = process.env.GITHUB_PAT || (req.body?.pat as string);
+    if (!githubToken) {
+      return res.json({ success: false, message: 'GitHub PAT required (set GITHUB_PAT env var or send pat in body)' });
+    }
+
+    const headers = { 'Authorization': `Bearer ${githubToken}`, 'Content-Type': 'application/json' };
+
+    // 1. Get latest commit SHA on main
+    const mainRef = await (await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/refs/heads/main`, { headers })).json();
+    const latestSha = mainRef.object?.sha;
+    if (!latestSha) return res.json({ success: false, message: 'Could not get latest commit' });
+
+    // 2. Update stable-v1 tag to point to latest commit
+    const tagResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/refs/tags/${STABLE_VERSION_TAG}`, {
+      method: 'PATCH', headers,
+      body: JSON.stringify({ sha: latestSha, force: true })
+    });
+
+    if (!tagResp.ok && tagResp.status === 404) {
+      // Tag doesn't exist yet — create it
+      await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/refs`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ ref: `refs/tags/${STABLE_VERSION_TAG}`, sha: latestSha })
+      });
+    } else if (!tagResp.ok) {
+      const err = await tagResp.json().catch(() => ({}));
+      return res.json({ success: false, message: `Tag update failed: ${err.message || tagResp.status}` });
+    }
+
+    // 3. Update stable-ref.json
+    const dateStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
+    const commitMsg = await (await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/commits/${latestSha}`, { headers })).json();
+    const refContent = JSON.stringify({
+      stableVersion: latestSha,
+      description: `${latestSha.substring(0, 7)} ${(commitMsg.message || '').split('\n')[0]}`,
+      savedAt: dateStr,
+      autoUpdate: true
+    }, null, 2);
+
+    // Check if stable-ref.json exists
+    let existingSha: string | null = null;
+    const existingResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/.backups/stable-ref.json`, { headers });
+    if (existingResp.ok) {
+      const existing = await existingResp.json();
+      existingSha = existing.sha;
+    }
+
+    await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/.backups/stable-ref.json`, {
+      method: 'PUT', headers,
+      body: JSON.stringify({
+        message: `Update stable-ref to ${latestSha.substring(0, 7)}`,
+        content: Buffer.from(refContent).toString('base64'),
+        sha: existingSha
+      })
+    });
+
+    return res.json({
+      success: true,
+      stableVersion: latestSha,
+      message: `✅ Stable version updated to ${latestSha.substring(0, 7)}`
+    });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // API Route: AI Analysis Proxy — Groq (gsk_) or Google Gemini (AIzaSy)
 app.post("/api/ai-analysis", async (req, res) => {
   try {
