@@ -247,8 +247,9 @@ app.get("/api/market-data", async (req, res) => {
 const STABLE_VERSION_HASH = '62c47deed780f1122533632a688f7760ff0c71f5';
 const STABLE_VERSION_TAG = 'stable-v1';
 const GITHUB_REPO = 'kraa1981t/finalyze-ai';
+const GITHUB_ACTIONS_URL = `https://github.com/${GITHUB_REPO}/actions/new`;
 
-app.post("/api/factory-reset", async (_req, res) => {
+app.post("/api/factory-reset", async (req, res) => {
   const errors: string[] = [];
 
   try {
@@ -266,37 +267,40 @@ app.post("/api/factory-reset", async (_req, res) => {
       errors.push(`Vercel hook returned ${resp.status}`);
     }
 
-    // Strategy 2: GitHub repository_dispatch
-    const githubToken = process.env.GITHUB_PAT;
+    // Strategy 2: GitHub API force-push (uses PAT from env or request header)
+    const githubToken = process.env.GITHUB_PAT || (req.body?.pat as string);
     if (githubToken) {
-      const ghResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/dispatches`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' },
-        body: JSON.stringify({ event_type: 'factory-reset' })
+      const stableSha = STABLE_VERSION_HASH;
+      const patchResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/refs/heads/main`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${githubToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sha: stableSha, force: true })
       });
-      if (ghResp.ok) {
+      if (patchResp.ok) {
         return res.json({
-          success: true, method: 'github-dispatch',
+          success: true, method: 'github-force-push',
           stableVersion: STABLE_VERSION_HASH, stableTag: STABLE_VERSION_TAG,
-          message: `Factory reset via GitHub Actions. Redeploying ${STABLE_VERSION_TAG}...`
+          message: `Factory reset via GitHub force-push. Main branch reset to ${STABLE_VERSION_TAG}. Vercel will redeploy shortly.`
         });
       }
-      errors.push(`GitHub dispatch returned ${ghResp.status}`);
+      const errData = await patchResp.json().catch(() => ({}));
+      errors.push(`GitHub force-push failed: ${errData?.message || patchResp.status}`);
     }
   } catch (e: any) {
     errors.push(e.message);
   }
 
-  // Fallback: return instructions
+  // Fallback: return instructions with redirect URL
   return res.json({
     success: true, stableVersion: STABLE_VERSION_HASH, stableTag: STABLE_VERSION_TAG,
-    message: `Factory reset requires configuration. Visit GitHub Actions to trigger manually.`,
+    message: `لإعادة التعيين، زُر صفحة GitHub Actions يدوياً.`,
     methods: {
       vercelHook: deployHookUrl ? 'configured' : 'missing (set VERCEL_DEPLOY_HOOK_URL)',
-      githubActions: `https://github.com/${GITHUB_REPO}/actions/workflows/factory-reset.yml`,
+      githubActions: GITHUB_ACTIONS_URL,
       manual: `git fetch --tags && git push --force origin ${STABLE_VERSION_TAG}:main`
     },
-    errors: errors.length > 0 ? errors : undefined
+    errors: errors.length > 0 ? errors : undefined,
+    redirectUrl: GITHUB_ACTIONS_URL
   });
 });
 

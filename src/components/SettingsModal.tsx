@@ -59,19 +59,35 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
   const [factoryResetLoading, setFactoryResetLoading] = useState(false);
   const [factoryResetDone, setFactoryResetDone] = useState(false);
   const [factoryResetError, setFactoryResetError] = useState('');
+  const [factoryResetRedirectUrl, setFactoryResetRedirectUrl] = useState('');
+  const [githubPat, setGithubPat] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('finalyze_github_pat') || '';
+    return '';
+  });
 
   const handleFactoryReset = async () => {
     setFactoryResetLoading(true);
     setFactoryResetError('');
     try {
-      const resp = await fetch('/api/factory-reset', { method: 'POST' });
+      const resp = await fetch('/api/factory-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pat: githubPat || undefined })
+      });
       const data = await resp.json();
       if (resp.ok && data.success) {
+        if (data.method === 'github-force-push' && githubPat) {
+          localStorage.setItem('finalyze_github_pat', githubPat);
+        }
         setFactoryResetDone(true);
         setTimeout(() => { setShowFactoryReset(false); setFactoryResetDone(false); }, 4000);
       } else {
-        setFactoryResetError(data.error || 'فشلت عملية إعادة التعيين');
-        setTimeout(() => setFactoryResetError(''), 6000);
+        if (data.redirectUrl) {
+          setFactoryResetRedirectUrl(data.redirectUrl);
+        } else {
+          setFactoryResetError(data.error || 'فشلت عملية إعادة التعيين');
+          setTimeout(() => setFactoryResetError(''), 6000);
+        }
       }
     } catch {
       setFactoryResetError('فشل الاتصال بالخادم');
@@ -591,6 +607,32 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
               {isAr ? 'سيتم إعادة نشر النسخة المستقرة (stable-v1) خلال دقائق. قد تحتاج إلى تحديث الصفحة بعد اكتمال العملية.' : 'The stable version (stable-v1) will be redeployed within minutes. You may need to refresh the page after completion.'}
             </p>
           </>
+        ) : factoryResetRedirectUrl ? (
+          <>
+            <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/20 flex items-center justify-center">
+              <AlertTriangle size={36} className="text-amber-400" />
+            </div>
+            <h3 className="text-lg font-black text-amber-400">
+              {isAr ? '🔄 يلزم تدخل يدوي' : '🔄 Manual Action Required'}
+            </h3>
+            <p className="text-sm text-slate-300 font-semibold">
+              {isAr ? 'اضغط الزر أدناه لفتح صفحة GitHub Actions، ثم اضغط "Run workflow" لإعادة التعيين.' : 'Click the button below to open GitHub Actions, then click "Run workflow" to reset.'}
+            </p>
+            <a
+              href={factoryResetRedirectUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-amber-500/20"
+            >
+              {isAr ? 'فتح GitHub Actions ⚡' : 'Open GitHub Actions ⚡'}
+            </a>
+            <button
+              onClick={() => setShowFactoryReset(false)}
+              className="w-full bg-white/5 hover:bg-white/10 text-white font-bold py-2 rounded-xl transition-all text-xs cursor-pointer"
+            >
+              {isAr ? 'إغلاق' : 'Close'}
+            </button>
+          </>
         ) : (
           <>
             <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
@@ -602,6 +644,16 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             <p className="text-sm text-slate-300 font-semibold">
               {isAr ? 'هل أنت متأكد؟ سيتم إعادة تعيين الموقع إلى النسخة المستقرة (stable-v1). هذا الإجراء لا يمكن التراجع عنه.' : 'Are you sure? This will reset the site to the stable version (stable-v1). This action cannot be undone.'}
             </p>
+            <div className="space-y-2">
+              <input
+                type="password"
+                placeholder={isAr ? 'GitHub Token (اختياري - للتشغيل التلقائي)' : 'GitHub Token (optional - for auto reset)'}
+                value={githubPat}
+                onChange={(e) => setGithubPat(e.target.value)}
+                className="w-full bg-brand-bg border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white text-left focus:outline-none focus:border-red-500/50"
+              />
+              <p className="text-[10px] text-slate-500">{isAr ? 'أدخل توكن GitHub للتفعيل التلقائي، أو اتركه فارغاً وسيتم توجيهك لصفحة GitHub Actions' : 'Enter GitHub token for auto-reset, or leave empty to be redirected to GitHub Actions'}</p>
+            </div>
             {factoryResetError && (
               <p className="text-xs text-red-400 font-bold bg-red-500/10 rounded-xl p-3">{factoryResetError}</p>
             )}
