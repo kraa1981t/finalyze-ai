@@ -185,6 +185,19 @@ export default function App() {
   }
   const [clients, setClients] = useState<ClientRecord[]>([]);
 
+  const isNewClient = useMemo(() => {
+    try {
+      const localClients = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+      if (!user || !user.email) return false;
+      const email = user.email.toLowerCase();
+      const inClients = clients.some((c: any) => c.email?.toLowerCase() === email);
+      const inLocal = localClients.some((c: any) => c.email?.toLowerCase() === email);
+      return !inClients && !inLocal;
+    } catch (e) {
+      return false;
+    }
+  }, [clients, user]);
+
   const fetchClients = async () => {
     // Merge Firestore clients with localStorage fallback
     const localClients: ClientRecord[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
@@ -1279,12 +1292,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Blocking API Key overlay — only for NEW users (not in finalyze_clients) */}
-      {user && user.email && !hasApiKey && !isDeveloperSession() && (() => {
-        const localClients = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
-        const isNewClient = !clients.some((c: any) => c.email?.toLowerCase() === user.email?.toLowerCase()) && 
-                           !localClients.some((c: any) => c.email?.toLowerCase() === user.email?.toLowerCase());
-        return isNewClient;
-      })() && (
+      {user && user.email && !hasApiKey && !isDeveloperSession() && isNewClient && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
           <ApiKeyModal
             key={user?.uid || 'no-session'}
