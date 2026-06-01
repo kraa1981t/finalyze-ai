@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import fs from "fs";
+import apiApp from "./api/index.ts";
 
 dotenv.config();
 
@@ -12,7 +13,7 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 5000;
+  const PORT = 3000;
 
   // Global request logger
   app.use((req, res, next) => {
@@ -22,6 +23,9 @@ async function startServer() {
 
   app.use(express.json());
   console.log("[Server] Initializing Finalyze Engine...");
+
+  // Mount API endpoints from api/index.ts
+  app.use(apiApp);
 
   // API Route: Health check
   app.get("/api/health", (req, res) => {
