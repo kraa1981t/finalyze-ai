@@ -1,16 +1,8 @@
-node_modules
-dist
+node_modules/
+build/
+dist/
+coverage/
 .DS_Store
-*.local
-.env
-SUMMARY.md
-.vscode
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Backups
-.backups/
-.vercel
+*.log
+.env*
+!.env.example

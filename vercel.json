@@ -1,18 +1,15 @@
 {
-  "name": "finalyze-ai",
-  "functions": {
-    "api/index.ts": {
-      "maxDuration": 30
-    }
-  },
+  "version": 2,
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
+    },
     {
       "source": "/(.*)",
-      "has": [
-        { "type": "header", "key": "accept", "value": "text/html" }
-      ],
-      "destination": "/"
+      "destination": "/index.html"
     }
   ]
 }
