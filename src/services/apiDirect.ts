@@ -157,22 +157,35 @@ export async function fetchCryptoPricesDirect(): Promise<any> {
 }
 
 const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+const CORS_PROXY_2 = 'https://corsproxy.io/?url=';
 
 function symbolToYahooForex(symbol: string): string | null {
   const upper = symbol.toUpperCase().replace(/ /g, '');
+
+  // Metals mapping (like old server)
+  const metalMap: Record<string, string> = {
+    'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F',
+    'XPDUSD': 'PA=F', 'XCUUSD': 'HG=F', 'XALUSD': 'ALI=F',
+    'XZNUSD': 'ZNC=F', 'XNIUSD': 'NIC=F', 'XPBUSD': 'LED=F',
+    'GOLD': 'GC=F', 'SILVER': 'SI=F', 'COPPER': 'HG=F',
+  };
+  if (metalMap[upper]) return metalMap[upper];
+
   // Forex pairs: EURUSD → EURUSD=X
-  if (/^[A-Z]{6}$/.test(upper)) {
-    return `${upper}=X`;
-  }
-  // Stock symbols: AAPL, TSLA etc
-  if (/^[A-Z]{1,5}$/.test(upper) && !upper.endsWith('USD')) {
-    return upper;
-  }
+  if (/^[A-Z]{6}$/.test(upper)) return `${upper}=X`;
+
   // Crypto: BTCUSD → BTC-USD
   if (upper.endsWith('USD') && !upper.endsWith('USDT')) {
     const base = upper.replace('USD', '');
     return `${base}-USD`;
   }
+  if (upper.endsWith('USDT')) {
+    return upper.replace('USDT', '-USD');
+  }
+
+  // Stocks: AAPL → AAPL
+  if (/^[A-Z]{1,5}$/.test(upper)) return upper;
+
   return null;
 }
 
@@ -198,54 +211,73 @@ async function fetchYahooFinance(symbol: string, timeframe: string): Promise<any
 
   const interval = yahooInterval(timeframe);
   const range = yahooRange(timeframe);
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=${interval}&range=${range}`;
 
-  const ac = new AbortController();
-  const timeout = setTimeout(() => ac.abort(), 15000);
+  // Try multiple symbol formats like the old server did
+  const base = symbol.toUpperCase().replace(/ /g, '').replace('USD', '').replace('-USD', '').replace('=X', '');
+  const attempts = [
+    yahooSymbol,                    // EURGBP=X
+    `${base}-USD`,                  // EURGBP-USD (crypto fallback)
+    `${base}=X`,                    // EURGBP=X again (different base)
+  ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
 
-  try {
-    // Try direct first
-    let r = await fetch(url, { signal: ac.signal });
-    clearTimeout(timeout);
+  const ranges = [range, '1mo']; // fallback to shorter range
+  const intervals = [interval, '1d']; // fallback to daily
 
-    // If CORS blocked, try proxy
-    if (!r.ok || r.status === 0) {
-      const ac2 = new AbortController();
-      const timeout2 = setTimeout(() => ac2.abort(), 15000);
-      r = await fetch(CORS_PROXY + encodeURIComponent(url), { signal: ac2.signal });
-      clearTimeout(timeout2);
-    }
+  for (const r of ranges) {
+    for (const it of intervals) {
+      for (const attempt of attempts) {
+        try {
+          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(attempt)}?interval=${it}&range=${r}`;
 
-    if (!r.ok) throw new Error(`Yahoo: HTTP ${r.status}`);
-    const data = await r.json();
-    const result = data?.chart?.result?.[0];
-    if (!result) throw new Error('No Yahoo data');
+          const ac = new AbortController();
+          const timeout = setTimeout(() => ac.abort(), 8000);
 
-    const ts = result.timestamp;
-    const q = result.indicators?.quote?.[0];
-    if (!ts || !q || !q.close) throw new Error('Incomplete Yahoo data');
-
-    return {
-      chart: {
-        result: [{
-          meta: { symbol },
-          timestamp: ts,
-          indicators: {
-            quote: [{
-              open: q.open,
-              high: q.high,
-              low: q.low,
-              close: q.close,
-              volume: q.volume || ts.map(() => 0),
-            }]
+          // Always use CORS proxy for GitHub Pages
+          const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
+          let resp: Response;
+          try {
+            resp = await fetch(proxyUrl, { signal: ac.signal });
+          } catch {
+            // Try second proxy
+            const proxy2 = `${CORS_PROXY_2}${encodeURIComponent(url)}`;
+            resp = await fetch(proxy2, { signal: ac.signal });
           }
-        }]
+          clearTimeout(timeout);
+
+          if (!resp.ok) continue;
+          const data = await resp.json();
+          const result = data?.chart?.result?.[0];
+          if (!result) continue;
+
+          const ts = result.timestamp;
+          const q = result.indicators?.quote?.[0];
+          if (!ts || !q || !q.close) continue;
+
+          const closes = q.close.filter((c: any) => c != null);
+          if (closes.length < 10) continue;
+
+          return {
+            chart: {
+              result: [{
+                meta: { symbol },
+                timestamp: ts,
+                indicators: {
+                  quote: [{
+                    open: q.open,
+                    high: q.high,
+                    low: q.low,
+                    close: q.close,
+                    volume: q.volume || ts.map(() => 0),
+                  }]
+                }
+              }]
+            }
+          };
+        } catch {}
       }
-    };
-  } catch (e) {
-    clearTimeout(timeout);
-    throw e;
+    }
   }
+  throw new Error('No Yahoo data found');
 }
 
 export async function fetchMarketDataDirect(symbol: string, timeframe: string): Promise<any> {
