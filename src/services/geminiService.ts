@@ -302,9 +302,10 @@ export async function analyzeMarketBatch(
 
     try {
       // Small delay between calls to avoid rate limiting (skip first)
-      if (i > 0) await new Promise(r => setTimeout(r, 800));
+      if (i > 0) await new Promise(r => setTimeout(r, 1200));
       await waitIfRateLimited();
 
+      console.log(`[Batch] Analyzing ${p.symbol} (${i + 1}/${total})...`);
       const result = await analyzeMarket({
         symbol: p.symbol,
         type: p.type,
@@ -313,8 +314,10 @@ export async function analyzeMarketBatch(
         settings,
         lang
       });
+      console.log(`[Batch] ${p.symbol} → ${result.signal} (${result.confidence}%)`);
       results.push(result);
     } catch (e: any) {
+      console.error(`[Batch] FAILED ${p.symbol}:`, e.message);
       errors.push({ symbol: p.symbol, error: e.message || 'Analysis failed' });
     }
   }
