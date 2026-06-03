@@ -23,6 +23,7 @@ import { resolveConflicts } from './services/portfolioRiskService';
 import ApiKeyModal from './components/ApiKeyModal';
 import SubscriptionModal from './components/SubscriptionModal';
 import PaymentModal from './components/PaymentModal';
+import ProfilePage from './components/ProfilePage';
 
 function hasAnyStoredKey(): boolean {
   try {
@@ -1516,40 +1517,11 @@ export default function App() {
             )}
 
             {activePage === 'profile' && (
-              <div className="bg-brand-alt border border-white/10 rounded-[32px] p-6 md:p-8 max-w-lg mx-auto">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white font-black text-xl shadow-lg">
-                    {user?.email?.charAt(0).toUpperCase() || '?'}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-white">{lang === 'ar' ? 'الملف الشخصي' : 'Profile'}</h3>
-                    <p className="text-sm text-slate-400">{user?.email || (lang === 'ar' ? 'زائر' : 'Guest')}</p>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                    <span className="text-xs text-slate-500 font-bold block mb-1">{lang === 'ar' ? 'البريد الإلكتروني' : 'Email'}</span>
-                    <span className="text-sm font-bold text-white">{user?.email || (lang === 'ar' ? 'غير مسجل' : 'Not logged in')}</span>
-                  </div>
-                  <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                    <span className="text-xs text-slate-500 font-bold block mb-1">{lang === 'ar' ? 'المعرف' : 'User ID'}</span>
-                    <span className="text-sm font-mono text-white/70 break-all">{user?.uid || '—'}</span>
-                  </div>
-                  <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                    <span className="text-xs text-slate-500 font-bold block mb-1">{lang === 'ar' ? 'الخطة' : 'Plan'}</span>
-                    <span className="text-sm font-bold text-emerald-400">{activeSubscription ? `${activeSubscription.label}` : (lang === 'ar' ? 'مجانية' : 'Free')}</span>
-                  </div>
-                  {activeSubscription && (
-                    <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                      <span className="text-xs text-slate-500 font-bold block mb-1">{lang === 'ar' ? 'تاريخ الانتهاء' : 'Expiry'}</span>
-                      <span className="text-sm font-bold text-white">{new Date(activeSubscription.expiryDate).toLocaleDateString()}</span>
-                    </div>
-                  )}
-                </div>
-                <button onClick={goBack} className="mt-6 w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-sm hover:bg-white/10 transition-all">
-                  {lang === 'ar' ? 'رجوع لخلف' : 'Go back'}
-                </button>
-              </div>
+              <ProfilePage
+                user={user}
+                lang={lang}
+                onBack={goBack}
+              />
             )}
           </motion.div>
         )}

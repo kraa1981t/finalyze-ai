@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
@@ -50,6 +50,20 @@ export default function Header({
   const t = translations[lang];
   const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
+  const [customAvatar, setCustomAvatar] = useState<string | null>(null);
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCustomAvatar(localStorage.getItem('finalyze_custom_avatar'));
+    setCustomLogo(localStorage.getItem('finalyze_custom_logo'));
+    const handleStorage = () => {
+      setCustomAvatar(localStorage.getItem('finalyze_custom_avatar'));
+      setCustomLogo(localStorage.getItem('finalyze_custom_logo'));
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   const isMarketClosedToday = () => {
     const day = new Date().getDay();
     return day === 0 || day === 6; // Sunday or Saturday
@@ -92,7 +106,7 @@ export default function Header({
                 </div>
               </button>
               <div className="w-16 h-16 bg-black rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl shadow-sky-500/40 rotate-3 hover:rotate-0 transition-all cursor-pointer border-2 border-white/50">
-                <img src="/logo.svg" alt="Joseph Trading" className="w-full h-full object-cover" />
+                <img src={customLogo || "/logo.svg"} alt="Joseph Trading" className="w-full h-full object-cover" />
               </div>
               <div className="flex flex-col">
                 <span className="text-4xl font-display font-black tracking-tighter text-black drop-shadow-sm leading-none">
@@ -184,7 +198,9 @@ export default function Header({
                 <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Profile</span>
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 rounded-xl bg-[#F59E0B] border border-black/10 flex items-center justify-center overflow-hidden shadow-md">
-                    {user.photoURL ? (
+                    {customAvatar ? (
+                      <img src={customAvatar} alt="profile" className="w-full h-full object-cover" />
+                    ) : user.photoURL ? (
                       <img src={user.photoURL} alt="profile" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-black/5 flex items-center justify-center text-black">
