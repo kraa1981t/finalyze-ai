@@ -1016,11 +1016,12 @@ export default function App() {
         }
 
         // Sign in directly - no verification, no API key blocking
-        await signOut(auth);
-        const cred = await signInAnonymously(auth);
+        // IMPORTANT: Set localStorage BEFORE signOut to prevent onAuthStateChanged from resetting state
         localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         localStorage.removeItem('finalyze_dev_bypass_active');
+        await signOut(auth);
+        const cred = await signInAnonymously(auth);
         setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
         setHasApiKey(hasAnyStoredKey());
         persistNeedsApiKey(null);
