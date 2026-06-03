@@ -91,7 +91,7 @@ export default function Header({
                   <Menu size={22} />
                 </div>
               </button>
-              <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl shadow-sky-500/40 rotate-3 hover:rotate-0 transition-all cursor-pointer border-2 border-white/50">
+              <div className="w-16 h-16 bg-black rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl shadow-sky-500/40 rotate-3 hover:rotate-0 transition-all cursor-pointer border-2 border-white/50">
                 <img src="/logo.svg" alt="Joseph Trading" className="w-full h-full object-cover" />
               </div>
               <div className="flex flex-col">
