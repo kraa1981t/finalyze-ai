@@ -133,9 +133,30 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
     try {
       if (githubPat) localStorage.setItem('finalyze_github_pat', githubPat);
       const headers = ghHeaders();
-      const patchResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/refs/heads/main`, {
-        method: 'PATCH', headers,
-        body: JSON.stringify({ sha: '62c47deed780f1122533632a688f7760ff0c71f5', force: true })
+      const gh = (url: string, opts?: any) => fetch(`https://api.github.com/repos/${GITHUB_REPO}${url}`, { headers, ...opts });
+
+      // Get the SHA from stable-v1 tag dynamically (not hardcoded)
+      let stableSha = '';
+      try {
+        const tagRef = await (await gh(`/git/refs/tags/${STABLE_TAG}`)).json();
+        stableSha = tagRef.object?.sha || '';
+      } catch {}
+
+      // If tag lookup fails, get the commit SHA the tag points to
+      if (stableSha) {
+        try {
+          const tagObj = await (await gh(`/git/tags/${stableSha}`)).json();
+          if (tagObj.object?.sha) stableSha = tagObj.object.sha;
+        } catch {}
+      }
+
+      if (!stableSha) {
+        stableSha = '62c47deed780f1122533632a688f7760ff0c71f5';
+      }
+
+      const patchResp = await gh('/git/refs/heads/main', {
+        method: 'PATCH',
+        body: JSON.stringify({ sha: stableSha, force: true })
       });
       if (patchResp.ok) {
         setFactoryResetDone(true);

@@ -1,0 +1,6 @@
+﻿{
+    "autoUpdate":  true,
+    "description":  "b67eac5 Fix forex data: multiple Yahoo symbol formats + dual CORS proxy + metals mapping",
+    "savedAt":  "2026-06-03 16:44",
+    "stableVersion":  "b67eac5046e89f9951c6a29dee73aaef816bd657"
+}
