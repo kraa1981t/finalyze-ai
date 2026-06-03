@@ -168,6 +168,44 @@ export default function App() {
            email.includes('dev');
   };
 
+  // AUTO-RADAR FOR CLIENTS: enable daily analysis automatically
+  useEffect(() => {
+    if (!user || isDeveloperSession()) return;
+    const today = new Date().toDateString();
+    const lastRun = localStorage.getItem('client_radar_last_run');
+    const clientAuto = localStorage.getItem('client_radar_enabled');
+
+    // Force enable for clients
+    if (clientAuto !== 'true') {
+      localStorage.setItem('client_radar_enabled', 'true');
+    }
+
+    // Set auto settings for daily analysis if not already set by developer
+    const saved = localStorage.getItem('auto_settings');
+    const parsed = saved ? (() => { try { return JSON.parse(saved); } catch { return null; } })() : null;
+    if (!parsed || !parsed.isEnabled) {
+      const dailySettings = {
+        isEnabled: true,
+        interval: 1440,
+        timeframe: '1d',
+        category: 'all',
+        tradingStyle: 'swing',
+      };
+      setAutoSettings(dailySettings);
+      localStorage.setItem('auto_settings', JSON.stringify(dailySettings));
+    }
+
+    // Check if new day → trigger re-analysis
+    if (lastRun !== today) {
+      localStorage.setItem('client_radar_last_run', today);
+      // Force a new scan by briefly toggling
+      setAutoSettings(prev => {
+        const updated = { ...prev, isEnabled: true };
+        return updated;
+      });
+    }
+  }, [user]);
+
   const hasActivePlan = useMemo((): boolean => {
     if (isDeveloperSession()) return true;
     if (activeSubscription && new Date(activeSubscription.expiryDate) > new Date()) return true;

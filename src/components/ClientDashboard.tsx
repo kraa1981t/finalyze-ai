@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, TrendingDown, Zap, ShieldAlert, ChevronDown, ChevronUp, X, BarChart2, Info } from 'lucide-react';
+import { TrendingUp, TrendingDown, Zap, ShieldAlert, ChevronDown, ChevronUp, X, BarChart2, Info, Activity } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
 import { Language, translations } from '../lib/i18n';
 
@@ -79,20 +79,55 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
 
   if (filtered.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Zap size={48} className="text-white/20 mb-4" />
-        <h3 className="text-xl font-black text-white/60">
-          {isAr ? 'لا توجد إشارات حالياً' : 'No signals available'}
-        </h3>
-        <p className="text-sm text-white/40 mt-2">
-          {isAr ? 'سيظهر التحليل التلقائي هنا عند توفره' : 'Auto analysis results will appear here'}
-        </p>
+      <div className="space-y-6" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
+        {/* Auto-analysis status banner - always show */}
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-5 py-3 flex items-center gap-3">
+          <div className="relative">
+            <Activity size={20} className="text-emerald-400" />
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+          </div>
+          <span className="text-sm font-black text-emerald-400">
+            {isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}
+          </span>
+          <span className="text-xs text-emerald-400/60 font-bold">
+            {isAr ? 'يتم التحليل مرة واحدة يومياً' : 'Analyzing once daily'}
+          </span>
+        </div>
+
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="relative w-16 h-16 mb-4">
+            <div className="absolute inset-0 border-b-2 border-emerald-400 rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Activity size={24} className="text-emerald-400" />
+            </div>
+          </div>
+          <h3 className="text-xl font-black text-white/60">
+            {isAr ? 'جاري تحليل الرموز...' : 'Analyzing symbols...'}
+          </h3>
+          <p className="text-sm text-white/40 mt-2">
+            {isAr ? 'سيظهر التحليل التلقائي هنا قريباً' : 'Auto analysis results will appear here shortly'}
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
+      {/* Auto-analysis status banner */}
+      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-5 py-3 flex items-center gap-3">
+        <div className="relative">
+          <Activity size={20} className="text-emerald-400" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+        </div>
+        <span className="text-sm font-black text-emerald-400">
+          {isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}
+        </span>
+        <span className="text-xs text-emerald-400/60 font-bold">
+          {isAr ? 'يتم التحليل مرة واحدة يومياً' : 'Analyzing once daily'}
+        </span>
+      </div>
+
       <div className="flex items-center gap-3 mb-2">
         <Zap size={22} className="text-primary" />
         <h2 className="text-lg font-black text-white">
