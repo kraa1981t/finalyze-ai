@@ -73,7 +73,17 @@ function toYahooFormat(klines: any[][], symbol: string): any {
 
 export async function fetchFearGreedDirect(): Promise<{ value: number; classification: string }> {
   try {
-    const r = await fetch(`${ALTERNATIVE_BASE}/fng/?limit=1`);
+    const url = `${ALTERNATIVE_BASE}/fng/?limit=1`;
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 10000);
+    let r = await fetch(url, { signal: ac.signal });
+    clearTimeout(timeout);
+    if (!r.ok || r.status === 0) {
+      const ac2 = new AbortController();
+      const timeout2 = setTimeout(() => ac2.abort(), 10000);
+      r = await fetch(CORS_PROXY + encodeURIComponent(url), { signal: ac2.signal });
+      clearTimeout(timeout2);
+    }
     const d = await r.json();
     const item = d?.data?.[0];
     return { value: Number(item?.value) || 50, classification: item?.value_classification || 'Neutral' };
@@ -84,7 +94,17 @@ export async function fetchFearGreedDirect(): Promise<{ value: number; classific
 
 export async function fetchEconCalendarDirect(): Promise<any[]> {
   try {
-    const r = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json');
+    const url = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 10000);
+    let r = await fetch(url, { signal: ac.signal });
+    clearTimeout(timeout);
+    if (!r.ok || r.status === 0) {
+      const ac2 = new AbortController();
+      const timeout2 = setTimeout(() => ac2.abort(), 10000);
+      r = await fetch(CORS_PROXY + encodeURIComponent(url), { signal: ac2.signal });
+      clearTimeout(timeout2);
+    }
     const data = await r.json();
     return (data || []).filter((e: any) => e.impact === 'High' || e.impact === 'Medium').slice(0, 10).map((e: any) => ({
       title: e.title, country: e.country, date: e.date,
@@ -97,7 +117,17 @@ export async function fetchEconCalendarDirect(): Promise<any[]> {
 
 export async function fetchNewsDirect(query: string): Promise<any[]> {
   try {
-    const r = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`);
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 10000);
+    let r = await fetch(url, { signal: ac.signal });
+    clearTimeout(timeout);
+    if (!r.ok || r.status === 0) {
+      const ac2 = new AbortController();
+      const timeout2 = setTimeout(() => ac2.abort(), 10000);
+      r = await fetch(CORS_PROXY + encodeURIComponent(url), { signal: ac2.signal });
+      clearTimeout(timeout2);
+    }
     const xml = await r.text();
     const titles = [...xml.matchAll(/<title>(.*?)<\/title>/g)].slice(1).map(m => m[1]);
     const sources = [...xml.matchAll(/<source>(.*?)<\/source>/g)].map(m => m[1]);
@@ -126,7 +156,100 @@ export async function fetchCryptoPricesDirect(): Promise<any> {
   }
 }
 
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+
+function symbolToYahooForex(symbol: string): string | null {
+  const upper = symbol.toUpperCase().replace(/ /g, '');
+  // Forex pairs: EURUSD → EURUSD=X
+  if (/^[A-Z]{6}$/.test(upper)) {
+    return `${upper}=X`;
+  }
+  // Stock symbols: AAPL, TSLA etc
+  if (/^[A-Z]{1,5}$/.test(upper) && !upper.endsWith('USD')) {
+    return upper;
+  }
+  // Crypto: BTCUSD → BTC-USD
+  if (upper.endsWith('USD') && !upper.endsWith('USDT')) {
+    const base = upper.replace('USD', '');
+    return `${base}-USD`;
+  }
+  return null;
+}
+
+function yahooInterval(timeframe: string): string {
+  const map: Record<string, string> = {
+    '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+    '1h': '1h', '4h': '1d', '1d': '1d', '1w': '1wk', '1M': '1mo',
+  };
+  return map[timeframe] || '1d';
+}
+
+function yahooRange(timeframe: string): string {
+  const map: Record<string, string> = {
+    '1m': '5d', '5m': '5d', '15m': '1mo', '30m': '1mo',
+    '1h': '3mo', '4h': '6mo', '1d': '1y', '1w': '2y', '1M': '5y',
+  };
+  return map[timeframe] || '1y';
+}
+
+async function fetchYahooFinance(symbol: string, timeframe: string): Promise<any> {
+  const yahooSymbol = symbolToYahooForex(symbol);
+  if (!yahooSymbol) throw new Error('Cannot convert symbol to Yahoo format');
+
+  const interval = yahooInterval(timeframe);
+  const range = yahooRange(timeframe);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=${interval}&range=${range}`;
+
+  const ac = new AbortController();
+  const timeout = setTimeout(() => ac.abort(), 15000);
+
+  try {
+    // Try direct first
+    let r = await fetch(url, { signal: ac.signal });
+    clearTimeout(timeout);
+
+    // If CORS blocked, try proxy
+    if (!r.ok || r.status === 0) {
+      const ac2 = new AbortController();
+      const timeout2 = setTimeout(() => ac2.abort(), 15000);
+      r = await fetch(CORS_PROXY + encodeURIComponent(url), { signal: ac2.signal });
+      clearTimeout(timeout2);
+    }
+
+    if (!r.ok) throw new Error(`Yahoo: HTTP ${r.status}`);
+    const data = await r.json();
+    const result = data?.chart?.result?.[0];
+    if (!result) throw new Error('No Yahoo data');
+
+    const ts = result.timestamp;
+    const q = result.indicators?.quote?.[0];
+    if (!ts || !q || !q.close) throw new Error('Incomplete Yahoo data');
+
+    return {
+      chart: {
+        result: [{
+          meta: { symbol },
+          timestamp: ts,
+          indicators: {
+            quote: [{
+              open: q.open,
+              high: q.high,
+              low: q.low,
+              close: q.close,
+              volume: q.volume || ts.map(() => 0),
+            }]
+          }
+        }]
+      }
+    };
+  } catch (e) {
+    clearTimeout(timeout);
+    throw e;
+  }
+}
+
 export async function fetchMarketDataDirect(symbol: string, timeframe: string): Promise<any> {
+  // 1. Try Binance first (crypto only, no CORS issues)
   const binancePair = findCryptoPair(symbol);
   if (binancePair) {
     try {
@@ -142,7 +265,13 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
       }
     } catch {}
   }
-  throw new Error('Market data currently unavailable');
+
+  // 2. Try Yahoo Finance (forex + stocks + crypto fallback)
+  try {
+    return await fetchYahooFinance(symbol, timeframe);
+  } catch {}
+
+  throw new Error('Market data currently unavailable from the source.');
 }
 
 export async function callAIDirect(prompt: string, apiKey: string): Promise<any> {
@@ -151,11 +280,32 @@ export async function callAIDirect(prompt: string, apiKey: string): Promise<any>
   const isGemini = apiKey.startsWith('AIzaSy') || apiKey.startsWith('AQ.');
   const isGroq = apiKey.startsWith('gsk_');
 
-  if (isGemini) {
-    return callGeminiDirect(prompt, apiKey);
-  } else if (isGroq) {
-    return callGroqDirect(prompt, apiKey);
+  // Try Groq first (preferred — faster, more reliable for batch)
+  if (isGroq) {
+    const groqResult = await callGroqDirect(prompt, apiKey);
+    if (!groqResult?.error) return groqResult;
+    // If Groq fails, try Gemini as fallback
+    const k2 = localStorage.getItem('finalyze_key2_value') || localStorage.getItem('finalyze_key1_value');
+    if (k2 && k2 !== apiKey) {
+      const gemResult = await callAIDirect(prompt, k2);
+      if (!gemResult?.error) return gemResult;
+    }
+    return groqResult;
   }
+
+  // Try Gemini
+  if (isGemini) {
+    const gemResult = await callGeminiDirect(prompt, apiKey);
+    if (!gemResult?.error) return gemResult;
+    // If Gemini fails, try Groq as fallback
+    const k2 = localStorage.getItem('finalyze_key2_value') || localStorage.getItem('finalyze_key1_value');
+    if (k2 && k2 !== apiKey) {
+      const groqResult = await callAIDirect(prompt, k2);
+      if (!groqResult?.error) return groqResult;
+    }
+    return gemResult;
+  }
+
   return { error: 'Unrecognized API key format. Use Google Gemini (AIza...) or Groq (gsk_...)' };
 }
 
