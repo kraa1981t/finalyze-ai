@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings } from '../types';
 
@@ -92,7 +92,7 @@ export default function Header({
                 </div>
               </button>
               <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl shadow-sky-500/40 rotate-3 hover:rotate-0 transition-all cursor-pointer border-2 border-white/50">
-                <img src="/logo.png" alt="Joseph Trading" className="w-full h-full object-cover scale-110" />
+                <img src="/logo.svg" alt="Joseph Trading" className="w-full h-full object-cover" />
               </div>
               <div className="flex flex-col">
                 <span className="text-4xl font-display font-black tracking-tighter text-black drop-shadow-sm leading-none">
@@ -104,6 +104,19 @@ export default function Header({
           </div>
 
           <div className="flex items-center gap-3 mb-2">
+            {/* Contact Us - Messenger */}
+            <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
+              <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">{lang === 'ar' ? 'تواصل معنا' : 'Contact Us'}</span>
+              <a
+                href="https://www.facebook.com/messages/e2ee/t/7630276620403742/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-xl bg-[#0084FF] border border-black/10 text-white hover:bg-[#006ADB] transition-all shadow-md"
+              >
+                <MessageCircle size={18} />
+              </a>
+            </div>
+
             {/* Auto Analysis toggle */}
             <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:shadow-md transition-shadow">
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">
