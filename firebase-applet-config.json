@@ -1,10 +1,11 @@
 {
-  "projectId": "flash-yarn-kcf5x",
-  "appId": "1:577116545628:web:46f2d606281788b66f7c99",
-  "apiKey": "AIzaSyBFZFo1asLM6k3PZMfHNYDM1wPJUzAu3d4",
-  "authDomain": "flash-yarn-kcf5x.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-0794dec6-6698-40b6-8286-e0c711a2ff13",
-  "storageBucket": "flash-yarn-kcf5x.firebasestorage.app",
-  "messagingSenderId": "577116545628",
-  "measurementId": ""
+  "projectId": "trading-made-easy-e8450",
+  "appId": "1:693217251684:web:f27779dc51e21fabceaa71",
+  "apiKey": "AIzaSyCvMayEuNTlQ5CWbjrrqw3aft_H044-uQM",
+  "authDomain": "trading-made-easy-e8450.firebaseapp.com",
+  "databaseURL": "https://trading-made-easy-e8450-default-rtdb.firebaseio.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "trading-made-easy-e8450.firebasestorage.app",
+  "messagingSenderId": "693217251684",
+  "measurementId": "G-3BTQSZLBC5"
 }
