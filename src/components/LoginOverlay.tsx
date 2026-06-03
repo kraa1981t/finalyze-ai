@@ -6,7 +6,6 @@ import { Language } from '../lib/i18n';
 interface LoginOverlayProps {
   onLogin: () => void;
   onBypassLogin?: (email: string) => void;
-  onClientAuth?: (email: string, password: string) => void;
   lang: Language;
   loginError: string | null;
   onClearError: () => void;
@@ -14,17 +13,13 @@ interface LoginOverlayProps {
   manualAuthUrl?: string | null;
 }
 
-export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lang, loginError, onClearError, redirecting, manualAuthUrl }: LoginOverlayProps) {
+export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError, onClearError, redirecting, manualAuthUrl }: LoginOverlayProps) {
   const [showGuide, setShowGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedConfigPath, setCopiedConfigPath] = useState(false);
 
-  const [customEmail, setCustomEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [inputError, setInputError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [authMethod, setAuthMethod] = useState<'email' | 'google'>('email');
-  const [verificationLink, setVerificationLink] = useState('');
 
   const [logoClicks, setLogoClicks] = useState(0);
   const [devModeActive, setDevModeActive] = useState(() => {
@@ -325,222 +320,96 @@ export default function LoginOverlay({ onLogin, onBypassLogin, onClientAuth, lan
               </h3>
             </div>
 
-            {/* Client Sign-In - Two Options */}
-            {!pendingVerification ? (
-              <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-right space-y-5">
-                <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
-                  <span>{lang === 'ar' ? 'تسجيل الدخول' : 'Client Sign-In'}</span>
-                  <ShieldCheck size={18} />
-                </div>
-
-                {/* Method Tabs */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setAuthMethod('email')}
-                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                      authMethod === 'email'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-white/5 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <AtSign size={14} />
-                    {lang === 'ar' ? 'إيميل + كلمة سر' : 'Email + Password'}
-                  </button>
-                  <button
-                    onClick={() => setAuthMethod('google')}
-                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                      authMethod === 'google'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-white/5 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Globe size={14} />
-                    Google
-                  </button>
-                </div>
-
-                {/* Email + Password Form */}
-                {authMethod === 'email' && (
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!customEmail || !password) return;
-                    setSubmitting(true);
-                    setVerificationLink('');
-                    await onClientAuth?.(customEmail.trim().toLowerCase(), password);
-                    setSubmitting(false);
-                  }} className="space-y-3">
-                    <input
-                      type="email"
-                      value={customEmail}
-                      onChange={(e) => { setCustomEmail(e.target.value); onClearError(); }}
-                      placeholder={lang === 'ar' ? 'البريد الإلكتروني' : 'your@email.com'}
-                      className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50"
-                      required
-                    />
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      value={password}
-                      onChange={(e) => { setPassword(e.target.value); onClearError(); }}
-                      placeholder={lang === 'ar' ? 'كلمة المرور' : 'Password'}
-                      className="w-full bg-brand-bg border border-white/10 rounded-2xl px-4 py-3.5 text-sm text-white text-left focus:outline-none focus:border-emerald-500/50"
-                      required
-                      minLength={6}
-                    />
-                    {inputError && <p className="text-[10px] text-red-400 font-bold mt-1 text-right">{inputError}</p>}
-
-                    {loginError && loginError !== 'verify_email' && (
-                      <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 text-center">
-                        <p className="text-[11px] text-red-400 font-bold">
-                          {loginError === 'auth/network-request-failed'
-                            ? (lang === 'ar' ? '❌ مشكلة في الاتصال بالإنترنت' : '❌ Network error')
-                            : loginError}
-                        </p>
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={submitting || !customEmail || !password}
-                      className="w-full bg-primary hover:bg-emerald-500 text-brand-bg font-black py-4 rounded-2xl transition-all text-sm cursor-pointer shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/25 active:scale-98 disabled:opacity-50"
-                    >
-                      {submitting
-                        ? (lang === 'ar' ? 'جاري...' : 'Please wait...')
-                        : (lang === 'ar' ? 'تسجيل وإرسال التفعيل ←' : 'Sign Up & Verify →')}
-                    </button>
-                  </form>
-                )}
-
-                {/* Google Sign-In */}
-                {authMethod === 'google' && (
-                  <div className="space-y-3">
-                    <p className="text-xs text-slate-400 text-center">
-                      {redirecting
-                        ? (lang === 'ar' ? 'جاري التوجيه إلى Google...' : 'Redirecting to Google...')
-                        : (lang === 'ar' ? 'سجل دخول بحساب Google الخاص بك' : 'Sign in with your Google account')}
-                    </p>
-                    <button
-                      onClick={onLogin}
-                      disabled={redirecting}
-                      className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-4 rounded-2xl transition-all text-sm shadow-lg active:scale-98 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {redirecting ? (
-                        <Loader2 size={18} className="animate-spin" />
-                      ) : (
-                        <Globe size={18} />
-                      )}
-                      {redirecting
-                        ? (lang === 'ar' ? 'جاري...' : 'Redirecting...')
-                        : (lang === 'ar' ? 'تسجيل دخول بـ Google' : 'Sign In with Google')}
-                    </button>
-                    {manualAuthUrl && (
-                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-center space-y-2">
-                        <p className="text-[11px] text-amber-400 font-bold">
-                          {lang === 'ar' ? '⚠️ لم يتم التوجيه تلقائياً. استخدم الرابط أدناه:' : '⚠️ Auto-redirect failed. Use the link below:'}
-                        </p>
-                        <a
-                          href={manualAuthUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block w-full bg-amber-500 hover:bg-amber-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all"
-                        >
-                          {lang === 'ar' ? '👆 اضغط هنا لتسجيل الدخول بـ Google' : '👆 Click here to Sign In with Google'}
-                        </a>
-                        <p className="text-[10px] text-slate-500">
-                          {lang === 'ar' ? 'بعد تسجيل الدخول، ارجع لهذه الصفحة' : 'After signing in, return to this page'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Direct Bypass Options for Developer Mode (Only visible if devModeActive is true) */}
-                {devModeActive && (
-                  <div className="pt-4 border-t border-white/5 space-y-3 text-right">
-                    <p className="text-[11px] text-slate-400 leading-relaxed font-bold">
-                      {lang === 'ar'
-                        ? '⚡ خيارات المطور للمحاكاة والاختبار السريع:'
-                        : '⚡ Developer Bypass & Simulation Options:'}
-                    </p>
-
-                    <div className="space-y-2">
-                      {/* 1. Developer Login - Mowten Option */}
-                      <button
-                        type="button"
-                        onClick={() => handlePresetSelect(currentDevEmail)}
-                        className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 transition-all text-left cursor-pointer group"
-                      >
-                        <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/15 px-2.5 py-1 rounded-full shrink-0">
-                          {lang === 'ar' ? 'خيار موطن ⚡' : 'Mowten Option ⚡'}
-                        </span>
-                        <div className="flex flex-col text-right">
-                          <span className="text-xs font-bold text-white">
-                            {lang === 'ar' ? 'خيار موطن (دخول مباشر بكامل الصلاحيات)' : 'Mowten Option (Direct Full Access)'}
-                          </span>
-                          <span className="text-[9px] text-slate-400">{currentDevEmail}</span>
-                        </div>
-                      </button>
-
-                      {/* 2. Client Login (User/Audience experience simulation) */}
-                      <button
-                        type="button"
-                        onClick={() => handlePresetSelect('trader.client@gmail.com')}
-                        className="w-full flex items-center justify-between p-3 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 transition-all text-left cursor-pointer group"
-                      >
-                        <span className="text-[9px] font-black uppercase text-blue-400 bg-blue-500/15 px-2.5 py-1 rounded-full shrink-0">
-                          {lang === 'ar' ? 'العميل - محاكاة تجربة الجمهور 💎' : 'Client - Simulation Mode 💎'}
-                        </span>
-                        <div className="flex flex-col text-right">
-                          <span className="text-xs font-bold text-white">VIP Trader (تجربة العميل)</span>
-                          <span className="text-[9px] text-slate-400">trader.client@gmail.com</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                )}
+            {/* Client Sign-In - Google Only */}
+            <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-right space-y-5">
+              <div className="flex items-center gap-2 text-emerald-400 justify-end font-bold text-sm">
+                <span>{lang === 'ar' ? 'تسجيل الدخول' : 'Sign In'}</span>
+                <ShieldCheck size={18} />
               </div>
-            ) : (
-              <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-right space-y-5">
-                <div className="flex items-center gap-2 text-amber-400 justify-end font-bold text-sm">
-                  <span>{lang === 'ar' ? 'تأكيد البريد الإلكتروني' : 'Email Verification'}</span>
-                  <Mail size={18} />
-                </div>
-                
-                <h4 className="text-md font-bold text-white leading-snug">
-                  {lang === 'ar' ? '📧 تحقق من بريدك Gmail' : '📧 Check Your Gmail Inbox'}
-                </h4>
-                
-                <p className="text-slate-300 text-xs leading-relaxed">
-                  {lang === 'ar'
-                    ? 'تم إرسال رابط التفعيل إلى بريدك الإلكتروني. افتح Gmail واضغط على زر "تأكيد الحساب" الأخضر داخل الرسالة.'
-                    : 'A verification link has been sent to your email. Open Gmail and click the green "Confirm Account" button inside the message.'}
-                </p>
 
-                <a
-                  href="https://mail.google.com/mail/u/0/#inbox"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-2xl text-sm transition-all cursor-pointer"
-                >
-                  <Mail size={16} />
-                  {lang === 'ar' ? 'فتح Gmail' : 'Open Gmail'}
-                </a>
-
-                <details className="text-center">
-                  <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300">
-                    {lang === 'ar' ? 'رابط التفعيل (إذا لم تصل الرسالة)' : 'Verification link (if email not received)'}
-                  </summary>
+              <p className="text-xs text-slate-400 text-center">
+                {redirecting
+                  ? (lang === 'ar' ? 'جاري التوجيه إلى Google...' : 'Redirecting to Google...')
+                  : (lang === 'ar' ? 'سجل دخول بحساب Google الخاص بك' : 'Sign in with your Google account')}
+              </p>
+              <button
+                onClick={onLogin}
+                disabled={redirecting}
+                className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-4 rounded-2xl transition-all text-sm shadow-lg active:scale-98 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {redirecting ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Globe size={18} />
+                )}
+                {redirecting
+                  ? (lang === 'ar' ? 'جاري...' : 'Redirecting...')
+                  : (lang === 'ar' ? 'تسجيل دخول بـ Google' : 'Sign In with Google')}
+              </button>
+              {manualAuthUrl && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-center space-y-2">
+                  <p className="text-[11px] text-amber-400 font-bold">
+                    {lang === 'ar' ? '⚠️ لم يتم التوجيه تلقائياً. استخدم الرابط أدناه:' : '⚠️ Auto-redirect failed. Use the link below:'}
+                  </p>
                   <a
-                    href={(() => { try { return localStorage.getItem('finalyze_verify_link') || '#'; } catch { return '#'; } })()}
+                    href={manualAuthUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-block mt-2 text-[10px] text-emerald-400 underline break-all"
+                    className="inline-block w-full bg-amber-500 hover:bg-amber-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all"
                   >
-                    {(() => { try { return localStorage.getItem('finalyze_verify_link') || ''; } catch { return ''; } })()}
+                    {lang === 'ar' ? '👆 اضغط هنا لتسجيل الدخول بـ Google' : '👆 Click here to Sign In with Google'}
                   </a>
-                </details>
-              </div>
-            )}
+                  <p className="text-[10px] text-slate-500">
+                    {lang === 'ar' ? 'بعد تسجيل الدخول، ارجع لهذه الصفحة' : 'After signing in, return to this page'}
+                  </p>
+                </div>
+              )}
+
+              {/* Direct Bypass Options for Developer Mode (Only visible if devModeActive is true) */}
+              {devModeActive && (
+                <div className="pt-4 border-t border-white/5 space-y-3 text-right">
+                  <p className="text-[11px] text-slate-400 leading-relaxed font-bold">
+                    {lang === 'ar'
+                      ? '⚡ خيارات المطور للمحاكاة والاختبار السريع:'
+                      : '⚡ Developer Bypass & Simulation Options:'}
+                  </p>
+
+                  <div className="space-y-2">
+                    {/* 1. Developer Login - Mowten Option */}
+                    <button
+                      type="button"
+                      onClick={() => handlePresetSelect(currentDevEmail)}
+                      className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 transition-all text-left cursor-pointer group"
+                    >
+                      <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/15 px-2.5 py-1 rounded-full shrink-0">
+                        {lang === 'ar' ? 'خيار موطن ⚡' : 'Mowten Option ⚡'}
+                      </span>
+                      <div className="flex flex-col text-right">
+                        <span className="text-xs font-bold text-white">
+                          {lang === 'ar' ? 'خيار موطن (دخول مباشر بكامل الصلاحيات)' : 'Mowten Option (Direct Full Access)'}
+                        </span>
+                        <span className="text-[9px] text-slate-400">{currentDevEmail}</span>
+                      </div>
+                    </button>
+
+                    {/* 2. Client Login (User/Audience experience simulation) */}
+                    <button
+                      type="button"
+                      onClick={() => handlePresetSelect('trader.client@gmail.com')}
+                      className="w-full flex items-center justify-between p-3 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 transition-all text-left cursor-pointer group"
+                    >
+                      <span className="text-[9px] font-black uppercase text-blue-400 bg-blue-500/15 px-2.5 py-1 rounded-full shrink-0">
+                        {lang === 'ar' ? 'العميل - محاكاة تجربة الجمهور 💎' : 'Client - Simulation Mode 💎'}
+                      </span>
+                      <div className="flex flex-col text-right">
+                        <span className="text-xs font-bold text-white">VIP Trader (تجربة العميل)</span>
+                        <span className="text-[9px] text-slate-400">trader.client@gmail.com</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center justify-center pt-2 border-t border-white/5 text-[9px] text-slate-500">
               <span>Google Secure Verification</span>

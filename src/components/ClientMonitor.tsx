@@ -20,12 +20,13 @@ interface ClientMonitorProps {
   onRefresh: () => void;
   onBan: (clientId: string) => void;
   onDelete: (clientId: string) => void;
+  onDeleteByEmail?: (email: string) => void;
   onRenew: (clientId: string, days: number) => void;
   freemiumDisabled?: boolean;
   onFreemiumToggle?: (v: boolean) => void;
 }
 
-export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelete, onRenew, freemiumDisabled: externalFreemium, onFreemiumToggle }: ClientMonitorProps) {
+export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelete, onDeleteByEmail, onRenew, freemiumDisabled: externalFreemium, onFreemiumToggle }: ClientMonitorProps) {
   const isAr = lang === 'ar';
   const [renewing, setRenewing] = useState<string | null>(null);
   const [renewDays, setRenewDays] = useState(30);
@@ -119,6 +120,7 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
                 <tr className="border-b border-white/10">
                   <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'الرتبة' : 'Rank'}</th>
                   <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'البريد الإلكتروني' : 'Email'}</th>
+                  <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'تاريخ التسجيل' : 'Registered'}</th>
                   <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'الحالة' : 'Status'}</th>
                   <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'الخطة' : 'Plan'}</th>
                   <th className="text-left px-4 py-3 text-xs text-white/60 font-bold uppercase tracking-wider">{isAr ? 'المتبقي' : 'Left'}</th>
@@ -133,6 +135,15 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sky-300 font-bold text-shadow-glow">{client.email}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs text-white/60 font-bold">
+                        {client.registeredAt
+                          ? (typeof client.registeredAt === 'object' && client.registeredAt?.toDate
+                            ? client.registeredAt.toDate().toLocaleDateString()
+                            : new Date(client.registeredAt).toLocaleDateString())
+                          : '--'}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -215,7 +226,7 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
                               <ShieldOff size={14} />
                             </button>
                             <button
-                              onClick={() => { if (confirm(isAr ? 'حذف هذا العميل؟' : 'Delete this client?')) onDelete(client.id); }}
+                              onClick={() => { if (confirm(isAr ? 'حذف هذا العميل؟' : 'Delete this client?')) { if (onDeleteByEmail) onDeleteByEmail(client.email); else onDelete(client.id); } }}
                               className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
                               title={isAr ? 'حذف' : 'Delete'}
                             >

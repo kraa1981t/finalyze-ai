@@ -279,6 +279,25 @@ export default function App() {
     fetchClients();
   };
 
+  const deleteClientByEmail = async (email: string) => {
+    const lowerEmail = email.toLowerCase().trim();
+    // Remove from Firestore
+    try {
+      const snap = await getDocs(query(collection(db, 'clients'), where('email', '==', lowerEmail)));
+      snap.docs.forEach(async (d) => { await deleteDoc(doc(db, 'clients', d.id)); });
+    } catch (e) { console.warn('Firestore delete by email failed:', e); }
+    // Remove from localStorage clients
+    const localClients: ClientRecord[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+    localStorage.setItem('finalyze_clients', JSON.stringify(localClients.filter(c => c.email.toLowerCase() !== lowerEmail)));
+    // Remove from client emails list
+    const clientEmails: any[] = JSON.parse(localStorage.getItem('finalyze_client_emails') || '[]');
+    localStorage.setItem('finalyze_client_emails', JSON.stringify(clientEmails.filter((c: any) => c.email.toLowerCase() !== lowerEmail)));
+    // Remove from banned list
+    const banned: string[] = JSON.parse(localStorage.getItem('finalyze_banned_emails') || '[]');
+    localStorage.setItem('finalyze_banned_emails', JSON.stringify(banned.filter(e => e !== lowerEmail)));
+    fetchClients();
+  };
+
   const renewClientPlan = async (clientId: string, days: number) => {
     const exp = new Date();
     exp.setDate(exp.getDate() + days);
@@ -970,7 +989,7 @@ export default function App() {
         return;
       }
 
-      // Try to save as pending client and send email
+      // Try to save as client and sign in directly (no verification, no API key required)
       try {
         const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
         const existing = existingSnap.docs[0]?.data();
@@ -996,54 +1015,52 @@ export default function App() {
           return;
         }
 
-        if (existing?.status === 'verified') {
-          // Already verified — sign in directly (keep existing API keys)
-          await signOut(auth);
-          const cred = await signInAnonymously(auth);
-          localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-          setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
-          const hasKey = hasAnyStoredKey();
-          setHasApiKey(hasKey);
-          persistNeedsApiKey(null);
-          return;
-        }
-
-        // New or existing pending — protect existing API keys, never clear
-        const isNewUser = !existingSnap.docs[0];
-        const savedKey = hasAnyStoredKey();
-        if (isNewUser && !savedKey) {
-          localStorage.removeItem('finalyze_key1_value');
-          localStorage.removeItem('finalyze_user_groq_api_key');
-          setHasApiKey(false);
-        }
-        // New or pending — save to localStorage + Firestore, send email, show API key page
+        // Sign in directly - no verification, no API key blocking
         await signOut(auth);
         const cred = await signInAnonymously(auth);
-        // Save to localStorage immediately so Client Monitor shows all registered users
-        // Save to Firestore as well (rules now published)
+        localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+        localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+        localStorage.removeItem('finalyze_dev_bypass_active');
+        setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
+        setHasApiKey(hasAnyStoredKey());
+        persistNeedsApiKey(null);
+
+        // Save to localStorage client list
+        const clientEmails: any[] = JSON.parse(localStorage.getItem('finalyze_client_emails') || '[]');
+        if (!clientEmails.some((c: any) => c.email === email)) {
+          clientEmails.push({ email, registeredAt: new Date().toISOString(), uid: cred.user.uid });
+          localStorage.setItem('finalyze_client_emails', JSON.stringify(clientEmails));
+        }
+
+        // Save to Firestore as verified client with free plan (best effort)
         try {
-          const existingFs = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
-          if (existingFs.docs[0]) {
-            await updateDoc(doc(db, 'clients', existingFs.docs[0].id), { uid: cred.user.uid, status: 'pending' });
+          if (existingSnap.docs[0]) {
+            await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { uid: cred.user.uid, status: 'verified', plan: 'free' });
           } else {
+            const count = (await getDocs(collection(db, 'clients'))).size;
             await addDoc(collection(db, 'clients'), {
-              email, uid: cred.user.uid, status: 'pending', plan: 'free', planExpiry: null,
-              registeredAt: serverTimestamp(), rank: 0,
+              email, uid: cred.user.uid, status: 'verified', plan: 'free', planExpiry: null,
+              registeredAt: serverTimestamp(), rank: count + 1,
             });
           }
         } catch (e) { console.warn('Firestore save on login failed:', e); }
-        const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
-        const verifyLink = `${window.location.origin}${window.location.pathname}?verify=true&email=${encodeURIComponent(email)}&token=${verifyToken}`;
-        // Send email (best effort)
-        fetch('/api/send-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, verifyLink }) }).catch(() => {});
-        // Sign in and show blocking API key page immediately
-        localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-        localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-        localStorage.setItem('finalyze_verify_link', verifyLink);
-        setUser({ uid: cred.user.uid, email, displayName: result.user.displayName || 'Client', photoURL: result.user.photoURL || '', emailVerified: true } as User);
-        // Only show blocking for truly new users without a saved key
-        persistNeedsApiKey(isNewUser && !hasAnyStoredKey() ? email : null);
+
+        // Also save to localStorage clients list for Client Monitor
+        const localClients: any[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+        if (!localClients.some((c: any) => c.email?.toLowerCase() === email.toLowerCase())) {
+          localClients.push({
+            id: 'local_' + Date.now(),
+            email,
+            uid: cred.user.uid,
+            status: 'verified',
+            plan: 'free',
+            planExpiry: null,
+            registeredAt: new Date().toISOString(),
+            rank: 0,
+          });
+          localStorage.setItem('finalyze_clients', JSON.stringify(localClients));
+          fetchClients();
+        }
         return;
       } catch (innerErr) {
         // Firestore/anon auth failed — still sign user in with basic session
@@ -1051,13 +1068,8 @@ export default function App() {
         localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         setUser({ uid: 'fallback_' + Date.now(), email, displayName: result.user.displayName || 'Client', emailVerified: true } as User);
-        const hasKey = hasAnyStoredKey();
-        setHasApiKey(hasKey);
-        if (!hasKey) {
-          persistNeedsApiKey(email);
-        } else {
-          persistNeedsApiKey(null);
-        }
+        setHasApiKey(hasAnyStoredKey());
+        persistNeedsApiKey(null);
         return;
       }
     } catch (error: any) {
@@ -1067,13 +1079,8 @@ export default function App() {
         localStorage.setItem('finalyze_auth_user', JSON.stringify({ email: googleUserEmail, placeholder: true }));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
         setUser({ uid: 'fallback_' + Date.now(), email: googleUserEmail, displayName: 'Client', emailVerified: true } as User);
-        const hasKey = hasAnyStoredKey();
-        setHasApiKey(hasKey);
-        if (!hasKey) {
-          persistNeedsApiKey(googleUserEmail);
-        } else {
-          persistNeedsApiKey(null);
-        }
+        setHasApiKey(hasAnyStoredKey());
+        persistNeedsApiKey(null);
         return;
       }
       if (error.code === 'auth/unauthorized-domain') {
@@ -1087,108 +1094,6 @@ export default function App() {
       }
     } finally {
       setRedirecting(false);
-    }
-  };
-
-  const handleClientAuth = async (email: string, password?: string) => {
-    setActivePage('main');
-    setPaymentPlan(null);
-    setAnalysisResults(null);
-    setIsSidebarOpen(false);
-    setLoginError(null);
-    try {
-      // Check if banned
-      if (isBannedEmail(email)) {
-        setLoginError(lang === 'ar' ? 'هذا البريد محظور. لا يمكنك التسجيل.' : 'This email is banned. You cannot register.');
-        return;
-      }
-      // Check if client is already registered in Firestore
-      const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
-      const existing = existingSnap.docs[0];
-
-      if (existing) {
-        const data = existing.data();
-        if (data.status === 'verified') {
-          // Already verified — sign in directly
-          localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-          const cred = await signInAnonymously(auth);
-          const mockUser = {
-            uid: cred.user.uid, email,
-            displayName: 'Client',
-            photoURL: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150',
-            emailVerified: true,
-          } as User;
-          setUser(mockUser);
-          localStorage.setItem('finalyze_auth_user', JSON.stringify(mockUser));
-          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-          localStorage.removeItem('finalyze_dev_bypass_active');
-          localStorage.removeItem('active_subscription');
-          setActiveSubscription(null);
-          const hasKey = hasAnyStoredKey();
-          setHasApiKey(hasKey);
-          persistNeedsApiKey(null);
-          return;
-        }
-        // Not verified — resend verification
-        if (data.verifyToken) {
-          // Sign in and show verification banner
-          localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-          localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-          const vLink = `${window.location.origin}${window.location.pathname}?verify=true&email=${encodeURIComponent(email)}&token=${data.verifyToken}`;
-          localStorage.setItem('finalyze_verify_link', vLink);
-          setPendingVerifyLink(vLink);
-          const cred = await signInAnonymously(auth);
-          setUser({ uid: cred.user.uid, email, displayName: '', emailVerified: true } as User);
-          return;
-        }
-      }
-
-      // New client registration
-      if (!password) {
-        setLoginError('auth/weak-password');
-        return;
-      }
-
-      // Generate verification token
-      const verifyToken = Math.random().toString(36).slice(2, 15) + Date.now().toString(36);
-      const verifyLink = `${window.location.origin}/verify?email=${encodeURIComponent(email)}&token=${verifyToken}`;
-
-      // Simple hash for password (client-side, for demo purposes)
-      const pwdHash = btoa(password + ':finalyze_salt');
-
-      // New user must enter API key — clear old keys
-      localStorage.removeItem('finalyze_key1_value');
-      localStorage.removeItem('finalyze_user_groq_api_key');
-      setHasApiKey(false);
-
-      // Set session BEFORE anonymous auth to prevent auth listener overriding state
-      localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
-      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-      localStorage.setItem('finalyze_verify_link', verifyLink);
-      setPendingVerifyLink(verifyLink);
-      persistNeedsApiKey(email);
-
-      // Save to Firestore
-      const cred = await signInAnonymously(auth);
-      await addDoc(collection(db, 'clients'), {
-        email, uid: cred.user.uid, password: pwdHash, verifyToken,
-        status: 'pending', plan: 'free', planExpiry: null,
-        registeredAt: serverTimestamp(), rank: 0,
-      });
-
-      const mockUser = {
-        uid: cred.user.uid, email, displayName: '', emailVerified: true,
-      } as User;
-      setUser(mockUser);
-    } catch (err: any) {
-      localStorage.removeItem('finalyze_auth_user');
-      localStorage.removeItem('finalyze_auth_timestamp');
-      if (err.code === 'auth/network-request-failed') {
-        setLoginError('auth/network-request-failed');
-      } else {
-        setLoginError(err.code || err.message);
-      }
     }
   };
 
@@ -1286,7 +1191,6 @@ export default function App() {
           <LoginOverlay 
             onLogin={handleLogin} 
             onBypassLogin={handleBypassLogin}
-            onClientAuth={handleClientAuth}
             lang={lang} 
             loginError={loginError}
             onClearError={() => { setLoginError(null); setPendingVerifyLink(null); }}
@@ -1296,69 +1200,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Blocking API Key overlay — only for NEW users (not in finalyze_clients) */}
-      {user && user.email && !hasApiKey && !isDeveloperSession() && isNewClient && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <ApiKeyModal
-            key={user?.uid || 'no-session'}
-            isOpen={true}
-            onClose={() => {}}
-            isBlocking={true}
-            lang={lang}
-            user={user}
-            onSaved={async (apiKey) => {
-              setHasApiKey(true);
-              persistNeedsApiKey(null);
-              setActivePage('main');
-              // Save client to Firestore + localStorage after key validation
-              const email = user?.email;
-              if (email) {
-                if (isBannedEmail(email)) {
-                  alert(lang === 'ar' ? 'هذا البريد محظور. لا يمكنك التسجيل.' : 'This email is banned. You cannot register.');
-                  handleLogout();
-                  return;
-                }
-                const newClient = {
-                  id: 'local_' + Date.now(),
-                  email,
-                  uid: user?.uid || '',
-                  status: 'active' as const,
-                  plan: 'free' as const,
-                  planExpiry: null,
-                  registeredAt: new Date().toISOString(),
-                  rank: 0,
-                  groqApiKey: apiKey,
-                };
-                // Save to localStorage as the permanent record
-                const localClients: any[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
-                const existingIdx = localClients.findIndex(c => c.email?.toLowerCase() === email.toLowerCase());
-                if (existingIdx >= 0) {
-                  localClients[existingIdx] = { ...localClients[existingIdx], groqApiKey: apiKey, status: 'active' };
-                } else {
-                  localClients.push(newClient);
-                }
-                localStorage.setItem('finalyze_clients', JSON.stringify(localClients));
-                fetchClients();
-                // Try Firestore (best effort)
-                try {
-                  const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
-                  if (existingSnap.docs[0]) {
-                    await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { groqApiKey: apiKey, status: 'active' });
-                  } else {
-                    await addDoc(collection(db, 'clients'), {
-                      email, groqApiKey: apiKey,
-                      status: 'active', plan: 'free', planExpiry: null,
-                      registeredAt: serverTimestamp(), rank: 0,
-                    });
-                  }
-                } catch (e) { console.warn('Failed to save client to Firestore, localStorage fallback active:', e); }
-              }
-            }}
-            onLogout={handleLogout}
-            asPage
-          />
-        </div>
-      )}
+      {/* Blocking API Key overlay — REMOVED for clients. API key is only managed via Settings (developer only). */}
 
       <Header 
         user={user} onLogin={handleLogin} onLogout={handleLogout} 
@@ -1514,6 +1356,7 @@ export default function App() {
                 onRefresh={fetchClients}
                 onBan={banClient}
                 onDelete={deleteClientRecord}
+                onDeleteByEmail={deleteClientByEmail}
                 onRenew={renewClientPlan}
                 freemiumDisabled={freemiumDisabled}
                 onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); }}
