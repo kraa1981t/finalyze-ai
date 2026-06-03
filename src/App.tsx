@@ -362,7 +362,11 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    const onHashChange = () => setActivePage(getPageFromHash());
+    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile'];
+    const onHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      setActivePage(VALID_PAGES.includes(hash) ? hash as any : 'main');
+    };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
