@@ -13,6 +13,7 @@ import SettingsModal from './components/SettingsModal';
 import SidebarPanel from './components/SidebarPanel';
 import TopSignals from './components/TopSignals';
 import PortfolioPanel from './components/PortfolioPanel';
+import ClientDashboard from './components/ClientDashboard';
 
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType, TradingStyle } from './types';
 import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS, FREE_SYMBOLS } from './constants';
@@ -50,6 +51,9 @@ export default function App() {
     return (!!k1 && k1en) || hasAnyStoredKey();
   });
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
+  const [clientSignals, setClientSignals] = useState<AnalysisResult[]>(() => {
+    try { return JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]'); } catch { return []; }
+  });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
@@ -700,6 +704,14 @@ export default function App() {
               const sig = result.signal || '';
               const isStrong = sig.includes('strong_buy') || sig.includes('strong_sell');
               if (isStrong) updateTopSignals([result]);
+              // Save ALL non-NO_ENTRY results for client dashboard
+              if (sig && sig !== 'no_entry') {
+                setClientSignals(prev => {
+                  const updated = [...prev.filter(r => r.symbol !== result.symbol), result];
+                  localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
+                  return updated.slice(-100);
+                });
+              }
             }
             if (isSubscribed) {
               const key = getApiKey();
@@ -1343,8 +1355,8 @@ export default function App() {
           </motion.div>
         )}
 
-        {/* FORM - hidden during analysis, hidden when results show, hidden when ApiKey is needed */}
-        <div style={{ display: isAnalyzing || analysisResults || activePage !== 'main' || !!needsApiKey ? 'none' : 'block' }}>
+        {/* FORM - hidden during analysis, hidden when results show, hidden when ApiKey is needed, hidden for clients */}
+        <div style={{ display: isAnalyzing || analysisResults || activePage !== 'main' || !!needsApiKey || !isDeveloperSession() ? 'none' : 'block' }}>
           {activeSubscription && (() => {
             const daysLeft = Math.ceil((new Date(activeSubscription.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
             return (
@@ -1394,12 +1406,29 @@ export default function App() {
                 setAnalysisError(null);
                 setProgress(null);
                updateTopSignals(filtered);
+               // Save manual results for client dashboard too
+               filtered.forEach(r => {
+                 if (r.signal !== 'no_entry') {
+                   setClientSignals(prev => {
+                     const updated = [...prev.filter(x => x.symbol !== r.symbol), r];
+                     localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
+                     return updated.slice(-100);
+                   });
+                 }
+               });
                playAudio('fail');
              }} 
               onError={(errMsg, allFailed) => { if (allFailed) setAnalysisResults([]); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); }}
           />
           <ConnectionStatus lang={lang} />
         </div>
+
+        {/* CLIENT DASHBOARD - shows for non-developers on main page */}
+        {!isDeveloperSession() && !analysisResults && !isAnalyzing && activePage === 'main' && !needsApiKey && (
+          <div className="max-w-7xl mx-auto px-4">
+            <ClientDashboard results={clientSignals} lang={lang} />
+          </div>
+        )}
 
         {/* Loading view - separate, no overlap with form */}
         {isAnalyzing && (
