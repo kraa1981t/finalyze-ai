@@ -293,216 +293,30 @@ export async function analyzeMarketBatch(
 ): Promise<{ results: AnalysisResult[]; errors: { symbol: string; error: string }[] }> {
   const results: AnalysisResult[] = [];
   const errors: { symbol: string; error: string }[] = [];
+  const total = paramsList.length;
 
-  // Phase 1: Fetch all market data in parallel
-  const dataPromises = paramsList.map((p, i) => fetchAndPrepareSymbolData(p.symbol, p.type, p.timeframe, lang));
-  const dataResults = await Promise.all(dataPromises);
+  // Analyze each symbol individually — one AI call per symbol for maximum accuracy
+  for (let i = 0; i < total; i++) {
+    const p = paramsList[i];
+    if (onProgress) onProgress(p.symbol, total, i);
 
-  // Separate successful data from failures
-  const validSymbols: { symbol: string; type: MarketType; timeframe: string; tradingStyle: TradingStyle; data: any }[] = [];
-  for (let i = 0; i < paramsList.length; i++) {
-    const d = dataResults[i];
-    if ('error' in d) {
-      errors.push({ symbol: paramsList[i].symbol, error: (d as any).error });
-    } else {
-      validSymbols.push({ ...paramsList[i], data: d });
+    try {
+      // Small delay between calls to avoid rate limiting (skip first)
+      if (i > 0) await new Promise(r => setTimeout(r, 800));
+      await waitIfRateLimited();
+
+      const result = await analyzeMarket({
+        symbol: p.symbol,
+        type: p.type,
+        timeframe: p.timeframe,
+        tradingStyle: p.tradingStyle,
+        settings,
+        lang
+      });
+      results.push(result);
+    } catch (e: any) {
+      errors.push({ symbol: p.symbol, error: e.message || 'Analysis failed' });
     }
-  }
-
-  if (validSymbols.length === 0) {
-    return { results, errors };
-  }
-
-  // Phase 2: Build single batch prompt
-  const tf = validSymbols[0].timeframe;
-  const ts = validSymbols[0].tradingStyle;
-  const type = validSymbols[0].type;
-  const isCrypto = type === MarketType.CRYPTO;
-  const infantLimit = isCrypto ? (settings?.minInfantAge ?? 10) * 2 : (settings?.minInfantAge ?? 10);
-  const matureLimit = isCrypto ? (settings?.minMatureAge ?? 25) * 2 : (settings?.minMatureAge ?? 25);
-  const oldLimit = isCrypto ? (settings?.maxMatureAge ?? 50) * 2 : (settings?.maxMatureAge ?? 50);
-
-  let batchPrompt = `You are an Elite Institutional Trader (ICT/SMC). Analyze ALL the following ${type} symbols (timeframe: ${tf}, style: ${ts}) and return a JSON ARRAY.
-
-RULES (apply to ALL symbols):
-- ONLY "strong_buy"/"strong_sell" if micro is ALIGNED with macro. If micro is in pullback → downgrade to "buy"/"sell".
-- Trend age zones: <${infantLimit} infancy (cap 65), <${matureLimit} youth (downgrade strong, cap 70), ${infantLimit}-${oldLimit} mature (full), >${oldLimit} old (cap 65).
-- Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
-- If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
-- Write summary and each reason in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Professional financial tone. Keep the summary under 2-3 sentences max. Do NOT write long paragraphs.
-- Return ONE object per symbol with: symbol, signal, confidence, summary, detailedReasons, microSignal, microTrend, technicalScore, sentimentScore, historicalMatch.
-
-Symbol details:\n`;
-
-  for (let i = 0; i < validSymbols.length; i++) {
-    const s = validSymbols[i];
-    const d = s.data;
-    batchPrompt += `\n${i + 1}. ${s.symbol}:
-  RSI: ${d.metrics?.rsi?.toFixed(1)}, Trend: ${d.metrics?.direction}, EMA Cross: ${d.metrics?.emaCross}, Vol Surge: ${d.metrics?.volSurge}, Trend Length: ${d.metrics?.totalAge}c, Momentum: ${d.metrics?.age}c
-  Micro (${d.microTF}): RSI ${d.microMetrics?.rsi?.toFixed(1) || 'N/A'}, Trend ${d.microMetrics?.direction || 'sideways'}, EMA ${d.microMetrics?.emaCross || 'unknown'}
-  Supply/Demand: ${d.zonesText}
-  News: ${d.newsText.substring(0, 200)}
-  Events: ${d.eventsText.substring(0, 150)}\n`;
-  }
-
-  batchPrompt += `\nReturn ONLY valid JSON object with a "results" array:
-{
-  "results": [
-    {
-      "symbol": "EURUSD",
-      "signal": "strong_buy"|"buy"|"neutral"|"sell"|"strong_sell"|"no_entry",
-      "confidence": number (0-100),
-      "summary": "string",
-      "detailedReasons": [{"check": "RSI", "value": "62.5", "status": "neutral", "impact": "no change"}],
-      "microSignal": "pullback"|"aligned"|"unknown",
-      "microTrend": "string",
-      "technicalScore": number,
-      "sentimentScore": number,
-      "historicalMatch": "string"
-    }
-  ]
-}`;
-
-  // Phase 3: Single AI call via server proxy (same architecture as working old version)
-  const keyValue = getApiKey() || '';
-  if (keyValue) mirrorApiKey(keyValue);
-
-  async function makeAICall(): Promise<any> {
-    const resp = await callAIDirect(batchPrompt, keyValue);
-    if (resp?.error) return resp;
-    return resp;
-  }
-
-  await waitIfRateLimited();
-  let aiResponse = await makeAICall();
-  if (aiResponse?.error === 'rate_limited') onRateLimited();
-
-  // AI failed → fallback to local analysis
-  if (aiResponse?.error || !aiResponse?.choices?.[0]?.message?.content) {
-    const errorMsg = aiResponse?.error || 'AI Synthesis Error: No response content.';
-    const noticeAr = `⚠️ (تنبيه: فشل الاتصال بالذكاء الاصطناعي الخاص بـ Google/Groq. [السبب: ${errorMsg}]. تم استخدام التحليل الفني المحلي المؤقت كبديل).\n\n`;
-    const noticeEn = `⚠️ (Warning: AI connection failed. [Reason: ${errorMsg}]. Temporary local technical analysis was used as a fallback).\n\n`;
-    const notice = lang === 'ar' ? noticeAr : noticeEn;
-
-    for (const s of validSymbols) {
-      const d = s.data;
-      const local = generateLocalAnalysis(d.metrics, d.zonesText, d.supplyDemandZones, d.microMetrics, d.microTF, settings, type, lang, s.symbol, infantLimit, matureLimit, oldLimit);
-      results.push({ symbol: s.symbol, type: s.type, timeframe: s.timeframe, signal: local.signal, confidence: local.confidence, summary: notice + local.summary, detailedReasons: local.detailedReasons, newsSources: [], technicalScore: local.technicalScore, sentimentScore: local.sentimentScore, trendMaturity: (d.metrics?.totalAge || 0) < infantLimit ? 'infancy' : (d.metrics?.totalAge || 0) < matureLimit ? 'youth' : (d.metrics?.totalAge || 0) <= oldLimit ? 'mature' : 'aging', trendAge: d.metrics?.totalAge || 0, microTF: d.microTF, microSignal: 'unknown', microTrend: '', historicalMatch: '', timestamp: new Date().toISOString(), userId: '' });
-    }
-    return { results, errors };
-  }
-
-  const rawText = aiResponse.choices[0].message.content;
-  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: 'AI returned invalid JSON' }))] };
-
-  let parsedBatch: any[];
-  try {
-    const parsed = JSON.parse(jsonMatch[0]);
-    parsedBatch = parsed.results || (Array.isArray(parsed) ? parsed : []);
-    if (!Array.isArray(parsedBatch)) throw new Error('Not an array');
-  } catch {
-    return { results, errors: [...errors, ...validSymbols.map(s => ({ symbol: s.symbol, error: 'AI returned invalid JSON array' }))] };
-  }
-
-  // Phase 4: Process each result with enforcement
-  for (const s of validSymbols) {
-    const aiResult = parsedBatch.find((r: any) => r.symbol?.toUpperCase() === s.symbol.toUpperCase());
-    const d = s.data;
-
-    if (!aiResult) {
-      errors.push({ symbol: s.symbol, error: 'AI did not return analysis for this symbol' });
-      continue;
-    }
-
-    const totalAge = d.metrics?.totalAge || 0;
-    const age = d.metrics?.age || 0;
-    const minAge = settings?.minTrendAge ?? 2;
-
-    let rawSignal = String(aiResult.signal || 'no_entry').toLowerCase().trim().replace(/\s+/g, '_');
-    if (rawSignal.includes('strong_buy') || rawSignal === 'strongbuy') rawSignal = 'strong_buy';
-    else if (rawSignal.includes('strong_sell') || rawSignal === 'strongsell') rawSignal = 'strong_sell';
-    else if (rawSignal.includes('buy')) rawSignal = 'buy';
-    else if (rawSignal.includes('sell')) rawSignal = 'sell';
-    else if (rawSignal.includes('neutral')) rawSignal = 'neutral';
-    else rawSignal = 'no_entry';
-
-    let finalSignal = rawSignal as SignalType;
-    let finalConfidence = Number(aiResult.confidence) || 50;
-
-    // Age zone enforcement
-    if (totalAge < infantLimit) { if (finalConfidence > 65) finalConfidence = 65; }
-    else if (totalAge < matureLimit) {
-      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
-      else if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
-      if (finalConfidence > 70) finalConfidence = 70;
-    }
-    else if (totalAge > oldLimit) { if (finalConfidence > 65) finalConfidence = 65; }
-    if (age < minAge && finalConfidence > 65) finalConfidence = 65;
-
-    const minConf = settings?.minConfidence || 55;
-    const strongConf = settings?.minStrongConfidence || 80;
-    if (finalConfidence < minConf) { finalSignal = SignalType.NEUTRAL; }
-    else {
-      if (finalSignal === SignalType.STRONG_BUY && finalConfidence < strongConf) finalSignal = SignalType.BUY;
-      else if (finalSignal === SignalType.STRONG_SELL && finalConfidence < strongConf) finalSignal = SignalType.SELL;
-      else if (finalSignal === SignalType.BUY && finalConfidence >= strongConf) finalSignal = SignalType.STRONG_BUY;
-      else if (finalSignal === SignalType.SELL && finalConfidence >= strongConf) finalSignal = SignalType.STRONG_SELL;
-    }
-
-    let detailedReasons = aiResult.detailedReasons;
-    if (!detailedReasons || !Array.isArray(detailedReasons) || detailedReasons.length === 0) {
-      detailedReasons = [];
-      const addReason = (check: string, value: string, status: string, impact: string, source?: string) => {
-        detailedReasons.push({ check, value, status, impact, source });
-      };
-      const rsiVal = d.metrics?.rsi;
-      if (rsiVal !== undefined) {
-        const rsiStatus = rsiVal > 70 ? 'negative' : rsiVal < 30 ? 'positive' : 'neutral';
-        addReason('RSI', rsiVal.toFixed(1), rsiStatus, rsiStatus === 'negative' ? 'overbought, caution' : rsiStatus === 'positive' ? 'oversold, bounce potential' : 'neutral zone');
-      }
-      if (d.metrics?.emaCross) {
-        addReason('EMA Cross', d.metrics.emaCross, d.metrics.emaCross === 'bullish' ? 'positive' : 'negative', d.metrics.emaCross === 'bullish' ? 'supports upward bias' : 'supports downward bias');
-      }
-      if (d.metrics?.direction) {
-        const isUp = d.metrics.direction === 'uptrend';
-        addReason('Trend Direction', d.metrics.direction, isUp ? 'positive' : d.metrics.direction === 'downtrend' ? 'negative' : 'neutral', isUp ? 'price making higher highs' : d.metrics.direction === 'downtrend' ? 'price making lower lows' : 'no clear direction');
-      }
-      const ageZoneDesc = totalAge < infantLimit ? `infancy (<${infantLimit})` : totalAge < matureLimit ? `youth (${infantLimit}-${matureLimit})` : totalAge <= oldLimit ? `mature (${matureLimit}-${oldLimit})` : `old (>${oldLimit})`;
-      addReason('Trend Age Zone', `${totalAge}c — ${ageZoneDesc}`, totalAge < infantLimit ? 'neutral' : totalAge < matureLimit ? 'neutral' : totalAge <= oldLimit ? 'positive' : 'neutral', totalAge < infantLimit ? 'confidence capped at 65' : totalAge < matureLimit ? 'strong signals downgraded' : totalAge <= oldLimit ? 'full confidence allowed' : 'confidence capped at 65');
-      if (d.metrics?.volSurge !== undefined) {
-        addReason('Volume Surge', d.metrics.volSurge ? 'true' : 'false', d.metrics.volSurge ? 'positive' : 'neutral', d.metrics.volSurge ? 'confirms momentum' : 'normal volume');
-      }
-      if (d.supplyDemandZones?.length > 0) {
-        const z = d.supplyDemandZones[0];
-        addReason('Supply/Demand Zone', `${z.type === 'supply' ? 'Supply' : 'Demand'} ${z.bottom.toFixed(2)}-${z.top.toFixed(2)} strength ${z.strength.toFixed(0)}%`, 'neutral', `nearest ${z.type} zone identified`);
-      }
-      addReason('Micro TF Alignment', aiResult.microSignal || 'unknown', aiResult.microSignal === 'aligned' ? 'positive' : 'neutral', aiResult.microSignal === 'aligned' ? 'micro aligns with macro' : 'micro diverging from macro');
-      const fg = d.contextFearGreed;
-      if (fg?.value !== undefined) {
-        addReason('Fear & Greed', `${fg.value}/100 — ${fg.classification || ''}`, fg.value <= 25 ? 'positive' : fg.value >= 75 ? 'negative' : 'neutral', fg.value <= 25 ? 'contrarian buy signal' : fg.value >= 75 ? 'extreme greed, cap confidence' : 'neutral sentiment');
-      }
-    }
-
-    if (onProgress) onProgress(s.symbol, validSymbols.length, results.length);
-
-    results.push({
-      symbol: s.symbol, type: s.type, timeframe: s.timeframe,
-      signal: finalSignal, confidence: finalConfidence,
-      summary: aiResult.summary || '',
-      detailedReasons,
-      newsSources: [...new Set(detailedReasons.filter((r: any) => r.check === 'News Sentiment' && r.source).map((r: any) => r.source))],
-      technicalScore: aiResult.technicalScore ?? d.metrics?.momentumScore ?? 50,
-      sentimentScore: aiResult.sentimentScore ?? d.contextFearGreed?.value ?? 50,
-      trendMaturity: totalAge < infantLimit ? 'infancy' : totalAge < matureLimit ? 'youth' : totalAge <= oldLimit ? 'mature' : 'aging',
-      trendAge: totalAge,
-      microTF: d.microTF,
-      microSignal: aiResult.microSignal || 'unknown',
-      microTrend: aiResult.microTrend || '',
-      historicalMatch: aiResult.historicalMatch || '',
-      timestamp: new Date().toISOString(),
-      userId: ''
-    });
   }
 
   return { results, errors };
@@ -601,25 +415,32 @@ RULES:
 - Trend age zones: <10 infancy (cap 65), <25 youth (downgrade strong, cap 70), 25-50 mature (full), >50 old (cap 65).
 - Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
 - If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
-- Write summary and each reason in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Professional financial tone. Keep the summary under 2-3 sentences max. Do NOT write long paragraphs.
-- In detailedReasons, list EVERY condition you checked and its outcome.
+- Write summary in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Use clear, professional financial language. Keep summary under 2-3 sentences max.
+- For detailedReasons: Each reason MUST have a short, clear, professional explanation (max 15 words). Use plain language, not jargon. Example: "RSI at 62.5 indicates neutral momentum" NOT "RSI 62.5 no change".
+
+CRITICAL RULES FOR detailedReasons:
+- Each "impact" field must be a SHORT phrase (under 15 words), written in plain professional language
+- Each "check" must name the indicator (RSI, EMA Cross, Trend Direction, etc.)
+- Each "value" must show the actual value
+- Each "status" must be exactly: "positive", "negative", or "neutral"
+- Do NOT write vague or garbled text. Be precise and clear.
 
 Return ONLY valid JSON:
 {
   "signal": "strong_buy"|"buy"|"neutral"|"sell"|"strong_sell"|"no_entry",
   "confidence": number (0-100),
-  "summary": "string — comprehensive Arabic/English paragraph covering ALL factors: RSI, EMA, trend, age zone, volume, micro alignment, Fear&Greed, news sources, economic events",
+  "summary": "string — clear 2-3 sentence summary covering RSI, EMA, trend, age zone, volume, micro alignment, Fear&Greed, news, events",
   "detailedReasons": [
-    {"check": "RSI", "value": "62.5", "status": "neutral", "impact": "no change"},
-    {"check": "EMA Cross", "value": "bullish", "status": "positive", "impact": "supports buy"},
-    {"check": "Trend Direction", "value": "uptrend", "status": "positive", "impact": "supports buy"},
-    {"check": "Trend Age Zone", "value": "mature (32 candles)", "status": "positive", "impact": "full confidence allowed"},
-    {"check": "Volume Surge", "value": "true", "status": "positive", "impact": "confirms momentum"},
-    {"check": "Supply/Demand Zone", "value": "demand 1.0850-1.0880 strength 72%", "status": "positive", "impact": "price near demand zone"},
-    {"check": "Micro TF Alignment", "value": "aligned", "status": "positive", "impact": "strong signal allowed"},
-    {"check": "Fear&Greed", "value": "45/100 Neutral", "status": "neutral", "impact": "no modification"},
-    {"check": "News Sentiment", "value": "2 positive articles", "status": "positive", "source": "Reuters, CNBC", "impact": "supports confidence"},
-    {"check": "Economic Events", "value": "no high impact events", "status": "neutral", "impact": "no penalty"}
+    {"check": "RSI", "value": "62.5", "status": "neutral", "impact": "Momentum is balanced, no extreme reading"},
+    {"check": "EMA Cross", "value": "bullish", "status": "positive", "impact": "9 EMA above 21 EMA supports upward bias"},
+    {"check": "Trend Direction", "value": "uptrend", "status": "positive", "impact": "Price making higher highs and higher lows"},
+    {"check": "Trend Age Zone", "value": "mature (32 candles)", "status": "positive", "impact": "Full confidence allowed in this zone"},
+    {"check": "Volume Surge", "value": "true", "status": "positive", "impact": "Volume spike confirms breakout momentum"},
+    {"check": "Supply/Demand Zone", "value": "demand 1.0850-1.0880", "status": "positive", "impact": "Price sitting on strong demand zone"},
+    {"check": "Micro TF Alignment", "value": "aligned", "status": "positive", "impact": "Lower timeframe confirms macro direction"},
+    {"check": "Fear&Greed", "value": "45/100 Neutral", "status": "neutral", "impact": "Market sentiment is balanced, no extreme"},
+    {"check": "News Sentiment", "value": "2 positive articles", "status": "positive", "impact": "Favorable news flow supports direction", "source": "Reuters, CNBC"},
+    {"check": "Economic Events", "value": "no high impact events", "status": "neutral", "impact": "No upcoming events to disrupt the move"}
   ],
   "technicalScore": number,
   "sentimentScore": number,
