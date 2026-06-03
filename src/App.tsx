@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { onAuthStateChanged, User, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -749,24 +749,9 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    // Clear stale auth state on mount
     localStorage.removeItem('finalyze_verify_link');
     setLoginError(null);
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (result?.user) {
-          const email = result.user.email || result.user.providerData?.[0]?.email || '';
-          if (email) {
-            await processGoogleUser(email, result.user.displayName || undefined, result.user.photoURL || undefined);
-          }
-        }
-      })
-      .catch((error: any) => {
-        console.error("Redirect login failure on mount:", error);
-      })
-      .finally(() => {
-        setRedirecting(false);
-      });
+    setRedirecting(false);
   }, []);
 
   useEffect(() => {
@@ -968,22 +953,16 @@ export default function App() {
     }
   }, [loading]);
 
-  const handleLoginRedirect = async () => {
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-    try {
-      await signInWithRedirect(auth, provider);
-    } catch (error: any) {
-      console.error('signInWithRedirect error:', error);
-      setRedirecting(false);
-    }
-  };
-
   const processGoogleUser = async (email: string, displayName?: string, photoURL?: string) => {
     // Developer emails → sign in directly
     if (email === 'taybekraa@gmail.com' || email === 'bachasalman69@gmail.com' || email.includes('dev')) {
-      await signOut(auth);
+      localStorage.setItem('finalyze_auth_user', JSON.stringify({ uid: 'dev_' + email.replace(/[^a-zA-Z0-9]/g, ''), email, displayName: 'Developer', emailVerified: true }));
+      localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
+      localStorage.setItem('finalyze_dev_bypass_active', 'true');
       setUser({ uid: 'dev_' + email.replace(/[^a-zA-Z0-9]/g, ''), email, displayName: 'Developer', emailVerified: true } as User);
+      setHasApiKey(true);
+      persistNeedsApiKey(null);
+      fetchClients();
       return;
     }
 
@@ -999,39 +978,35 @@ export default function App() {
         try { sessionStorage.setItem('finalyze_key_mirror', ak); } catch {}
       }
 
-      if (isBannedEmail(email)) {
-        setLoginError(lang === 'ar' ? 'هذا الحساب محظور. لا يمكنك تسجيل الدخول.' : 'This account is banned. You cannot log in.');
-        setRedirecting(false);
-        return;
-      }
-      if (existing?.status === 'banned') {
+      if (isBannedEmail(email) || existing?.status === 'banned') {
         setLoginError(lang === 'ar' ? 'هذا الحساب محظور. لا يمكنك تسجيل الدخول.' : 'This account is banned. You cannot log in.');
         setRedirecting(false);
         return;
       }
 
-      localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+      // Set session via localStorage FIRST
+      localStorage.setItem('finalyze_auth_user', JSON.stringify({ uid: email, email, displayName: displayName || 'Client', photoURL: photoURL || '', emailVerified: true }));
       localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
       localStorage.removeItem('finalyze_dev_bypass_active');
-      await signOut(auth);
-      const cred = await signInAnonymously(auth);
-      setUser({ uid: cred.user.uid, email, displayName: displayName || 'Client', photoURL: photoURL || '', emailVerified: true } as User);
+
+      // Set user in state
+      setUser({ uid: email, email, displayName: displayName || 'Client', photoURL: photoURL || '', emailVerified: true } as User);
       setHasApiKey(hasAnyStoredKey());
       persistNeedsApiKey(null);
 
       const clientEmails: any[] = JSON.parse(localStorage.getItem('finalyze_client_emails') || '[]');
       if (!clientEmails.some((c: any) => c.email === email)) {
-        clientEmails.push({ email, registeredAt: new Date().toISOString(), uid: cred.user.uid });
+        clientEmails.push({ email, registeredAt: new Date().toISOString(), uid: email });
         localStorage.setItem('finalyze_client_emails', JSON.stringify(clientEmails));
       }
 
       try {
         if (existingSnap.docs[0]) {
-          await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { uid: cred.user.uid, status: 'verified', plan: 'free' });
+          await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { status: 'verified', plan: 'free' });
         } else {
           const count = (await getDocs(collection(db, 'clients'))).size;
           await addDoc(collection(db, 'clients'), {
-            email, uid: cred.user.uid, status: 'verified', plan: 'free', planExpiry: null,
+            email, status: 'verified', plan: 'free', planExpiry: null,
             registeredAt: serverTimestamp(), rank: count + 1,
           });
         }
@@ -1042,7 +1017,6 @@ export default function App() {
         localClients.push({
           id: 'local_' + Date.now(),
           email,
-          uid: cred.user.uid,
           status: 'verified',
           plan: 'free',
           planExpiry: null,
@@ -1052,15 +1026,13 @@ export default function App() {
         localStorage.setItem('finalyze_clients', JSON.stringify(localClients));
         fetchClients();
       }
-      return;
     } catch (innerErr) {
       console.error('Non-critical error during client setup:', innerErr);
-      localStorage.setItem('finalyze_auth_user', JSON.stringify({ email, placeholder: true }));
+      localStorage.setItem('finalyze_auth_user', JSON.stringify({ uid: email, email, displayName: displayName || 'Client', photoURL: photoURL || '', emailVerified: true }));
       localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-      setUser({ uid: 'fallback_' + Date.now(), email, displayName: displayName || 'Client', emailVerified: true } as User);
+      setUser({ uid: email, email, displayName: displayName || 'Client', photoURL: photoURL || '', emailVerified: true } as User);
       setHasApiKey(hasAnyStoredKey());
       persistNeedsApiKey(null);
-      return;
     }
   };
 
@@ -1073,9 +1045,24 @@ export default function App() {
     setManualAuthUrl(null);
     setRedirecting(true);
     try {
-      await handleLoginRedirect();
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await signInWithPopup(auth, provider);
+      const email = result?.user?.email || result?.user?.providerData?.[0]?.email || '';
+      if (!email) { throw new Error('no_email'); }
+      await processGoogleUser(email, result.user.displayName || undefined, result.user.photoURL || undefined);
     } catch (error: any) {
-      console.error("=== signInWithRedirect ERROR ===", error);
+      console.error("=== Google sign-in ERROR ===", error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        setLoginError('تم إغلاق نافذة تسجيل الدخول. حاول مرة أخرى.');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setLoginError(`هذا النطاق (${window.location.hostname}) غير مسموح به في Firebase.`);
+      } else if (error.message === 'no_email') {
+        setLoginError('لم نتمكن من الحصول على بريدك الإلكتروني. حاول مرة أخرى.');
+      } else {
+        setLoginError(`Google sign-in error: ${error.code || error.message}`);
+      }
+    } finally {
       setRedirecting(false);
     }
   };
