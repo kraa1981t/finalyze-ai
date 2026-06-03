@@ -1,6 +1,6 @@
 ﻿{
     "autoUpdate":  true,
-    "description":  "b67eac5 Fix forex data: multiple Yahoo symbol formats + dual CORS proxy + metals mapping",
-    "savedAt":  "2026-06-03 16:44",
-    "stableVersion":  "b67eac5046e89f9951c6a29dee73aaef816bd657"
+    "description":  "9cd7a10 Google-only login, client restrictions, email monitoring, remove API key for clients",
+    "savedAt":  "2026-06-03 17:10",
+    "stableVersion":  "9cd7a10d89f6b5f48f9323ed9e064f3d1611bc79"
 }
