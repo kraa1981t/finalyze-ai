@@ -144,20 +144,18 @@ export default function Header({
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-xl transition-all border-2 shadow-lg",
                     autoSettings.isEnabled
-                      ? (isWaiting
-                        ? 'bg-red-600 border-red-700 text-white shadow-red-500/40 hover:bg-red-700'
-                        : 'bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/40')
+                      ? 'bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/40'
                       : 'bg-[#F59E0B] border-black/10 text-black hover:bg-[#d97706]'
                   )}
                 >
                   <div className="relative">
                     <Zap size={18} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
-                    {autoSettings.isEnabled && !isWaiting && (
+                    {autoSettings.isEnabled && (
                       <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full animate-ping shadow-[0_0_12px_white]" />
                     )}
                   </div>
                   <span className="text-[12px] font-black uppercase tracking-wider hidden md:inline">
-                    {autoSettings.isEnabled ? (isWaiting ? 'Restart' : 'ON') : 'OFF'}
+                    {autoSettings.isEnabled ? 'ON' : 'OFF'}
                   </span>
                 </button>
               ) : (

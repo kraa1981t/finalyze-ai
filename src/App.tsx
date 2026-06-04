@@ -132,7 +132,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
   const [showForm, setShowForm] = useState(true);
-  const [isScanningFinished, setIsScanningFinished] = useState(() => localStorage.getItem('radar_scan_finished') === 'true');
+  const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
   const [activeSubscription, setActiveSubscription] = useState<{ label: string; amount: number; expiryDate: string } | null>(() => {
     try {
@@ -474,10 +474,6 @@ export default function App() {
   useEffect(() => {
     autoSettingsRef.current = autoSettings;
   }, [autoSettings]);
-
-  useEffect(() => {
-    localStorage.setItem('radar_scan_finished', isScanningFinished.toString());
-  }, [isScanningFinished]);
 
   const [isRadarUnlocked, setIsRadarUnlocked] = useState(false);
 

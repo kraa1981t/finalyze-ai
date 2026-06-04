@@ -88,7 +88,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           </h3>
           <p className="text-sm text-brand-muted mt-1">
             {autoSettings.isEnabled
-              ? (isWaiting ? (lang === 'ar' ? 'يعيد التشغيل...' : 'Restarting...') : (lang === 'ar' ? 'الرادار نشط' : 'Radar Active'))
+              ? (lang === 'ar' ? 'الرادار نشط' : 'Radar Active')
               : (lang === 'ar' ? 'الرادار متوقف' : 'Radar Off')}
           </p>
         </div>
@@ -97,20 +97,18 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           className={cn(
             "flex items-center gap-2 px-5 py-3 rounded-xl transition-all border-2 shadow-lg",
             autoSettings.isEnabled
-              ? (isWaiting
-                ? 'bg-red-600 border-red-700 text-white shadow-red-500/40'
-                : 'bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/40')
+              ? 'bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/40'
               : 'bg-[#F59E0B] border-black/10 text-black hover:bg-[#d97706]'
           )}
         >
           <div className="relative">
             <Zap size={20} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
-            {autoSettings.isEnabled && !isWaiting && (
+            {autoSettings.isEnabled && (
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full animate-ping shadow-[0_0_12px_white]" />
             )}
           </div>
           <span className="text-sm font-black uppercase tracking-wider">
-            {autoSettings.isEnabled ? (isWaiting ? 'Restart' : 'ON') : 'OFF'}
+            {autoSettings.isEnabled ? 'ON' : 'OFF'}
           </span>
         </button>
       </div>
