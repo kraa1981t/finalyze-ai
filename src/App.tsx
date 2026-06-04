@@ -621,16 +621,28 @@ export default function App() {
 
   // RADAR - Developer only, fully standalone
   const radarTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevIsEnabledRef = useRef(false);
 
   useEffect(() => {
     if (!isDeveloperSession()) return;
 
-    // Cleanup previous
-    if (radarTimerRef.current) {
-      clearInterval(radarTimerRef.current);
-      radarTimerRef.current = null;
+    const justEnabled = autoSettings.isEnabled && !prevIsEnabledRef.current;
+    const justDisabled = !autoSettings.isEnabled && prevIsEnabledRef.current;
+    prevIsEnabledRef.current = autoSettings.isEnabled;
+
+    // If just disabled — stop
+    if (justDisabled) {
+      if (radarTimerRef.current) {
+        clearInterval(radarTimerRef.current);
+        radarTimerRef.current = null;
+      }
+      return;
     }
 
+    // If already running — don't restart (settings changes take effect on next tick via autoSettingsRef)
+    if (radarTimerRef.current && !justEnabled) return;
+
+    // If not enabled — don't start
     if (!autoSettings.isEnabled) return;
 
     const tick = async () => {
@@ -736,7 +748,7 @@ export default function App() {
       playAudio('fail');
     };
 
-    // Run immediately, then repeat every interval
+    // Start: immediate first scan, then interval
     tick();
     const ms = (autoSettings.interval || 15) * 60000;
     radarTimerRef.current = setInterval(tick, ms);
@@ -747,7 +759,7 @@ export default function App() {
         radarTimerRef.current = null;
       }
     };
-  }, [autoSettings.isEnabled, autoSettings.interval]);
+  }, [autoSettings.isEnabled]);
 
   useEffect(() => {
     localStorage.removeItem('finalyze_verify_link');
