@@ -816,21 +816,29 @@ export default function App() {
     };
 
     // Run once, then schedule next scan
-    tick().then(() => {
-      // Scan finished → yellow icon + notification
-      setIsScanningFinished(true);
-      setFoundAnyStrong(signalsRef.current.length > 0);
-      playAudio('success');
+    const runScan = async () => {
+      try {
+        await tick();
+      } catch (e) {
+        console.error('Radar scan error:', e);
+      } finally {
+        // Always show yellow after scan completes (success or error)
+        setIsScanningFinished(true);
+        setFoundAnyStrong(signalsRef.current.length > 0);
+        playAudio('success');
 
-      if (autoSettingsRef.current.isEnabled) {
-        const ms = (autoSettingsRef.current.interval || 15) * 60000;
-        radarTimerRef.current = setTimeout(() => {
-          radarTimerRef.current = null;
-          setIsScanningFinished(false);
-          tick();
-        }, ms);
+        // Schedule next scan
+        if (autoSettingsRef.current.isEnabled) {
+          const ms = (autoSettingsRef.current.interval || 15) * 60000;
+          radarTimerRef.current = setTimeout(() => {
+            radarTimerRef.current = null;
+            setIsScanningFinished(false);
+            runScan();
+          }, ms);
+        }
       }
-    });
+    };
+    runScan();
 
     return () => {
       if (radarTimerRef.current) {
