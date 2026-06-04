@@ -683,20 +683,12 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // RADAR - Developer only, never auto-starts
-  const radarTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const prevIsEnabledRef = useRef(false);
-  const mountedRef = useRef(false);
+  // RADAR - Developer only, never auto-starts on page load
+  const radarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevIsEnabledRef = useRef(autoSettings.isEnabled); // Initialize from actual state
 
   useEffect(() => {
     if (!isDeveloperSession()) return;
-
-    // First mount: skip entirely — never auto-start on page load/refresh
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      prevIsEnabledRef.current = autoSettings.isEnabled;
-      return;
-    }
 
     const justEnabled = autoSettings.isEnabled && !prevIsEnabledRef.current;
     const justDisabled = !autoSettings.isEnabled && prevIsEnabledRef.current;
@@ -705,13 +697,13 @@ export default function App() {
     // If just disabled — stop
     if (justDisabled) {
       if (radarTimerRef.current) {
-        clearInterval(radarTimerRef.current);
+        clearTimeout(radarTimerRef.current);
         radarTimerRef.current = null;
       }
       return;
     }
 
-    // If not a toggle event — ignore (settings changed, not on/off)
+    // If not a toggle event — ignore
     if (!justEnabled) return;
 
     // If already running — don't restart
