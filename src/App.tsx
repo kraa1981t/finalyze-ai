@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
@@ -171,6 +171,7 @@ export default function App() {
   // CLIENT: Incremental results loading from developer via Firestore
   const clientQueueRef = useRef<any[]>([]);
   const clientLoadingRef = useRef(false);
+  const lastPollResultsRef = useRef<string>('');
 
   // Sort by signal strength: strong > buy/sell > others
   const sortSignalsByStrength = (results: any[]) => {
@@ -183,14 +184,17 @@ export default function App() {
       const aSig = strengthOrder[a.signal] ?? 99;
       const bSig = strengthOrder[b.signal] ?? 99;
       if (aSig !== bSig) return aSig - bSig;
-      const aConf = a.confidence || 0;
-      const bConf = b.confidence || 0;
-      return bConf - aConf;
+      return (b.confidence || 0) - (a.confidence || 0);
     });
   };
 
-  // Process queue: show one symbol at a time with delay
-  const processClientQueue = useCallback(async () => {
+  // Add results to queue and start processing
+  const queueClientResults = (results: any[]) => {
+    clientQueueRef.current = [...clientQueueRef.current, ...results];
+    processClientQueueFn();
+  };
+
+  const processClientQueueFn = async () => {
     if (clientLoadingRef.current || clientQueueRef.current.length === 0) return;
     clientLoadingRef.current = true;
 
@@ -198,115 +202,78 @@ export default function App() {
       const result = clientQueueRef.current.shift();
       if (!result) break;
 
-      // Add to displayed signals
       setClientSignals(prev => {
         const updated = [...prev.filter((r: any) => r.symbol !== result.symbol), result];
         localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
         return updated.slice(-100);
       });
 
-      // Play notification sound for strong signals
       const sig = result.signal || '';
       if (sig.includes('strong_buy') || sig.includes('strong_sell')) {
-        playAudio('success');
-      } else {
-        playAudio('fail');
+        try { playAudio('success'); } catch {}
       }
 
-      // Wait 2-3 seconds before next symbol
       if (clientQueueRef.current.length > 0) {
         await new Promise(r => setTimeout(r, 2500));
       }
     }
 
     clientLoadingRef.current = false;
-  }, []);
+  };
 
+  // CLIENT: Load on login + poll every 30 seconds
   useEffect(() => {
     if (!user || isDeveloperSession()) return;
 
-    const loadSharedResults = async () => {
+    const loadFromFirestore = async () => {
       try {
-        // Check if new day — clear old results
+        // New day → clear old results
         const today = new Date().toDateString();
         const lastDate = localStorage.getItem('finalyze_client_results_date');
         if (lastDate !== today) {
           setClientSignals([]);
           localStorage.removeItem('finalyze_client_signals');
           localStorage.setItem('finalyze_client_results_date', today);
+          lastPollResultsRef.current = '';
         }
 
-        // Load from Firestore
-        const snap = await getDocs(query(collection(db, 'shared_results'), orderBy('timestamp', 'desc')));
-        if (!snap.empty) {
-          const latest = snap.docs[0]?.data();
-          if (latest?.results) {
-            const sorted = sortSignalsByStrength(latest.results);
-            // Queue all results for incremental display
-            clientQueueRef.current = sorted;
-            processClientQueue();
-          }
-        }
-
-        // Also load shared alert settings
-        const alertSnap = await getDocs(query(collection(db, 'shared_alerts')));
-        if (!alertSnap.empty) {
-          const alertData = alertSnap.docs[0]?.data();
-          if (alertData) {
-            localStorage.setItem('finalyze_client_alerts', JSON.stringify(alertData));
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to load shared results:', e);
-      }
-    };
-    loadSharedResults();
-  }, [user]);
-
-  // CLIENT: Poll Firestore every 3 minutes for new results from developer
-  const lastPollResultsRef = useRef<string>('');
-
-  useEffect(() => {
-    if (!user || isDeveloperSession()) return;
-
-    const pollForNewResults = async () => {
-      try {
         const snap = await getDocs(query(collection(db, 'shared_results'), orderBy('timestamp', 'desc')));
         if (snap.empty) return;
         const latest = snap.docs[0]?.data();
         if (!latest?.results) return;
 
-        // Skip if same results already processed
         const snapId = snap.docs[0].id;
         if (lastPollResultsRef.current === snapId) return;
         lastPollResultsRef.current = snapId;
 
-        // Get currently displayed symbols
+        // Find new results not yet displayed
         const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
         const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
-
-        // Find NEW results not yet displayed
         const newResults = latest.results.filter((r: any) => !currentSymbols.has(r.symbol));
-        if (newResults.length === 0) return;
 
-        // Sort and queue new results
-        const sorted = sortSignalsByStrength(newResults);
-        clientQueueRef.current = [...clientQueueRef.current, ...sorted];
-        processClientQueue();
+        if (newResults.length > 0) {
+          const sorted = sortSignalsByStrength(newResults);
+          queueClientResults(sorted);
+        } else if (currentSignals.length === 0) {
+          // No local signals and no new ones — show all from Firestore
+          const sorted = sortSignalsByStrength(latest.results);
+          queueClientResults(sorted);
+        }
+
+        // Load alert settings
+        const alertSnap = await getDocs(query(collection(db, 'shared_alerts')));
+        if (!alertSnap.empty) {
+          const alertData = alertSnap.docs[0]?.data();
+          if (alertData) localStorage.setItem('finalyze_client_alerts', JSON.stringify(alertData));
+        }
       } catch (e) {
-        console.warn('Poll failed:', e);
+        console.warn('Failed to load shared results:', e);
       }
     };
 
-    // Initial poll immediately
-    const initialTimeout = setTimeout(pollForNewResults, 2000);
-    // Then every 30 seconds
-    const interval = setInterval(pollForNewResults, 30000);
-
-    return () => {
-      clearTimeout(initialTimeout);
-      clearInterval(interval);
-    };
+    loadFromFirestore();
+    const interval = setInterval(loadFromFirestore, 30000);
+    return () => clearInterval(interval);
   }, [user]);
 
   const hasActivePlan = useMemo((): boolean => {
@@ -728,12 +695,20 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // RADAR - Developer only, fully standalone
+  // RADAR - Developer only, never auto-starts
   const radarTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevIsEnabledRef = useRef(false);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
     if (!isDeveloperSession()) return;
+
+    // First mount: skip entirely — never auto-start on page load/refresh
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      prevIsEnabledRef.current = autoSettings.isEnabled;
+      return;
+    }
 
     const justEnabled = autoSettings.isEnabled && !prevIsEnabledRef.current;
     const justDisabled = !autoSettings.isEnabled && prevIsEnabledRef.current;
@@ -745,21 +720,14 @@ export default function App() {
         clearInterval(radarTimerRef.current);
         radarTimerRef.current = null;
       }
-      sessionStorage.removeItem('radar_started');
       return;
     }
 
+    // If not a toggle event — ignore (settings changed, not on/off)
+    if (!justEnabled) return;
+
     // If already running — don't restart
-    if (radarTimerRef.current && !justEnabled) return;
-
-    // On page refresh: if was already started this session, don't restart
-    if (!justEnabled && sessionStorage.getItem('radar_started') === 'true') return;
-
-    // If not enabled — don't start
-    if (!autoSettings.isEnabled) return;
-
-    // Mark as started
-    sessionStorage.setItem('radar_started', 'true');
+    if (radarTimerRef.current) return;
 
     const tick = async () => {
       const s = autoSettingsRef.current;
