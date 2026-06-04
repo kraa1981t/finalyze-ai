@@ -684,7 +684,7 @@ export default function App() {
   }, []);
 
   // RADAR - Developer only, never auto-starts
-  const radarTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const radarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevIsEnabledRef = useRef(false);
   const mountedRef = useRef(false);
 
@@ -705,19 +705,20 @@ export default function App() {
     // If just disabled — stop
     if (justDisabled) {
       if (radarTimerRef.current) {
-        clearInterval(radarTimerRef.current);
+        clearTimeout(radarTimerRef.current as any);
         radarTimerRef.current = null;
       }
+      setIsScanningFinished(true);
       return;
     }
 
-    // If not a toggle event — ignore (settings changed, not on/off)
+    // If not a toggle event — ignore
     if (!justEnabled) return;
 
     // If already running — don't restart
     if (radarTimerRef.current) return;
 
-    const tick = async () => {
+    const runScan = async () => {
       const s = autoSettingsRef.current;
       if (!s.isEnabled) return;
 
@@ -726,8 +727,12 @@ export default function App() {
         : (s.category || 'all').split(',') as (keyof typeof SYMBOL_CATEGORIES)[];
 
       const open = cats.filter(isMarketOpen);
-      if (open.length === 0) return;
+      if (open.length === 0) {
+        setIsScanningFinished(true);
+        return;
+      }
 
+      // SCANNING — green
       setIsScanningFinished(false);
 
       let hidden: string[] = [];
@@ -786,8 +791,12 @@ export default function App() {
         }
       }
 
+      // SCAN COMPLETE — yellow
       setIsScanningFinished(true);
       setFoundAnyStrong(signalsRef.current.length > 0);
+
+      // Play completion sound
+      try { playAudio('success'); } catch {}
 
       // Save to Firestore for clients
       try {
@@ -817,19 +826,18 @@ export default function App() {
         console.warn('Firestore save failed:', e);
       }
 
-      playAudio('fail');
-    };
-
-    // Run once, then schedule next scan
-    tick().then(() => {
+      // Schedule next scan after interval
       if (autoSettingsRef.current.isEnabled) {
         const ms = (autoSettingsRef.current.interval || 15) * 60000;
         radarTimerRef.current = setTimeout(() => {
           radarTimerRef.current = null;
-          tick();
+          runScan();
         }, ms);
       }
-    });
+    };
+
+    // Start first scan
+    runScan();
 
     return () => {
       if (radarTimerRef.current) {
