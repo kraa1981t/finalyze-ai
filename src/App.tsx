@@ -168,42 +168,32 @@ export default function App() {
            email.includes('dev');
   };
 
-  // AUTO-RADAR FOR CLIENTS: enable daily analysis automatically
+  // CLIENT: Load shared results from developer via Firestore
   useEffect(() => {
     if (!user || isDeveloperSession()) return;
-    const today = new Date().toDateString();
-    const lastRun = localStorage.getItem('client_radar_last_run');
-    const clientAuto = localStorage.getItem('client_radar_enabled');
-
-    // Force enable for clients
-    if (clientAuto !== 'true') {
-      localStorage.setItem('client_radar_enabled', 'true');
-    }
-
-    // Set auto settings for daily analysis if not already set by developer
-    const saved = localStorage.getItem('auto_settings');
-    const parsed = saved ? (() => { try { return JSON.parse(saved); } catch { return null; } })() : null;
-    if (!parsed || !parsed.isEnabled) {
-      const dailySettings = {
-        isEnabled: true,
-        interval: 1440,
-        timeframe: '1d',
-        category: 'all',
-        tradingStyle: 'swing',
-      };
-      setAutoSettings(dailySettings);
-      localStorage.setItem('auto_settings', JSON.stringify(dailySettings));
-    }
-
-    // Check if new day → trigger re-analysis
-    if (lastRun !== today) {
-      localStorage.setItem('client_radar_last_run', today);
-      // Force a new scan by briefly toggling
-      setAutoSettings(prev => {
-        const updated = { ...prev, isEnabled: true };
-        return updated;
-      });
-    }
+    const loadSharedResults = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'shared_results'), orderBy('timestamp', 'desc')));
+        if (!snap.empty) {
+          const latest = snap.docs[0]?.data();
+          if (latest?.results) {
+            setClientSignals(latest.results);
+            localStorage.setItem('finalyze_client_signals', JSON.stringify(latest.results));
+          }
+        }
+        // Also load shared alert settings
+        const alertSnap = await getDocs(query(collection(db, 'shared_alerts')));
+        if (!alertSnap.empty) {
+          const alertData = alertSnap.docs[0]?.data();
+          if (alertData) {
+            localStorage.setItem('finalyze_client_alerts', JSON.stringify(alertData));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load shared results:', e);
+      }
+    };
+    loadSharedResults();
   }, [user]);
 
   const hasActivePlan = useMemo((): boolean => {
@@ -532,8 +522,20 @@ export default function App() {
   const saveStrategySettings = () => {
     localStorage.setItem('strategy_settings', JSON.stringify(settings));
   };
-  const saveAutoSettings = () => {
+  const saveAutoSettings = async () => {
     localStorage.setItem('auto_settings', JSON.stringify(autoSettings));
+    // Developer: save to Firestore so clients get the alert settings
+    if (isDeveloperSession()) {
+      try {
+        const oldSnap = await getDocs(collection(db, 'shared_alerts'));
+        for (const d of oldSnap.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
+        await addDoc(collection(db, 'shared_alerts'), {
+          autoSettings,
+          strategySettings: settings,
+          timestamp: serverTimestamp(),
+        });
+      } catch (e) { console.warn('Failed to save alerts to Firestore:', e); }
+    }
   };
 
   const updateTopSignals = (results: AnalysisResult[]) => {
@@ -742,8 +744,8 @@ export default function App() {
               const sig = result.signal || '';
               const isStrong = sig.includes('strong_buy') || sig.includes('strong_sell');
               if (isStrong) updateTopSignals([result]);
-              // Save ALL non-NO_ENTRY results for client dashboard
-              if (sig && sig !== 'no_entry') {
+              // Developer: save all results locally
+              if (isDeveloperSession() && sig && sig !== 'no_entry') {
                 setClientSignals(prev => {
                   const updated = [...prev.filter(r => r.symbol !== result.symbol), result];
                   localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
@@ -773,6 +775,44 @@ export default function App() {
         setIsScanningFinished(true);
         setFoundAnyStrong(signalsRef.current.length > 0);
         setAutoSettings(prev => ({ ...prev, lastFinishedAt: finishedAt }));
+
+        // Developer: save results to Firestore for clients
+        if (isDeveloperSession()) {
+          try {
+            const allResults = signalsRef.current.length > 0 ? signalsRef.current : [];
+            // Also include non-strong results from clientSignals
+            const localResults = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
+            const merged = [...allResults];
+            localResults.forEach((r: any) => {
+              if (!merged.find((m: any) => m.symbol === r.symbol)) merged.push(r);
+            });
+            if (merged.length > 0) {
+              // Delete old shared results
+              const oldSnap = await getDocs(collection(db, 'shared_results'));
+              for (const d of oldSnap.docs) {
+                await deleteDoc(doc(db, 'shared_results', d.id));
+              }
+              await addDoc(collection(db, 'shared_results'), {
+                results: merged.slice(-100),
+                timestamp: serverTimestamp(),
+                developerEmail: user?.email || '',
+              });
+            }
+            // Save alert settings for clients
+            const oldAlertSnap = await getDocs(collection(db, 'shared_alerts'));
+            for (const d of oldAlertSnap.docs) {
+              await deleteDoc(doc(db, 'shared_alerts', d.id));
+            }
+            await addDoc(collection(db, 'shared_alerts'), {
+              autoSettings: { ...autoSettingsRef.current, lastFinishedAt: finishedAt },
+              strategySettings: settings,
+              timestamp: serverTimestamp(),
+            });
+          } catch (e) {
+            console.warn('Failed to save shared results to Firestore:', e);
+          }
+        }
+
         timeoutId = setTimeout(runAutoScan, (autoSettingsRef.current.interval || 15) * 60000);
       }
     };
@@ -1445,16 +1485,30 @@ export default function App() {
                 setAnalysisError(null);
                 setProgress(null);
                updateTopSignals(filtered);
-               // Save manual results for client dashboard too
-               filtered.forEach(r => {
-                 if (r.signal !== 'no_entry') {
-                   setClientSignals(prev => {
-                     const updated = [...prev.filter(x => x.symbol !== r.symbol), r];
-                     localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
-                     return updated.slice(-100);
-                   });
-                 }
-               });
+               // Developer only: save manual results locally and to Firestore for clients
+               if (isDeveloperSession()) {
+                 filtered.forEach(r => {
+                   if (r.signal !== 'no_entry') {
+                     setClientSignals(prev => {
+                       const updated = [...prev.filter(x => x.symbol !== r.symbol), r];
+                       localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
+                       return updated.slice(-100);
+                     });
+                   }
+                 });
+                 // Save to Firestore for clients
+                 (async () => {
+                   try {
+                     const oldSnap = await getDocs(collection(db, 'shared_results'));
+                     for (const d of oldSnap.docs) await deleteDoc(doc(db, 'shared_results', d.id));
+                     await addDoc(collection(db, 'shared_results'), {
+                       results: filtered.filter(r => r.signal !== 'no_entry').slice(-100),
+                       timestamp: serverTimestamp(),
+                       developerEmail: user?.email || '',
+                     });
+                   } catch (e) { console.warn('Failed to save to Firestore:', e); }
+                 })();
+               }
                playAudio('fail');
              }} 
               onError={(errMsg, allFailed) => { if (allFailed) setAnalysisResults([]); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); }}
