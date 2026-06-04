@@ -12,6 +12,7 @@ import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
 import SidebarPanel from './components/SidebarPanel';
 import TopSignals from './components/TopSignals';
+import SignalSummary from './components/SignalSummary';
 import PortfolioPanel from './components/PortfolioPanel';
 import ClientDashboard from './components/ClientDashboard';
 
@@ -1462,6 +1463,7 @@ export default function App() {
               </div>
             );
           })()}
+          <SignalSummary signals={topSignals} lang={lang} />
           <TopSignals 
             signals={topSignals} onRemove={removeSignal} 
             onSelect={handleSelectSignal} onClearAll={() => setTopSignals([])}
