@@ -64,7 +64,7 @@ export default function SignalSummary({ signals, lang }: SignalSummaryProps) {
     <div className="mb-6 rounded-2xl border border-brand-text/10 bg-brand-alt/40 backdrop-blur-md p-4">
       <h3 className={cn("text-[10px] font-black uppercase tracking-[0.2em] text-brand-muted mb-3 flex items-center gap-2", isRTL ? "flex-row-reverse" : "")}>
         <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-        {isRTL(lang) ? 'ملخص الإشارات' : 'Signal Summary'}
+        {isRTL ? 'ملخص الإشارات' : 'Signal Summary'}
       </h3>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
@@ -98,8 +98,4 @@ export default function SignalSummary({ signals, lang }: SignalSummaryProps) {
       </div>
     </div>
   );
-}
-
-function isRTL(lang: Language) {
-  return lang === 'ar';
 }
