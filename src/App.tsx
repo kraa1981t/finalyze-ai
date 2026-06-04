@@ -298,10 +298,10 @@ export default function App() {
       }
     };
 
-    // Initial poll after 30 seconds
-    const initialTimeout = setTimeout(pollForNewResults, 30000);
-    // Then every 3 minutes
-    const interval = setInterval(pollForNewResults, 180000);
+    // Initial poll immediately
+    const initialTimeout = setTimeout(pollForNewResults, 2000);
+    // Then every 30 seconds
+    const interval = setInterval(pollForNewResults, 30000);
 
     return () => {
       clearTimeout(initialTimeout);
@@ -749,14 +749,21 @@ export default function App() {
         clearInterval(radarTimerRef.current);
         radarTimerRef.current = null;
       }
+      sessionStorage.removeItem('radar_started');
       return;
     }
 
-    // If already running — don't restart (settings changes take effect on next tick via autoSettingsRef)
+    // If already running — don't restart
     if (radarTimerRef.current && !justEnabled) return;
+
+    // On page refresh: if was already started this session, don't restart
+    if (!justEnabled && sessionStorage.getItem('radar_started') === 'true') return;
 
     // If not enabled — don't start
     if (!autoSettings.isEnabled) return;
+
+    // Mark as started
+    sessionStorage.setItem('radar_started', 'true');
 
     const tick = async () => {
       const s = autoSettingsRef.current;
