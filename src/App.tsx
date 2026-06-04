@@ -173,7 +173,6 @@ export default function App() {
   const clientLoadingRef = useRef(false);
   const lastPollResultsRef = useRef<string>('');
 
-  // Sort by signal strength: strong > buy/sell > others
   const sortSignalsByStrength = (results: any[]) => {
     const strengthOrder: Record<string, number> = {
       'strong_buy': 0, 'strong_sell': 1,
@@ -188,46 +187,39 @@ export default function App() {
     });
   };
 
-  // Add results to queue and start processing
-  const queueClientResults = (results: any[]) => {
-    clientQueueRef.current = [...clientQueueRef.current, ...results];
-    processClientQueueFn();
-  };
-
-  const processClientQueueFn = async () => {
-    if (clientLoadingRef.current || clientQueueRef.current.length === 0) return;
-    clientLoadingRef.current = true;
-
-    while (clientQueueRef.current.length > 0) {
-      const result = clientQueueRef.current.shift();
-      if (!result) break;
-
-      setClientSignals(prev => {
-        const updated = [...prev.filter((r: any) => r.symbol !== result.symbol), result];
-        localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
-        return updated.slice(-100);
-      });
-
-      const sig = result.signal || '';
-      if (sig.includes('strong_buy') || sig.includes('strong_sell')) {
-        try { playAudio('success'); } catch {}
-      }
-
-      if (clientQueueRef.current.length > 0) {
-        await new Promise(r => setTimeout(r, 2500));
-      }
-    }
-
-    clientLoadingRef.current = false;
-  };
-
   // CLIENT: Load on login + poll every 30 seconds
   useEffect(() => {
     if (!user || isDeveloperSession()) return;
 
+    const processQueue = async () => {
+      if (clientLoadingRef.current || clientQueueRef.current.length === 0) return;
+      clientLoadingRef.current = true;
+
+      while (clientQueueRef.current.length > 0) {
+        const result = clientQueueRef.current.shift();
+        if (!result) break;
+
+        setClientSignals(prev => {
+          const updated = [...prev.filter((r: any) => r.symbol !== result.symbol), result];
+          localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
+          return updated.slice(-100);
+        });
+
+        const sig = result.signal || '';
+        if (sig.includes('strong_buy') || sig.includes('strong_sell')) {
+          try { playAudio('success'); } catch {}
+        }
+
+        if (clientQueueRef.current.length > 0) {
+          await new Promise(r => setTimeout(r, 2500));
+        }
+      }
+
+      clientLoadingRef.current = false;
+    };
+
     const loadFromFirestore = async () => {
       try {
-        // New day → clear old results
         const today = new Date().toDateString();
         const lastDate = localStorage.getItem('finalyze_client_results_date');
         if (lastDate !== today) {
@@ -246,21 +238,17 @@ export default function App() {
         if (lastPollResultsRef.current === snapId) return;
         lastPollResultsRef.current = snapId;
 
-        // Find new results not yet displayed
         const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
         const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
         const newResults = latest.results.filter((r: any) => !currentSymbols.has(r.symbol));
 
-        if (newResults.length > 0) {
-          const sorted = sortSignalsByStrength(newResults);
-          queueClientResults(sorted);
-        } else if (currentSignals.length === 0) {
-          // No local signals and no new ones — show all from Firestore
-          const sorted = sortSignalsByStrength(latest.results);
-          queueClientResults(sorted);
+        const toShow = newResults.length > 0 ? newResults : (currentSignals.length === 0 ? latest.results : []);
+        if (toShow.length > 0) {
+          const sorted = sortSignalsByStrength(toShow);
+          clientQueueRef.current = [...clientQueueRef.current, ...sorted];
+          processQueue();
         }
 
-        // Load alert settings
         const alertSnap = await getDocs(query(collection(db, 'shared_alerts')));
         if (!alertSnap.empty) {
           const alertData = alertSnap.docs[0]?.data();
@@ -832,14 +820,20 @@ export default function App() {
       playAudio('fail');
     };
 
-    // Start: immediate first scan, then interval
-    tick();
-    const ms = (autoSettings.interval || 15) * 60000;
-    radarTimerRef.current = setInterval(tick, ms);
+    // Run once, then schedule next scan
+    tick().then(() => {
+      if (autoSettingsRef.current.isEnabled) {
+        const ms = (autoSettingsRef.current.interval || 15) * 60000;
+        radarTimerRef.current = setTimeout(() => {
+          radarTimerRef.current = null;
+          tick();
+        }, ms);
+      }
+    });
 
     return () => {
       if (radarTimerRef.current) {
-        clearInterval(radarTimerRef.current);
+        clearTimeout(radarTimerRef.current as any);
         radarTimerRef.current = null;
       }
     };
