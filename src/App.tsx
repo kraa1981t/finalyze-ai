@@ -619,133 +619,92 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // ULTIMATE RADAR LOGIC
+  // ULTIMATE RADAR LOGIC - Developer only
   const prevEnabledRef = useRef(false);
-  const prevConfigRef = useRef({
-    interval: autoSettings.interval,
-    timeframe: autoSettings.timeframe,
-    category: autoSettings.category,
-    tradingStyle: autoSettings.tradingStyle
-  });
 
   useEffect(() => {
+    // Only developer runs auto-analysis
+    if (!isDeveloperSession()) return;
+
     const saved = localStorage.getItem('auto_settings');
     const savedIsEnabled = saved ? (() => { try { return JSON.parse(saved).isEnabled === true; } catch { return false; } })() : false;
-    // Respect user toggle-off even if localStorage still has enabled=true
-    if (!autoSettings.isEnabled && prevEnabledRef.current) {
-      prevEnabledRef.current = false;
-      return;
-    }
+    
+    // Stop if disabled
     if (!autoSettings.isEnabled && !savedIsEnabled) {
       prevEnabledRef.current = false;
       return;
     }
-    // Override ref from localStorage on mount to bypass state initialization bug
-    if (!autoSettings.isEnabled && savedIsEnabled && !prevEnabledRef.current) {
-      autoSettingsRef.current = { ...autoSettingsRef.current, isEnabled: true };
+    // If just toggled off
+    if (!autoSettings.isEnabled && prevEnabledRef.current) {
+      prevEnabledRef.current = false;
+      setIsScanningFinished(true);
+      return;
     }
 
     let isSubscribed = true;
     let timeoutId: NodeJS.Timeout;
-
-    // Detect if the user just clicked/toggled the Radar ON
-    const justToggledOn = !prevEnabledRef.current;
-    
-    // Detect if any configuration settings changed
-    const configChanged = 
-      prevConfigRef.current.interval !== autoSettings.interval ||
-      prevConfigRef.current.timeframe !== autoSettings.timeframe ||
-      prevConfigRef.current.category !== autoSettings.category ||
-      prevConfigRef.current.tradingStyle !== autoSettings.tradingStyle;
-
-    // Update refs for next run
     prevEnabledRef.current = true;
-    prevConfigRef.current = {
-      interval: autoSettings.interval,
-      timeframe: autoSettings.timeframe,
-      category: autoSettings.category,
-      tradingStyle: autoSettings.tradingStyle
-    };
 
     const runAutoScan = async () => {
-      if (!isSubscribed || isAnalyzing) {
-        timeoutId = setTimeout(runAutoScan, 5000);
+      if (!isSubscribed || !autoSettingsRef.current.isEnabled) return;
+      if (isAnalyzing) {
+        timeoutId = setTimeout(runAutoScan, 3000);
         return;
       }
 
       const currentSettings = autoSettingsRef.current;
-      const categories = currentSettings.category === 'all' 
+      const cats = currentSettings.category === 'all'
         ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
         : (currentSettings.category || 'all').split(',') as (keyof typeof SYMBOL_CATEGORIES)[];
 
-      // Check if any category is actually open
-      const openCategories = categories.filter(isMarketOpen);
+      const openCategories = cats.filter(isMarketOpen);
       if (openCategories.length === 0) {
         setIsScanningFinished(true);
-        timeoutId = setTimeout(runAutoScan, 30000); // Check again in 30s
+        timeoutId = setTimeout(runAutoScan, 30000);
         return;
       }
 
       setIsScanningFinished(false);
 
-      // Respect user deleted/hidden symbols in all categories
       let hiddenSymbols: string[] = [];
       let customSymbols: string[] = [];
       try {
-        const savedHidden = localStorage.getItem('finalyze_hidden_symbols');
-        hiddenSymbols = savedHidden ? JSON.parse(savedHidden) : [];
-        const savedCustom = localStorage.getItem('finalyze_custom_symbols');
-        customSymbols = savedCustom ? JSON.parse(savedCustom) : [];
-      } catch (e) {
-        console.warn("Failed to load symbols for auto scan:", e);
-      }
+        hiddenSymbols = JSON.parse(localStorage.getItem('finalyze_hidden_symbols') || '[]');
+        customSymbols = JSON.parse(localStorage.getItem('finalyze_custom_symbols') || '[]');
+      } catch {}
 
       for (const cat of openCategories) {
-        // FREE plan: only scan FREE_SYMBOLS, otherwise unify like manual form
+        if (!isSubscribed || !autoSettingsRef.current.isEnabled) break;
+
         const symbols = hasActivePlan
           ? (() => {
               const allGroupsSymbols = SYMBOL_GROUPS[cat]?.flatMap(g => g.symbols) || [];
-              const customForType = customSymbols.filter(s => 
-                (ALL_SYMBOLS_DB[cat] || []).includes(s) &&
-                !allGroupsSymbols.includes(s)
+              const customForType = customSymbols.filter(s =>
+                (ALL_SYMBOLS_DB[cat] || []).includes(s) && !allGroupsSymbols.includes(s)
               );
-              const allSymbolsCombined = [...allGroupsSymbols, ...customForType];
-              return allSymbolsCombined.filter(s => !hiddenSymbols.includes(s));
+              return [...allGroupsSymbols, ...customForType].filter(s => !hiddenSymbols.includes(s));
             })()
           : (FREE_SYMBOLS[cat] || []);
-        
-        const mType = cat === 'crypto' ? MarketType.CRYPTO : 
+
+        const mType = cat === 'crypto' ? MarketType.CRYPTO :
                       cat === 'stocks' ? MarketType.STOCKS :
                       cat === 'metals' ? MarketType.METALS : MarketType.FOREX;
 
         for (const symbol of symbols) {
           if (!isSubscribed || !autoSettingsRef.current.isEnabled || isAnalyzing) break;
-          // Check if client is banned (via API key / email)
-          if (user?.email) {
-            try {
-              const statusSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', user.email)));
-              const clientData = statusSnap.docs[0]?.data();
-              if (clientData?.status === 'banned') {
-                try { localStorage.removeItem('finalyze_key1_value'); localStorage.removeItem('finalyze_user_groq_api_key'); } catch {}
-                setHasApiKey(false);
-                break;
-              }
-            } catch {}
-          }
+
           await waitIfRateLimited();
           try {
-            const tf = !hasActivePlan ? '1d' : currentSettings.timeframe;
-            const ts = !hasActivePlan ? TradingStyle.DAY_TRADING : currentSettings.tradingStyle;
             const result = await analyzeMarket({
-              symbol, type: mType, timeframe: tf,
-              tradingStyle: ts, settings, lang
+              symbol, type: mType,
+              timeframe: currentSettings.timeframe,
+              tradingStyle: currentSettings.tradingStyle,
+              settings, lang
             });
             if (result && isSubscribed) {
               const sig = result.signal || '';
-              const isStrong = sig.includes('strong_buy') || sig.includes('strong_sell');
-              if (isStrong) updateTopSignals([result]);
-              // Developer: save all results locally
-              if (isDeveloperSession() && sig && sig !== 'no_entry') {
+              if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([result]);
+              if (sig && sig !== 'no_entry') {
                 setClientSignals(prev => {
                   const updated = [...prev.filter(r => r.symbol !== result.symbol), result];
                   localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
@@ -758,83 +717,63 @@ export default function App() {
               const delay = (key.startsWith('AIzaSy') || key.startsWith('AQ.')) ? 3500 : 2500;
               await new Promise(r => setTimeout(r, delay));
             }
-          } catch (e) { 
+          } catch (e) {
             console.error("Analysis Loop Error:", e);
             await new Promise(r => setTimeout(r, 8000));
           }
         }
       }
 
-      if (isSubscribed) {
+      if (isSubscribed && autoSettingsRef.current.isEnabled) {
         const finishedAt = Date.now();
-        const nextTime = finishedAt + ((autoSettingsRef.current.interval || 15) * 60000);
-        localStorage.setItem('radar_next_scan_at', nextTime.toString());
-        
-        playAudio('fail');
-        
+        const intervalMs = (autoSettingsRef.current.interval || 15) * 60000;
         setIsScanningFinished(true);
         setFoundAnyStrong(signalsRef.current.length > 0);
         setAutoSettings(prev => ({ ...prev, lastFinishedAt: finishedAt }));
+        playAudio('fail');
 
         // Developer: save results to Firestore for clients
         if (isDeveloperSession()) {
           try {
             const allResults = signalsRef.current.length > 0 ? signalsRef.current : [];
-            // Also include non-strong results from clientSignals
             const localResults = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
             const merged = [...allResults];
             localResults.forEach((r: any) => {
               if (!merged.find((m: any) => m.symbol === r.symbol)) merged.push(r);
             });
             if (merged.length > 0) {
-              // Delete old shared results
               const oldSnap = await getDocs(collection(db, 'shared_results'));
-              for (const d of oldSnap.docs) {
-                await deleteDoc(doc(db, 'shared_results', d.id));
-              }
+              for (const d of oldSnap.docs) await deleteDoc(doc(db, 'shared_results', d.id));
               await addDoc(collection(db, 'shared_results'), {
                 results: merged.slice(-100),
                 timestamp: serverTimestamp(),
                 developerEmail: user?.email || '',
               });
             }
-            // Save alert settings for clients
             const oldAlertSnap = await getDocs(collection(db, 'shared_alerts'));
-            for (const d of oldAlertSnap.docs) {
-              await deleteDoc(doc(db, 'shared_alerts', d.id));
-            }
+            for (const d of oldAlertSnap.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
             await addDoc(collection(db, 'shared_alerts'), {
               autoSettings: { ...autoSettingsRef.current, lastFinishedAt: finishedAt },
               strategySettings: settings,
               timestamp: serverTimestamp(),
             });
           } catch (e) {
-            console.warn('Failed to save shared results to Firestore:', e);
+            console.warn('Failed to save shared results:', e);
           }
         }
 
-        timeoutId = setTimeout(runAutoScan, (autoSettingsRef.current.interval || 15) * 60000);
+        // Schedule next scan after interval
+        timeoutId = setTimeout(runAutoScan, intervalMs);
       }
     };
 
-    // If just toggled ON or if configuration changed, force an immediate start (delay of 1000ms)
-    const nextScanAt = (justToggledOn || configChanged || autoSettings.forceRestart) ? 0 : parseInt(localStorage.getItem('radar_next_scan_at') || '0');
-    const now = Date.now();
-    let initialDelay = 1000;
+    // Start immediately on toggle-on, otherwise wait for next scheduled time
+    timeoutId = setTimeout(runAutoScan, 1000);
 
-    if (now < nextScanAt) {
-      initialDelay = nextScanAt - now;
-      setIsScanningFinished(true);
-    } else {
-      setIsScanningFinished(false);
-    }
-
-    timeoutId = setTimeout(runAutoScan, initialDelay);
     return () => { isSubscribed = false; clearTimeout(timeoutId); };
   }, [
-    autoSettings.isEnabled, autoSettings.category, autoSettings.timeframe, 
-    autoSettings.interval, autoSettings.showAllSignals, autoSettings.tradingStyle,
-    autoSettings.forceRestart, // Trigger effect on force restart
+    autoSettings.isEnabled, autoSettings.category, autoSettings.timeframe,
+    autoSettings.interval, autoSettings.tradingStyle, autoSettings.forceRestart,
     settings.minStrongConfidence
   ]);
 
