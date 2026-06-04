@@ -168,19 +168,86 @@ export default function App() {
            email.includes('dev');
   };
 
-  // CLIENT: Load shared results from developer via Firestore
+  // CLIENT: Incremental results loading from developer via Firestore
+  const clientQueueRef = useRef<any[]>([]);
+  const clientLoadingRef = useRef(false);
+
+  // Sort by signal strength: strong > buy/sell > others
+  const sortSignalsByStrength = (results: any[]) => {
+    const strengthOrder: Record<string, number> = {
+      'strong_buy': 0, 'strong_sell': 1,
+      'buy': 2, 'sell': 3,
+      'no_entry': 4, 'neutral': 5
+    };
+    return [...results].sort((a, b) => {
+      const aSig = strengthOrder[a.signal] ?? 99;
+      const bSig = strengthOrder[b.signal] ?? 99;
+      if (aSig !== bSig) return aSig - bSig;
+      const aConf = a.confidence || 0;
+      const bConf = b.confidence || 0;
+      return bConf - aConf;
+    });
+  };
+
+  // Process queue: show one symbol at a time with delay
+  const processClientQueue = useCallback(async () => {
+    if (clientLoadingRef.current || clientQueueRef.current.length === 0) return;
+    clientLoadingRef.current = true;
+
+    while (clientQueueRef.current.length > 0) {
+      const result = clientQueueRef.current.shift();
+      if (!result) break;
+
+      // Add to displayed signals
+      setClientSignals(prev => {
+        const updated = [...prev.filter((r: any) => r.symbol !== result.symbol), result];
+        localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
+        return updated.slice(-100);
+      });
+
+      // Play notification sound for strong signals
+      const sig = result.signal || '';
+      if (sig.includes('strong_buy') || sig.includes('strong_sell')) {
+        playAudio('success');
+      } else {
+        playAudio('fail');
+      }
+
+      // Wait 2-3 seconds before next symbol
+      if (clientQueueRef.current.length > 0) {
+        await new Promise(r => setTimeout(r, 2500));
+      }
+    }
+
+    clientLoadingRef.current = false;
+  }, []);
+
   useEffect(() => {
     if (!user || isDeveloperSession()) return;
+
     const loadSharedResults = async () => {
       try {
+        // Check if new day — clear old results
+        const today = new Date().toDateString();
+        const lastDate = localStorage.getItem('finalyze_client_results_date');
+        if (lastDate !== today) {
+          setClientSignals([]);
+          localStorage.removeItem('finalyze_client_signals');
+          localStorage.setItem('finalyze_client_results_date', today);
+        }
+
+        // Load from Firestore
         const snap = await getDocs(query(collection(db, 'shared_results'), orderBy('timestamp', 'desc')));
         if (!snap.empty) {
           const latest = snap.docs[0]?.data();
           if (latest?.results) {
-            setClientSignals(latest.results);
-            localStorage.setItem('finalyze_client_signals', JSON.stringify(latest.results));
+            const sorted = sortSignalsByStrength(latest.results);
+            // Queue all results for incremental display
+            clientQueueRef.current = sorted;
+            processClientQueue();
           }
         }
+
         // Also load shared alert settings
         const alertSnap = await getDocs(query(collection(db, 'shared_alerts')));
         if (!alertSnap.empty) {
@@ -194,6 +261,52 @@ export default function App() {
       }
     };
     loadSharedResults();
+  }, [user]);
+
+  // CLIENT: Poll Firestore every 3 minutes for new results from developer
+  const lastPollResultsRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!user || isDeveloperSession()) return;
+
+    const pollForNewResults = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'shared_results'), orderBy('timestamp', 'desc')));
+        if (snap.empty) return;
+        const latest = snap.docs[0]?.data();
+        if (!latest?.results) return;
+
+        // Skip if same results already processed
+        const snapId = snap.docs[0].id;
+        if (lastPollResultsRef.current === snapId) return;
+        lastPollResultsRef.current = snapId;
+
+        // Get currently displayed symbols
+        const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
+        const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
+
+        // Find NEW results not yet displayed
+        const newResults = latest.results.filter((r: any) => !currentSymbols.has(r.symbol));
+        if (newResults.length === 0) return;
+
+        // Sort and queue new results
+        const sorted = sortSignalsByStrength(newResults);
+        clientQueueRef.current = [...clientQueueRef.current, ...sorted];
+        processClientQueue();
+      } catch (e) {
+        console.warn('Poll failed:', e);
+      }
+    };
+
+    // Initial poll after 30 seconds
+    const initialTimeout = setTimeout(pollForNewResults, 30000);
+    // Then every 3 minutes
+    const interval = setInterval(pollForNewResults, 180000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
   }, [user]);
 
   const hasActivePlan = useMemo((): boolean => {
