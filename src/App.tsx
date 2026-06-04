@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
@@ -685,22 +685,130 @@ export default function App() {
 
   // RADAR - Developer only, never auto-starts on page load
   const radarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevIsEnabledRef = useRef<boolean | null>(null); // null = first render
+
+  const runRadarScan = useCallback(async () => {
+    const s = autoSettingsRef.current;
+    if (!s.isEnabled) return;
+
+    const cats = s.category === 'all'
+      ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
+      : (s.category || 'all').split(',') as (keyof typeof SYMBOL_CATEGORIES)[];
+
+    const open = cats.filter(isMarketOpen);
+    if (open.length === 0) return;
+
+    setIsScanningFinished(false);
+
+    let hidden: string[] = [];
+    let custom: string[] = [];
+    try {
+      hidden = JSON.parse(localStorage.getItem('finalyze_hidden_symbols') || '[]');
+      custom = JSON.parse(localStorage.getItem('finalyze_custom_symbols') || '[]');
+    } catch {}
+
+    for (const cat of open) {
+      if (!autoSettingsRef.current.isEnabled) break;
+
+      const syms = hasActivePlan
+        ? (() => {
+            const g = SYMBOL_GROUPS[cat]?.flatMap(x => x.symbols) || [];
+            const c = custom.filter(x =>
+              (ALL_SYMBOLS_DB[cat] || []).includes(x) && !g.includes(x)
+            );
+            return [...g, ...c].filter(x => !hidden.includes(x));
+          })()
+        : (FREE_SYMBOLS[cat] || []);
+
+      const mt = cat === 'crypto' ? MarketType.CRYPTO :
+                 cat === 'stocks' ? MarketType.STOCKS :
+                 cat === 'metals' ? MarketType.METALS : MarketType.FOREX;
+
+      for (const sym of syms) {
+        if (!autoSettingsRef.current.isEnabled) break;
+
+        await waitIfRateLimited();
+        try {
+          const r = await Promise.race([
+            analyzeMarket({
+              symbol: sym, type: mt,
+              timeframe: s.timeframe,
+              tradingStyle: s.tradingStyle,
+              settings, lang
+            }),
+            new Promise<null>((_, rej) => setTimeout(() => rej(new Error('timeout')), 30000))
+          ]);
+          if (r) {
+            const sig = r.signal || '';
+            if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
+            if (sig && sig !== 'no_entry') {
+              setClientSignals(prev => {
+                const u = [...prev.filter(x => x.symbol !== r.symbol), r];
+                localStorage.setItem('finalyze_client_signals', JSON.stringify(u.slice(-100)));
+                return u.slice(-100);
+              });
+            }
+          }
+          const key = getApiKey();
+          const d = (key.startsWith('AIzaSy') || key.startsWith('AQ.')) ? 3500 : 2500;
+          await new Promise(r => setTimeout(r, d));
+        } catch (e) {
+          console.error("Radar Error:", e);
+          await new Promise(r => setTimeout(r, 3000));
+        }
+      }
+    }
+
+    // Save to Firestore for clients
+    try {
+      const all = signalsRef.current.length > 0 ? signalsRef.current : [];
+      const loc = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
+      const merged = [...all];
+      loc.forEach((r: any) => {
+        if (!merged.find((m: any) => m.symbol === r.symbol)) merged.push(r);
+      });
+      await Promise.race([
+        (async () => {
+          if (merged.length > 0) {
+            const old = await getDocs(collection(db, 'shared_results'));
+            for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
+            await addDoc(collection(db, 'shared_results'), {
+              results: merged.slice(-100),
+              timestamp: serverTimestamp(),
+              developerEmail: user?.email || '',
+            });
+          }
+          const oldA = await getDocs(collection(db, 'shared_alerts'));
+          for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
+          await addDoc(collection(db, 'shared_alerts'), {
+            autoSettings: s,
+            strategySettings: settings,
+            timestamp: serverTimestamp(),
+          });
+        })(),
+        new Promise<null>((_, rej) => setTimeout(() => rej(new Error('Firestore timeout')), 15000))
+      ]);
+    } catch (e) {
+      console.warn('Firestore save failed:', e);
+    }
+  }, [settings, lang, hasActivePlan]);
+
+  // Radar lifecycle: start on toggle-ON, stop on toggle-OFF
+  const prevRadarEnabledRef = useRef(false);
 
   useEffect(() => {
     if (!isDeveloperSession()) return;
 
-    // First render: record state, don't start
-    if (prevIsEnabledRef.current === null) {
-      prevIsEnabledRef.current = autoSettings.isEnabled;
-      return;
-    }
+    const isOn = autoSettings.isEnabled;
+    const wasOn = prevRadarEnabledRef.current;
+    prevRadarEnabledRef.current = isOn;
 
-    const justEnabled = autoSettings.isEnabled && !prevIsEnabledRef.current;
-    const justDisabled = !autoSettings.isEnabled && prevIsEnabledRef.current;
-    prevIsEnabledRef.current = autoSettings.isEnabled;
+    // First render: don't start, just record
+    if (!wasOn && !isOn) return;
+    // Already running and not toggled: skip
+    if (wasOn && isOn) return;
 
-    if (justDisabled) {
+    // Just toggled OFF
+    if (!isOn) {
       if (radarTimerRef.current) {
         clearTimeout(radarTimerRef.current);
         radarTimerRef.current = null;
@@ -708,143 +816,32 @@ export default function App() {
       return;
     }
 
-    if (!justEnabled) return;
-    if (radarTimerRef.current) return;
-
-    const tick = async () => {
-      const s = autoSettingsRef.current;
-      if (!s.isEnabled) return;
-
-      const cats = s.category === 'all'
-        ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
-        : (s.category || 'all').split(',') as (keyof typeof SYMBOL_CATEGORIES)[];
-
-      const open = cats.filter(isMarketOpen);
-      if (open.length === 0) return;
-
-      setIsScanningFinished(false);
-
-      let hidden: string[] = [];
-      let custom: string[] = [];
+    // Just toggled ON — start scan loop
+    const loop = async () => {
       try {
-        hidden = JSON.parse(localStorage.getItem('finalyze_hidden_symbols') || '[]');
-        custom = JSON.parse(localStorage.getItem('finalyze_custom_symbols') || '[]');
-      } catch {}
-
-      for (const cat of open) {
-        if (!autoSettingsRef.current.isEnabled) break;
-
-        const syms = hasActivePlan
-          ? (() => {
-              const g = SYMBOL_GROUPS[cat]?.flatMap(x => x.symbols) || [];
-              const c = custom.filter(x =>
-                (ALL_SYMBOLS_DB[cat] || []).includes(x) && !g.includes(x)
-              );
-              return [...g, ...c].filter(x => !hidden.includes(x));
-            })()
-          : (FREE_SYMBOLS[cat] || []);
-
-        const mt = cat === 'crypto' ? MarketType.CRYPTO :
-                   cat === 'stocks' ? MarketType.STOCKS :
-                   cat === 'metals' ? MarketType.METALS : MarketType.FOREX;
-
-        for (const sym of syms) {
-          if (!autoSettingsRef.current.isEnabled) break;
-
-          await waitIfRateLimited();
-          try {
-            const r = await Promise.race([
-              analyzeMarket({
-                symbol: sym, type: mt,
-                timeframe: s.timeframe,
-                tradingStyle: s.tradingStyle,
-                settings, lang
-              }),
-              new Promise<null>((_, rej) => setTimeout(() => rej(new Error('timeout')), 30000))
-            ]);
-            if (r) {
-              const sig = r.signal || '';
-              if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
-              if (sig && sig !== 'no_entry') {
-                setClientSignals(prev => {
-                  const u = [...prev.filter(x => x.symbol !== r.symbol), r];
-                  localStorage.setItem('finalyze_client_signals', JSON.stringify(u.slice(-100)));
-                  return u.slice(-100);
-                });
-              }
-            }
-            const key = getApiKey();
-            const d = (key.startsWith('AIzaSy') || key.startsWith('AQ.')) ? 3500 : 2500;
-            await new Promise(r => setTimeout(r, d));
-          } catch (e) {
-            console.error("Radar Error:", e);
-            await new Promise(r => setTimeout(r, 3000));
-          }
-        }
-      }
-
-      // Save to Firestore for clients
-      try {
-        const all = signalsRef.current.length > 0 ? signalsRef.current : [];
-        const loc = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
-        const merged = [...all];
-        loc.forEach((r: any) => {
-          if (!merged.find((m: any) => m.symbol === r.symbol)) merged.push(r);
-        });
-        await Promise.race([
-          (async () => {
-            if (merged.length > 0) {
-              const old = await getDocs(collection(db, 'shared_results'));
-              for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
-              await addDoc(collection(db, 'shared_results'), {
-                results: merged.slice(-100),
-                timestamp: serverTimestamp(),
-                developerEmail: user?.email || '',
-              });
-            }
-            const oldA = await getDocs(collection(db, 'shared_alerts'));
-            for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
-            await addDoc(collection(db, 'shared_alerts'), {
-              autoSettings: s,
-              strategySettings: settings,
-              timestamp: serverTimestamp(),
-            });
-          })(),
-          new Promise<null>((_, rej) => setTimeout(() => rej(new Error('Firestore timeout')), 15000))
-        ]);
+        await runRadarScan();
       } catch (e) {
-        console.warn('Firestore save failed:', e);
-      }
-    };
-
-    // Run once, then schedule next scan
-    const runScan = async () => {
-      try {
-        await tick();
-      } catch (e) {
-        console.error('Radar scan error:', e);
+        console.error('Radar error:', e);
       } finally {
-        // Always show yellow after scan completes (success or error)
         setIsScanningFinished(true);
         setFoundAnyStrong(signalsRef.current.length > 0);
         playAudio('success');
 
-        // Schedule next scan
         if (autoSettingsRef.current.isEnabled) {
           const ms = (autoSettingsRef.current.interval || 15) * 60000;
           radarTimerRef.current = setTimeout(() => {
             radarTimerRef.current = null;
             setIsScanningFinished(false);
-            runScan();
+            loop();
           }, ms);
         }
       }
     };
-    runScan();
+    loop();
 
     return () => {
       if (radarTimerRef.current) {
-        clearTimeout(radarTimerRef.current as any);
+        clearTimeout(radarTimerRef.current);
         radarTimerRef.current = null;
       }
     };
