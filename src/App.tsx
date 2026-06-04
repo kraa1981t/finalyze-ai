@@ -685,16 +685,21 @@ export default function App() {
 
   // RADAR - Developer only, never auto-starts on page load
   const radarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevIsEnabledRef = useRef(autoSettings.isEnabled); // Initialize from actual state
+  const prevIsEnabledRef = useRef<boolean | null>(null); // null = first render
 
   useEffect(() => {
     if (!isDeveloperSession()) return;
+
+    // First render: record state, don't start
+    if (prevIsEnabledRef.current === null) {
+      prevIsEnabledRef.current = autoSettings.isEnabled;
+      return;
+    }
 
     const justEnabled = autoSettings.isEnabled && !prevIsEnabledRef.current;
     const justDisabled = !autoSettings.isEnabled && prevIsEnabledRef.current;
     prevIsEnabledRef.current = autoSettings.isEnabled;
 
-    // If just disabled — stop
     if (justDisabled) {
       if (radarTimerRef.current) {
         clearTimeout(radarTimerRef.current);
@@ -703,10 +708,7 @@ export default function App() {
       return;
     }
 
-    // If not a toggle event — ignore
     if (!justEnabled) return;
-
-    // If already running — don't restart
     if (radarTimerRef.current) return;
 
     const tick = async () => {
