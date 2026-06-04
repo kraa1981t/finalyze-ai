@@ -1231,6 +1231,7 @@ export default function App() {
         isWaiting={isScanningFinished}
         hasApiKey={hasApiKey || isDeveloperSession()}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        isDeveloper={isDeveloperSession()}
       />
 
       {/* Sidebar Panel - pushes content, doesn't overlay */}

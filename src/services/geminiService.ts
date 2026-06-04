@@ -401,7 +401,8 @@ export async function analyzeMarket(params: {
       ? contextEcon.map(e => `• ${e.country} | ${e.title} | Impact: ${e.impact} | Forecast: ${e.forecast} | Previous: ${e.previous}`).join('\n')
       : 'No major economic events this week.';
 
-    const technicalPrompt = `You are an Elite Institutional Trader (ICT/SMC). Analyze ${symbol} (${type}, ${timeframe}, ${tradingStyle}) and return a JSON trading decision with DETAILED step-by-step reasoning.
+    const isAr = lang === 'ar';
+    const technicalPrompt = `You are an Elite Institutional Trader (ICT/SMC). Analyze ${symbol} (${type}, ${timeframe}, ${tradingStyle}) and return a JSON trading decision.
 
 MARKET DATA: RSI ${metrics?.rsi?.toFixed(1)}, Trend ${metrics?.direction}, EMA Cross ${metrics?.emaCross}, Vol Surge ${metrics?.volSurge}, Trend Length ${metrics?.totalAge}c, Momentum ${metrics?.age}c.
 
@@ -418,32 +419,39 @@ RULES:
 - Trend age zones: <10 infancy (cap 65), <25 youth (downgrade strong, cap 70), 25-50 mature (full), >50 old (cap 65).
 - Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
 - If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
-- Write summary in ${lang === 'ar' ? 'ARABIC' : 'ENGLISH'}. Use clear, professional financial language. Keep summary under 2-3 sentences max.
-- For detailedReasons: Each reason MUST have a short, clear, professional explanation (max 15 words). Use plain language, not jargon. Example: "RSI at 62.5 indicates neutral momentum" NOT "RSI 62.5 no change".
+
+LANGUAGE RULES (CRITICAL):
+${isAr ? `- ALL text fields (summary, detailedReasons impact) MUST be written in formal Arabic (فصحى) using professional financial terminology.
+- Use terms like: الزخم، الاتجاه، الاختراق، مناطق العرض والطلب، التوافق الزمني، معنويات السوق، الأحداث الاقتصادية.
+- DO NOT use English words mixed in Arabic text.
+- DO NOT repeat the same phrase in different reasons. Each reason must be unique and specific.
+- Keep each impact field under 12 words. Be precise and concise.` : `- Write summary in clear, professional English. Keep under 2-3 sentences.
+- Each impact field max 15 words, precise and professional.`}
 
 CRITICAL RULES FOR detailedReasons:
-- Each "impact" field must be a SHORT phrase (under 15 words), written in plain professional language
+- Each "impact" must be SHORT and SPECIFIC to that exact indicator.
 - Each "check" must name the indicator (RSI, EMA Cross, Trend Direction, etc.)
 - Each "value" must show the actual value
 - Each "status" must be exactly: "positive", "negative", or "neutral"
-- Do NOT write vague or garbled text. Be precise and clear.
+- Do NOT repeat similar phrases across different reasons.
+- Do NOT write vague or garbled text.
 
 Return ONLY valid JSON:
 {
   "signal": "strong_buy"|"buy"|"neutral"|"sell"|"strong_sell"|"no_entry",
   "confidence": number (0-100),
-  "summary": "string — clear 2-3 sentence summary covering RSI, EMA, trend, age zone, volume, micro alignment, Fear&Greed, news, events",
+  "summary": "string — 2-3 sentence summary",
   "detailedReasons": [
-    {"check": "RSI", "value": "62.5", "status": "neutral", "impact": "Momentum is balanced, no extreme reading"},
-    {"check": "EMA Cross", "value": "bullish", "status": "positive", "impact": "9 EMA above 21 EMA supports upward bias"},
-    {"check": "Trend Direction", "value": "uptrend", "status": "positive", "impact": "Price making higher highs and higher lows"},
-    {"check": "Trend Age Zone", "value": "mature (32 candles)", "status": "positive", "impact": "Full confidence allowed in this zone"},
-    {"check": "Volume Surge", "value": "true", "status": "positive", "impact": "Volume spike confirms breakout momentum"},
-    {"check": "Supply/Demand Zone", "value": "demand 1.0850-1.0880", "status": "positive", "impact": "Price sitting on strong demand zone"},
-    {"check": "Micro TF Alignment", "value": "aligned", "status": "positive", "impact": "Lower timeframe confirms macro direction"},
-    {"check": "Fear&Greed", "value": "45/100 Neutral", "status": "neutral", "impact": "Market sentiment is balanced, no extreme"},
-    {"check": "News Sentiment", "value": "2 positive articles", "status": "positive", "impact": "Favorable news flow supports direction", "source": "Reuters, CNBC"},
-    {"check": "Economic Events", "value": "no high impact events", "status": "neutral", "impact": "No upcoming events to disrupt the move"}
+    {"check": "RSI", "value": "62.5", "status": "neutral", "impact": "${isAr ? 'الزخم متوازن دون قراءة متطرفة' : 'Momentum balanced, no extreme reading'}"},
+    {"check": "EMA Cross", "value": "bullish", "status": "positive", "impact": "${isAr ? 'المتوسط 9 فوق المتوسط 21 يدعم الاتجاه الصاعد' : '9 EMA above 21 EMA supports upward bias'}"},
+    {"check": "Trend Direction", "value": "uptrend", "status": "positive", "impact": "${isAr ? 'السعر يسجّل قِمم وقيعان أعلى' : 'Price making higher highs and higher lows'}"},
+    {"check": "Trend Age Zone", "value": "mature (32c)", "status": "positive", "impact": "${isAr ? 'منطقة ناضجة تسمح بالثقة الكاملة' : 'Mature zone allows full confidence'}"},
+    {"check": "Volume Surge", "value": "true", "status": "positive", "impact": "${isAr ? 'ارتفاع الحجم يؤكد زخم الاختراق' : 'Volume spike confirms breakout momentum'}"},
+    {"check": "Supply/Demand", "value": "demand 1.085", "status": "positive", "impact": "${isAr ? 'السعر يرتكز على منطقة طلب قوية' : 'Price resting on strong demand zone'}"},
+    {"check": "Micro Alignment", "value": "aligned", "status": "positive", "impact": "${isAr ? 'الإطار الزمني الأصغر يؤكد الاتجاه العام' : 'Lower timeframe confirms macro direction'}"},
+    {"check": "Fear&Greed", "value": "45/100", "status": "neutral", "impact": "${isAr ? 'معنويات السوق محايدة دون تطرف' : 'Market sentiment balanced, no extreme'}"},
+    {"check": "News Sentiment", "value": "2 positive", "status": "positive", "impact": "${isAr ? 'تدفق أخبار إيجابي يدعم الاتجاه' : 'Favorable news flow supports direction'}"},
+    {"check": "Economic Events", "value": "none", "status": "neutral", "impact": "${isAr ? 'لا أحداث اقتصادية عالية التأثير قادمة' : 'No upcoming high-impact events'}"}
   ],
   "technicalScore": number,
   "sentimentScore": number,

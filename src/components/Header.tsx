@@ -21,6 +21,7 @@ interface HeaderProps {
   isWaiting?: boolean;
   hasApiKey: boolean;
   onToggleSidebar: () => void;
+  isDeveloper?: boolean;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -45,7 +46,8 @@ export default function Header({
   onAutoSettingsChange,
   isWaiting,
   hasApiKey,
-  onToggleSidebar
+  onToggleSidebar,
+  isDeveloper = false
 }: HeaderProps) {
   const t = translations[lang];
   const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
@@ -131,32 +133,44 @@ export default function Header({
               </a>
             </div>
 
-            {/* Auto Analysis toggle */}
+            {/* Auto Analysis - toggle for dev, status for clients */}
             <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:shadow-md transition-shadow">
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">
                 {lang === 'ar' ? 'التحليل التلقائي' : 'Auto Analysis'}
               </span>
-              <button
-                onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl transition-all border-2 shadow-lg",
-                  autoSettings.isEnabled
-                    ? (isWaiting
-                      ? 'bg-red-600 border-red-700 text-white shadow-red-500/40 hover:bg-red-700'
-                      : 'bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/40')
-                    : 'bg-[#F59E0B] border-black/10 text-black hover:bg-[#d97706]'
-                )}
-              >
-                <div className="relative">
-                  <Zap size={18} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
-                  {autoSettings.isEnabled && !isWaiting && (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full animate-ping shadow-[0_0_12px_white]" />
+              {isDeveloper ? (
+                <button
+                  onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-xl transition-all border-2 shadow-lg",
+                    autoSettings.isEnabled
+                      ? (isWaiting
+                        ? 'bg-red-600 border-red-700 text-white shadow-red-500/40 hover:bg-red-700'
+                        : 'bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/40')
+                      : 'bg-[#F59E0B] border-black/10 text-black hover:bg-[#d97706]'
                   )}
+                >
+                  <div className="relative">
+                    <Zap size={18} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
+                    {autoSettings.isEnabled && !isWaiting && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full animate-ping shadow-[0_0_12px_white]" />
+                    )}
+                  </div>
+                  <span className="text-[12px] font-black uppercase tracking-wider hidden md:inline">
+                    {autoSettings.isEnabled ? (isWaiting ? 'Restart' : 'ON') : 'OFF'}
+                  </span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border-2 border-emerald-500/40">
+                  <div className="relative">
+                    <Zap size={18} className="text-emerald-400" fill="currentColor" />
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
+                  </div>
+                  <span className="text-[12px] font-black text-emerald-400 uppercase tracking-wider hidden md:inline">
+                    {lang === 'ar' ? 'نشط' : 'Active'}
+                  </span>
                 </div>
-                <span className="text-[12px] font-black uppercase tracking-wider hidden md:inline">
-                  {autoSettings.isEnabled ? (isWaiting ? 'Restart' : 'ON') : 'OFF'}
-                </span>
-              </button>
+              )}
             </div>
 
             <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
