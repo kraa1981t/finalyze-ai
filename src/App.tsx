@@ -759,12 +759,15 @@ export default function App() {
 
           await waitIfRateLimited();
           try {
-            const r = await analyzeMarket({
-              symbol: sym, type: mt,
-              timeframe: s.timeframe,
-              tradingStyle: s.tradingStyle,
-              settings, lang
-            });
+            const r = await Promise.race([
+              analyzeMarket({
+                symbol: sym, type: mt,
+                timeframe: s.timeframe,
+                tradingStyle: s.tradingStyle,
+                settings, lang
+              }),
+              new Promise<null>((_, rej) => setTimeout(() => rej(new Error('timeout')), 30000))
+            ]);
             if (r) {
               const sig = r.signal || '';
               if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
@@ -781,7 +784,7 @@ export default function App() {
             await new Promise(r => setTimeout(r, d));
           } catch (e) {
             console.error("Radar Error:", e);
-            await new Promise(r => setTimeout(r, 8000));
+            await new Promise(r => setTimeout(r, 3000));
           }
         }
       }
@@ -794,22 +797,27 @@ export default function App() {
         loc.forEach((r: any) => {
           if (!merged.find((m: any) => m.symbol === r.symbol)) merged.push(r);
         });
-        if (merged.length > 0) {
-          const old = await getDocs(collection(db, 'shared_results'));
-          for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
-          await addDoc(collection(db, 'shared_results'), {
-            results: merged.slice(-100),
-            timestamp: serverTimestamp(),
-            developerEmail: user?.email || '',
-          });
-        }
-        const oldA = await getDocs(collection(db, 'shared_alerts'));
-        for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
-        await addDoc(collection(db, 'shared_alerts'), {
-          autoSettings: s,
-          strategySettings: settings,
-          timestamp: serverTimestamp(),
-        });
+        await Promise.race([
+          (async () => {
+            if (merged.length > 0) {
+              const old = await getDocs(collection(db, 'shared_results'));
+              for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
+              await addDoc(collection(db, 'shared_results'), {
+                results: merged.slice(-100),
+                timestamp: serverTimestamp(),
+                developerEmail: user?.email || '',
+              });
+            }
+            const oldA = await getDocs(collection(db, 'shared_alerts'));
+            for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
+            await addDoc(collection(db, 'shared_alerts'), {
+              autoSettings: s,
+              strategySettings: settings,
+              timestamp: serverTimestamp(),
+            });
+          })(),
+          new Promise<null>((_, rej) => setTimeout(() => rej(new Error('Firestore timeout')), 15000))
+        ]);
       } catch (e) {
         console.warn('Firestore save failed:', e);
       }
