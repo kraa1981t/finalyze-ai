@@ -619,148 +619,135 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // ULTIMATE RADAR LOGIC - Developer only
-  const radarIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const radarRunningRef = useRef(false);
+  // RADAR - Developer only, fully standalone
+  const radarTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    // Only developer runs auto-analysis
     if (!isDeveloperSession()) return;
 
-    // Clear any existing radar
-    if (radarIntervalRef.current) {
-      clearInterval(radarIntervalRef.current);
-      radarIntervalRef.current = null;
+    // Cleanup previous
+    if (radarTimerRef.current) {
+      clearInterval(radarTimerRef.current);
+      radarTimerRef.current = null;
     }
 
-    // Stop if disabled
-    if (!autoSettings.isEnabled) {
-      return;
-    }
+    if (!autoSettings.isEnabled) return;
 
-    const runAutoScan = async () => {
-      if (radarRunningRef.current || isAnalyzing) return;
-      radarRunningRef.current = true;
+    const tick = async () => {
+      const s = autoSettingsRef.current;
+      if (!s.isEnabled) return;
 
+      const cats = s.category === 'all'
+        ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
+        : (s.category || 'all').split(',') as (keyof typeof SYMBOL_CATEGORIES)[];
+
+      const open = cats.filter(isMarketOpen);
+      if (open.length === 0) return;
+
+      setIsScanningFinished(false);
+
+      let hidden: string[] = [];
+      let custom: string[] = [];
       try {
-        const currentSettings = autoSettingsRef.current;
-        if (!currentSettings.isEnabled) return;
+        hidden = JSON.parse(localStorage.getItem('finalyze_hidden_symbols') || '[]');
+        custom = JSON.parse(localStorage.getItem('finalyze_custom_symbols') || '[]');
+      } catch {}
 
-        const cats = currentSettings.category === 'all'
-          ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
-          : (currentSettings.category || 'all').split(',') as (keyof typeof SYMBOL_CATEGORIES)[];
+      for (const cat of open) {
+        if (!autoSettingsRef.current.isEnabled) break;
 
-        const openCategories = cats.filter(isMarketOpen);
-        if (openCategories.length === 0) return;
+        const syms = hasActivePlan
+          ? (() => {
+              const g = SYMBOL_GROUPS[cat]?.flatMap(x => x.symbols) || [];
+              const c = custom.filter(x =>
+                (ALL_SYMBOLS_DB[cat] || []).includes(x) && !g.includes(x)
+              );
+              return [...g, ...c].filter(x => !hidden.includes(x));
+            })()
+          : (FREE_SYMBOLS[cat] || []);
 
-        setIsScanningFinished(false);
+        const mt = cat === 'crypto' ? MarketType.CRYPTO :
+                   cat === 'stocks' ? MarketType.STOCKS :
+                   cat === 'metals' ? MarketType.METALS : MarketType.FOREX;
 
-        let hiddenSymbols: string[] = [];
-        let customSymbols: string[] = [];
-        try {
-          hiddenSymbols = JSON.parse(localStorage.getItem('finalyze_hidden_symbols') || '[]');
-          customSymbols = JSON.parse(localStorage.getItem('finalyze_custom_symbols') || '[]');
-        } catch {}
-
-        for (const cat of openCategories) {
+        for (const sym of syms) {
           if (!autoSettingsRef.current.isEnabled) break;
 
-          const symbols = hasActivePlan
-            ? (() => {
-                const allGroupsSymbols = SYMBOL_GROUPS[cat]?.flatMap(g => g.symbols) || [];
-                const customForType = customSymbols.filter(s =>
-                  (ALL_SYMBOLS_DB[cat] || []).includes(s) && !allGroupsSymbols.includes(s)
-                );
-                return [...allGroupsSymbols, ...customForType].filter(s => !hiddenSymbols.includes(s));
-              })()
-            : (FREE_SYMBOLS[cat] || []);
-
-          const mType = cat === 'crypto' ? MarketType.CRYPTO :
-                        cat === 'stocks' ? MarketType.STOCKS :
-                        cat === 'metals' ? MarketType.METALS : MarketType.FOREX;
-
-          for (const symbol of symbols) {
-            if (!autoSettingsRef.current.isEnabled || isAnalyzing) break;
-
-            await waitIfRateLimited();
-            try {
-              const result = await analyzeMarket({
-                symbol, type: mType,
-                timeframe: currentSettings.timeframe,
-                tradingStyle: currentSettings.tradingStyle,
-                settings, lang
-              });
-              if (result) {
-                const sig = result.signal || '';
-                if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([result]);
-                if (sig && sig !== 'no_entry') {
-                  setClientSignals(prev => {
-                    const updated = [...prev.filter(r => r.symbol !== result.symbol), result];
-                    localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
-                    return updated.slice(-100);
-                  });
-                }
-              }
-              const key = getApiKey();
-              const delay = (key.startsWith('AIzaSy') || key.startsWith('AQ.')) ? 3500 : 2500;
-              await new Promise(r => setTimeout(r, delay));
-            } catch (e) {
-              console.error("Analysis Loop Error:", e);
-              await new Promise(r => setTimeout(r, 8000));
-            }
-          }
-        }
-
-        const finishedAt = Date.now();
-        setIsScanningFinished(true);
-        setFoundAnyStrong(signalsRef.current.length > 0);
-
-        // Developer: save results to Firestore for clients
-        try {
-          const allResults = signalsRef.current.length > 0 ? signalsRef.current : [];
-          const localResults = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
-          const merged = [...allResults];
-          localResults.forEach((r: any) => {
-            if (!merged.find((m: any) => m.symbol === r.symbol)) merged.push(r);
-          });
-          if (merged.length > 0) {
-            const oldSnap = await getDocs(collection(db, 'shared_results'));
-            for (const d of oldSnap.docs) await deleteDoc(doc(db, 'shared_results', d.id));
-            await addDoc(collection(db, 'shared_results'), {
-              results: merged.slice(-100),
-              timestamp: serverTimestamp(),
-              developerEmail: user?.email || '',
+          await waitIfRateLimited();
+          try {
+            const r = await analyzeMarket({
+              symbol: sym, type: mt,
+              timeframe: s.timeframe,
+              tradingStyle: s.tradingStyle,
+              settings, lang
             });
+            if (r) {
+              const sig = r.signal || '';
+              if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
+              if (sig && sig !== 'no_entry') {
+                setClientSignals(prev => {
+                  const u = [...prev.filter(x => x.symbol !== r.symbol), r];
+                  localStorage.setItem('finalyze_client_signals', JSON.stringify(u.slice(-100)));
+                  return u.slice(-100);
+                });
+              }
+            }
+            const key = getApiKey();
+            const d = (key.startsWith('AIzaSy') || key.startsWith('AQ.')) ? 3500 : 2500;
+            await new Promise(r => setTimeout(r, d));
+          } catch (e) {
+            console.error("Radar Error:", e);
+            await new Promise(r => setTimeout(r, 8000));
           }
-          const oldAlertSnap = await getDocs(collection(db, 'shared_alerts'));
-          for (const d of oldAlertSnap.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
-          await addDoc(collection(db, 'shared_alerts'), {
-            autoSettings: { ...autoSettingsRef.current, lastFinishedAt: finishedAt },
-            strategySettings: settings,
-            timestamp: serverTimestamp(),
-          });
-        } catch (e) {
-          console.warn('Failed to save shared results:', e);
         }
-
-        playAudio('fail');
-      } finally {
-        radarRunningRef.current = false;
       }
+
+      setIsScanningFinished(true);
+      setFoundAnyStrong(signalsRef.current.length > 0);
+
+      // Save to Firestore for clients
+      try {
+        const all = signalsRef.current.length > 0 ? signalsRef.current : [];
+        const loc = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
+        const merged = [...all];
+        loc.forEach((r: any) => {
+          if (!merged.find((m: any) => m.symbol === r.symbol)) merged.push(r);
+        });
+        if (merged.length > 0) {
+          const old = await getDocs(collection(db, 'shared_results'));
+          for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
+          await addDoc(collection(db, 'shared_results'), {
+            results: merged.slice(-100),
+            timestamp: serverTimestamp(),
+            developerEmail: user?.email || '',
+          });
+        }
+        const oldA = await getDocs(collection(db, 'shared_alerts'));
+        for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
+        await addDoc(collection(db, 'shared_alerts'), {
+          autoSettings: s,
+          strategySettings: settings,
+          timestamp: serverTimestamp(),
+        });
+      } catch (e) {
+        console.warn('Firestore save failed:', e);
+      }
+
+      playAudio('fail');
     };
 
-    // Start interval: scan immediately, then repeat every interval
-    const intervalMs = (autoSettings.interval || 15) * 60000;
-    runAutoScan(); // First scan immediately
-    radarIntervalRef.current = setInterval(runAutoScan, intervalMs);
+    // Run immediately, then repeat every interval
+    tick();
+    const ms = (autoSettings.interval || 15) * 60000;
+    radarTimerRef.current = setInterval(tick, ms);
 
     return () => {
-      if (radarIntervalRef.current) {
-        clearInterval(radarIntervalRef.current);
-        radarIntervalRef.current = null;
+      if (radarTimerRef.current) {
+        clearInterval(radarTimerRef.current);
+        radarTimerRef.current = null;
       }
     };
-  }, [autoSettings.isEnabled, autoSettings.interval, autoSettings.category, autoSettings.timeframe, autoSettings.tradingStyle]);
+  }, [autoSettings.isEnabled, autoSettings.interval]);
 
   useEffect(() => {
     localStorage.removeItem('finalyze_verify_link');
