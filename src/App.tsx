@@ -507,6 +507,7 @@ export default function App() {
     const unlockAudio = () => {
       const successAudio = successAudioRef.current;
       const failAudio = failAudioRef.current;
+      const completionAudio = completionAudioRef.current;
 
       if (successAudio) {
         successAudio.play()
@@ -524,6 +525,15 @@ export default function App() {
             failAudio.currentTime = 0;
           })
           .catch(e => console.log("Fail audio silent unlock failed:", e));
+      }
+
+      if (completionAudio) {
+        completionAudio.play()
+          .then(() => {
+            completionAudio.pause();
+            completionAudio.currentTime = 0;
+          })
+          .catch(e => console.log("Completion audio silent unlock failed:", e));
       }
 
       setIsRadarUnlocked(true);
