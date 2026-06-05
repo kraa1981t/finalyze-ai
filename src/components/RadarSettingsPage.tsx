@@ -4,6 +4,7 @@ import { Zap, Activity, Layers, Sparkles, Clock, Music, Volume2, Upload, Trash2,
 import { AutoAnalysisSettings } from '../types';
 import { Language } from '../lib/i18n';
 import { saveAudioBlob, deleteAudioBlob } from '../lib/db';
+import { loadCustomAudio, removeCustomAudio } from '../lib/audioEngine';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
@@ -34,28 +35,30 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
     const file = e.target.files?.[0];
     if (file) {
       try {
-        await saveAudioBlob(type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail', file);
+        const key = type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail';
+        await saveAudioBlob(key, file);
+        await loadCustomAudio(key, file);
         onAutoSettingsChange({
           ...autoSettings,
           [type === 'success' ? 'successSound' : type === 'completion' ? 'completionSound' : 'failSound']: 'custom'
         });
-        window.dispatchEvent(new CustomEvent('custom-audio-updated', { detail: { type } }));
       } catch (err) {
-        console.error("Failed to save audio to DB", err);
+        console.error("Failed to save audio", err);
       }
     }
   };
 
   const handleDeleteCustomAudio = async (type: 'success' | 'fail' | 'completion') => {
     try {
-      await deleteAudioBlob(type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail');
+      const key = type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail';
+      await deleteAudioBlob(key);
+      removeCustomAudio(key);
       onAutoSettingsChange({
         ...autoSettings,
         [type === 'success' ? 'successSound' : type === 'completion' ? 'completionSound' : 'failSound']: ''
       });
-      window.dispatchEvent(new CustomEvent('custom-audio-updated', { detail: { type } }));
     } catch (err) {
-      console.error("Failed to delete audio from DB", err);
+      console.error("Failed to delete audio", err);
     }
   };
 

@@ -3,6 +3,7 @@ import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut 
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
+import { playSuccess, playFail, playCompletion } from './lib/audioEngine';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
 import Header from './components/Header';
 import AnalysisForm from './components/AnalysisForm';
@@ -430,45 +431,7 @@ export default function App() {
     autoSettingsRef.current = autoSettings;
   }, [autoSettings]);
 
-  const [isRadarUnlocked, setIsRadarUnlocked] = useState(false);
-
-  const [customAudioUrls, setCustomAudioUrls] = useState<{ success?: string, fail?: string, completion?: string }>({});
-
-  const loadCustomAudio = async () => {
-    try {
-      const { getAudioBlob } = await import('./lib/db');
-      const successBlob = await getAudioBlob('custom_success');
-      const failBlob = await getAudioBlob('custom_fail');
-      const completionBlob = await getAudioBlob('custom_completion');
-      
-      setCustomAudioUrls(prev => {
-        if (prev.success) URL.revokeObjectURL(prev.success);
-        if (prev.fail) URL.revokeObjectURL(prev.fail);
-        if (prev.completion) URL.revokeObjectURL(prev.completion);
-        return {
-          success: successBlob ? URL.createObjectURL(successBlob) : undefined,
-          fail: failBlob ? URL.createObjectURL(failBlob) : undefined,
-          completion: completionBlob ? URL.createObjectURL(completionBlob) : undefined,
-        };
-      });
-    } catch (e) {
-      console.warn("Failed to load custom audio from DB", e);
-    }
-  };
-
-  // Load persistent custom audio from IndexedDB on startup or settings change
-  useEffect(() => {
-    loadCustomAudio();
-  }, [autoSettings.successSound, autoSettings.failSound, autoSettings.completionSound]);
-
-  // Listen to custom audio update events for hot-reloading new uploads
-  useEffect(() => {
-    const handleAudioChange = () => {
-      loadCustomAudio();
-    };
-    window.addEventListener('custom-audio-updated', handleAudioChange);
-    return () => window.removeEventListener('custom-audio-updated', handleAudioChange);
-  }, []);
+  // Web Audio API — no unlock needed
 
   // Sync URL hash with activePage so refreshes keep the same page
   useEffect(() => {
@@ -497,80 +460,13 @@ export default function App() {
     return [];
   });
 
-  // NATIVE AUDIO ENGINE (Bulletproof against browser blocks)
-  const successAudioRef = useRef<HTMLAudioElement>(null);
-  const failAudioRef = useRef<HTMLAudioElement>(null);
-  const completionAudioRef = useRef<HTMLAudioElement>(null);
-
-  // Global automatic silent audio unlock on first user interaction (click/touch)
-  useEffect(() => {
-    const unlockAudio = () => {
-      const successAudio = successAudioRef.current;
-      const failAudio = failAudioRef.current;
-      const completionAudio = completionAudioRef.current;
-
-      if (successAudio) {
-        successAudio.play()
-          .then(() => {
-            successAudio.pause();
-            successAudio.currentTime = 0;
-          })
-          .catch(e => console.log("Success audio silent unlock failed:", e));
-      }
-
-      if (failAudio) {
-        failAudio.play()
-          .then(() => {
-            failAudio.pause();
-            failAudio.currentTime = 0;
-          })
-          .catch(e => console.log("Fail audio silent unlock failed:", e));
-      }
-
-      if (completionAudio) {
-        completionAudio.play()
-          .then(() => {
-            completionAudio.pause();
-            completionAudio.currentTime = 0;
-          })
-          .catch(e => console.log("Completion audio silent unlock failed:", e));
-      }
-
-      setIsRadarUnlocked(true);
-
-      // Clean up event listeners immediately after first user interaction
-      window.removeEventListener('click', unlockAudio);
-      window.removeEventListener('touchstart', unlockAudio);
-      window.removeEventListener('mousedown', unlockAudio);
-    };
-
-    window.addEventListener('click', unlockAudio, { passive: true });
-    window.addEventListener('touchstart', unlockAudio, { passive: true });
-    window.addEventListener('mousedown', unlockAudio, { passive: true });
-
-    return () => {
-      window.removeEventListener('click', unlockAudio);
-      window.removeEventListener('touchstart', unlockAudio);
-      window.removeEventListener('mousedown', unlockAudio);
-    };
-  }, []);
+  // Web Audio API — no unlock needed
 
   const playAudio = (type?: 'success' | 'fail' | 'completion') => {
-    const audioEl = type === 'success' ? successAudioRef.current : type === 'completion' ? completionAudioRef.current : failAudioRef.current;
-    
-    if (audioEl) {
-      audioEl.volume = Math.max(0, Math.min(1, autoSettings.volume || 0.5));
-      audioEl.currentTime = 0; // Force restart
-      const playPromise = audioEl.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(e => console.warn(`Audio playback blocked/interrupted (${type}):`, e));
-      }
-    }
-  };
-
-  const handleUnlockRadar = () => {
-    // Legacy support for header trigger, but global unlock listener already guarantees freedom!
-    setIsRadarUnlocked(true);
+    const vol = Math.max(0, Math.min(1, autoSettings.volume || 0.5));
+    if (type === 'success') playSuccess(vol);
+    else if (type === 'completion') playCompletion(vol);
+    else playFail(vol);
   };
 
   // Track the most up-to-date signals instantly to avoid stale closures
@@ -1254,25 +1150,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-brand-bg relative">
-      {/* NATIVE AUDIO ELEMENTS - Hidden but present in DOM for perfect playback */}
-      <audio 
-        key={customAudioUrls.success || 'success_default'}
-        ref={successAudioRef} 
-        src={autoSettings.successSound === 'custom' ? customAudioUrls.success : (autoSettings.successSound || 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg')} 
-        preload="auto" 
-      />
-      <audio 
-        key={customAudioUrls.fail || 'fail_default'}
-        ref={failAudioRef} 
-        src={autoSettings.failSound === 'custom' ? customAudioUrls.fail : (autoSettings.failSound || 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg')} 
-        preload="auto" 
-      />
-      <audio 
-        key={autoSettings.completionSound === 'custom' ? customAudioUrls.completion : (autoSettings.completionSound || 'completion_default')}
-        ref={completionAudioRef} 
-        src={autoSettings.completionSound === 'custom' ? customAudioUrls.completion : (autoSettings.completionSound || 'https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3')} 
-        preload="auto" 
-      />
+      {/* AUDIO: Web Audio API via audioEngine.ts */}
 
       <AnimatePresence>
         {!user && !loading && (
@@ -1486,8 +1364,6 @@ export default function App() {
             onSelect={handleSelectSignal} onClearAll={() => setTopSignals([])}
             lang={lang} 
           />
-
-          <PortfolioPanel signals={topSignals} lang={lang} />
 
           <div className="h-[10px] bg-emerald-500 rounded-full my-10 shadow-[0_0_20px_rgba(16,185,129,0.7)] border-t border-emerald-400/20" />
 
