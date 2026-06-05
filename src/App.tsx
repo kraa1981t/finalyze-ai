@@ -3,7 +3,7 @@ import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut 
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { playSuccess, playFail, playCompletion } from './lib/audioEngine';
+import { playSuccess, playFail, playCompletion, initAudio } from './lib/audioEngine';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
 import Header from './components/Header';
 import AnalysisForm from './components/AnalysisForm';
@@ -431,7 +431,23 @@ export default function App() {
     autoSettingsRef.current = autoSettings;
   }, [autoSettings]);
 
-  // Web Audio API — no unlock needed
+  // Web Audio API — unlock AudioContext on first user click (browser autoplay policy)
+  useEffect(() => {
+    const unlock = () => {
+      initAudio();
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('mousedown', unlock);
+    };
+    window.addEventListener('click', unlock, { passive: true });
+    window.addEventListener('touchstart', unlock, { passive: true });
+    window.addEventListener('mousedown', unlock, { passive: true });
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('mousedown', unlock);
+    };
+  }, []);
 
   // Sync URL hash with activePage so refreshes keep the same page
   useEffect(() => {

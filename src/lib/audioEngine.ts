@@ -1,19 +1,32 @@
 let ctx: AudioContext | null = null;
+let unlocked = false;
 const customBuffers: Map<string, AudioBuffer> = new Map();
 
-function getCtx(): AudioContext {
-  if (!ctx || ctx.state === 'closed') {
-    ctx = new AudioContext();
+export function initAudio() {
+  try {
+    if (!ctx || ctx.state === 'closed') {
+      ctx = new AudioContext();
+    }
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    unlocked = true;
+  } catch (e) {
+    console.warn('initAudio failed:', e);
   }
-  if (ctx.state === 'suspended') {
-    ctx.resume();
-  }
+}
+
+function getCtx(): AudioContext | null {
+  if (!unlocked) return null;
+  if (!ctx || ctx.state === 'closed') return null;
+  if (ctx.state === 'suspended') ctx.resume();
   return ctx;
 }
 
 function playTone(freq: number, duration: number, type: OscillatorType = 'sine', volume: number = 0.5) {
   try {
     const ac = getCtx();
+    if (!ac) return;
     const osc = ac.createOscillator();
     const gain = ac.createGain();
     osc.type = type;
@@ -32,6 +45,7 @@ function playTone(freq: number, duration: number, type: OscillatorType = 'sine',
 function playBuffer(buffer: AudioBuffer, volume: number) {
   try {
     const ac = getCtx();
+    if (!ac) return;
     const source = ac.createBufferSource();
     const gain = ac.createGain();
     source.buffer = buffer;
@@ -46,9 +60,9 @@ function playBuffer(buffer: AudioBuffer, volume: number) {
 
 export async function loadCustomAudio(key: string, blob: Blob) {
   try {
-    const ac = getCtx();
+    if (!ctx || ctx.state === 'closed') ctx = new AudioContext();
     const arrayBuf = await blob.arrayBuffer();
-    const buffer = await ac.decodeAudioData(arrayBuf);
+    const buffer = await ctx.decodeAudioData(arrayBuf);
     customBuffers.set(key, buffer);
   } catch (e) {
     console.warn('Failed to decode custom audio:', e);

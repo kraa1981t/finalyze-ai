@@ -4,7 +4,7 @@ import { Zap, Activity, Layers, Sparkles, Clock, Music, Volume2, Upload, Trash2,
 import { AutoAnalysisSettings } from '../types';
 import { Language } from '../lib/i18n';
 import { saveAudioBlob, deleteAudioBlob } from '../lib/db';
-import { loadCustomAudio, removeCustomAudio } from '../lib/audioEngine';
+import { loadCustomAudio, removeCustomAudio, playSuccess, playFail, playCompletion } from '../lib/audioEngine';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
@@ -131,9 +131,14 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
             <span className="text-xs font-bold text-brand-muted">
               {lang === 'ar' ? 'تنبيه فرصة جديدة' : 'New Signal Alert'}
             </span>
-            <button onClick={() => successFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors">
-              <Upload size={16} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => playSuccess(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title="Test">
+                <Volume2 size={14} />
+              </button>
+              <button onClick={() => successFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors">
+                <Upload size={16} />
+              </button>
+            </div>
             <input type="file" ref={successFileRef} onChange={(e) => handleAudioUpload(e, 'success')} accept="audio/*" className="hidden" />
           </div>
           <button
@@ -164,9 +169,14 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
             <span className="text-xs font-bold text-brand-muted">
               {lang === 'ar' ? 'تنبيه إتمام التحليل' : 'Analysis Finished Alert'}
             </span>
-            <button onClick={() => failFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors">
-              <Upload size={16} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => playFail(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title="Test">
+                <Volume2 size={14} />
+              </button>
+              <button onClick={() => failFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors">
+                <Upload size={16} />
+              </button>
+            </div>
             <input type="file" ref={failFileRef} onChange={(e) => handleAudioUpload(e, 'fail')} accept="audio/*" className="hidden" />
           </div>
           <button
@@ -197,9 +207,14 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
             <span className="text-xs font-bold text-brand-muted">
               {lang === 'ar' ? 'تنبيه انتهاء الدورة' : 'Cycle Completion Alert'}
             </span>
-            <button onClick={() => completionFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors">
-              <Upload size={16} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => playCompletion(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title="Test">
+                <Volume2 size={14} />
+              </button>
+              <button onClick={() => completionFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors">
+                <Upload size={16} />
+              </button>
+            </div>
             <input type="file" ref={completionFileRef} onChange={(e) => handleAudioUpload(e, 'completion')} accept="audio/*" className="hidden" />
           </div>
           <button
