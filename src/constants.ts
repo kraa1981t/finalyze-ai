@@ -67,6 +67,12 @@ export const DEFAULT_FAIL_SOUNDS = [
   { id: 'alert', url: 'https://assets.mixkit.co/active_storage/sfx/431/431-preview.mp3', label: 'Alert' }
 ];
 
+export const DEFAULT_COMPLETION_SOUNDS = [
+  { id: 'completion_tone', url: 'https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3', label: 'Completion Tone' },
+  { id: 'completion_bell', url: 'https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3', label: 'Soft Bell' },
+  { id: 'completion_done', url: 'https://assets.mixkit.co/active_storage/sfx/1993/1993-preview.mp3', label: 'Done Chime' }
+];
+
 export const FREE_SYMBOLS: Record<string, string[]> = {
   forex: ['EURUSD', 'GBPUSD', 'USDJPY', 'EURJPY', 'GBPJPY'],
   crypto: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'XRPUSD', 'ADAUSD'],

@@ -20,6 +20,7 @@ interface RadarSettingsPageProps {
 export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, onSave, isWaiting, lang, hasActivePlan = true, onUpgrade }: RadarSettingsPageProps) {
   const successFileRef = useRef<HTMLInputElement>(null);
   const failFileRef = useRef<HTMLInputElement>(null);
+  const completionFileRef = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState(false);
   const [showUpgradeOverlay, setShowUpgradeOverlay] = useState(false);
 
@@ -29,14 +30,14 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'success' | 'fail') => {
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'success' | 'fail' | 'completion') => {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        await saveAudioBlob(type === 'success' ? 'custom_success' : 'custom_fail', file);
+        await saveAudioBlob(type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail', file);
         onAutoSettingsChange({
           ...autoSettings,
-          [type === 'success' ? 'successSound' : 'failSound']: 'custom'
+          [type === 'success' ? 'successSound' : type === 'completion' ? 'completionSound' : 'failSound']: 'custom'
         });
         window.dispatchEvent(new CustomEvent('custom-audio-updated', { detail: { type } }));
       } catch (err) {
@@ -45,12 +46,12 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
     }
   };
 
-  const handleDeleteCustomAudio = async (type: 'success' | 'fail') => {
+  const handleDeleteCustomAudio = async (type: 'success' | 'fail' | 'completion') => {
     try {
-      await deleteAudioBlob(type === 'success' ? 'custom_success' : 'custom_fail');
+      await deleteAudioBlob(type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail');
       onAutoSettingsChange({
         ...autoSettings,
-        [type === 'success' ? 'successSound' : 'failSound']: ''
+        [type === 'success' ? 'successSound' : type === 'completion' ? 'completionSound' : 'failSound']: ''
       });
       window.dispatchEvent(new CustomEvent('custom-audio-updated', { detail: { type } }));
     } catch (err) {
@@ -182,6 +183,39 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
             </span>
             {autoSettings.failSound === 'custom' && (
               <button onClick={() => handleDeleteCustomAudio('fail')} className="ml-auto p-1 hover:bg-red-500/20 rounded-lg text-red-500">
+                <Trash2 size={14} />
+              </button>
+            )}
+          </button>
+        </div>
+
+        <div className="space-y-3 pt-4 border-t border-brand-text/5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-brand-muted">
+              {lang === 'ar' ? 'تنبيه انتهاء الدورة' : 'Cycle Completion Alert'}
+            </span>
+            <button onClick={() => completionFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors">
+              <Upload size={16} />
+            </button>
+            <input type="file" ref={completionFileRef} onChange={(e) => handleAudioUpload(e, 'completion')} accept="audio/*" className="hidden" />
+          </div>
+          <button
+            onClick={() => onAutoSettingsChange({ ...autoSettings, completionSound: autoSettings.completionSound === 'custom' ? '' : 'custom' })}
+            className={cn(
+              "flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-xs font-black border-2 transition-all text-left",
+              autoSettings.completionSound === 'custom'
+                ? 'bg-[#F59E0B]/10 border-[#F59E0B] text-[#F59E0B]'
+                : 'bg-brand-bg border-brand-text/5 text-brand-muted'
+            )}
+          >
+            <div className={cn("w-2 h-2 rounded-full", autoSettings.completionSound === 'custom' ? "bg-[#F59E0B]" : "bg-brand-text/20")} />
+            <span className="truncate">
+              {autoSettings.completionSound === 'custom'
+                ? (lang === 'ar' ? 'نغمة مخصصة (نشطة)' : 'Custom Sound (Active)')
+                : (lang === 'ar' ? 'نغمة افتراضية' : 'Default Sound')}
+            </span>
+            {autoSettings.completionSound === 'custom' && (
+              <button onClick={() => handleDeleteCustomAudio('completion')} className="ml-auto p-1 hover:bg-red-500/20 rounded-lg text-red-500">
                 <Trash2 size={14} />
               </button>
             )}

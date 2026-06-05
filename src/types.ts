@@ -74,5 +74,6 @@ export interface AutoAnalysisSettings {
   lastFinishedAt?: number;
   successSound?: string;
   failSound?: string;
+  completionSound?: string;
   forceRestart?: boolean;
 }

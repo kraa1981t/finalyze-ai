@@ -12,7 +12,6 @@ import LoginOverlay from './components/LoginOverlay';
 import SettingsModal from './components/SettingsModal';
 import SidebarPanel from './components/SidebarPanel';
 import TopSignals from './components/TopSignals';
-import SignalSummary from './components/SignalSummary';
 import PortfolioPanel from './components/PortfolioPanel';
 import ClientDashboard from './components/ClientDashboard';
 
@@ -433,21 +432,23 @@ export default function App() {
 
   const [isRadarUnlocked, setIsRadarUnlocked] = useState(false);
 
-  const [customAudioUrls, setCustomAudioUrls] = useState<{ success?: string, fail?: string }>({});
+  const [customAudioUrls, setCustomAudioUrls] = useState<{ success?: string, fail?: string, completion?: string }>({});
 
   const loadCustomAudio = async () => {
     try {
       const { getAudioBlob } = await import('./lib/db');
       const successBlob = await getAudioBlob('custom_success');
       const failBlob = await getAudioBlob('custom_fail');
+      const completionBlob = await getAudioBlob('custom_completion');
       
       setCustomAudioUrls(prev => {
-        // Revoke old object URLs to avoid memory leaks
         if (prev.success) URL.revokeObjectURL(prev.success);
         if (prev.fail) URL.revokeObjectURL(prev.fail);
+        if (prev.completion) URL.revokeObjectURL(prev.completion);
         return {
           success: successBlob ? URL.createObjectURL(successBlob) : undefined,
-          fail: failBlob ? URL.createObjectURL(failBlob) : undefined
+          fail: failBlob ? URL.createObjectURL(failBlob) : undefined,
+          completion: completionBlob ? URL.createObjectURL(completionBlob) : undefined,
         };
       });
     } catch (e) {
@@ -458,7 +459,7 @@ export default function App() {
   // Load persistent custom audio from IndexedDB on startup or settings change
   useEffect(() => {
     loadCustomAudio();
-  }, [autoSettings.successSound, autoSettings.failSound]);
+  }, [autoSettings.successSound, autoSettings.failSound, autoSettings.completionSound]);
 
   // Listen to custom audio update events for hot-reloading new uploads
   useEffect(() => {
@@ -499,6 +500,7 @@ export default function App() {
   // NATIVE AUDIO ENGINE (Bulletproof against browser blocks)
   const successAudioRef = useRef<HTMLAudioElement>(null);
   const failAudioRef = useRef<HTMLAudioElement>(null);
+  const completionAudioRef = useRef<HTMLAudioElement>(null);
 
   // Global automatic silent audio unlock on first user interaction (click/touch)
   useEffect(() => {
@@ -543,8 +545,8 @@ export default function App() {
     };
   }, []);
 
-  const playAudio = (type?: 'success' | 'fail') => {
-    const audioEl = type === 'success' ? successAudioRef.current : failAudioRef.current;
+  const playAudio = (type?: 'success' | 'fail' | 'completion') => {
+    const audioEl = type === 'success' ? successAudioRef.current : type === 'completion' ? completionAudioRef.current : failAudioRef.current;
     
     if (audioEl) {
       audioEl.volume = Math.max(0, Math.min(1, autoSettings.volume || 0.5));
@@ -826,7 +828,7 @@ export default function App() {
       } finally {
         setIsScanningFinished(true);
         setFoundAnyStrong(signalsRef.current.length > 0);
-        playAudio('success');
+        playAudio('completion');
 
         if (autoSettingsRef.current.isEnabled) {
           const ms = (autoSettingsRef.current.interval || 15) * 60000;
@@ -1255,6 +1257,12 @@ export default function App() {
         src={autoSettings.failSound === 'custom' ? customAudioUrls.fail : (autoSettings.failSound || 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg')} 
         preload="auto" 
       />
+      <audio 
+        key={autoSettings.completionSound === 'custom' ? customAudioUrls.completion : (autoSettings.completionSound || 'completion_default')}
+        ref={completionAudioRef} 
+        src={autoSettings.completionSound === 'custom' ? customAudioUrls.completion : (autoSettings.completionSound || 'https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3')} 
+        preload="auto" 
+      />
 
       <AnimatePresence>
         {!user && !loading && (
@@ -1463,7 +1471,6 @@ export default function App() {
               </div>
             );
           })()}
-          <SignalSummary signals={topSignals} lang={lang} />
           <TopSignals 
             signals={topSignals} onRemove={removeSignal} 
             onSelect={handleSelectSignal} onClearAll={() => setTopSignals([])}
