@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings } from '../types';
+import { initAudio } from '../lib/audioEngine';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
@@ -140,7 +141,10 @@ export default function Header({
               </span>
               {isDeveloper ? (
                 <button
-                  onClick={() => onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled })}
+                  onClick={() => {
+                    initAudio();
+                    onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled });
+                  }}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-xl transition-all border-2 shadow-lg",
                     autoSettings.isEnabled

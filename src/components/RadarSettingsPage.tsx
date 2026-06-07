@@ -62,6 +62,45 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
     }
   };
 
+  // Save custom audio to desktop file
+  const handleSaveToDesktop = async (type: 'success' | 'fail' | 'completion') => {
+    try {
+      const key = type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail';
+      const { getAudioBlob } = await import('../lib/db');
+      const blob = await getAudioBlob(key);
+      if (!blob) return;
+      
+      const handle = await (window as any).showSaveFilePicker({
+        suggestedName: `${type}_alert_sound.${blob.type === 'audio/mpeg' ? 'mp3' : 'wav'}`,
+        types: [{ description: 'Audio Files', accept: { 'audio/*': ['.mp3', '.wav', '.ogg', '.m4a'] } }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+    } catch (err) {
+      if ((err as any).name !== 'AbortError') console.error("Failed to save to desktop", err);
+    }
+  };
+
+  // Load custom audio from desktop file
+  const handleLoadFromDesktop = async (type: 'success' | 'fail' | 'completion') => {
+    try {
+      const [handle] = await (window as any).showOpenFilePicker({
+        types: [{ description: 'Audio Files', accept: { 'audio/*': ['.mp3', '.wav', '.ogg', '.m4a'] } }]
+      });
+      const file = await handle.getFile();
+      const key = type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail';
+      await saveAudioBlob(key, file);
+      await loadCustomAudio(key, file);
+      onAutoSettingsChange({
+        ...autoSettings,
+        [type === 'success' ? 'successSound' : type === 'completion' ? 'completionSound' : 'failSound']: 'custom'
+      });
+    } catch (err) {
+      if ((err as any).name !== 'AbortError') console.error("Failed to load from desktop", err);
+    }
+  };
+
   const selectedList = autoSettings.category === 'all'
     ? ['forex', 'crypto', 'stocks', 'metals']
     : (autoSettings.category || 'all').split(',');
@@ -132,11 +171,17 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
               {lang === 'ar' ? 'تنبيه فرصة جديدة' : 'New Signal Alert'}
             </span>
             <div className="flex items-center gap-2">
-              <button onClick={() => playSuccess(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title="Test">
+              <button onClick={() => playSuccess(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
                 <Volume2 size={14} />
               </button>
-              <button onClick={() => successFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors">
+              <button onClick={() => successFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors" title={lang === 'ar' ? 'رفع من الجهاز' : 'Upload from Device'}>
                 <Upload size={16} />
+              </button>
+              <button onClick={() => handleSaveToDesktop('success')} className="p-2 bg-blue-500/20 rounded-xl text-blue-400 hover:bg-blue-500/30 transition-colors" title={lang === 'ar' ? 'حفظ على سطح المكتب' : 'Save to Desktop'}>
+                <Download size={16} />
+              </button>
+              <button onClick={() => handleLoadFromDesktop('success')} className="p-2 bg-purple-500/20 rounded-xl text-purple-400 hover:bg-purple-500/30 transition-colors" title={lang === 'ar' ? 'تحميل من سطح المكتب' : 'Load from Desktop'}>
+                <FileAudio size={16} />
               </button>
             </div>
             <input type="file" ref={successFileRef} onChange={(e) => handleAudioUpload(e, 'success')} accept="audio/*" className="hidden" />
@@ -170,11 +215,17 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
               {lang === 'ar' ? 'تنبيه إتمام التحليل' : 'Analysis Finished Alert'}
             </span>
             <div className="flex items-center gap-2">
-              <button onClick={() => playFail(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title="Test">
+              <button onClick={() => playFail(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
                 <Volume2 size={14} />
               </button>
-              <button onClick={() => failFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors">
+              <button onClick={() => failFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors" title={lang === 'ar' ? 'رفع من الجهاز' : 'Upload from Device'}>
                 <Upload size={16} />
+              </button>
+              <button onClick={() => handleSaveToDesktop('fail')} className="p-2 bg-blue-500/20 rounded-xl text-blue-400 hover:bg-blue-500/30 transition-colors" title={lang === 'ar' ? 'حفظ على سطح المكتب' : 'Save to Desktop'}>
+                <Download size={16} />
+              </button>
+              <button onClick={() => handleLoadFromDesktop('fail')} className="p-2 bg-purple-500/20 rounded-xl text-purple-400 hover:bg-purple-500/30 transition-colors" title={lang === 'ar' ? 'تحميل من سطح المكتب' : 'Load from Desktop'}>
+                <FileAudio size={16} />
               </button>
             </div>
             <input type="file" ref={failFileRef} onChange={(e) => handleAudioUpload(e, 'fail')} accept="audio/*" className="hidden" />
@@ -208,11 +259,17 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
               {lang === 'ar' ? 'تنبيه انتهاء الدورة' : 'Cycle Completion Alert'}
             </span>
             <div className="flex items-center gap-2">
-              <button onClick={() => playCompletion(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title="Test">
+              <button onClick={() => playCompletion(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
                 <Volume2 size={14} />
               </button>
-              <button onClick={() => completionFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors">
+              <button onClick={() => completionFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors" title={lang === 'ar' ? 'رفع من الجهاز' : 'Upload from Device'}>
                 <Upload size={16} />
+              </button>
+              <button onClick={() => handleSaveToDesktop('completion')} className="p-2 bg-blue-500/20 rounded-xl text-blue-400 hover:bg-blue-500/30 transition-colors" title={lang === 'ar' ? 'حفظ على سطح المكتب' : 'Save to Desktop'}>
+                <Download size={16} />
+              </button>
+              <button onClick={() => handleLoadFromDesktop('completion')} className="p-2 bg-purple-500/20 rounded-xl text-purple-400 hover:bg-purple-500/30 transition-colors" title={lang === 'ar' ? 'تحميل من سطح المكتب' : 'Load from Desktop'}>
+                <FileAudio size={16} />
               </button>
             </div>
             <input type="file" ref={completionFileRef} onChange={(e) => handleAudioUpload(e, 'completion')} accept="audio/*" className="hidden" />
