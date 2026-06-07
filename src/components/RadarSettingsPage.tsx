@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Zap, Activity, Layers, Sparkles, Clock, Music, Volume2, Upload, Trash2, CheckCircle, Crown, Star, X } from 'lucide-react';
+import { Zap, Activity, Layers, Sparkles, Clock, Music, Volume2, Upload, Trash2, CheckCircle, Crown, Star, X, Download, FileAudio } from 'lucide-react';
 import { AutoAnalysisSettings } from '../types';
 import { Language } from '../lib/i18n';
 import { saveAudioBlob, deleteAudioBlob } from '../lib/db';
