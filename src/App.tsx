@@ -230,8 +230,11 @@ export default function App() {
           lastPollResultsRef.current = '';
         }
 
-        const snap = await getDocs(query(collection(db, 'shared_results'), orderBy('timestamp', 'desc')));
-        if (snap.empty) return;
+        const snap = await Promise.race([
+          getDocs(query(collection(db, 'shared_results'), orderBy('timestamp', 'desc'))),
+          new Promise<null>((_, rej) => setTimeout(() => rej(new Error('Firestore read timeout')), 15000))
+        ]) as any;
+        if (!snap || snap.empty) return;
         const latest = snap.docs[0]?.data();
         if (!latest?.results) return;
 
@@ -250,8 +253,11 @@ export default function App() {
           processQueue();
         }
 
-        const alertSnap = await getDocs(query(collection(db, 'shared_alerts')));
-        if (!alertSnap.empty) {
+        const alertSnap = await Promise.race([
+          getDocs(query(collection(db, 'shared_alerts'))),
+          new Promise<null>((_, rej) => setTimeout(() => rej(new Error('Alerts read timeout')), 10000))
+        ]) as any;
+        if (alertSnap && !alertSnap.empty) {
           const alertData = alertSnap.docs[0]?.data();
           if (alertData) localStorage.setItem('finalyze_client_alerts', JSON.stringify(alertData));
         }
