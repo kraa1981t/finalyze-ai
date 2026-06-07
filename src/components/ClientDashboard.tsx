@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, TrendingDown, Zap, ShieldAlert, ChevronDown, ChevronUp, X, BarChart2, Info, Activity } from 'lucide-react';
+import { TrendingUp, Zap, ShieldAlert, ChevronDown, ChevronUp, X, BarChart2, Info, Activity } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
 import { Language, translations } from '../lib/i18n';
 
@@ -12,9 +12,7 @@ interface ClientDashboardProps {
 
 const SIGNAL_META: Record<string, { color: string; bg: string; border: string; icon: any; labelAr: string; labelEn: string }> = {
   [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', icon: TrendingUp, labelAr: 'شراء قوي', labelEn: 'Strong Buy' },
-  [SignalType.BUY]: { color: 'text-emerald-300', bg: 'bg-emerald-500/10', border: 'border-emerald-400/20', icon: TrendingUp, labelAr: 'شراء', labelEn: 'Buy' },
   [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', icon: ShieldAlert, labelAr: 'بيع قوي', labelEn: 'Strong Sell' },
-  [SignalType.SELL]: { color: 'text-red-300', bg: 'bg-red-500/10', border: 'border-red-400/20', icon: TrendingDown, labelAr: 'بيع', labelEn: 'Sell' },
 };
 
 function SignalCard({ result, lang, onSelect, isSelected }: { result: AnalysisResult; lang: Language; onSelect: () => void; isSelected: boolean }) {
@@ -60,9 +58,7 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [expandedReasons, setExpandedReasons] = useState<string | null>(null);
 
-  const filtered = results.filter(r => r.signal !== SignalType.NO_ENTRY && r.signal !== SignalType.NEUTRAL);
-  const strong = filtered.filter(r => r.signal === SignalType.STRONG_BUY || r.signal === SignalType.STRONG_SELL);
-  const medium = filtered.filter(r => r.signal === SignalType.BUY || r.signal === SignalType.SELL);
+  const filtered = results.filter(r => r.signal === SignalType.STRONG_BUY || r.signal === SignalType.STRONG_SELL);
 
   const selectedResult = results.find(r => r.symbol === selectedSymbol);
 
@@ -74,8 +70,7 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
     return 4;
   };
 
-  const sortedStrong = [...strong].sort((a, b) => signalOrder(a.signal) - signalOrder(b.signal) || b.confidence - a.confidence);
-  const sortedMedium = [...medium].sort((a, b) => signalOrder(a.signal) - signalOrder(b.signal) || b.confidence - a.confidence);
+  const sortedStrong = [...filtered].sort((a, b) => signalOrder(a.signal) - signalOrder(b.signal) || b.confidence - a.confidence);
 
   if (filtered.length === 0) {
     return (
@@ -131,20 +126,20 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
       <div className="flex items-center gap-3 mb-2">
         <Zap size={22} className="text-primary" />
         <h2 className="text-lg font-black text-white">
-          {isAr ? 'إشارات التداول' : 'Trading Signals'}
+          {isAr ? 'إشارات التداول القوية' : 'Strong Trading Signals'}
         </h2>
         <span className="text-xs text-white/40 font-bold">({filtered.length})</span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Strong Signals - Right */}
+      <div className="grid grid-cols-1 gap-6">
+        {/* Strong Signals */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1.5 h-6 rounded-full bg-gradient-to-b from-emerald-400 to-red-400" />
             <h3 className="text-sm font-black text-white/80 uppercase tracking-wider">
               {isAr ? 'إشارات قوية' : 'Strong Signals'}
             </h3>
-            <span className="text-xs text-white/40 font-bold">({strong.length})</span>
+            <span className="text-xs text-white/40 font-bold">({filtered.length})</span>
           </div>
           {sortedStrong.length === 0 ? (
             <div className="bg-brand-alt/50 rounded-2xl p-8 border border-white/5 text-center">
@@ -153,34 +148,6 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
           ) : (
             <div className="space-y-3">
               {sortedStrong.map(r => (
-                <SignalCard
-                  key={r.symbol}
-                  result={r}
-                  lang={lang}
-                  isSelected={selectedSymbol === r.symbol}
-                  onSelect={() => setSelectedSymbol(selectedSymbol === r.symbol ? null : r.symbol)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Medium Signals - Left */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-1.5 h-6 rounded-full bg-gradient-to-b from-emerald-300/60 to-red-300/60" />
-            <h3 className="text-sm font-black text-white/80 uppercase tracking-wider">
-              {isAr ? 'إشارات متوسطة' : 'Medium Signals'}
-            </h3>
-            <span className="text-xs text-white/40 font-bold">({medium.length})</span>
-          </div>
-          {sortedMedium.length === 0 ? (
-            <div className="bg-brand-alt/50 rounded-2xl p-8 border border-white/5 text-center">
-              <p className="text-xs text-white/40 font-bold">{isAr ? 'لا توجد إشارات متوسطة حالياً' : 'No medium signals right now'}</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {sortedMedium.map(r => (
                 <SignalCard
                   key={r.symbol}
                   result={r}
