@@ -149,24 +149,24 @@ export default function App() {
   });
 
   const isDeveloperSession = () => {
-    // 1. URL parameter bypass — add ?dev or ?owner=1 to any URL to bypass as developer
-    if (typeof window !== 'undefined') {
+    if (!user) return false;
+    const email = user.email || '';
+    const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+    const isDevEmail = email === activeDevEmail ||
+                       email === 'bachasalman69@gmail.com' ||
+                       email === 'taybekraa@gmail.com' ||
+                       email.includes('dev');
+    // URL parameter bypass — only for known developer emails
+    if (isDevEmail && typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.has('dev') || params.get('owner') === '1') {
         localStorage.setItem('finalyze_dev_bypass_active', 'true');
         return true;
       }
     }
-    // 2. Standard localStorage flag
-    if (localStorage.getItem('finalyze_dev_bypass_active') === 'true') return true;
-    // 3. User email checks
-    if (!user) return false;
-    const email = user.email || '';
-    const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
-    return email === activeDevEmail ||
-           email === 'bachasalman69@gmail.com' ||
-           email === 'taybekraa@gmail.com' ||
-           email.includes('dev');
+    // Bypass flag — only for known developer emails
+    if (isDevEmail && localStorage.getItem('finalyze_dev_bypass_active') === 'true') return true;
+    return isDevEmail;
   };
 
   // CLIENT: Incremental results loading from developer via Firestore
@@ -803,8 +803,12 @@ export default function App() {
         const isDeveloper = email === activeDevEmail ||
                             email === 'bachasalman69@gmail.com' || 
                             email === 'taybekraa@gmail.com' || 
-                            email.includes('dev') ||
-                            localStorage.getItem('finalyze_dev_bypass_active') === 'true';
+                            email.includes('dev');
+
+        // Clear dev bypass if current user is not a developer
+        if (!isDeveloper) {
+          localStorage.removeItem('finalyze_dev_bypass_active');
+        }
 
         if (isDeveloper) {
           // Keep developer session active forever
@@ -857,6 +861,11 @@ export default function App() {
         const email = u.email || '';
         const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
         const isDeveloper = email === activeDevEmail || email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
+
+        // Clear dev bypass for non-developer users
+        if (!isDeveloper) {
+          localStorage.removeItem('finalyze_dev_bypass_active');
+        }
 
         // Fetch clients list for developer session
         if (isDeveloper || localStorage.getItem('finalyze_dev_bypass_active') === 'true') {
