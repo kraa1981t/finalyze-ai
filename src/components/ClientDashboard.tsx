@@ -42,10 +42,12 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [expandedReasons, setExpandedReasons] = useState<string | null>(null);
 
-  // Filter for STRONG signals only
+  // Filter for strong signals or buy/sell signals sent by developer
   const filtered = results.filter(r => 
     r.signal === SignalType.STRONG_BUY || 
-    r.signal === SignalType.STRONG_SELL
+    r.signal === SignalType.STRONG_SELL || 
+    r.signal === SignalType.BUY || 
+    r.signal === SignalType.SELL
   );
 
   const signalOrder = (s: string) => {

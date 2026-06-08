@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -213,9 +213,10 @@ export default function App() {
         const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
         
         // Find if any new strong signal is in the list
+        const minStrong = 80;
         const hasNewStrong = latest.results.some((r: any) => 
           !currentSymbols.has(r.symbol) && 
-          r.confidence >= (settings?.minStrongConfidence || 80) &&
+          r.confidence >= minStrong &&
           (r.signal?.includes('strong') || r.signal?.includes('buy') || r.signal?.includes('sell'))
         );
 
@@ -244,7 +245,7 @@ export default function App() {
     loadFromFirestore();
     const interval = setInterval(loadFromFirestore, 30000);
     return () => clearInterval(interval);
-  }, [user, settings.minStrongConfidence]);
+  }, [user]);
 
   const hasActivePlan = useMemo((): boolean => {
     if (isDeveloperSession()) return true;
