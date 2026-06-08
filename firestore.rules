@@ -29,5 +29,17 @@ service cloud.firestore {
     match /userPreferences/{userId} {
       allow read, write: if true;
     }
+
+    // Shared results — developer writes, clients read
+    match /shared_results/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Shared alerts — developer writes, clients read
+    match /shared_alerts/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
   }
 }
