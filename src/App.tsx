@@ -691,10 +691,22 @@ export default function App() {
       }
     }
 
-    // Save auto-settings to Firestore for clients
+    // Save to Firestore for clients
     try {
+      const all = signalsRef.current.length > 0 ? signalsRef.current : [];
+      const merged = [...all];
+      scanResults.forEach((r: any) => {
+        if (!merged.find((m: any) => m.symbol === r.symbol)) merged.push(r);
+      });
       await Promise.race([
         (async () => {
+          const old = await getDocs(collection(db, 'shared_results'));
+          for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
+          await addDoc(collection(db, 'shared_results'), {
+            results: merged.slice(-100),
+            timestamp: serverTimestamp(),
+            developerEmail: user?.email || '',
+          });
           const oldA = await getDocs(collection(db, 'shared_alerts'));
           for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
           await addDoc(collection(db, 'shared_alerts'), {
@@ -1453,6 +1465,20 @@ export default function App() {
                 setAnalysisError(null);
                 setProgress(null);
                 updateTopSignals(filtered);
+               // Developer: save manual results to Firestore for clients
+               if (isDeveloperSession()) {
+                 (async () => {
+                   try {
+                     const oldSnap = await getDocs(collection(db, 'shared_results'));
+                     for (const d of oldSnap.docs) await deleteDoc(doc(db, 'shared_results', d.id));
+                     await addDoc(collection(db, 'shared_results'), {
+                       results: filtered.filter(r => r.signal !== 'no_entry').slice(-100),
+                       timestamp: serverTimestamp(),
+                       developerEmail: user?.email || '',
+                     });
+                   } catch (e) { console.warn('Failed to save to Firestore:', e); }
+                 })();
+               }
                playAudio('fail');
              }} 
               onError={(errMsg, allFailed) => { if (allFailed) setAnalysisResults([]); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); }}
