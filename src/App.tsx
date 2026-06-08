@@ -637,6 +637,9 @@ export default function App() {
       custom = JSON.parse(localStorage.getItem('finalyze_custom_symbols') || '[]');
     } catch {}
 
+    // Track ALL results from this scan directly (not via batched React state)
+    const scanResults: AnalysisResult[] = [];
+
     for (const cat of open) {
       if (!autoSettingsRef.current.isEnabled) break;
 
@@ -672,6 +675,7 @@ export default function App() {
             const sig = r.signal || '';
             if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
             if (sig && sig !== 'no_entry') {
+              scanResults.push(r);
               setClientSignals(prev => {
                 const u = [...prev.filter(x => x.symbol !== r.symbol), r];
                 localStorage.setItem('finalyze_client_signals', JSON.stringify(u.slice(-100)));
@@ -689,12 +693,11 @@ export default function App() {
       }
     }
 
-    // Save to Firestore for clients
+    // Save to Firestore for clients — use scanResults directly instead of stale localStorage
     try {
       const all = signalsRef.current.length > 0 ? signalsRef.current : [];
-      const loc = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
       const merged = [...all];
-      loc.forEach((r: any) => {
+      scanResults.forEach((r: any) => {
         if (!merged.find((m: any) => m.symbol === r.symbol)) merged.push(r);
       });
       await Promise.race([
