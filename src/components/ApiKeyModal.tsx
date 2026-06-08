@@ -224,32 +224,33 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         </div>
       </div>
 
-      <div className="flex flex-col gap-2.5 mb-5 select-none">
-        <a
-          href="https://aistudio.google.com/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-2 text-xs text-emerald-400 hover:text-emerald-300 transition-all bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 py-2.5 rounded-xl font-bold w-full"
-        >
-          <Info size={14} className="shrink-0" />
-          {isAr ? 'أنشئ مفتاح Google Gemini مجاني (موصى به)' : 'Create free Google Gemini key (recommended)'}
-        </a>
-
+      <div className="flex flex-col gap-3 mb-5 select-none">
         <a
           href="https://console.groq.com/keys"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-2 text-xs text-sky-400 hover:text-sky-300 transition-all bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/15 py-2.5 rounded-xl font-bold w-full"
+          className="inline-flex items-center justify-center gap-3.5 text-sm text-sky-400 hover:text-sky-300 transition-all bg-sky-500/15 border-2 border-sky-500/50 hover:border-sky-400 hover:bg-sky-500/25 py-4.5 rounded-2xl font-black w-full shadow-[0_0_30px_rgba(14,165,233,0.3)] animate-pulse scale-[1.02] relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-sky-500/10 to-blue-500/10 opacity-50" />
+          <Key size={18} className="shrink-0 text-sky-400 animate-spin" style={{ animationDuration: '6s' }} />
+          <span>{isAr ? 'أنشئ مفتاح Groq مجاني (موصى به للغاية وسريع)' : 'Create free Groq key (Highly Recommended)'}</span>
+        </a>
+
+        <a
+          href="https://aistudio.google.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-slate-300 transition-all bg-white/5 border border-white/10 hover:bg-white/10 py-2.5 rounded-xl font-bold w-full"
         >
           <Info size={14} className="shrink-0" />
-          {isAr ? 'أنشئ مفتاح Groq مجاني' : 'Create free Groq API key'}
+          {isAr ? 'أنشئ مفتاح Google Gemini مجاني' : 'Create free Google Gemini key'}
         </a>
       </div>
 
       <p className="text-slate-400 text-sm leading-relaxed mb-6">
         {isAr
-          ? 'أدخل مفتاح Google Gemini (موصى به لسرعته واستقراره في تحليل اللغة العربية) أو مفتاح Groq للبدء بالتحليل الاحترافي.'
-          : 'Enter your Google Gemini key (recommended for speed and stability) or Groq key to start professional analysis.'}
+          ? 'يرجى إدخال مفتاح Groq الخاص بك (موصى به لتجنب أي فشل في الاتصال وللحصول على تحليل مستقر وسريع) أو مفتاح Google البديل.'
+          : 'Please enter your Groq API key (highly recommended to avoid connection failures and get stable analysis) or Google Gemini key.'}
       </p>
 
       {typeof window !== 'undefined' && localStorage.getItem('finalyze_verify_link') && (

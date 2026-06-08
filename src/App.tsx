@@ -135,6 +135,7 @@ export default function App() {
   const [showForm, setShowForm] = useState(true);
   const [isScanningFinished, setIsScanningFinished] = useState(false);
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
+  const [newSignalAlert, setNewSignalAlert] = useState<string | null>(null);
   const [activeSubscription, setActiveSubscription] = useState<{ label: string; amount: number; expiryDate: string } | null>(() => {
     try {
       const saved = localStorage.getItem('active_subscription');
@@ -169,55 +170,12 @@ export default function App() {
     return isDevEmail;
   };
 
-  // CLIENT: Incremental results loading from developer via Firestore
-  const clientQueueRef = useRef<any[]>([]);
-  const clientLoadingRef = useRef(false);
+  // CLIENT: Mirror results from developer via Firestore in real-time
   const lastPollResultsRef = useRef<string>('');
-
-  const sortSignalsByStrength = (results: any[]) => {
-    const strengthOrder: Record<string, number> = {
-      'strong_buy': 0, 'strong_sell': 1,
-      'buy': 2, 'sell': 3,
-      'no_entry': 4, 'neutral': 5
-    };
-    return [...results].sort((a, b) => {
-      const aSig = strengthOrder[a.signal] ?? 99;
-      const bSig = strengthOrder[b.signal] ?? 99;
-      if (aSig !== bSig) return aSig - bSig;
-      return (b.confidence || 0) - (a.confidence || 0);
-    });
-  };
 
   // CLIENT: Load on login + poll every 30 seconds
   useEffect(() => {
     if (!user || isDeveloperSession()) return;
-
-    const processQueue = async () => {
-      if (clientLoadingRef.current || clientQueueRef.current.length === 0) return;
-      clientLoadingRef.current = true;
-
-      while (clientQueueRef.current.length > 0) {
-        const result = clientQueueRef.current.shift();
-        if (!result) break;
-
-        setClientSignals(prev => {
-          const updated = [...prev.filter((r: any) => r.symbol !== result.symbol), result];
-          localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
-          return updated.slice(-100);
-        });
-
-        const sig = result.signal || '';
-        if (sig.includes('strong_buy') || sig.includes('strong_sell')) {
-          try { playAudio('success'); } catch {}
-        }
-
-        if (clientQueueRef.current.length > 0) {
-          await new Promise(r => setTimeout(r, 2500));
-        }
-      }
-
-      clientLoadingRef.current = false;
-    };
 
     const loadFromFirestore = async () => {
       try {
@@ -234,9 +192,18 @@ export default function App() {
           getDocs(query(collection(db, 'shared_results'), orderBy('timestamp', 'desc'))),
           new Promise<null>((_, rej) => setTimeout(() => rej(new Error('Firestore read timeout')), 15000))
         ]) as any;
-        if (!snap || snap.empty) return;
+        
+        if (!snap || snap.empty) {
+          setClientSignals([]);
+          localStorage.removeItem('finalyze_client_signals');
+          return;
+        }
         const latest = snap.docs[0]?.data();
-        if (!latest?.results) return;
+        if (!latest?.results) {
+          setClientSignals([]);
+          localStorage.removeItem('finalyze_client_signals');
+          return;
+        }
 
         const snapId = snap.docs[0].id;
         if (lastPollResultsRef.current === snapId) return;
@@ -244,14 +211,22 @@ export default function App() {
 
         const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
         const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
-        const newResults = latest.results.filter((r: any) => !currentSymbols.has(r.symbol));
+        
+        // Find if any new strong signal is in the list
+        const hasNewStrong = latest.results.some((r: any) => 
+          !currentSymbols.has(r.symbol) && 
+          r.confidence >= (settings?.minStrongConfidence || 80) &&
+          (r.signal?.includes('strong') || r.signal?.includes('buy') || r.signal?.includes('sell'))
+        );
 
-        const toShow = newResults.length > 0 ? newResults : (currentSignals.length === 0 ? latest.results : []);
-        if (toShow.length > 0) {
-          const sorted = sortSignalsByStrength(toShow);
-          clientQueueRef.current = [...clientQueueRef.current, ...sorted];
-          processQueue();
+        if (hasNewStrong) {
+          setNewSignalAlert(lang === 'ar' ? '🚀 تم رصد فرصة تداول قوية جديدة!' : '🚀 New strong trading opportunity detected!');
+          setTimeout(() => setNewSignalAlert(null), 8000);
+          try { playAudio('success'); } catch {}
         }
+
+        setClientSignals(latest.results);
+        localStorage.setItem('finalyze_client_signals', JSON.stringify(latest.results));
 
         const alertSnap = await Promise.race([
           getDocs(query(collection(db, 'shared_alerts'))),
@@ -269,7 +244,7 @@ export default function App() {
     loadFromFirestore();
     const interval = setInterval(loadFromFirestore, 30000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, settings.minStrongConfidence]);
 
   const hasActivePlan = useMemo((): boolean => {
     if (isDeveloperSession()) return true;
@@ -497,7 +472,30 @@ export default function App() {
   useEffect(() => {
     signalsRef.current = topSignals;
     localStorage.setItem('top_signals_persistent', JSON.stringify(topSignals));
-  }, [topSignals]);
+
+    // Real-time synchronization from Developer account to Firestore
+    if (isDeveloperSession()) {
+      const syncToFirestore = async () => {
+        try {
+          // Clean old results first
+          const old = await getDocs(collection(db, 'shared_results'));
+          for (const d of old.docs) {
+            await deleteDoc(doc(db, 'shared_results', d.id));
+          }
+          // Save updated list
+          await addDoc(collection(db, 'shared_results'), {
+            results: topSignals,
+            timestamp: new Date().toISOString(),
+            developerEmail: user?.email || '',
+          });
+          console.log('Top signals synced to Firestore shared_results collection successfully');
+        } catch (e) {
+          console.warn('Failed to sync top signals to Firestore:', e);
+        }
+      };
+      syncToFirestore();
+    }
+  }, [topSignals, user]);
 
   useEffect(() => {
     localStorage.setItem('language', lang);
@@ -566,6 +564,8 @@ export default function App() {
       setTopSignals(resolved.slice(0, 15));
       
       if (hasBrandNewSymbol) {
+        setNewSignalAlert(lang === 'ar' ? '🚀 تم رصد فرصة تداول قوية جديدة!' : '🚀 New strong trading opportunity detected!');
+        setTimeout(() => setNewSignalAlert(null), 8000);
         setTimeout(() => {
           playAudio('success');
         }, 400);
@@ -620,6 +620,9 @@ export default function App() {
   const runRadarScan = useCallback(async () => {
     const s = autoSettingsRef.current;
     if (!s.isEnabled) return;
+
+    // Play sound alert when automated analysis starts
+    try { playAudio('completion'); } catch {}
 
     const cats = s.category === 'all'
       ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
@@ -938,6 +941,37 @@ export default function App() {
     }
   }, [loading]);
 
+  // Load custom audios from IndexedDB on startup
+  useEffect(() => {
+    const loadSavedAudios = async () => {
+      try {
+        const { getAudioBlob } = await import('./lib/db');
+        const { loadCustomAudio } = await import('./lib/audioEngine');
+        
+        const successBlob = await getAudioBlob('custom_success');
+        if (successBlob) await loadCustomAudio('custom_success', successBlob);
+        
+        const failBlob = await getAudioBlob('custom_fail');
+        if (failBlob) await loadCustomAudio('custom_fail', failBlob);
+        
+        const completionBlob = await getAudioBlob('custom_completion');
+        if (completionBlob) await loadCustomAudio('custom_completion', completionBlob);
+        
+        console.log('Saved custom audios loaded into audio engine successfully.');
+      } catch (e) {
+        console.warn('Failed to load saved custom audios from IndexedDB:', e);
+      }
+    };
+    loadSavedAudios();
+
+    // Hot-reload when custom audios are updated from Settings
+    const handleAudioUpdate = () => {
+      loadSavedAudios();
+    };
+    window.addEventListener('custom-audio-updated', handleAudioUpdate);
+    return () => window.removeEventListener('custom-audio-updated', handleAudioUpdate);
+  }, []);
+
   // Sync freemium state from localStorage (when PaymentModal toggles it)
   useEffect(() => {
     const sync = () => setFreemiumDisabled(localStorage.getItem('finalyze_freemium_disabled') === 'true');
@@ -1184,8 +1218,23 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-brand-bg relative">
-      {/* AUDIO: Web Audio API via audioEngine.ts */}
-
+      <AnimatePresence>
+        {newSignalAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4"
+          >
+            <div className="bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 rounded-2xl p-4 flex items-center justify-between shadow-2xl shadow-emerald-500/20">
+              <span className="text-emerald-400 text-xs font-black uppercase tracking-widest">
+                {newSignalAlert}
+              </span>
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {!user && !loading && (
           <LoginOverlay 

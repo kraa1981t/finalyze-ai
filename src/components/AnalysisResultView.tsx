@@ -195,6 +195,28 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                   </button>
                 </div>
 
+                {/* Stop Loss & Take Profit Display */}
+                {selectedResult.stopLoss && selectedResult.takeProfit ? (
+                  <div className="grid grid-cols-2 gap-4 p-5 bg-brand-alt border border-brand-text/5 rounded-2xl">
+                    <div className="text-center p-3 bg-red-500/10 rounded-xl border border-red-500/10">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-red-400 mb-1">
+                        {isRTL ? 'وقف الخسارة (SL)' : 'Stop Loss (SL)'}
+                      </div>
+                      <div className="text-lg font-bold text-red-500 font-mono">
+                        {selectedResult.stopLoss.toFixed(selectedResult.symbol.includes('JPY') ? 3 : 5)}
+                      </div>
+                    </div>
+                    <div className="text-center p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/10">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-emerald-400 mb-1">
+                        {isRTL ? 'جني الأرباح (TP)' : 'Take Profit (TP)'}
+                      </div>
+                      <div className="text-lg font-bold text-emerald-500 font-mono">
+                        {selectedResult.takeProfit.toFixed(selectedResult.symbol.includes('JPY') ? 3 : 5)}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                    {/* Left: Summary Analysis */}

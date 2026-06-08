@@ -40,6 +40,8 @@ export interface AnalysisResult {
   microTrend?: string;
   timestamp: string;
   userId: string;
+  stopLoss?: number;
+  takeProfit?: number;
 }
 
 export interface UserPreference {

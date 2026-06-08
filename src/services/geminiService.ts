@@ -457,7 +457,9 @@ Return ONLY valid JSON:
   "sentimentScore": number,
   "historicalMatch": "string",
   "microSignal": "pullback"|"aligned"|"unknown",
-  "microTrend": "string"
+  "microTrend": "string",
+  "stopLoss": number,
+  "takeProfit": number
 }`;
 
     const keyValue = getApiKey() || '';
@@ -640,6 +642,35 @@ Return ONLY valid JSON:
         contextEcon.some((e: any) => e.impact === 'High') ? '-10% confidence penalty' : 'no penalty');
     }
 
+    // Fallback calculation for Stop Loss and Take Profit
+    const currentPrice = closes[closes.length - 1] || 0;
+    const last10Lows = lows.slice(-10);
+    const last10Highs = highs.slice(-10);
+    const minLow = last10Lows.length > 0 ? Math.min(...last10Lows) : currentPrice * 0.99;
+    const maxHigh = last10Highs.length > 0 ? Math.max(...last10Highs) : currentPrice * 1.01;
+
+    let finalStopLoss = Number(resultData.stopLoss) || 0;
+    let finalTakeProfit = Number(resultData.takeProfit) || 0;
+
+    if (finalSignal.includes('buy')) {
+      if (!finalStopLoss || finalStopLoss >= currentPrice) {
+        finalStopLoss = minLow * 0.998;
+      }
+      if (!finalTakeProfit || finalTakeProfit <= currentPrice) {
+        finalTakeProfit = currentPrice + (currentPrice - finalStopLoss) * 1.5;
+      }
+    } else if (finalSignal.includes('sell')) {
+      if (!finalStopLoss || finalStopLoss <= currentPrice) {
+        finalStopLoss = maxHigh * 1.002;
+      }
+      if (!finalTakeProfit || finalTakeProfit >= currentPrice) {
+        finalTakeProfit = currentPrice - (finalStopLoss - currentPrice) * 1.5;
+      }
+    } else {
+      finalStopLoss = 0;
+      finalTakeProfit = 0;
+    }
+
     return {
       symbol, type, timeframe,
       signal: finalSignal,
@@ -658,7 +689,9 @@ Return ONLY valid JSON:
       microTrend: resultData.microTrend || "",
       historicalMatch: resultData.historicalMatch || "",
       timestamp: new Date().toISOString(),
-      userId: ""
+      userId: "",
+      stopLoss: finalStopLoss,
+      takeProfit: finalTakeProfit
     };
 
   } catch (error: any) {

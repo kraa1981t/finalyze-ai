@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, Zap, ShieldAlert, ChevronDown, ChevronUp, X, BarChart2, Info, Activity } from 'lucide-react';
+import { TrendingUp, Zap, ShieldAlert, ChevronDown, ChevronUp, BarChart2, Info, Activity, Clock } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
 import { Language, translations } from '../lib/i18n';
 
@@ -13,44 +13,28 @@ interface ClientDashboardProps {
 const SIGNAL_META: Record<string, { color: string; bg: string; border: string; icon: any; labelAr: string; labelEn: string }> = {
   [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', icon: TrendingUp, labelAr: 'شراء قوي', labelEn: 'Strong Buy' },
   [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', icon: ShieldAlert, labelAr: 'بيع قوي', labelEn: 'Strong Sell' },
+  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: TrendingUp, labelAr: 'شراء', labelEn: 'Buy' },
+  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: ShieldAlert, labelAr: 'بيع', labelEn: 'Sell' },
 };
 
-function SignalCard({ result, lang, onSelect, isSelected }: { result: AnalysisResult; lang: Language; onSelect: () => void; isSelected: boolean }) {
-  const t = translations[lang];
-  const isAr = lang === 'ar';
-  const meta = SIGNAL_META[result.signal];
-  if (!meta) return null;
-  const Icon = meta.icon;
-
-  return (
-    <motion.button
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.03 }}
-      whileTap={{ scale: 0.97 }}
-      onClick={onSelect}
-      className={`w-full text-right rounded-2xl p-4 border transition-all shadow-lg hover:shadow-xl ${meta.bg} ${meta.border} ${isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-brand-bg' : ''}`}
-      style={{ direction: isAr ? 'rtl' : 'ltr' }}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Icon size={18} className={meta.color} />
-          <span className={`text-sm font-black ${meta.color}`}>{isAr ? meta.labelAr : meta.labelEn}</span>
-        </div>
-        <span className="text-xl font-black text-white">{result.symbol}</span>
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-white/60 font-bold">{result.type}</span>
-        <div className="flex items-center gap-1">
-          <div className="h-1.5 w-16 bg-white/10 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${result.signal.includes('buy') ? 'bg-emerald-400' : 'bg-red-400'}`} style={{ width: `${result.confidence}%` }} />
-          </div>
-          <span className="text-xs text-white/70 font-bold">{result.confidence}%</span>
-        </div>
-      </div>
-    </motion.button>
-  );
-}
+const formatPublishDate = (timestamp: string, lang: string) => {
+  try {
+    const date = new Date(timestamp);
+    const isAr = lang === 'ar';
+    const daysAr = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const daysEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = isAr ? daysAr[date.getDay()] : daysEn[date.getDay()];
+    
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return isAr 
+      ? `${dayName} الساعة ${hours}:${minutes}`
+      : `${dayName} at ${hours}:${minutes}`;
+  } catch {
+    return timestamp;
+  }
+};
 
 export default function ClientDashboard({ results, lang }: ClientDashboardProps) {
   const isAr = lang === 'ar';
@@ -58,9 +42,13 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [expandedReasons, setExpandedReasons] = useState<string | null>(null);
 
-  const filtered = results.filter(r => r.signal === SignalType.STRONG_BUY || r.signal === SignalType.STRONG_SELL);
-
-  const selectedResult = results.find(r => r.symbol === selectedSymbol);
+  // Filter for strong signals or buy/sell signals sent by developer
+  const filtered = results.filter(r => 
+    r.signal === SignalType.STRONG_BUY || 
+    r.signal === SignalType.STRONG_SELL || 
+    r.signal === SignalType.BUY || 
+    r.signal === SignalType.SELL
+  );
 
   const signalOrder = (s: string) => {
     if (s === SignalType.STRONG_BUY) return 0;
@@ -72,10 +60,14 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
 
   const sortedStrong = [...filtered].sort((a, b) => signalOrder(a.signal) - signalOrder(b.signal) || b.confidence - a.confidence);
 
+  // Auto-select the first symbol or active one for the chart
+  const activeResult = sortedStrong.find(r => r.symbol === selectedSymbol) || sortedStrong[0];
+  const activeSymbol = activeResult?.symbol || null;
+
   if (filtered.length === 0) {
     return (
       <div className="space-y-6" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
-        {/* Auto-analysis status banner - always show */}
+        {/* Auto-analysis status banner */}
         <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-5 py-3 flex items-center gap-3">
           <div className="relative">
             <Activity size={20} className="text-emerald-400" />
@@ -85,7 +77,7 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
             {isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}
           </span>
           <span className="text-xs text-emerald-400/60 font-bold">
-            {isAr ? 'يتم التحليل مرة واحدة يومياً' : 'Analyzing once daily'}
+            {isAr ? 'يتم تحديث الفرص في الوقت الفعلي من المطور' : 'Opportunities synchronized in real-time from developer'}
           </span>
         </div>
 
@@ -97,10 +89,10 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
             </div>
           </div>
           <h3 className="text-xl font-black text-white/60">
-            {isAr ? 'جاري تحليل الرموز...' : 'Analyzing symbols...'}
+            {isAr ? 'في انتظار نشر فرص جديدة...' : 'Waiting for new opportunities...'}
           </h3>
           <p className="text-sm text-white/40 mt-2">
-            {isAr ? 'سيظهر التحليل التلقائي هنا قريباً' : 'Auto analysis results will appear here shortly'}
+            {isAr ? 'ستظهر التحليلات والفرص القوية بمجرد نشرها من حساب المطور' : 'Strong analyses and signals will appear once published by developer'}
           </p>
         </div>
       </div>
@@ -109,7 +101,7 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
 
   return (
     <div className="space-y-6" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
-      {/* Auto-analysis status banner */}
+      {/* 1. Auto-analysis status banner */}
       <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-5 py-3 flex items-center gap-3">
         <div className="relative">
           <Activity size={20} className="text-emerald-400" />
@@ -119,135 +111,178 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
           {isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}
         </span>
         <span className="text-xs text-emerald-400/60 font-bold">
-          {isAr ? 'يتم التحليل مرة واحدة يومياً' : 'Analyzing once daily'}
+          {isAr ? 'يتم تحديث الفرص تلقائياً فور صدورها' : 'Opportunities synchronized in real-time'}
         </span>
       </div>
 
-      <div className="flex items-center gap-3 mb-2">
-        <Zap size={22} className="text-primary" />
-        <h2 className="text-lg font-black text-white">
-          {isAr ? 'إشارات التداول القوية' : 'Strong Trading Signals'}
-        </h2>
-        <span className="text-xs text-white/40 font-bold">({filtered.length})</span>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        {/* Strong Signals */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-1.5 h-6 rounded-full bg-gradient-to-b from-emerald-400 to-red-400" />
-            <h3 className="text-sm font-black text-white/80 uppercase tracking-wider">
-              {isAr ? 'إشارات قوية' : 'Strong Signals'}
-            </h3>
-            <span className="text-xs text-white/40 font-bold">({filtered.length})</span>
+      {/* 2. Chart Section at the Very Top */}
+      {activeSymbol && (
+        <div className="bg-brand-alt rounded-3xl border border-white/10 overflow-hidden shadow-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-white/5">
+            <div className="flex items-center gap-3">
+              <BarChart2 size={20} className="text-primary" />
+              <span className="text-lg font-black text-white italic tracking-wider">{activeSymbol}</span>
+              {SIGNAL_META[activeResult.signal] && (
+                <span className={`text-xs font-black px-3 py-1 rounded-full ${SIGNAL_META[activeResult.signal].bg} ${SIGNAL_META[activeResult.signal].color} border ${SIGNAL_META[activeResult.signal].border}`}>
+                  {isAr ? SIGNAL_META[activeResult.signal].labelAr : SIGNAL_META[activeResult.signal].labelEn}
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-white/40 font-bold font-mono">
+              {formatPublishDate(activeResult.timestamp, lang)}
+            </span>
           </div>
-          {sortedStrong.length === 0 ? (
-            <div className="bg-brand-alt/50 rounded-2xl p-8 border border-white/5 text-center">
-              <p className="text-xs text-white/40 font-bold">{isAr ? 'لا توجد إشارات قوية حالياً' : 'No strong signals right now'}</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {sortedStrong.map(r => (
-                <SignalCard
-                  key={r.symbol}
-                  result={r}
-                  lang={lang}
-                  isSelected={selectedSymbol === r.symbol}
-                  onSelect={() => setSelectedSymbol(selectedSymbol === r.symbol ? null : r.symbol)}
-                />
-              ))}
-            </div>
-          )}
+          <div className="h-[350px] md:h-[400px] rounded-2xl overflow-hidden relative">
+            <TradingViewWidget symbol={activeSymbol} />
+          </div>
         </div>
+      )}
+
+      {/* 3. Section Title */}
+      <div className="flex items-center gap-3 mt-8 mb-2">
+        <Zap size={22} className="text-primary animate-pulse" />
+        <h2 className="text-lg font-black text-white">
+          {isAr ? 'الفرص القوية المتاحة' : 'Strong Trading Opportunities'}
+        </h2>
+        <span className="text-xs text-white/40 font-bold">({sortedStrong.length})</span>
       </div>
 
-      {/* Selected Symbol: Chart + Reasons */}
-      <AnimatePresence>
-        {selectedResult && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="mt-6 bg-brand-alt rounded-3xl border border-white/10 overflow-hidden shadow-2xl"
-          >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <BarChart2 size={20} className="text-primary" />
-                <span className="text-base font-black text-white">{selectedResult.symbol}</span>
-                {SIGNAL_META[selectedResult.signal] && (
-                  <span className={`text-xs font-black px-3 py-1 rounded-full ${SIGNAL_META[selectedResult.signal].bg} ${SIGNAL_META[selectedResult.signal].color} border ${SIGNAL_META[selectedResult.signal].border}`}>
-                    {isAr ? SIGNAL_META[selectedResult.signal].labelAr : SIGNAL_META[selectedResult.signal].labelEn}
-                  </span>
+      {/* 4. Opportunities List with Detailed Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {sortedStrong.map((res) => {
+          const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.STRONG_BUY];
+          const Icon = meta.icon;
+          const isSelected = selectedSymbol === res.symbol || (!selectedSymbol && sortedStrong[0].symbol === res.symbol);
+
+          return (
+            <motion.div
+              key={res.symbol}
+              layout
+              className={`rounded-2xl p-5 border bg-brand-alt/45 backdrop-blur-md transition-all shadow-lg flex flex-col justify-between ${
+                isSelected ? 'border-primary ring-1 ring-primary bg-brand-alt/80 scale-[1.01]' : 'border-white/5 hover:border-white/10 hover:bg-brand-alt/60'
+              }`}
+            >
+              <div>
+                {/* Header: Symbol & Signal & Time */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl font-black text-white tracking-tighter italic">{res.symbol}</span>
+                      <span className="text-xs bg-white/5 border border-white/10 text-white/60 px-2 py-0.5 rounded font-black uppercase">
+                        {res.timeframe}
+                      </span>
+                    </div>
+                    {/* Publish Date */}
+                    <div className="flex items-center gap-1.5 text-[10px] text-white/40 font-bold">
+                      <Clock size={10} />
+                      <span>{formatPublishDate(res.timestamp, lang)}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-1.5">
+                    <div className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 ${meta.bg} ${meta.border} border`}>
+                      <Icon size={12} className={meta.color} />
+                      <span className={`text-[10px] font-black uppercase ${meta.color}`}>
+                        {isAr ? meta.labelAr : meta.labelEn}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-black text-white/60 font-mono">
+                      {isAr ? `ثقة: ${res.confidence}%` : `Conf: ${res.confidence}%`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Target Levels: Stop Loss & Take Profit */}
+                {res.stopLoss && res.takeProfit ? (
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-center">
+                      <span className="text-[9px] block text-red-400 font-bold uppercase tracking-wider mb-0.5">
+                        {isAr ? 'وقف الخسارة (SL)' : 'Stop Loss (SL)'}
+                      </span>
+                      <span className="text-sm font-extrabold text-red-500 font-mono">
+                        {res.stopLoss.toFixed(res.symbol.includes('JPY') ? 3 : 5)}
+                      </span>
+                    </div>
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-center">
+                      <span className="text-[9px] block text-emerald-400 font-bold uppercase tracking-wider mb-0.5">
+                        {isAr ? 'جني الأرباح (TP)' : 'Take Profit (TP)'}
+                      </span>
+                      <span className="text-sm font-extrabold text-emerald-500 font-mono">
+                        {res.takeProfit.toFixed(res.symbol.includes('JPY') ? 3 : 5)}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Analysis Reasons Directly Visible */}
+                {res.summary && (
+                  <div className="bg-white/5 rounded-xl p-3 border border-white/5 text-xs text-white/70 leading-relaxed mb-4">
+                    <p className="font-bold">{res.summary}</p>
+                  </div>
+                )}
+
+                {/* Technical Indicator Checks (Collapsible) */}
+                {res.detailedReasons && res.detailedReasons.length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedReasons(expandedReasons === res.symbol ? null : res.symbol);
+                      }}
+                      className="flex items-center gap-1 text-[10px] font-bold text-white/50 hover:text-white transition-colors"
+                    >
+                      <Info size={12} />
+                      <span>{isAr ? 'شروط وتفاصيل المؤشرات الفنية' : 'Technical Indicator Checks'}</span>
+                      {expandedReasons === res.symbol ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                    </button>
+                    <AnimatePresence>
+                      {expandedReasons === res.symbol && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="space-y-1.5 mt-2.5 overflow-hidden"
+                        >
+                          {res.detailedReasons.map((reason, i) => (
+                            <div key={i} className="bg-white/[0.02] rounded-lg p-2.5 border border-white/5 flex items-center justify-between text-[10px]">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-1.5 h-1.5 rounded-full ${
+                                  reason.status === 'positive' ? 'bg-emerald-400' :
+                                  reason.status === 'negative' ? 'bg-red-400' : 'bg-white/30'
+                                }`} />
+                                <span className="font-bold text-white/80">{reason.check}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-white/40 font-mono">{reason.value}</span>
+                                {reason.impact && (
+                                  <span className="block text-[9px] text-white/30 mt-0.5">{reason.impact}</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 )}
               </div>
-              <button onClick={() => setSelectedSymbol(null)} className="p-2 rounded-xl hover:bg-white/10 transition-colors">
-                <X size={18} className="text-white/60" />
+
+              {/* View Chart Button */}
+              <button
+                onClick={() => setSelectedSymbol(res.symbol)}
+                className={`w-full mt-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                  isSelected 
+                    ? 'bg-primary text-white shadow-lg' 
+                    : 'bg-white/5 border border-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <BarChart2 size={12} />
+                <span>{isAr ? 'عرض الشارت التفاعلي' : 'View Interactive Chart'}</span>
               </button>
-            </div>
-
-            <div className="p-4">
-              <div className="h-[400px] rounded-2xl overflow-hidden">
-                <TradingViewWidget symbol={selectedResult.symbol} />
-              </div>
-            </div>
-
-            {/* Summary */}
-            {selectedResult.summary && (
-              <div className="px-6 pb-4">
-                <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                  <p className="text-sm text-white/70 font-bold leading-relaxed" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
-                    {selectedResult.summary}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Detailed Reasons */}
-            {selectedResult.detailedReasons && selectedResult.detailedReasons.length > 0 && (
-              <div className="px-6 pb-6">
-                <button
-                  onClick={() => setExpandedReasons(expandedReasons === selectedResult.symbol ? null : selectedResult.symbol)}
-                  className="flex items-center gap-2 mb-3 text-sm font-black text-white/80 hover:text-white transition-colors"
-                >
-                  <Info size={16} />
-                  {isAr ? 'أسباب التحليل' : 'Analysis Reasons'}
-                  {expandedReasons === selectedResult.symbol ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-                <AnimatePresence>
-                  {expandedReasons === selectedResult.symbol && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="space-y-2 overflow-hidden"
-                    >
-                      {selectedResult.detailedReasons.map((reason, i) => (
-                        <div key={i} className="bg-white/5 rounded-xl p-3 border border-white/5 flex items-start gap-3">
-                          <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                            reason.status === 'positive' ? 'bg-emerald-400' :
-                            reason.status === 'negative' ? 'bg-red-400' : 'bg-white/40'
-                          }`} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-black text-white/80">{reason.check}</span>
-                              <span className="text-[10px] text-white/40 font-bold">{reason.value}</span>
-                            </div>
-                            {reason.impact && (
-                              <p className="text-[11px] text-white/50 mt-0.5 font-bold" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
-                                {reason.impact}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          );
+        })}
+      </div>
     </div>
   );
 }
