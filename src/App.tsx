@@ -679,11 +679,6 @@ export default function App() {
             if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
             if (sig && sig !== 'no_entry') {
               scanResults.push(r);
-              setClientSignals(prev => {
-                const u = [...prev.filter(x => x.symbol !== r.symbol), r];
-                localStorage.setItem('finalyze_client_signals', JSON.stringify(u.slice(-100)));
-                return u.slice(-100);
-              });
             }
           }
           const key = getApiKey();
@@ -696,24 +691,10 @@ export default function App() {
       }
     }
 
-    // Save to Firestore for clients — use scanResults directly instead of stale localStorage
+    // Save auto-settings to Firestore for clients
     try {
-      const all = signalsRef.current.length > 0 ? signalsRef.current : [];
-      const merged = [...all];
-      scanResults.forEach((r: any) => {
-        if (!merged.find((m: any) => m.symbol === r.symbol)) merged.push(r);
-      });
       await Promise.race([
         (async () => {
-          if (merged.length > 0) {
-            const old = await getDocs(collection(db, 'shared_results'));
-            for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
-            await addDoc(collection(db, 'shared_results'), {
-              results: merged.slice(-100),
-              timestamp: serverTimestamp(),
-              developerEmail: user?.email || '',
-            });
-          }
           const oldA = await getDocs(collection(db, 'shared_alerts'));
           for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
           await addDoc(collection(db, 'shared_alerts'), {
@@ -1471,31 +1452,7 @@ export default function App() {
                 setIsAnalyzing(false);
                 setAnalysisError(null);
                 setProgress(null);
-               updateTopSignals(filtered);
-               // Developer only: save manual results locally and to Firestore for clients
-               if (isDeveloperSession()) {
-                 filtered.forEach(r => {
-                   if (r.signal !== 'no_entry') {
-                     setClientSignals(prev => {
-                       const updated = [...prev.filter(x => x.symbol !== r.symbol), r];
-                       localStorage.setItem('finalyze_client_signals', JSON.stringify(updated.slice(-100)));
-                       return updated.slice(-100);
-                     });
-                   }
-                 });
-                 // Save to Firestore for clients
-                 (async () => {
-                   try {
-                     const oldSnap = await getDocs(collection(db, 'shared_results'));
-                     for (const d of oldSnap.docs) await deleteDoc(doc(db, 'shared_results', d.id));
-                     await addDoc(collection(db, 'shared_results'), {
-                       results: filtered.filter(r => r.signal !== 'no_entry').slice(-100),
-                       timestamp: serverTimestamp(),
-                       developerEmail: user?.email || '',
-                     });
-                   } catch (e) { console.warn('Failed to save to Firestore:', e); }
-                 })();
-               }
+                updateTopSignals(filtered);
                playAudio('fail');
              }} 
               onError={(errMsg, allFailed) => { if (allFailed) setAnalysisResults([]); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); }}
