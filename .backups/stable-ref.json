@@ -1,6 +1,6 @@
-﻿{
+{
     "autoUpdate":  true,
-    "description":  "9cd7a10 Google-only login, client restrictions, email monitoring, remove API key for clients",
-    "savedAt":  "2026-06-03 17:10",
-    "stableVersion":  "9cd7a10d89f6b5f48f9323ed9e064f3d1611bc79"
+    "description":  "c3a69ee ClientDashboard: STRONG signals only",
+    "savedAt":  "2026-06-09 04:06",
+    "stableVersion":  "c3a69ee09f3f41264c6bab8b35c908fd33fca54e"
 }
