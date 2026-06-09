@@ -151,8 +151,8 @@ export default function App() {
 
   const isDeveloperSession = () => {
     if (!user) return false;
-    const email = user.email || '';
-    const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+    const email = (user.email || '').toLowerCase().trim();
+    const activeDevEmail = (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com').toLowerCase().trim();
     const isDevEmail = email === activeDevEmail ||
                        email === 'bachasalman69@gmail.com' ||
                        email === 'taybekraa@gmail.com' ||
@@ -207,7 +207,14 @@ export default function App() {
           return;
         }
 
-        if (!data?.results || data.results.length === 0) {
+        // Filter out expired results (older than 20 hours)
+        const maxAgeInMs = 20 * 60 * 60 * 1000;
+        const now = Date.now();
+        const activeResults = (data?.results || []).filter((r: any) => 
+          (now - new Date(r.timestamp).getTime()) < maxAgeInMs
+        );
+
+        if (activeResults.length === 0) {
           setClientSignals([]);
           localStorage.removeItem('finalyze_client_signals');
           return;
@@ -216,7 +223,7 @@ export default function App() {
         const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
         const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
         const minStrong = 80;
-        const hasNewStrong = data.results.some((r: any) =>
+        const hasNewStrong = activeResults.some((r: any) =>
           !currentSymbols.has(r.symbol) &&
           r.confidence >= minStrong &&
           (r.signal?.includes('strong') || r.signal?.includes('buy') || r.signal?.includes('sell'))
@@ -228,8 +235,8 @@ export default function App() {
           try { playAudio('success'); } catch {}
         }
 
-        setClientSignals(data.results);
-        localStorage.setItem('finalyze_client_signals', JSON.stringify(data.results));
+        setClientSignals(activeResults);
+        localStorage.setItem('finalyze_client_signals', JSON.stringify(activeResults));
       },
       (error) => {
         console.warn('onSnapshot error for shared_results:', error);
@@ -533,7 +540,18 @@ export default function App() {
   const updateTopSignals = (results: AnalysisResult[]) => {
     let changed = false;
     let hasBrandNewSymbol = false;
-    let updated = [...signalsRef.current];
+    
+    // Auto-purge signals older than 20 hours to prevent accumulation
+    const maxAgeInMs = 20 * 60 * 60 * 1000;
+    const now = Date.now();
+    let updated = signalsRef.current.filter(s => {
+      const age = now - new Date(s.timestamp).getTime();
+      if (age >= maxAgeInMs) {
+        changed = true;
+        return false;
+      }
+      return true;
+    });
 
     results.forEach(res => {
       const isStrong = res.confidence >= settings.minStrongConfidence && (res.signal === 'strong_buy' || res.signal === 'strong_sell');
@@ -572,18 +590,8 @@ export default function App() {
     }
   };
 
-  const removeSignal = async (symbol: string) => {
-    const updated = signalsRef.current.filter(s => s.symbol !== symbol);
-    setTopSignals(updated);
-    if (isDeveloperSession()) {
-      try {
-        await setDoc(doc(db, 'shared_results', 'latest'), {
-          results: updated,
-          timestamp: new Date().toISOString(),
-          developerEmail: user?.email || '',
-        });
-      } catch (e) { console.warn('[removeSignal] Firestore sync failed:', e); }
-    }
+  const removeSignal = (symbol: string) => {
+    setTopSignals(prev => prev.filter(s => s.symbol !== symbol));
   };
 
   const handleClearAll = async () => {
@@ -599,6 +607,7 @@ export default function App() {
           timestamp: serverTimestamp(),
           developerEmail: user?.email || '',
         });
+        // Verify the write by reading back from server
         const verify = await getDocFromServer(ref);
         if (verify.exists()) {
           const d = verify.data();
@@ -607,7 +616,11 @@ export default function App() {
             const msg = 'Clear verification FAILED: token mismatch. Wrote ' + resetToken + ' got ' + d.resetToken;
             console.error(msg);
             setNewSignalAlert('❌ ' + msg);
+          } else {
+            console.log('Clear verified OK, token:', resetToken);
           }
+        } else {
+          console.error('Clear verification FAILED: document missing after write');
         }
       } catch (e) {
         console.warn('Failed to clear Firestore shared_results:', e);
@@ -624,72 +637,34 @@ export default function App() {
   const isMarketOpen = (category: string) => {
     if (category === 'crypto') return true;
     const day = new Date().getDay();
+    // Strictly closed on Saturday (6) and Sunday (0)
     if (day === 0 || day === 6) return false;
     return true;
   };
 
-  // AUTO-CLEAR STALE SIGNALS AT START OF NEW TRADING DAY
-  const lastPurgeDateRef = useRef<string>('');
+  // HARD PURGE FOR STALE RESULTS (Weekend Cleanup)
   useEffect(() => {
-    const checkAndPurgeNewDay = async () => {
-      const today = new Date().toDateString();
-      if (lastPurgeDateRef.current === today) return;
-      const lastPurgeStored = localStorage.getItem('finalyze_last_purge_date');
-      if (lastPurgeStored === today) {
-        lastPurgeDateRef.current = today;
-        return;
-      }
-
+    const purgeStale = () => {
       const day = new Date().getDay();
-      const isWeekend = day === 0 || day === 6;
-      const allCryptos = ALL_SYMBOLS_DB.crypto || [];
-
-      if (!isDeveloperSession()) {
-        const today2 = new Date().toDateString();
-        const clientLastDate = localStorage.getItem('finalyze_client_results_date');
-        if (clientLastDate !== today2) {
-          setClientSignals([]);
-          localStorage.removeItem('finalyze_client_signals');
-          localStorage.setItem('finalyze_client_results_date', today2);
-        }
-        lastPurgeDateRef.current = today;
-        localStorage.setItem('finalyze_last_purge_date', today);
-        return;
-      }
-
-      const current = signalsRef.current;
-      let filtered: AnalysisResult[];
-      if (isWeekend) {
-        filtered = current.filter(s => {
-          const sym = s.symbol.toUpperCase();
-          return allCryptos.includes(sym) || sym.includes('-USD') || sym.endsWith('USD');
+      if (day === 0 || day === 6) {
+        setTopSignals(prev => {
+          const filtered = prev.filter(s => {
+            const sym = s.symbol.toUpperCase();
+            // Expanded check: includes all cryptos in our DB plus any -USD format
+            const allCryptos = ALL_SYMBOLS_DB.crypto || [];
+            return allCryptos.includes(sym) || sym.includes('-USD') || sym.endsWith('USD');
+          });
+          if (filtered.length !== prev.length) {
+            localStorage.setItem('top_signals_persistent', JSON.stringify(filtered));
+          }
+          return filtered;
         });
-      } else {
-        filtered = [];
-      }
-
-      lastPurgeDateRef.current = today;
-      localStorage.setItem('finalyze_last_purge_date', today);
-      localStorage.setItem('top_signals_persistent', JSON.stringify(filtered));
-      setTopSignals(filtered);
-
-      try {
-        const resetToken = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-        await setDoc(doc(db, 'shared_results', 'latest'), {
-          results: filtered,
-          resetToken,
-          timestamp: new Date().toISOString(),
-          developerEmail: user?.email || '',
-        });
-      } catch (e) {
-        console.warn('[purgeNewDay] Firestore purge failed:', e);
       }
     };
-
-    checkAndPurgeNewDay();
-    const interval = setInterval(checkAndPurgeNewDay, 5 * 60 * 1000);
+    purgeStale();
+    const interval = setInterval(purgeStale, 60000); // Check every minute
     return () => clearInterval(interval);
-  }, [user]);
+  }, []);
 
   // RADAR - Developer only, never auto-starts on page load
   const radarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -698,6 +673,7 @@ export default function App() {
     const s = autoSettingsRef.current;
     if (!s.isEnabled) return;
 
+    // Play sound alert when automated analysis starts
     try { playAudio('completion'); } catch {}
 
     const cats = s.category === 'all'
@@ -716,6 +692,7 @@ export default function App() {
       custom = JSON.parse(localStorage.getItem('finalyze_custom_symbols') || '[]');
     } catch {}
 
+    // Track ALL results from this scan directly (not via batched React state)
     const scanResults: AnalysisResult[] = [];
 
     for (const cat of open) {
@@ -754,6 +731,11 @@ export default function App() {
             if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
             if (sig && sig !== 'no_entry') {
               scanResults.push(r);
+              setClientSignals(prev => {
+                const u = [...prev.filter(x => x.symbol !== r.symbol), r];
+                localStorage.setItem('finalyze_client_signals', JSON.stringify(u.slice(-100)));
+                return u.slice(-100);
+              });
             }
           }
           const key = getApiKey();

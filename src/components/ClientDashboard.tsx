@@ -42,10 +42,12 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [expandedReasons, setExpandedReasons] = useState<string | null>(null);
 
-  // Filter for STRONG signals only
+  // Filter for active STRONG signals only (less than 20 hours old)
+  const maxAgeInMs = 20 * 60 * 60 * 1000;
+  const now = Date.now();
   const filtered = results.filter(r => 
-    r.signal === SignalType.STRONG_BUY || 
-    r.signal === SignalType.STRONG_SELL
+    (r.signal === SignalType.STRONG_BUY || r.signal === SignalType.STRONG_SELL) &&
+    (now - new Date(r.timestamp).getTime()) < maxAgeInMs
   );
 
   const signalOrder = (s: string) => {
