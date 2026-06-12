@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Zap, Globe, BarChart3, ExternalLink, HelpCircle, ChevronDown, ChevronUp, Copy, Check, Lock, Mail, MessageSquare, X, Loader2, Key, AtSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
+import { BASE_URL } from '../lib/firebase';
 
 interface LoginOverlayProps {
   onLogin: () => void;
@@ -14,6 +15,14 @@ interface LoginOverlayProps {
 }
 
 export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError, onClearError, redirecting, manualAuthUrl }: LoginOverlayProps) {
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCustomLogo(localStorage.getItem('finalyze_custom_logo'));
+    const handleStorage = () => setCustomLogo(localStorage.getItem('finalyze_custom_logo'));
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
   const [showGuide, setShowGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedConfigPath, setCopiedConfigPath] = useState(false);
@@ -246,7 +255,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
           className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center overflow-hidden shadow-xl shadow-emerald-500/25 rotate-3 hover:rotate-0 transition-all border border-white/50 cursor-pointer select-none active:scale-95"
           title={lang === 'ar' ? 'انقر 5 مرات لتفعيل وضع المطور' : 'Click 5 times for Developer Mode'}
         >
-          <img src="/logo.png" alt="Finalyze AI Logo" className="w-full h-full object-cover scale-110" />
+          <img src={customLogo || `${BASE_URL}logo.png`} alt="Finalyze AI Logo" className="w-full h-full object-cover scale-110" />
         </div>
         <div className="flex flex-col text-left">
           <span className="text-3xl font-display font-black tracking-tighter text-white drop-shadow-sm leading-none">
@@ -870,7 +879,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
                       <span className="text-[9px] uppercase tracking-wider text-slate-400 font-black">Security Workspace</span>
                     </div>
                     <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden border border-slate-200">
-                      <img src="/logo.png" alt="Finalyze AI Logo" className="w-full h-full object-cover scale-110" />
+                      <img src={customLogo || `${BASE_URL}logo.png`} alt="Finalyze AI Logo" className="w-full h-full object-cover scale-110" />
                     </div>
                   </div>
 

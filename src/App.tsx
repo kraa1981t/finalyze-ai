@@ -207,12 +207,17 @@ export default function App() {
           return;
         }
 
-        // Filter out expired results (older than 20 hours)
+        // Filter out expired results (older than 20 hours) — be defensive about timestamp parsing
         const maxAgeInMs = 20 * 60 * 60 * 1000;
         const now = Date.now();
-        const activeResults = (data?.results || []).filter((r: any) => 
-          (now - new Date(r.timestamp).getTime()) < maxAgeInMs
-        );
+        const activeResults = (data?.results || []).filter((r: any) => {
+          try {
+            const ts = new Date(r?.timestamp).getTime();
+            return !isNaN(ts) && (now - ts) < maxAgeInMs;
+          } catch {
+            return true; // Keep if timestamp unparseable (don't lose data)
+          }
+        });
 
         if (activeResults.length === 0) {
           setClientSignals([]);
@@ -464,12 +469,9 @@ export default function App() {
 
   const [progress, setProgress] = useState<{ current: string, total: number, index: number } | null>(null);
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
-    const saved = localStorage.getItem('top_signals_persistent');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return []; }
-    }
-    return [];
+    try { return JSON.parse(localStorage.getItem('top_signals_persistent') || '[]'); } catch { return []; }
   });
+  const [lastSyncStatus, setLastSyncStatus] = useState<{ ok: boolean; count?: number; error?: string; time: number } | null>(null);
 
   // Web Audio API — no unlock needed
 
@@ -497,9 +499,11 @@ export default function App() {
           timestamp: new Date().toISOString(),
           developerEmail: user?.email || '',
         }).then(() => {
-          console.log('Top signals synced to Firestore successfully');
+          console.log('Top signals synced to Firestore successfully, count:', topSignals.length);
+          setLastSyncStatus({ ok: true, count: topSignals.length, time: Date.now() });
         }).catch(e => {
           console.warn('Failed to sync top signals to Firestore:', e);
+          setLastSyncStatus({ ok: false, error: String(e), time: Date.now() });
         });
       }, 300);
     }
@@ -765,6 +769,7 @@ export default function App() {
 
   // Radar lifecycle: start on toggle-ON, stop on toggle-OFF
   const prevRadarEnabledRef = useRef(false);
+  const radarFirstRenderRef = useRef(true);
 
   useEffect(() => {
     if (!isDeveloperSession()) return;
@@ -773,7 +778,13 @@ export default function App() {
     const wasOn = prevRadarEnabledRef.current;
     prevRadarEnabledRef.current = isOn;
 
-    // First render: don't start, just record
+    // First render: NEVER start scanning — only record initial state
+    if (radarFirstRenderRef.current) {
+      radarFirstRenderRef.current = false;
+      return;
+    }
+
+    // Both off: nothing to do
     if (!wasOn && !isOn) return;
     // Already running and not toggled: skip
     if (wasOn && isOn) return;
@@ -839,6 +850,7 @@ export default function App() {
         localStorage.removeItem('finalyze_client_reset_token');
         localStorage.removeItem('top_signals_persistent');
         localStorage.removeItem('finalyze_client_alerts');
+        localStorage.removeItem('finalyze_custom_logo');
         // Save new version then hard reload
         localStorage.setItem('finalyze_build_version', currentVersion);
         window.location.reload();
@@ -1325,6 +1337,7 @@ export default function App() {
         hasApiKey={hasApiKey || isDeveloperSession()}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isDeveloper={isDeveloperSession()}
+        lastSyncStatus={lastSyncStatus}
       />
 
       {/* Sidebar Panel - pushes content, doesn't overlay */}

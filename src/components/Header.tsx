@@ -4,6 +4,7 @@ import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, Aler
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings } from '../types';
 import { initAudio } from '../lib/audioEngine';
+import { BASE_URL } from '../lib/firebase';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
@@ -23,6 +24,7 @@ interface HeaderProps {
   hasApiKey: boolean;
   onToggleSidebar: () => void;
   isDeveloper?: boolean;
+  lastSyncStatus?: { ok: boolean; count?: number; error?: string; time: number } | null;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -48,7 +50,8 @@ export default function Header({
   isWaiting,
   hasApiKey,
   onToggleSidebar,
-  isDeveloper = false
+  isDeveloper = false,
+  lastSyncStatus = null
 }: HeaderProps) {
   const t = translations[lang];
   const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
@@ -109,7 +112,7 @@ export default function Header({
                 </div>
               </button>
               <div className="w-16 h-16 bg-black rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl shadow-sky-500/40 rotate-3 hover:rotate-0 transition-all cursor-pointer border-2 border-white/50">
-                <img src={customLogo || "/logo.svg"} alt="Joseph Trading" className="w-full h-full object-cover" />
+                <img src={customLogo || `${BASE_URL}logo.png`} alt="Joseph Trading" className="w-full h-full object-cover" />
               </div>
               <div className="flex flex-col">
                 <span className="text-4xl font-display font-black tracking-tighter text-black drop-shadow-sm leading-none">
@@ -176,6 +179,22 @@ export default function Header({
                 </div>
               )}
             </div>
+
+            {/* Firestore Sync Status (Developer only) */}
+            {isDeveloper && lastSyncStatus && (
+              <div className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl border-2 transition-all"
+                style={{
+                  background: lastSyncStatus.ok ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                  borderColor: lastSyncStatus.ok ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'
+                }}
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">{lastSyncStatus.ok ? '✓ Synced' : '✗ Sync Failed'}</span>
+                  {lastSyncStatus.count !== undefined && <span className="text-[10px] font-mono text-emerald-400">{lastSyncStatus.count} signals</span>}
+                </div>
+                {lastSyncStatus.error && <span className="text-[9px] font-mono text-red-400">{lastSyncStatus.error.slice(0,50)}</span>}
+              </div>
+            )}
 
             <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">Theme</span>

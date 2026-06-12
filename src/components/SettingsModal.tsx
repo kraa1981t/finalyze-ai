@@ -601,10 +601,11 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             {isAr ? 'حذف جميع نتائج التحليل المحفوظة لدى العملاء. سيتم حذف البيانات من localStorage الخاص بكل عميل عند زيارته التالية للموقع.' : 'Delete all saved analysis results for clients. Data will be removed from each client\'s localStorage on their next visit.'}
           </p>
           <button
-            onClick={() => {
+            onClick={async () => {
               if (confirm(isAr ? 'هل تريد حذف جميع نتائج التحليل للعملاء؟' : 'Delete all analysis results for clients?')) {
                 localStorage.removeItem('finalyze_client_signals');
-                alert(isAr ? '✅ تم حذف النتائج. عند زيارة العملاء للموقع، ستظهر النتائج الجديدة.' : '✅ Results deleted. New results will appear when clients visit the site.');
+                onDeleteClientResults?.();
+                alert(isAr ? '✅ تم حذف النتائج من Firebase. عند زيارة العملاء للموقع، ستظهر النتائج الجديدة.' : '✅ Results deleted from Firebase. New results will appear when clients visit the site.');
               }
             }}
             className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"

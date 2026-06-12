@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { Camera, Upload, Trash2, Image, ArrowLeft, Save, Check } from 'lucide-react';
 import { Language } from '../lib/i18n';
+import { BASE_URL } from '../lib/firebase';
 
 interface ProfilePageProps {
   user: User | null;
@@ -9,6 +10,7 @@ interface ProfilePageProps {
   onBack: () => void;
   onAvatarChange?: (dataUrl: string | null) => void;
   onLogoChange?: (dataUrl: string | null) => void;
+  isDeveloper?: boolean;
 }
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
@@ -22,7 +24,7 @@ function readFileAsDataURL(file: File): Promise<string> {
   });
 }
 
-export default function ProfilePage({ user, lang, onBack, onAvatarChange, onLogoChange }: ProfilePageProps) {
+export default function ProfilePage({ user, lang, onBack, onAvatarChange, onLogoChange, isDeveloper = false }: ProfilePageProps) {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState('');
@@ -146,48 +148,50 @@ export default function ProfilePage({ user, lang, onBack, onAvatarChange, onLogo
         </div>
       </div>
 
-      {/* Logo Section */}
-      <div className="mb-8">
-        <label className="text-xs font-black uppercase tracking-wider text-white/50 mb-3 block">
-          {lang === 'ar' ? 'شعار التطبيق' : 'App Logo'}
-        </label>
-        <div className="flex items-center gap-4">
-          <div className="relative group">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-white/20 bg-black flex items-center justify-center">
-              {logo ? (
-                <img src={logo} alt="logo" className="w-full h-full object-cover" />
-              ) : (
-                <img src="/logo.svg" alt="logo" className="w-full h-full object-cover" />
+      {/* Logo Section - Developer Only */}
+      {isDeveloper && (
+        <div className="mb-8">
+          <label className="text-xs font-black uppercase tracking-wider text-white/50 mb-3 block">
+            {lang === 'ar' ? 'شعار التطبيق' : 'App Logo'}
+          </label>
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-white/20 bg-black flex items-center justify-center">
+                {logo ? (
+                  <img src={logo} alt="logo" className="w-full h-full object-cover" />
+                ) : (
+                  <img src={`${BASE_URL}logo.png`} alt="logo" className="w-full h-full object-cover" />
+                )}
+              </div>
+              {logo && (
+                <button
+                  onClick={handleRemoveLogo}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 size={12} className="text-white" />
+                </button>
               )}
             </div>
-            {logo && (
+            <div className="flex flex-col gap-2">
               <button
-                onClick={handleRemoveLogo}
-                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => logoInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#F59E0B] text-black rounded-xl font-black text-xs uppercase tracking-wider hover:bg-[#d97706] transition-all shadow-md"
               >
-                <Trash2 size={12} className="text-white" />
+                <Image size={16} />
+                {lang === 'ar' ? 'رفع شعار' : 'Upload Logo'}
               </button>
-            )}
+              <span className="text-[10px] text-white/30">{lang === 'ar' ? 'SVG/PNG/JPG - أقل من 3MB' : 'SVG/PNG/JPG - under 3MB'}</span>
+            </div>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/svg+xml,image/png,image/jpeg,image/webp"
+              onChange={handleLogoUpload}
+              className="hidden"
+            />
           </div>
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => logoInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#F59E0B] text-black rounded-xl font-black text-xs uppercase tracking-wider hover:bg-[#d97706] transition-all shadow-md"
-            >
-              <Image size={16} />
-              {lang === 'ar' ? 'رفع شعار' : 'Upload Logo'}
-            </button>
-            <span className="text-[10px] text-white/30">{lang === 'ar' ? 'SVG/PNG/JPG - أقل من 3MB' : 'SVG/PNG/JPG - under 3MB'}</span>
-          </div>
-          <input
-            ref={logoInputRef}
-            type="file"
-            accept="image/svg+xml,image/png,image/jpeg,image/webp"
-            onChange={handleLogoUpload}
-            className="hidden"
-          />
         </div>
-      </div>
+      )}
 
       {/* Display Name */}
       <div className="mb-8">
