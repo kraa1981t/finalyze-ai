@@ -789,19 +789,8 @@ export default function App() {
     const wasOn = prevRadarEnabledRef.current;
     prevRadarEnabledRef.current = isOn;
 
-    // First render: NEVER start scanning — only record initial state
-    if (radarFirstRenderRef.current) {
-      radarFirstRenderRef.current = false;
-      return;
-    }
-
-    // Both off: nothing to do
-    if (!wasOn && !isOn) return;
-    // Already running and not toggled: skip
-    if (wasOn && isOn) return;
-
-    // Just toggled OFF
-    if (!isOn) {
+    // Turned OFF: cancel timer, stop
+    if (wasOn && !isOn) {
       if (radarTimerRef.current) {
         clearTimeout(radarTimerRef.current);
         radarTimerRef.current = null;
@@ -809,7 +798,9 @@ export default function App() {
       return;
     }
 
-    // Just toggled ON — start scan loop
+    if (!isOn) return;
+
+    // Shared scan loop
     const loop = async () => {
       try {
         await runRadarScan();
@@ -830,14 +821,24 @@ export default function App() {
         }
       }
     };
-    loop();
 
-    return () => {
-      if (radarTimerRef.current) {
-        clearTimeout(radarTimerRef.current);
+    // First render: schedule first scan after interval, don't scan now
+    if (radarFirstRenderRef.current) {
+      radarFirstRenderRef.current = false;
+      setIsScanningFinished(true);
+      const ms = (autoSettings.interval || 15) * 60000;
+      radarTimerRef.current = setTimeout(() => {
         radarTimerRef.current = null;
-      }
-    };
+        setIsScanningFinished(false);
+        loop();
+      }, ms);
+      return;
+    }
+
+    // Toggled from OFF to ON — scan immediately
+    if (!wasOn) {
+      loop();
+    }
   }, [autoSettings.isEnabled]);
 
   // Build version check: force cache bust on new deploy
