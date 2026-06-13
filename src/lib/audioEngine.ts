@@ -81,6 +81,14 @@ export function playSuccess(volume: number = 0.5) {
   setTimeout(() => playTone(1320, 0.2, 'sine', volume), 220);
 }
 
+export function playStart(volume: number = 0.5) {
+  const buf = customBuffers.get('custom_start');
+  if (buf) { playBuffer(buf, volume); return; }
+  playTone(660, 0.1, 'sine', volume);
+  setTimeout(() => playTone(880, 0.12, 'sine', volume), 80);
+  setTimeout(() => playTone(1100, 0.15, 'sine', volume), 170);
+}
+
 export function playFail(volume: number = 0.5) {
   const buf = customBuffers.get('custom_fail');
   if (buf) { playBuffer(buf, volume); return; }

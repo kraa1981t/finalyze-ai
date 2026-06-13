@@ -3,7 +3,7 @@ import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut,
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, getDocFromServer, onSnapshot, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { playSuccess, playFail, playCompletion, initAudio } from './lib/audioEngine';
+import { playSuccess, playFail, playCompletion, playStart, initAudio } from './lib/audioEngine';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
 import Header from './components/Header';
 import AnalysisForm from './components/AnalysisForm';
@@ -133,7 +133,17 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
   const [showForm, setShowForm] = useState(true);
-  const [isScanningFinished, setIsScanningFinished] = useState(false);
+  const [isScanningFinished, setIsScanningFinished] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('auto_settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // If radar is enabled, start as "waiting" (yellow), not scanning (green)
+        return parsed.isEnabled === true;
+      }
+    } catch {}
+    return false;
+  });
   const [foundAnyStrong, setFoundAnyStrong] = useState(false);
   const [newSignalAlert, setNewSignalAlert] = useState<string | null>(null);
   const [activeSubscription, setActiveSubscription] = useState<{ label: string; amount: number; expiryDate: string } | null>(() => {
@@ -475,10 +485,11 @@ export default function App() {
 
   // Web Audio API — no unlock needed
 
-  const playAudio = (type?: 'success' | 'fail' | 'completion') => {
+  const playAudio = (type?: 'success' | 'fail' | 'completion' | 'start') => {
     const vol = Math.max(0, Math.min(1, autoSettings.volume || 0.5));
     if (type === 'success') playSuccess(vol);
     else if (type === 'completion') playCompletion(vol);
+    else if (type === 'start') playStart(vol);
     else playFail(vol);
   };
 
@@ -677,8 +688,8 @@ export default function App() {
     const s = autoSettingsRef.current;
     if (!s.isEnabled) return;
 
-    // Play sound alert when automated analysis starts
-    try { playAudio('completion'); } catch {}
+    // Play start alert sound
+    try { playAudio('start'); } catch {}
 
     const cats = s.category === 'all'
       ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
@@ -1533,7 +1544,7 @@ export default function App() {
              user={user} lang={lang} settings={settings}
              hasActivePlan={hasActivePlan}
               onUpgrade={() => navigateTo('plans')}
-              onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); }}
+              onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); try { playStart(autoSettings.volume || 0.5); } catch {} }}
              onProgress={(current, total, index) => setProgress({ current, total, index })}
              onResult={(results) => {
                const day = new Date().getDay();

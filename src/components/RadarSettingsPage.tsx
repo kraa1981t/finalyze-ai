@@ -4,7 +4,7 @@ import { Zap, Activity, Layers, Sparkles, Clock, Music, Volume2, Upload, Trash2,
 import { AutoAnalysisSettings } from '../types';
 import { Language } from '../lib/i18n';
 import { saveAudioBlob, deleteAudioBlob } from '../lib/db';
-import { loadCustomAudio, removeCustomAudio, playSuccess, playFail, playCompletion } from '../lib/audioEngine';
+import { loadCustomAudio, removeCustomAudio, playStart, playSuccess, playFail, playCompletion } from '../lib/audioEngine';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
