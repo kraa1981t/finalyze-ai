@@ -27,7 +27,6 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script>
 function log(msg, type = 'info') {
   const el = document.getElementById('output');
@@ -52,21 +51,12 @@ let db = null;
 try {
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
-  showStatus('Firebase loaded. Signing in anonymously...');
-  
-  firebase.auth().signInAnonymously().then(() => {
-    showStatus('✅ Authenticated as anonymous user', 'success');
-    document.getElementById('buttons').style.display = 'block';
-    log('✅ Firestore ready. Use buttons below to test.', 'success');
-  }).catch(err => {
-    showStatus('❌ Auth error: ' + err.message, 'error');
-    log('Auth error: ' + err.message, 'error');
-    document.getElementById('buttons').style.display = 'block';
-  });
+  showStatus('✅ Firebase loaded (anonymous auth disabled, queries will show permission errors)', 'info');
+  document.getElementById('buttons').style.display = 'block';
+  log('ℹ️ This tool reads Firestore directly. Errors shown here reveal the root cause.', 'info');
 } catch (err) {
   showStatus('❌ Firebase init error: ' + err.message, 'error');
   log('Firebase init error: ' + err.message, 'error');
-  document.getElementById('buttons').style.display = 'block';
 }
 
 function getTimestamp(raw) {
@@ -89,7 +79,7 @@ function getTimestamp(raw) {
 
 async function checkFirestore() {
   document.getElementById('output').innerHTML = '';
-  log('📋 Reading ALL docs from shared_results collection...');
+  log('📋 Reading ALL docs from shared_results collection (no orderBy)...');
   try {
     const snap = await db.collection('shared_results').get();
     log(`✅ Found ${snap.size} document(s)`, snap.size > 0 ? 'success' : 'info');
@@ -114,14 +104,19 @@ async function checkFirestore() {
       });
       
       if (latest) {
-        log(`\n🏆 LATEST doc: ${latest.results?.length ?? 0} results, ts: ${getTimestamp(latest.timestamp).str}`, 'success');
+        log(`\n🏆 LATEST doc: ${latest.results?.length ?? 0} results`, 'success');
       }
     } else {
-      log('⚠️ No documents found. Developer needs to run radar scan first.', 'error');
+      log('⚠️ No documents found.', 'warning');
     }
   } catch (err) {
-    log(`❌ QUERY ERROR: ${err.message}`, 'error');
-    log('If this is an "index not found" error, click "Add test doc" first to trigger index creation.', 'info');
+    log(`❌ ERROR: ${err.message}`, 'error');
+    // Check for common error patterns
+    if (err.message.includes('index')) {
+      log('👉 This means the Firestore index is missing! Click "➕ Add test doc" then retry.', 'info');
+    } else if (err.message.includes('permission') || err.message.includes('denied')) {
+      log('👉 Permission denied (expected without auth). But the MAIN APP has Google auth, so this is NOT the issue.', 'info');
+    }
   }
 }
 
@@ -137,16 +132,18 @@ async function addTestDoc() {
       developerEmail: 'diagnostics@finalyze.local'
     });
     log(`✅ Added test doc with ID: ${ref.id}`, 'success');
-    log('Now click "Read shared_results" to verify.', 'info');
   } catch (err) {
-    log(`❌ ADD ERROR: ${err.message}`, 'error');
+    log(`❌ ERROR: ${err.message}`, 'error');
+    if (err.message.includes('permission') || err.message.includes('denied')) {
+      log('👉 Permission denied. This tool has no auth. Use the main app for authenticated access.', 'info');
+    }
   }
 }
 
 async function deleteAll() {
   if (!confirm('Delete ALL shared_results documents? This cannot be undone!')) return;
   document.getElementById('output').innerHTML = '';
-  log('🗑️ Deleting ALL shared_results documents...');
+  log('🗑️ Delete requires auth — will likely fail.');
   try {
     const snap = await db.collection('shared_results').get();
     let count = 0;
@@ -155,7 +152,7 @@ async function deleteAll() {
     await Promise.all(promises);
     log(`✅ Deleted ${count} document(s)`, 'success');
   } catch (err) {
-    log(`❌ DELETE ERROR: ${err.message}`, 'error');
+    log(`❌ ERROR: ${err.message}`, 'error');
   }
 }
 
@@ -168,10 +165,10 @@ async function checkAlerts() {
     snap.forEach(doc => {
       const data = doc.data();
       const ts = getTimestamp(data.timestamp);
-      log(`📄 ID: ${doc.id} | ts: ${ts.str} | autoSettings: ${!!data.autoSettings} | strategySettings: ${!!data.strategySettings}`);
+      log(`📄 ID: ${doc.id} | ts: ${ts.str} | autoSettings: ${!!data.autoSettings}`);
     });
   } catch (err) {
-    log(`❌ ALERTS QUERY ERROR: ${err.message}`, 'error');
+    log(`❌ ERROR: ${err.message}`, 'error');
   }
 }
 </script>
