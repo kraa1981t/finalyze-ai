@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="UTF-8"><title>Force Clear</title></head>
+<body>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script>
+async function main() {
+  const firebaseConfig = {
+    apiKey: "AIzaSyCvMayEuNTlQ5CWbjrrqw3aft_H044-uQM",
+    authDomain: "trading-made-easy-e8450.firebaseapp.com",
+    projectId: "trading-made-easy-e8450",
+    storageBucket: "trading-made-easy-e8450.firebasestorage.app",
+    messagingSenderId: "825181155493",
+    appId: "1:825181155493:web:93e18f4c09033f28fb5614"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  
+  // Try collection approach: delete all then add one
+  const snap = await db.collection('shared_results').orderBy('timestamp', 'desc').get();
+  console.log('shared_results collection count:', snap.size);
+  snap.forEach(d => console.log('  doc id:', d.id, 'results:', d.data().results?.length, 'has results:', !!d.data().results));
+
+  if (snap.size > 0) {
+    const latest = snap.docs[0].data();
+    console.log('Latest results:', latest.results?.length, 'entries');
+    if (latest.results) console.log('First result:', JSON.stringify(latest.results[0]));
+  }
+}
+main().catch(console.error);
+</script>
+</body>
+</html>

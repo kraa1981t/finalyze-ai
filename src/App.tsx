@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
-import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { playSuccess, playFail, playCompletion, playStart, initAudio } from './lib/audioEngine';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
@@ -180,13 +180,11 @@ export default function App() {
     return isDevEmail;
   };
 
-  // CLIENT: Mirror results from developer via Firestore — poll collection every 30s
+  // CLIENT: Mirror results from developer via Firestore — poll collection every 30s, NO orderBy (avoid index issues)
   const lastPollResultsRef = useRef<string>('');
 
   useEffect(() => {
     if (!user || isDeveloperSession()) return;
-
-    const resultsQuery = query(collection(db, 'shared_results'), orderBy('timestamp', 'desc'));
 
     const loadFromFirestore = async () => {
       try {
@@ -199,8 +197,9 @@ export default function App() {
           lastPollResultsRef.current = '';
         }
 
+        // Read ALL docs from shared_results, find the latest by timestamp on client side
         const snap = await Promise.race([
-          getDocs(resultsQuery),
+          getDocs(collection(db, 'shared_results')),
           new Promise<null>((_, rej) => setTimeout(() => rej(new Error('Firestore read timeout')), 15000))
         ]) as any;
 
@@ -209,45 +208,66 @@ export default function App() {
           localStorage.removeItem('finalyze_client_signals');
           return;
         }
-        const latest = snap.docs[0]?.data();
-        if (!latest?.results) {
+
+        // Find latest document by comparing timestamps client-side
+        let latest: any = null;
+        let latestTs = 0;
+        snap.forEach((d: any) => {
+          const data = d.data();
+          let ts = 0;
+          const raw = data?.timestamp;
+          if (raw) {
+            if (typeof raw === 'string') {
+              ts = new Date(raw).getTime();
+            } else if (typeof raw === 'object' && raw.toMillis) {
+              ts = raw.toMillis();
+            } else if (raw instanceof Date) {
+              ts = raw.getTime();
+            } else if (typeof raw === 'number') {
+              ts = raw;
+            }
+          }
+          if (ts >= latestTs) {
+            latestTs = ts;
+            latest = data;
+          }
+        });
+
+        if (!latest || !latest.results) {
           setClientSignals([]);
           localStorage.removeItem('finalyze_client_signals');
           return;
         }
 
-        const snapId = snap.docs[0].id;
-        if (lastPollResultsRef.current === snapId) return;
-        lastPollResultsRef.current = snapId;
-
-        const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
-        const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
-
-        const minStrong = 80;
-        const hasNewStrong = latest.results.some((r: any) =>
-          !currentSymbols.has(r.symbol) &&
-          r.confidence >= minStrong &&
-          (r.signal?.includes('strong') || r.signal?.includes('buy') || r.signal?.includes('sell'))
-        );
-
-        if (hasNewStrong) {
-          setNewSignalAlert(lang === 'ar' ? '🚀 تم رصد فرصة تداول قوية جديدة!' : '🚀 New strong trading opportunity detected!');
-          setTimeout(() => setNewSignalAlert(null), 8000);
-          try { playAudio('success'); } catch {}
-        }
-
         setClientSignals(latest.results);
         localStorage.setItem('finalyze_client_signals', JSON.stringify(latest.results));
 
-        // Also fetch alerts
+        // Also fetch alerts (also without orderBy)
         try {
           const alertSnap = await Promise.race([
-            getDocs(query(collection(db, 'shared_alerts'), orderBy('timestamp', 'desc'))),
+            getDocs(collection(db, 'shared_alerts')),
             new Promise<null>((_, rej) => setTimeout(() => rej(new Error('Alerts read timeout')), 10000))
           ]) as any;
           if (alertSnap && !alertSnap.empty) {
-            const alertData = alertSnap.docs[0]?.data();
-            if (alertData) localStorage.setItem('finalyze_client_alerts', JSON.stringify(alertData));
+            // Find the latest alert by timestamp client-side
+            let latestAlert: any = null;
+            let latestAlertTs = 0;
+            alertSnap.forEach((d: any) => {
+              const data = d.data();
+              let ts = 0;
+              const raw = data?.timestamp;
+              if (raw) {
+                if (typeof raw === 'string') ts = new Date(raw).getTime();
+                else if (typeof raw === 'object' && raw.toMillis) ts = raw.toMillis();
+                else if (raw instanceof Date) ts = raw.getTime();
+                else if (typeof raw === 'number') ts = raw;
+              }
+              if (ts >= latestAlertTs) {
+                latestAlertTs = ts;
+                latestAlert = data;
+              }
+            });
+            if (latestAlert) localStorage.setItem('finalyze_client_alerts', JSON.stringify(latestAlert));
           }
         } catch (e) {
           console.warn('Failed to load shared alerts:', e);
