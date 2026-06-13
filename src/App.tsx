@@ -785,6 +785,23 @@ export default function App() {
       }
     }
 
+    // Save results to Firestore for clients (explicit sync after full scan)
+    try {
+      await Promise.race([
+        setDoc(doc(db, 'shared_results', 'latest'), {
+          results: signalsRef.current,
+          timestamp: new Date().toISOString(),
+          developerEmail: user?.email || '',
+        }),
+        new Promise<null>((_, rej) => setTimeout(() => rej(new Error('shared_results timeout')), 15000))
+      ]);
+      setLastSyncStatus({ ok: true, count: signalsRef.current.length, time: Date.now() });
+      console.log('Radar scan synced to Firestore, count:', signalsRef.current.length);
+    } catch (e) {
+      console.warn('Firestore sync failed:', e);
+      setLastSyncStatus({ ok: false, error: String(e), time: Date.now() });
+    }
+
     // Save alerts to Firestore for clients
     try {
       await Promise.race([
@@ -798,7 +815,7 @@ export default function App() {
     } catch (e) {
       console.warn('Firestore save failed:', e);
     }
-  }, [settings, lang, hasActivePlan]);
+  }, [settings, lang, hasActivePlan, user]);
 
   // Radar lifecycle: start on toggle-ON, stop on toggle-OFF
   const prevRadarEnabledRef = useRef(false);
