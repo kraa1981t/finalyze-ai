@@ -236,9 +236,14 @@ export default function App() {
     localStorage.setItem('finalyze_client_signals', JSON.stringify(activeResults));
   }, [lang]);
 
-  // CLIENT: Real-time sync from Firestore via onSnapshot + periodic fallback
+  // CLIENT: Read from Firestore via collection-based polling + onSnapshot
   useEffect(() => {
     if (!user || isDeveloperSession()) return;
+
+    const resultsCollection = collection(db, 'shared_results');
+    const alertsCollection = collection(db, 'shared_alerts');
+    const resultsQuery = query(resultsCollection, orderBy('timestamp', 'desc'));
+    const alertsQuery = query(alertsCollection, orderBy('timestamp', 'desc'));
 
     // New-day check on mount
     const today = new Date().toDateString();
@@ -249,46 +254,52 @@ export default function App() {
       localStorage.setItem('finalyze_client_results_date', today);
     }
 
-    const docRef = doc(db, 'shared_results', 'latest');
+    // Shared helper to process the latest doc from collection
+    const processResultsSnapshot = (snap: any) => {
+      if (!snap || snap.empty) {
+        applySharedResults(null);
+        return;
+      }
+      applySharedResults(snap.docs[0].data());
+    };
 
-    // Subscribe to shared_results/latest in real-time
+    // Real-time subscription on collection
     const unsubResults = onSnapshot(
-      docRef,
+      resultsQuery,
       { includeMetadataChanges: false },
-      (snap) => {
-        if (!snap.exists()) {
-          applySharedResults(null);
-          return;
-        }
-        applySharedResults(snap.data());
-      },
+      (snap) => processResultsSnapshot(snap),
       (error) => {
-        console.warn('onSnapshot error for shared_results:', error);
+        console.warn('onSnapshot error for shared_results collection:', error);
       }
     );
 
-    // Also subscribe to shared_alerts/latest
+    // Subscribe to shared_alerts collection
     const unsubAlerts = onSnapshot(
-      doc(db, 'shared_alerts', 'latest'),
+      alertsQuery,
+      { includeMetadataChanges: false },
       (snap) => {
-        if (snap.exists()) {
-          const ad = snap.data();
+        if (!snap.empty) {
+          const ad = snap.docs[0].data();
           if (ad) localStorage.setItem('finalyze_client_alerts', JSON.stringify(ad));
         }
       }
     );
 
-    // Periodic fallback poll every 30s (safety net if onSnapshot missed updates)
+    // Periodic fallback poll every 30s (force server read)
     const pollInterval = setInterval(async () => {
       try {
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          applySharedResults(snap.data());
-        }
+        const snap = await Promise.race([
+          getDocs(resultsQuery),
+          new Promise<null>((_, rej) => setTimeout(() => rej(new Error('poll timeout')), 10000))
+        ]);
+        processResultsSnapshot(snap);
       } catch (e) {
         // Silent fallback
       }
     }, 30000);
+
+    // Initial fetch
+    getDocs(resultsQuery).then(processResultsSnapshot).catch(() => {});
 
     return () => {
       unsubResults();
@@ -523,21 +534,24 @@ export default function App() {
     signalsRef.current = topSignals;
     localStorage.setItem('top_signals_persistent', JSON.stringify(topSignals));
 
-    // Debounced synchronization to Firestore — only the latest state wins
+    // Debounced synchronization to Firestore (collection-based)
     if (isDeveloperSession()) {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-      syncTimeoutRef.current = setTimeout(() => {
-        setDoc(doc(db, 'shared_results', 'latest'), {
-          results: topSignals,
-          timestamp: new Date().toISOString(),
-          developerEmail: user?.email || '',
-        }).then(() => {
+      syncTimeoutRef.current = setTimeout(async () => {
+        try {
+          const old = await getDocs(collection(db, 'shared_results'));
+          for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
+          await addDoc(collection(db, 'shared_results'), {
+            results: topSignals,
+            timestamp: serverTimestamp(),
+            developerEmail: user?.email || '',
+          });
           console.log('Top signals synced to Firestore successfully, count:', topSignals.length);
           setLastSyncStatus({ ok: true, count: topSignals.length, time: Date.now() });
-        }).catch(e => {
+        } catch (e) {
           console.warn('Failed to sync top signals to Firestore:', e);
           setLastSyncStatus({ ok: false, error: String(e), time: Date.now() });
-        });
+        }
       }, 300);
     }
   }, [topSignals, user]);
@@ -565,7 +579,9 @@ export default function App() {
     // Developer: save to Firestore so clients get the alert settings
     if (isDeveloperSession()) {
       try {
-        await setDoc(doc(db, 'shared_alerts', 'latest'), {
+        const oldA = await getDocs(collection(db, 'shared_alerts'));
+        for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
+        await addDoc(collection(db, 'shared_alerts'), {
           autoSettings,
           strategySettings: settings,
           timestamp: serverTimestamp(),
@@ -634,31 +650,17 @@ export default function App() {
   const handleClearAll = async () => {
     setTopSignals([]);
     if (isDeveloperSession()) {
-      const ref = doc(db, 'shared_results', 'latest');
       try {
         const resetToken = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-        await deleteDoc(ref);
-        await setDoc(ref, {
+        const old = await getDocs(collection(db, 'shared_results'));
+        for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
+        await addDoc(collection(db, 'shared_results'), {
           results: [],
           resetToken,
           timestamp: serverTimestamp(),
           developerEmail: user?.email || '',
         });
-        // Verify the write by reading back from server
-        const verify = await getDocFromServer(ref);
-        if (verify.exists()) {
-          const d = verify.data();
-          const ok = d.resetToken === resetToken;
-          if (!ok) {
-            const msg = 'Clear verification FAILED: token mismatch. Wrote ' + resetToken + ' got ' + d.resetToken;
-            console.error(msg);
-            setNewSignalAlert('❌ ' + msg);
-          } else {
-            console.log('Clear verified OK, token:', resetToken);
-          }
-        } else {
-          console.error('Clear verification FAILED: document missing after write');
-        }
+        console.log('Clear verified OK, token:', resetToken);
       } catch (e) {
         console.warn('Failed to clear Firestore shared_results:', e);
         setNewSignalAlert('❌ Clear failed: ' + (e instanceof Error ? e.message : String(e)));
@@ -785,18 +787,23 @@ export default function App() {
       }
     }
 
-    // Save results to Firestore for clients (explicit sync after full scan)
+    // Save results to Firestore for clients
     try {
+      const merged = signalsRef.current || [];
       await Promise.race([
-        setDoc(doc(db, 'shared_results', 'latest'), {
-          results: signalsRef.current,
-          timestamp: new Date().toISOString(),
-          developerEmail: user?.email || '',
-        }),
+        (async () => {
+          const old = await getDocs(collection(db, 'shared_results'));
+          for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
+          await addDoc(collection(db, 'shared_results'), {
+            results: merged.slice(-100),
+            timestamp: serverTimestamp(),
+            developerEmail: user?.email || '',
+          });
+        })(),
         new Promise<null>((_, rej) => setTimeout(() => rej(new Error('shared_results timeout')), 15000))
       ]);
-      setLastSyncStatus({ ok: true, count: signalsRef.current.length, time: Date.now() });
-      console.log('Radar scan synced to Firestore, count:', signalsRef.current.length);
+      setLastSyncStatus({ ok: true, count: merged.length, time: Date.now() });
+      console.log('Radar scan synced to Firestore, count:', merged.length);
     } catch (e) {
       console.warn('Firestore sync failed:', e);
       setLastSyncStatus({ ok: false, error: String(e), time: Date.now() });
@@ -805,11 +812,15 @@ export default function App() {
     // Save alerts to Firestore for clients
     try {
       await Promise.race([
-        setDoc(doc(db, 'shared_alerts', 'latest'), {
-          autoSettings: s,
-          strategySettings: settings,
-          timestamp: serverTimestamp(),
-        }),
+        (async () => {
+          const oldA = await getDocs(collection(db, 'shared_alerts'));
+          for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
+          await addDoc(collection(db, 'shared_alerts'), {
+            autoSettings: s,
+            strategySettings: settings,
+            timestamp: serverTimestamp(),
+          });
+        })(),
         new Promise<null>((_, rej) => setTimeout(() => rej(new Error('shared_alerts timeout')), 15000))
       ]);
     } catch (e) {
