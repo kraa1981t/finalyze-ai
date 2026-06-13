@@ -2,29 +2,42 @@
 <html lang="ar">
 <head><meta charset="UTF-8"><title>Finalyze Diagnostics</title>
 <style>
-body { font-family: monospace; background: #111; color: #eee; padding: 20px; max-width: 800px; margin: auto; }
-h1 { color: #0ff; }
-pre { background: #1a1a2e; padding: 10px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap; }
-button { background: #0ff; color: #000; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 4px; }
-button.danger { background: #f44; }
-.error { color: #f44; }
-.success { color: #0f0; }
-.info { color: #ff0; }
+  body { font-family: monospace; background: #111; color: #eee; padding: 20px; max-width: 800px; margin: auto; }
+  h1 { color: #0ff; }
+  pre { background: #1a1a2e; padding: 10px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap; }
+  button { background: #0ff; color: #000; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 4px; }
+  button.danger { background: #f44; }
+  .error { color: #f44; }
+  .success { color: #0f0; }
+  .info { color: #ff0; }
+  .loading { color: #aaa; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
 </style>
 </head>
 <body>
-<h1>🔍 Finalyze Diagnostics</h1>
-<div id="status">Initializing...</div>
-<button onclick="checkFirestore()">🔄 Read shared_results</button>
-<button class="danger" onclick="clearAll()">🗑️ Delete ALL shared_results docs</button>
-<button onclick="addTestDoc()">➕ Add test document</button>
-<button onclick="checkAlerts()">📢 Read shared_alerts</button>
+<h1>🔍 Finalyze Firestore Diagnostics</h1>
+<div id="status" class="loading">Loading Firebase...</div>
+<div id="buttons" style="display:none">
+  <button onclick="checkFirestore()">📋 Read shared_results</button>
+  <button onclick="addTestDoc()">➕ Add test doc</button>
+  <button class="danger" onclick="deleteAll()">🗑️ Delete ALL shared_results</button>
+  <button onclick="checkAlerts()">📢 Read shared_alerts</button>
+</div>
 <div id="output"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script>
+function log(msg, type = 'info') {
+  const el = document.getElementById('output');
+  el.innerHTML += `<pre class="${type}">${msg}</pre>`;
+}
+
+function showStatus(msg, type = 'loading') {
+  document.getElementById('status').innerHTML = `<span class="${type}">${msg}</span>`;
+}
+
 const firebaseConfig = {
   apiKey: "AIzaSyCvMayEuNTlQ5CWbjrrqw3aft_H044-uQM",
   authDomain: "trading-made-easy-e8450.firebaseapp.com",
@@ -33,98 +46,107 @@ const firebaseConfig = {
   messagingSenderId: "825181155493",
   appId: "1:825181155493:web:93e18f4c09033f28fb5614"
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-let dbInitialized = false;
 
-function log(msg, type = 'info') {
-  const el = document.getElementById('output');
-  el.innerHTML += `<pre class="${type}">${msg}</pre>`;
+let db = null;
+
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  showStatus('Firebase loaded. Signing in anonymously...');
+  
+  firebase.auth().signInAnonymously().then(() => {
+    showStatus('✅ Authenticated as anonymous user', 'success');
+    document.getElementById('buttons').style.display = 'block';
+    log('✅ Firestore ready. Use buttons below to test.', 'success');
+  }).catch(err => {
+    showStatus('❌ Auth error: ' + err.message, 'error');
+    log('Auth error: ' + err.message, 'error');
+    document.getElementById('buttons').style.display = 'block';
+  });
+} catch (err) {
+  showStatus('❌ Firebase init error: ' + err.message, 'error');
+  log('Firebase init error: ' + err.message, 'error');
+  document.getElementById('buttons').style.display = 'block';
 }
 
-async function ensureAuth() {
-  if (dbInitialized) return;
-  try {
-    await firebase.auth().signInAnonymously();
-    dbInitialized = true;
-    document.getElementById('status').innerHTML = '✅ Authenticated (anonymous)';
-    log('Authenticated anonymously', 'success');
-  } catch (e) {
-    document.getElementById('status').innerHTML = '❌ Auth failed: ' + e.message;
-    log('Auth error: ' + e.message, 'error');
+function getTimestamp(raw) {
+  if (!raw) return { val: 0, str: 'N/A' };
+  if (typeof raw === 'string') {
+    const d = new Date(raw);
+    return { val: d.getTime(), str: raw };
   }
+  if (typeof raw === 'object' && raw.toMillis) {
+    return { val: raw.toMillis(), str: raw.toDate ? raw.toDate().toISOString() : String(raw) };
+  }
+  if (raw instanceof Date) {
+    return { val: raw.getTime(), str: raw.toISOString() };
+  }
+  if (typeof raw === 'number') {
+    return { val: raw, str: new Date(raw).toISOString() };
+  }
+  return { val: 0, str: String(raw) };
 }
 
 async function checkFirestore() {
-  await ensureAuth();
   document.getElementById('output').innerHTML = '';
-  log('Reading shared_results collection (ALL docs)...');
+  log('📋 Reading ALL docs from shared_results collection...');
   try {
     const snap = await db.collection('shared_results').get();
-    log(`Found ${snap.size} document(s)`, 'success');
+    log(`✅ Found ${snap.size} document(s)`, snap.size > 0 ? 'success' : 'info');
+    
     if (snap.size > 0) {
+      let latest = null;
+      let latestTs = 0;
+      
       snap.forEach(doc => {
         const data = doc.data();
-        const ts = data.timestamp;
-        let tsStr = '?';
-        if (ts) {
-          if (typeof ts === 'string') tsStr = ts;
-          else if (ts.toDate) tsStr = ts.toDate().toISOString();
-          else if (ts instanceof Date) tsStr = ts.toISOString();
-          else tsStr = String(ts);
-        }
-        log(`📄 ID: ${doc.id} | timestamp: ${tsStr} | results: ${data.results?.length ?? 0} items | email: ${data.developerEmail || '?'}`);
+        const ts = getTimestamp(data.timestamp);
+        log(`📄 ID: ${doc.id} | ts: ${ts.str} | results: ${data.results?.length ?? 0} | email: ${data.developerEmail || '?'}`);
         if (data.results && data.results.length > 0) {
-          const first = data.results[0];
-          log(`   First result: ${first.symbol} | signal: ${first.signal} | confidence: ${first.confidence}`, 'info');
+          data.results.slice(0, 3).forEach(r => {
+            log(`   ${r.symbol}: ${r.signal} (${r.confidence}%)`, 'info');
+          });
+          if (data.results.length > 3) log(`   ... and ${data.results.length - 3} more`, 'info');
           const strong = data.results.filter(r => r.signal === 'strong_buy' || r.signal === 'strong_sell');
-          log(`   Strong signals in this doc: ${strong.length}`, strong.length > 0 ? 'success' : 'info');
+          log(`   Strong signals: ${strong.length}`, strong.length > 0 ? 'success' : 'info');
         }
+        if (ts.val >= latestTs) { latestTs = ts.val; latest = data; }
       });
+      
+      if (latest) {
+        log(`\n🏆 LATEST doc: ${latest.results?.length ?? 0} results, ts: ${getTimestamp(latest.timestamp).str}`, 'success');
+      }
+    } else {
+      log('⚠️ No documents found. Developer needs to run radar scan first.', 'error');
     }
-  } catch (e) {
-    log('ERROR: ' + e.message, 'error');
-  }
-}
-
-async function checkAlerts() {
-  await ensureAuth();
-  document.getElementById('output').innerHTML = '';
-  log('Reading shared_alerts collection (ALL docs)...');
-  try {
-    const snap = await db.collection('shared_alerts').get();
-    log(`Found ${snap.size} document(s)`, 'success');
-    snap.forEach(doc => {
-      const data = doc.data();
-      log(`📄 ID: ${doc.id} | has autoSettings: ${!!data.autoSettings} | has strategySettings: ${!!data.strategySettings}`);
-    });
-  } catch (e) {
-    log('ERROR: ' + e.message, 'error');
+  } catch (err) {
+    log(`❌ QUERY ERROR: ${err.message}`, 'error');
+    log('If this is an "index not found" error, click "Add test doc" first to trigger index creation.', 'info');
   }
 }
 
 async function addTestDoc() {
-  await ensureAuth();
   document.getElementById('output').innerHTML = '';
-  log('Adding test document to shared_results...');
+  log('➕ Adding test document to shared_results...');
   try {
     const ref = await db.collection('shared_results').add({
-      results: [{ symbol: 'TEST', signal: 'strong_buy', confidence: 99, timestamp: new Date().toISOString(), summary: 'Test signal' }],
+      results: [
+        { symbol: 'TESTBTC', signal: 'strong_buy', confidence: 99, timestamp: new Date().toISOString(), summary: 'Diagnostic test — ignore' }
+      ],
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-      developerEmail: 'diagnostics@test.com'
+      developerEmail: 'diagnostics@finalyze.local'
     });
     log(`✅ Added test doc with ID: ${ref.id}`, 'success');
-    await checkFirestore();
-  } catch (e) {
-    log('ERROR: ' + e.message, 'error');
+    log('Now click "Read shared_results" to verify.', 'info');
+  } catch (err) {
+    log(`❌ ADD ERROR: ${err.message}`, 'error');
   }
 }
 
-async function clearAll() {
+async function deleteAll() {
   if (!confirm('Delete ALL shared_results documents? This cannot be undone!')) return;
-  await ensureAuth();
   document.getElementById('output').innerHTML = '';
-  log('Deleting ALL shared_results documents...');
+  log('🗑️ Deleting ALL shared_results documents...');
   try {
     const snap = await db.collection('shared_results').get();
     let count = 0;
@@ -132,15 +154,26 @@ async function clearAll() {
     snap.forEach(doc => { promises.push(doc.ref.delete()); count++; });
     await Promise.all(promises);
     log(`✅ Deleted ${count} document(s)`, 'success');
-  } catch (e) {
-    log('ERROR: ' + e.message, 'error');
+  } catch (err) {
+    log(`❌ DELETE ERROR: ${err.message}`, 'error');
   }
 }
 
-// Auto-run on load
-window.onload = () => {
-  ensureAuth().then(() => checkFirestore());
-};
+async function checkAlerts() {
+  document.getElementById('output').innerHTML = '';
+  log('📢 Reading ALL docs from shared_alerts collection...');
+  try {
+    const snap = await db.collection('shared_alerts').get();
+    log(`✅ Found ${snap.size} document(s)`, snap.size > 0 ? 'success' : 'info');
+    snap.forEach(doc => {
+      const data = doc.data();
+      const ts = getTimestamp(data.timestamp);
+      log(`📄 ID: ${doc.id} | ts: ${ts.str} | autoSettings: ${!!data.autoSettings} | strategySettings: ${!!data.strategySettings}`);
+    });
+  } catch (err) {
+    log(`❌ ALERTS QUERY ERROR: ${err.message}`, 'error');
+  }
+}
 </script>
 </body>
 </html>
