@@ -180,9 +180,63 @@ export default function App() {
     return isDevEmail;
   };
 
-  // CLIENT: Mirror results from developer via Firestore in real-time
+  // CLIENT: Mirror results from developer via Firestore
+  // Shared helper to apply Firestore data to client state
+  const applySharedResults = useCallback((data: any) => {
+    if (!data) {
+      setClientSignals([]);
+      localStorage.removeItem('finalyze_client_signals');
+      localStorage.removeItem('finalyze_client_reset_token');
+      return;
+    }
 
-  // CLIENT: Real-time sync from Firestore via onSnapshot
+    // If developer triggered a reset, clear unconditionally
+    const savedResetToken = localStorage.getItem('finalyze_client_reset_token');
+    if (data.resetToken && data.resetToken !== savedResetToken) {
+      localStorage.setItem('finalyze_client_reset_token', data.resetToken);
+      setClientSignals([]);
+      localStorage.removeItem('finalyze_client_signals');
+      return;
+    }
+
+    // Filter out expired results (older than 20 hours)
+    const maxAgeInMs = 20 * 60 * 60 * 1000;
+    const now = Date.now();
+    const activeResults = (data?.results || []).filter((r: any) => {
+      try {
+        const ts = new Date(r?.timestamp).getTime();
+        return !isNaN(ts) && (now - ts) < maxAgeInMs;
+      } catch {
+        return true;
+      }
+    });
+
+    if (activeResults.length === 0) {
+      setClientSignals([]);
+      localStorage.removeItem('finalyze_client_signals');
+      return;
+    }
+
+    const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
+    const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
+    const minStrong = 80;
+    const hasNewStrong = activeResults.some((r: any) =>
+      !currentSymbols.has(r.symbol) &&
+      r.confidence >= minStrong &&
+      (r.signal?.includes('strong') || r.signal?.includes('buy') || r.signal?.includes('sell'))
+    );
+
+    if (hasNewStrong) {
+      setNewSignalAlert(lang === 'ar' ? '🚀 تم رصد فرصة تداول قوية جديدة!' : '🚀 New strong trading opportunity detected!');
+      setTimeout(() => setNewSignalAlert(null), 8000);
+      try { playAudio('success'); } catch {}
+    }
+
+    setClientSignals(activeResults);
+    localStorage.setItem('finalyze_client_signals', JSON.stringify(activeResults));
+  }, [lang]);
+
+  // CLIENT: Real-time sync from Firestore via onSnapshot + periodic fallback
   useEffect(() => {
     if (!user || isDeveloperSession()) return;
 
@@ -195,63 +249,18 @@ export default function App() {
       localStorage.setItem('finalyze_client_results_date', today);
     }
 
+    const docRef = doc(db, 'shared_results', 'latest');
+
     // Subscribe to shared_results/latest in real-time
     const unsubResults = onSnapshot(
-      doc(db, 'shared_results', 'latest'),
+      docRef,
       { includeMetadataChanges: false },
       (snap) => {
         if (!snap.exists()) {
-          setClientSignals([]);
-          localStorage.removeItem('finalyze_client_signals');
-          localStorage.removeItem('finalyze_client_reset_token');
+          applySharedResults(null);
           return;
         }
-        const data = snap.data();
-
-        // If developer triggered a reset, clear unconditionally
-        const savedResetToken = localStorage.getItem('finalyze_client_reset_token');
-        if (data.resetToken && data.resetToken !== savedResetToken) {
-          localStorage.setItem('finalyze_client_reset_token', data.resetToken);
-          setClientSignals([]);
-          localStorage.removeItem('finalyze_client_signals');
-          return;
-        }
-
-        // Filter out expired results (older than 20 hours) — be defensive about timestamp parsing
-        const maxAgeInMs = 20 * 60 * 60 * 1000;
-        const now = Date.now();
-        const activeResults = (data?.results || []).filter((r: any) => {
-          try {
-            const ts = new Date(r?.timestamp).getTime();
-            return !isNaN(ts) && (now - ts) < maxAgeInMs;
-          } catch {
-            return true; // Keep if timestamp unparseable (don't lose data)
-          }
-        });
-
-        if (activeResults.length === 0) {
-          setClientSignals([]);
-          localStorage.removeItem('finalyze_client_signals');
-          return;
-        }
-
-        const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
-        const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
-        const minStrong = 80;
-        const hasNewStrong = activeResults.some((r: any) =>
-          !currentSymbols.has(r.symbol) &&
-          r.confidence >= minStrong &&
-          (r.signal?.includes('strong') || r.signal?.includes('buy') || r.signal?.includes('sell'))
-        );
-
-        if (hasNewStrong) {
-          setNewSignalAlert(lang === 'ar' ? '🚀 تم رصد فرصة تداول قوية جديدة!' : '🚀 New strong trading opportunity detected!');
-          setTimeout(() => setNewSignalAlert(null), 8000);
-          try { playAudio('success'); } catch {}
-        }
-
-        setClientSignals(activeResults);
-        localStorage.setItem('finalyze_client_signals', JSON.stringify(activeResults));
+        applySharedResults(snap.data());
       },
       (error) => {
         console.warn('onSnapshot error for shared_results:', error);
@@ -269,11 +278,24 @@ export default function App() {
       }
     );
 
+    // Periodic fallback poll every 30s (safety net if onSnapshot missed updates)
+    const pollInterval = setInterval(async () => {
+      try {
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          applySharedResults(snap.data());
+        }
+      } catch (e) {
+        // Silent fallback
+      }
+    }, 30000);
+
     return () => {
       unsubResults();
       unsubAlerts();
+      clearInterval(pollInterval);
     };
-  }, [user]);
+  }, [user, applySharedResults]);
 
   const hasActivePlan = useMemo((): boolean => {
     if (isDeveloperSession()) return true;
