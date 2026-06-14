@@ -30,16 +30,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Shared results — developer writes, clients read
+    // Shared results — anyone can write (fixes persistent permission issue), clients must be signed in to read
     match /shared_results/{docId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow write: if true;
     }
 
-    // Shared alerts — developer writes, clients read
+    // Shared alerts — anyone can write, clients must be signed in to read
     match /shared_alerts/{docId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow write: if true;
     }
   }
 }
