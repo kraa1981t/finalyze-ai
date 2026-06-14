@@ -602,31 +602,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             {isAr ? '⚠️ هذا الإجراء يعيد تعيين الموقع بالكامل إلى النسخة المستقرة (stable-v2). سيتم فقدان أي تغييرات لاحقة. يرجى التأكد قبل المتابعة.' : '⚠️ This resets the entire site to the stable version (stable-v2). Any subsequent changes will be lost. Please be certain before proceeding.'}
           </p>
 
-          {/* Save Current as Stable */}
-          <button
-            onClick={handleSaveStable}
-            disabled={saveStableLoading}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-          >
-            {saveStableLoading ? (
-              <><Loader2 size={16} className="animate-spin" /> {isAr ? 'جاري الحفظ...' : 'Saving...'}</>
-            ) : saveStableDone ? (
-              <><CheckCircle size={16} /> {isAr ? 'تم الحفظ كنسخة مستقرة ✅' : 'Saved as Stable ✅'}</>
-            ) : (
-              <><CheckCircle size={16} /> {isAr ? 'حفظ النسخة الحالية كمستقرة' : 'Save Current as Stable'}</>
-            )}
-          </button>
-          {saveStableError && <p className="text-xs text-red-400 font-bold">{saveStableError}</p>}
-
-          {/* Factory Reset */}
-          <button
-            onClick={() => setShowFactoryReset(true)}
-            className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
-          >
-            <RotateCcw size={16} />
-            {isAr ? 'بدء إعادة تعيين المصنع' : 'Start Factory Reset'}
-          </button>
-
           {/* Direct link to GitHub Actions */}
           <a
             href="https://github.com/kraa1981t/finalyze-ai/actions/workflows/factory-reset.yml"
