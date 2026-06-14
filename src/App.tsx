@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
-import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where, setDoc, query, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { playSuccess, playFail, playCompletion, playStart, initAudio } from './lib/audioEngine';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
@@ -180,106 +180,88 @@ export default function App() {
     return isDevEmail;
   };
 
-  // CLIENT: Mirror results from developer via Firestore in real-time
+  // CLIENT: Mirror results from developer via Firestore — poll collection every 10s, NO orderBy
   useEffect(() => {
     if (!user || isDeveloperSession()) return;
+    console.log('[CLIENT] Setting up Firestore polling for shared_results');
 
-    // Subscription helper to apply Firestore document data to client state
-    const applySharedResults = (data: any) => {
-      if (!data) {
-        setClientSignals([]);
-        localStorage.removeItem('finalyze_client_signals');
-        localStorage.removeItem('finalyze_client_reset_token');
-        return;
-      }
-
-      // If developer triggered a reset, clear unconditionally
-      const savedResetToken = localStorage.getItem('finalyze_client_reset_token');
-      if (data.resetToken && data.resetToken !== savedResetToken) {
-        localStorage.setItem('finalyze_client_reset_token', data.resetToken);
-        setClientSignals([]);
-        localStorage.removeItem('finalyze_client_signals');
-        return;
-      }
-
-      if (!data.results || data.results.length === 0) {
-        setClientSignals([]);
-        localStorage.removeItem('finalyze_client_signals');
-        return;
-      }
-
-      const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
-      const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
-      const minStrong = 80;
-      const hasNewStrong = data.results.some((r: any) =>
-        !currentSymbols.has(r.symbol) &&
-        r.confidence >= minStrong &&
-        (r.signal?.includes('strong') || r.signal?.includes('buy') || r.signal?.includes('sell'))
-      );
-
-      if (hasNewStrong) {
-        setNewSignalAlert(lang === 'ar' ? '🚀 تم رصد فرصة تداول قوية جديدة!' : '🚀 New strong trading opportunity detected!');
-        setTimeout(() => setNewSignalAlert(null), 8000);
-        try { playAudio('success'); } catch {}
-      }
-
-      setClientSignals(data.results);
-      localStorage.setItem('finalyze_client_signals', JSON.stringify(data.results));
-    };
-
-    // Subscribe to shared_results/latest in real-time
-    const unsubResults = onSnapshot(
-      doc(db, 'shared_results', 'latest'),
-      { includeMetadataChanges: false },
-      (snap) => {
-        if (!snap.exists()) {
-          applySharedResults(null);
+    const loadFromFirestore = async () => {
+      try {
+        console.log('[CLIENT] Polling shared_results collection...');
+        const snap = await getDocs(collection(db, 'shared_results'));
+        console.log(`[CLIENT] Found ${snap.size} docs in shared_results`);
+        
+        if (snap.empty) {
+          console.warn('[CLIENT] shared_results collection is empty');
+          setClientSignals([]);
+          localStorage.removeItem('finalyze_client_signals');
           return;
         }
-        applySharedResults(snap.data());
-      },
-      (error) => {
-        console.warn('onSnapshot error for shared_results:', error);
-      }
-    );
-
-    // Subscribe to shared_alerts/latest in real-time
-    const unsubAlerts = onSnapshot(
-      doc(db, 'shared_alerts', 'latest'),
-      (snap) => {
-        if (snap.exists()) {
-          const ad = snap.data();
-          if (ad) localStorage.setItem('finalyze_client_alerts', JSON.stringify(ad));
+        
+        // Find the latest doc by comparing timestamps (handle string, Date, Timestamp, number)
+        let latestData: any = null;
+        let latestTs = 0;
+        
+        snap.forEach(d => {
+          const dta = d.data();
+          let ts = 0;
+          if (dta.timestamp) {
+            if (typeof dta.timestamp === 'string') ts = new Date(dta.timestamp).getTime();
+            else if (typeof dta.timestamp === 'object' && dta.timestamp.toMillis) ts = dta.timestamp.toMillis();
+            else if (dta.timestamp instanceof Date) ts = dta.timestamp.getTime();
+            else if (typeof dta.timestamp === 'number') ts = dta.timestamp;
+          }
+          if (ts >= latestTs) { latestTs = ts; latestData = dta; }
+        });
+        
+        if (!latestData) {
+          console.warn('[CLIENT] No docs with valid timestamp found');
+          setClientSignals([]);
+          localStorage.removeItem('finalyze_client_signals');
+          return;
         }
-      },
-      (error) => {
-        console.warn('onSnapshot error for shared_alerts:', error);
-      }
-    );
-
-    // Periodic fallback poll every 30s as safety net (force server read)
-    const pollInterval = setInterval(async () => {
-      try {
-        const snap = await getDoc(doc(db, 'shared_results', 'latest'));
-        if (snap.exists()) {
-          applySharedResults(snap.data());
+        
+        const results = latestData.results;
+        if (!results || !Array.isArray(results) || results.length === 0) {
+          console.warn('[CLIENT] Latest doc has no results array, clearing');
+          setClientSignals([]);
+          localStorage.removeItem('finalyze_client_signals');
+          return;
         }
-      } catch (e) {
-        // Silent fallback
+        
+        const strongCount = results.filter((r: any) => r.signal === 'strong_buy' || r.signal === 'strong_sell').length;
+        console.log(`[CLIENT] Setting ${results.length} signals (${strongCount} strong)`);
+        
+        // Alert for new strong signals
+        const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
+        const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
+        const hasNewStrong = results.some((r: any) =>
+          !currentSymbols.has(r.symbol) &&
+          r.confidence >= 80 &&
+          (r.signal?.includes('strong') || r.signal?.includes('buy') || r.signal?.includes('sell'))
+        );
+        if (hasNewStrong) {
+          setNewSignalAlert(lang === 'ar' ? '🚀 تم رصد فرصة تداول قوية جديدة!' : '🚀 New strong trading opportunity detected!');
+          setTimeout(() => setNewSignalAlert(null), 8000);
+          try { playAudio('success'); } catch {}
+        }
+        
+        setClientSignals(results);
+        localStorage.setItem('finalyze_client_signals', JSON.stringify(results));
+      } catch (e: any) {
+        console.error('[CLIENT] Failed to load shared results:', e?.code || e?.message || e);
       }
-    }, 30000);
-
-    // Initial fetch
-    getDoc(doc(db, 'shared_results', 'latest'))
-      .then((snap) => {
-        if (snap.exists()) applySharedResults(snap.data());
-      })
-      .catch(() => {});
-
+    };
+    
+    // Initial fetch immediately
+    loadFromFirestore();
+    
+    // Poll every 10 seconds
+    const interval = setInterval(loadFromFirestore, 10000);
+    
     return () => {
-      unsubResults();
-      unsubAlerts();
-      clearInterval(pollInterval);
+      console.log('[CLIENT] Cleaning up Firestore polling');
+      clearInterval(interval);
     };
   }, [user, lang]);
 
