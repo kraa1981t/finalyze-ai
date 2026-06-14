@@ -69,7 +69,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
   const [saveStableError, setSaveStableError] = useState('');
 
   const GITHUB_REPO = 'kraa1981t/finalyze-ai';
-  const STABLE_TAG = 'stable-v1';
+  const STABLE_TAG = 'stable-v2';
 
   const ghHeaders = () => {
     const token = githubPat;
@@ -163,7 +163,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         setTimeout(() => { setShowFactoryReset(false); setFactoryResetDone(false); }, 4000);
       } else {
         const err = await patchResp.json().catch(() => ({}));
-        setFactoryResetRedirectUrl(`https://github.com/${GITHUB_REPO}/actions/new`);
+        setFactoryResetRedirectUrl(`https://github.com/${GITHUB_REPO}/actions/workflows/factory-reset.yml`);
         setFactoryResetError(`GitHub force-push failed: ${err.message || patchResp.status}`);
         setTimeout(() => setFactoryResetError(''), 6000);
       }
@@ -712,7 +712,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
               {isAr ? '✅ تم بدء إعادة التعيين!' : '✅ Factory Reset Initiated!'}
             </h3>
             <p className="text-sm text-slate-300 font-semibold">
-              {isAr ? 'سيتم إعادة نشر النسخة المستقرة (stable-v1) خلال دقائق. قد تحتاج إلى تحديث الصفحة بعد اكتمال العملية.' : 'The stable version (stable-v1) will be redeployed within minutes. You may need to refresh the page after completion.'}
+              {isAr ? 'سيتم إعادة نشر النسخة المستقرة (stable-v2) خلال دقائق. قد تحتاج إلى تحديث الصفحة بعد اكتمال العملية.' : 'The stable version (stable-v2) will be redeployed within minutes. You may need to refresh the page after completion.'}
             </p>
           </>
         ) : factoryResetRedirectUrl ? (
@@ -750,7 +750,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
               {isAr ? '⚠️ تأكيد إعادة تعيين المصنع' : '⚠️ Confirm Factory Reset'}
             </h3>
             <p className="text-sm text-slate-300 font-semibold">
-              {isAr ? 'هل أنت متأكد؟ سيتم إعادة تعيين الموقع إلى النسخة المستقرة (stable-v1). هذا الإجراء لا يمكن التراجع عنه.' : 'Are you sure? This will reset the site to the stable version (stable-v1). This action cannot be undone.'}
+              {isAr ? 'هل أنت متأكد؟ سيتم إعادة تعيين الموقع إلى النسخة المستقرة (stable-v2). هذا الإجراء لا يمكن التراجع عنه.' : 'Are you sure? This will reset the site to the stable version (stable-v2). This action cannot be undone.'}
             </p>
             {factoryResetError && (
               <p className="text-xs text-red-400 font-bold bg-red-500/10 rounded-xl p-3">{factoryResetError}</p>
