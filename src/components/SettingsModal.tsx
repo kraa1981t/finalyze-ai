@@ -623,7 +623,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         </h3>
         <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-5 space-y-3">
           <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-            {isAr ? '⚠️ هذا الإجراء يعيد تعيين الموقع بالكامل إلى النسخة المستقرة (stable-v1). سيتم فقدان أي تغييرات لاحقة. يرجى التأكد قبل المتابعة.' : '⚠️ This resets the entire site to the stable version (stable-v1). Any subsequent changes will be lost. Please be certain before proceeding.'}
+            {isAr ? '⚠️ هذا الإجراء يعيد تعيين الموقع بالكامل إلى النسخة المستقرة (stable-v2). سيتم فقدان أي تغييرات لاحقة. يرجى التأكد قبل المتابعة.' : '⚠️ This resets the entire site to the stable version (stable-v2). Any subsequent changes will be lost. Please be certain before proceeding.'}
           </p>
 
           {/* Save Current as Stable */}
@@ -651,14 +651,16 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             {isAr ? 'بدء إعادة تعيين المصنع' : 'Start Factory Reset'}
           </button>
 
-          {/* GitHub PAT input */}
-          <input
-            type="password"
-            placeholder={isAr ? 'GitHub PAT (للتشغيل التلقائي)' : 'GitHub PAT (for auto mode)'}
-            value={githubPat}
-            onChange={(e) => setGithubPat(e.target.value)}
-            className="w-full bg-brand-bg border border-white/10 rounded-xl px-3 py-2 text-xs text-white text-center focus:outline-none focus:border-emerald-500/50"
-          />
+          {/* Direct link to GitHub Actions */}
+          <a
+            href="https://github.com/kraa1981t/finalyze-ai/actions/workflows/factory-reset.yml"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 text-center"
+          >
+            <RotateCcw size={16} />
+            {isAr ? 'فتح Factory Reset على GitHub' : 'Open Factory Reset on GitHub'}
+          </a>
         </div>
       </div>
 
