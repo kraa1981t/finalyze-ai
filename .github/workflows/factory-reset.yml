@@ -1,17 +1,34 @@
 name: Factory Reset - Redeploy Stable Version
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [factory-reset]
+    inputs:
+      version:
+        description: 'Stable version to deploy'
+        required: true
+        default: 'stable-v2'
+        type: choice
+        options:
+          - stable-v2
+          - stable-v1
 jobs:
   reset:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: stable-v1
+          ref: ${{ github.event.inputs.version }}
           fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npx vite build
       - run: |
           git config user.name "factory-reset"
           git config user.email "factory-reset@finalyze-ai"
-          git push origin HEAD:main --force
+          cd dist
+          git init
+          git add -A
+          git commit -m "deploy ${{ github.event.inputs.version }}"
+          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git push -f origin HEAD:gh-pages
