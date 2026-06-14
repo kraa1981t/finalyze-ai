@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
-import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where, onSnapshot, setDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { playSuccess, playFail, playCompletion, playStart, initAudio } from './lib/audioEngine';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
@@ -180,107 +180,108 @@ export default function App() {
     return isDevEmail;
   };
 
-  // CLIENT: Mirror results from developer via Firestore — poll collection every 30s, NO orderBy (avoid index issues)
-  const lastPollResultsRef = useRef<string>('');
-
+  // CLIENT: Mirror results from developer via Firestore in real-time
   useEffect(() => {
     if (!user || isDeveloperSession()) return;
 
-    const loadFromFirestore = async () => {
-      try {
-        const today = new Date().toDateString();
-        const lastDate = localStorage.getItem('finalyze_client_results_date');
-        if (lastDate !== today) {
-          setClientSignals([]);
-          localStorage.removeItem('finalyze_client_signals');
-          localStorage.setItem('finalyze_client_results_date', today);
-          lastPollResultsRef.current = '';
-        }
-
-        // Read ALL docs from shared_results, find the latest by timestamp on client side
-        const snap = await Promise.race([
-          getDocs(collection(db, 'shared_results')),
-          new Promise<null>((_, rej) => setTimeout(() => rej(new Error('Firestore read timeout')), 15000))
-        ]) as any;
-
-        if (!snap || snap.empty) {
-          setClientSignals([]);
-          localStorage.removeItem('finalyze_client_signals');
-          return;
-        }
-
-        // Find latest document by comparing timestamps client-side
-        let latest: any = null;
-        let latestTs = 0;
-        snap.forEach((d: any) => {
-          const data = d.data();
-          let ts = 0;
-          const raw = data?.timestamp;
-          if (raw) {
-            if (typeof raw === 'string') {
-              ts = new Date(raw).getTime();
-            } else if (typeof raw === 'object' && raw.toMillis) {
-              ts = raw.toMillis();
-            } else if (raw instanceof Date) {
-              ts = raw.getTime();
-            } else if (typeof raw === 'number') {
-              ts = raw;
-            }
-          }
-          if (ts >= latestTs) {
-            latestTs = ts;
-            latest = data;
-          }
-        });
-
-        if (!latest || !latest.results) {
-          setClientSignals([]);
-          localStorage.removeItem('finalyze_client_signals');
-          return;
-        }
-
-        setClientSignals(latest.results);
-        localStorage.setItem('finalyze_client_signals', JSON.stringify(latest.results));
-
-        // Also fetch alerts (also without orderBy)
-        try {
-          const alertSnap = await Promise.race([
-            getDocs(collection(db, 'shared_alerts')),
-            new Promise<null>((_, rej) => setTimeout(() => rej(new Error('Alerts read timeout')), 10000))
-          ]) as any;
-          if (alertSnap && !alertSnap.empty) {
-            // Find the latest alert by timestamp client-side
-            let latestAlert: any = null;
-            let latestAlertTs = 0;
-            alertSnap.forEach((d: any) => {
-              const data = d.data();
-              let ts = 0;
-              const raw = data?.timestamp;
-              if (raw) {
-                if (typeof raw === 'string') ts = new Date(raw).getTime();
-                else if (typeof raw === 'object' && raw.toMillis) ts = raw.toMillis();
-                else if (raw instanceof Date) ts = raw.getTime();
-                else if (typeof raw === 'number') ts = raw;
-              }
-              if (ts >= latestAlertTs) {
-                latestAlertTs = ts;
-                latestAlert = data;
-              }
-            });
-            if (latestAlert) localStorage.setItem('finalyze_client_alerts', JSON.stringify(latestAlert));
-          }
-        } catch (e) {
-          console.warn('Failed to load shared alerts:', e);
-        }
-      } catch (e) {
-        console.warn('Failed to load shared results:', e);
+    // Subscription helper to apply Firestore document data to client state
+    const applySharedResults = (data: any) => {
+      if (!data) {
+        setClientSignals([]);
+        localStorage.removeItem('finalyze_client_signals');
+        localStorage.removeItem('finalyze_client_reset_token');
+        return;
       }
+
+      // If developer triggered a reset, clear unconditionally
+      const savedResetToken = localStorage.getItem('finalyze_client_reset_token');
+      if (data.resetToken && data.resetToken !== savedResetToken) {
+        localStorage.setItem('finalyze_client_reset_token', data.resetToken);
+        setClientSignals([]);
+        localStorage.removeItem('finalyze_client_signals');
+        return;
+      }
+
+      if (!data.results || data.results.length === 0) {
+        setClientSignals([]);
+        localStorage.removeItem('finalyze_client_signals');
+        return;
+      }
+
+      const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
+      const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
+      const minStrong = 80;
+      const hasNewStrong = data.results.some((r: any) =>
+        !currentSymbols.has(r.symbol) &&
+        r.confidence >= minStrong &&
+        (r.signal?.includes('strong') || r.signal?.includes('buy') || r.signal?.includes('sell'))
+      );
+
+      if (hasNewStrong) {
+        setNewSignalAlert(lang === 'ar' ? '🚀 تم رصد فرصة تداول قوية جديدة!' : '🚀 New strong trading opportunity detected!');
+        setTimeout(() => setNewSignalAlert(null), 8000);
+        try { playAudio('success'); } catch {}
+      }
+
+      setClientSignals(data.results);
+      localStorage.setItem('finalyze_client_signals', JSON.stringify(data.results));
     };
 
-    loadFromFirestore();
-    const interval = setInterval(loadFromFirestore, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
+    // Subscribe to shared_results/latest in real-time
+    const unsubResults = onSnapshot(
+      doc(db, 'shared_results', 'latest'),
+      { includeMetadataChanges: false },
+      (snap) => {
+        if (!snap.exists()) {
+          applySharedResults(null);
+          return;
+        }
+        applySharedResults(snap.data());
+      },
+      (error) => {
+        console.warn('onSnapshot error for shared_results:', error);
+      }
+    );
+
+    // Subscribe to shared_alerts/latest in real-time
+    const unsubAlerts = onSnapshot(
+      doc(db, 'shared_alerts', 'latest'),
+      (snap) => {
+        if (snap.exists()) {
+          const ad = snap.data();
+          if (ad) localStorage.setItem('finalyze_client_alerts', JSON.stringify(ad));
+        }
+      },
+      (error) => {
+        console.warn('onSnapshot error for shared_alerts:', error);
+      }
+    );
+
+    // Periodic fallback poll every 30s as safety net (force server read)
+    const pollInterval = setInterval(async () => {
+      try {
+        const snap = await getDoc(doc(db, 'shared_results', 'latest'));
+        if (snap.exists()) {
+          applySharedResults(snap.data());
+        }
+      } catch (e) {
+        // Silent fallback
+      }
+    }, 30000);
+
+    // Initial fetch
+    getDoc(doc(db, 'shared_results', 'latest'))
+      .then((snap) => {
+        if (snap.exists()) applySharedResults(snap.data());
+      })
+      .catch(() => {});
+
+    return () => {
+      unsubResults();
+      unsubAlerts();
+      clearInterval(pollInterval);
+    };
+  }, [user, lang]);
 
   const hasActivePlan = useMemo((): boolean => {
     if (isDeveloperSession()) return true;
@@ -508,24 +509,21 @@ export default function App() {
     signalsRef.current = topSignals;
     localStorage.setItem('top_signals_persistent', JSON.stringify(topSignals));
 
-    // Debounced synchronization to Firestore (collection-based)
+    // Debounced synchronization to Firestore — only the latest state wins
     if (isDeveloperSession()) {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-      syncTimeoutRef.current = setTimeout(async () => {
-        try {
-          const old = await getDocs(collection(db, 'shared_results'));
-          for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
-          await addDoc(collection(db, 'shared_results'), {
-            results: topSignals,
-            timestamp: serverTimestamp(),
-            developerEmail: user?.email || '',
-          });
+      syncTimeoutRef.current = setTimeout(() => {
+        setDoc(doc(db, 'shared_results', 'latest'), {
+          results: topSignals,
+          timestamp: new Date().toISOString(),
+          developerEmail: user?.email || '',
+        }).then(() => {
           console.log('Top signals synced to Firestore successfully, count:', topSignals.length);
           setLastSyncStatus({ ok: true, count: topSignals.length, time: Date.now() });
-        } catch (e) {
+        }).catch(e => {
           console.warn('Failed to sync top signals to Firestore:', e);
           setLastSyncStatus({ ok: false, error: String(e), time: Date.now() });
-        }
+        });
       }, 300);
     }
   }, [topSignals, user]);
@@ -553,12 +551,10 @@ export default function App() {
     // Developer: save to Firestore so clients get the alert settings
     if (isDeveloperSession()) {
       try {
-        const oldA = await getDocs(collection(db, 'shared_alerts'));
-        for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
-        await addDoc(collection(db, 'shared_alerts'), {
+        await setDoc(doc(db, 'shared_alerts', 'latest'), {
           autoSettings,
           strategySettings: settings,
-          timestamp: serverTimestamp(),
+          timestamp: new Date().toISOString(),
         });
       } catch (e) { console.warn('Failed to save alerts to Firestore:', e); }
     }
@@ -617,12 +613,36 @@ export default function App() {
     }
   };
 
-  const removeSignal = (symbol: string) => {
-    setTopSignals(prev => prev.filter(s => s.symbol !== symbol));
+  const removeSignal = async (symbol: string) => {
+    const updated = signalsRef.current.filter(s => s.symbol !== symbol);
+    setTopSignals(updated);
+    if (isDeveloperSession()) {
+      try {
+        await setDoc(doc(db, 'shared_results', 'latest'), {
+          results: updated,
+          timestamp: new Date().toISOString(),
+          developerEmail: user?.email || '',
+        });
+      } catch (e) { console.warn('[removeSignal] Firestore sync failed:', e); }
+    }
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     setTopSignals([]);
+    if (isDeveloperSession()) {
+      try {
+        const resetToken = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+        await setDoc(doc(db, 'shared_results', 'latest'), {
+          results: [],
+          resetToken,
+          timestamp: new Date().toISOString(),
+          developerEmail: user?.email || '',
+        });
+        console.log('Clear synced to Firestore, token:', resetToken);
+      } catch (e) {
+        console.warn('Failed to clear Firestore shared_results:', e);
+      }
+    }
   };
 
   const handleSelectSignal = (result: AnalysisResult) => {
@@ -638,29 +658,69 @@ export default function App() {
     return true;
   };
 
-  // HARD PURGE FOR STALE RESULTS (Weekend Cleanup)
+  // AUTO-CLEAR STALE SIGNALS AT START OF NEW TRADING DAY
+  const lastPurgeDateRef = useRef<string>('');
   useEffect(() => {
-    const purgeStale = () => {
+    const checkAndPurgeNewDay = async () => {
+      const today = new Date().toDateString();
+      if (lastPurgeDateRef.current === today) return;
+      const lastPurgeStored = localStorage.getItem('finalyze_last_purge_date');
+      if (lastPurgeStored === today) {
+        lastPurgeDateRef.current = today;
+        return;
+      }
+
       const day = new Date().getDay();
-      if (day === 0 || day === 6) {
-        setTopSignals(prev => {
-          const filtered = prev.filter(s => {
-            const sym = s.symbol.toUpperCase();
-            // Expanded check: includes all cryptos in our DB plus any -USD format
-            const allCryptos = ALL_SYMBOLS_DB.crypto || [];
-            return allCryptos.includes(sym) || sym.includes('-USD') || sym.endsWith('USD');
-          });
-          if (filtered.length !== prev.length) {
-            localStorage.setItem('top_signals_persistent', JSON.stringify(filtered));
-          }
-          return filtered;
+      const isWeekend = day === 0 || day === 6;
+      const allCryptos = ALL_SYMBOLS_DB.crypto || [];
+
+      if (!isDeveloperSession()) {
+        const today2 = new Date().toDateString();
+        const clientLastDate = localStorage.getItem('finalyze_client_results_date');
+        if (clientLastDate !== today2) {
+          setClientSignals([]);
+          localStorage.removeItem('finalyze_client_signals');
+          localStorage.setItem('finalyze_client_results_date', today2);
+        }
+        lastPurgeDateRef.current = today;
+        localStorage.setItem('finalyze_last_purge_date', today);
+        return;
+      }
+
+      const current = signalsRef.current;
+      let filtered: AnalysisResult[];
+      if (isWeekend) {
+        filtered = current.filter(s => {
+          const sym = s.symbol.toUpperCase();
+          return allCryptos.includes(sym) || sym.includes('-USD') || sym.endsWith('USD');
         });
+      } else {
+        filtered = [];
+      }
+
+      lastPurgeDateRef.current = today;
+      localStorage.setItem('finalyze_last_purge_date', today);
+      localStorage.setItem('top_signals_persistent', JSON.stringify(filtered));
+      setTopSignals(filtered);
+
+      try {
+        const resetToken = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+        await setDoc(doc(db, 'shared_results', 'latest'), {
+          results: filtered,
+          resetToken,
+          timestamp: new Date().toISOString(),
+          developerEmail: user?.email || '',
+        });
+        console.log('Automated new trading day purge executed. Remaining:', filtered.length);
+      } catch (e) {
+        console.warn('[purgeNewDay] Firestore purge failed:', e);
       }
     };
-    purgeStale();
-    const interval = setInterval(purgeStale, 60000); // Check every minute
+
+    checkAndPurgeNewDay();
+    const interval = setInterval(checkAndPurgeNewDay, 5 * 60 * 1000); // Check every 5 minutes
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   // RADAR - Developer only, never auto-starts on page load
   const radarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -749,15 +809,11 @@ export default function App() {
       const merged = signalsRef.current || [];
       if (merged.length > 0) {
         await Promise.race([
-          (async () => {
-            const old = await getDocs(collection(db, 'shared_results'));
-            for (const d of old.docs) await deleteDoc(doc(db, 'shared_results', d.id));
-            await addDoc(collection(db, 'shared_results'), {
-              results: merged.slice(-100),
-              timestamp: serverTimestamp(),
-              developerEmail: user?.email || '',
-            });
-          })(),
+          setDoc(doc(db, 'shared_results', 'latest'), {
+            results: merged.slice(-100),
+            timestamp: new Date().toISOString(),
+            developerEmail: user?.email || '',
+          }),
           new Promise<null>((_, rej) => setTimeout(() => rej(new Error('shared_results timeout')), 15000))
         ]);
         setLastSyncStatus({ ok: true, count: merged.length, time: Date.now() });
@@ -771,15 +827,11 @@ export default function App() {
     // Save alerts to Firestore for clients
     try {
       await Promise.race([
-        (async () => {
-          const oldA = await getDocs(collection(db, 'shared_alerts'));
-          for (const d of oldA.docs) await deleteDoc(doc(db, 'shared_alerts', d.id));
-          await addDoc(collection(db, 'shared_alerts'), {
-            autoSettings: s,
-            strategySettings: settings,
-            timestamp: serverTimestamp(),
-          });
-        })(),
+        setDoc(doc(db, 'shared_alerts', 'latest'), {
+          autoSettings: s,
+          strategySettings: settings,
+          timestamp: new Date().toISOString(),
+        }),
         new Promise<null>((_, rej) => setTimeout(() => rej(new Error('shared_alerts timeout')), 15000))
       ]);
     } catch (e) {
