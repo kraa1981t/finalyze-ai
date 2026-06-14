@@ -591,30 +591,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         </div>
       )}
 
-      {/* Section: Delete Client Results */}
-      <div className="space-y-4 pt-6 border-t border-amber-500/20">
-        <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
-          <AlertTriangle size={16} /> {isAr ? '🗑️ حذف نتائج العملاء' : '🗑️ Delete Client Results'}
-        </h3>
-        <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 space-y-3">
-          <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-            {isAr ? 'حذف جميع نتائج التحليل المحفوظة لدى العملاء. سيتم حذف البيانات من localStorage الخاص بكل عميل عند زيارته التالية للموقع.' : 'Delete all saved analysis results for clients. Data will be removed from each client\'s localStorage on their next visit.'}
-          </p>
-          <button
-            onClick={async () => {
-              if (confirm(isAr ? 'هل تريد حذف جميع نتائج التحليل للعملاء؟' : 'Delete all analysis results for clients?')) {
-                localStorage.removeItem('finalyze_client_signals');
-                onDeleteClientResults?.();
-                alert(isAr ? '✅ تم حذف النتائج من Firebase. عند زيارة العملاء للموقع، ستظهر النتائج الجديدة.' : '✅ Results deleted from Firebase. New results will appear when clients visit the site.');
-              }
-            }}
-            className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
-          >
-            <AlertTriangle size={16} />
-            {isAr ? 'حذف جميع نتائج العملاء' : 'Delete All Client Results'}
-          </button>
-        </div>
-      </div>
 
       {/* Section 6: Factory Reset */}
       <div className="space-y-4 pt-6 border-t border-red-500/20">
