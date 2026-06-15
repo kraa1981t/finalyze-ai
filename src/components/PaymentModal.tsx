@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalLink, ShieldOff, Shield } from 'lucide-react';
 import { fetchCryptoPricesDirect } from '../services/apiDirect';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
@@ -224,6 +226,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     };
     setSubPrices(clean);
     localStorage.setItem(SUBSCRIPTION_STORAGE_KEY, JSON.stringify(clean));
+    setDoc(doc(db, 'shared_settings', 'prices'), { ...clean, updatedAt: Date.now() }).catch(console.warn);
   };
 
   const addNewAddress = () => {

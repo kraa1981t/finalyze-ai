@@ -265,6 +265,28 @@ export default function App() {
     };
   }, [user, lang]);
 
+  // CLIENT: Sync freemium state from Firestore
+  useEffect(() => {
+    if (!user || isDeveloperSession()) return;
+    const syncFreemium = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'shared_settings', 'freemium'));
+        if (snap.exists()) {
+          const data = snap.data();
+          const disabled = data.disabled === true;
+          setFreemiumDisabled(disabled);
+          localStorage.setItem('finalyze_freemium_disabled', disabled ? 'true' : 'false');
+          console.log('[CLIENT] Freemium state synced from Firestore:', disabled);
+        }
+      } catch (e) {
+        console.warn('[CLIENT] Failed to sync freemium state:', e);
+      }
+    };
+    syncFreemium();
+    const interval = setInterval(syncFreemium, 10000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const hasActivePlan = useMemo((): boolean => {
     if (isDeveloperSession()) return true;
     if (activeSubscription && new Date(activeSubscription.expiryDate) > new Date()) return true;
@@ -1527,7 +1549,7 @@ export default function App() {
                 manageMode
                 lang={lang}
                 freemiumDisabled={freemiumDisabled}
-                onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); }}
+                onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); setDoc(doc(db, 'shared_settings', 'freemium'), { disabled: v, updatedAt: Date.now() }).catch(console.warn); }}
               />
             )}
 
@@ -1542,7 +1564,7 @@ export default function App() {
                 onDeleteByEmail={deleteClientByEmail}
                 onRenew={renewClientPlan}
                 freemiumDisabled={freemiumDisabled}
-                onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); }}
+                onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); setDoc(doc(db, 'shared_settings', 'freemium'), { disabled: v, updatedAt: Date.now() }).catch(console.warn); }}
               />
             )}
 
@@ -1616,7 +1638,7 @@ export default function App() {
         {/* CLIENT DASHBOARD - shows for non-developers on main page */}
         {!isDeveloperSession() && !analysisResults && !isAnalyzing && activePage === 'main' && !needsApiKey && (
           <div className="max-w-7xl mx-auto px-4">
-            <ClientDashboard results={clientSignals} lang={lang} />
+            <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} />
           </div>
         )}
 

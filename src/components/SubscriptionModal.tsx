@@ -1,6 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { X, DollarSign, Star, Crown, Sparkles } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const STORAGE_KEY = 'subscription_prices';
@@ -19,6 +21,28 @@ export default function SubscriptionModal({ isOpen, onClose, onSelectPlan, asPag
       return saved ? JSON.parse(saved) : DEFAULT_PRICES;
     } catch { return DEFAULT_PRICES; }
   });
+
+  // Sync prices from Firestore every 10 seconds
+  React.useEffect(() => {
+    const syncPrices = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'shared_settings', 'prices'));
+        if (snap.exists()) {
+          const data = snap.data();
+          const newPrices = {
+            weekly: data.weekly ?? DEFAULT_PRICES.weekly,
+            monthly: data.monthly ?? DEFAULT_PRICES.monthly,
+            yearly: data.yearly ?? DEFAULT_PRICES.yearly,
+          };
+          setPrices(newPrices);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(newPrices));
+        }
+      } catch {}
+    };
+    syncPrices();
+    const interval = setInterval(syncPrices, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (!isOpen) return null;
 

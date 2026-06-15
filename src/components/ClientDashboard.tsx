@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, Zap, ShieldAlert, ChevronDown, ChevronUp, BarChart2, Info, Activity, Clock } from 'lucide-react';
+import { TrendingUp, Zap, ShieldAlert, ChevronDown, ChevronUp, BarChart2, Info, Activity, Clock, Lock } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
 import { Language, translations } from '../lib/i18n';
 
 interface ClientDashboardProps {
   results: AnalysisResult[];
   lang: Language;
+  hasActivePlan?: boolean;
 }
 
 const SIGNAL_META: Record<string, { color: string; bg: string; border: string; icon: any; labelAr: string; labelEn: string }> = {
@@ -36,7 +37,7 @@ const formatPublishDate = (timestamp: string, lang: string) => {
   }
 };
 
-export default function ClientDashboard({ results, lang }: ClientDashboardProps) {
+export default function ClientDashboard({ results, lang, hasActivePlan = false }: ClientDashboardProps) {
   const isAr = lang === 'ar';
   const t = translations[lang];
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -58,7 +59,36 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
     return 4;
   };
 
-  const sortedStrong = [...filtered].sort((a, b) => signalOrder(a.signal) - signalOrder(b.signal) || b.confidence - a.confidence);
+  const sortedAll = [...filtered].sort((a, b) => signalOrder(a.signal) - signalOrder(b.signal) || b.confidence - a.confidence);
+
+  // Apply per-category limit (2 symbols per category) when free plan is disabled
+  const FREE_LIMIT = 2;
+  const sortedStrong = hasActivePlan
+    ? sortedAll
+    : (() => {
+        const counts: Record<string, number> = {};
+        return sortedAll.filter(r => {
+          const cat = r.category || 'Unknown';
+          counts[cat] = (counts[cat] || 0) + 1;
+          return counts[cat] <= FREE_LIMIT;
+        });
+      })();
+
+  const isLimited = !hasActivePlan && sortedAll.length > sortedStrong.length;
+  const lockedCount = sortedAll.length - sortedStrong.length;
+
+  // Determine which are locked (for rendering lock icons)
+  const lockedIds = new Set<string>();
+  if (!hasActivePlan) {
+    const counts: Record<string, number> = {};
+    for (const r of sortedAll) {
+      const cat = r.category || 'Unknown';
+      counts[cat] = (counts[cat] || 0) + 1;
+      if (counts[cat] > FREE_LIMIT) {
+        lockedIds.add(r.symbol + '_' + r.timestamp);
+      }
+    }
+  }
 
   // Auto-select the first symbol or active one for the chart
   const activeResult = sortedStrong.find(r => r.symbol === selectedSymbol) || sortedStrong[0];
@@ -111,9 +141,24 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
           {isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}
         </span>
         <span className="text-xs text-emerald-400/60 font-bold">
-          {isAr ? 'يتم تحديث الفرص تلقائياً فور صدورها' : 'Opportunities synchronized in real-time'}
+          {isAr ? 'يتم تحديث فرص تلقائياً فور صدورها' : 'Opportunities synchronized in real-time'}
         </span>
       </div>
+
+      {/* Upgrade banner when limited */}
+      {isLimited && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-5 py-3 flex items-center gap-3">
+          <Lock size={20} className="text-amber-400" />
+          <div>
+            <span className="text-sm font-black text-amber-400">
+              {isAr ? `عرض ${sortedStrong.length} من ${sortedAll.length} فرصة` : `Showing ${sortedStrong.length} of ${sortedAll.length} opportunities`}
+            </span>
+            <p className="text-xs text-amber-400/60 font-bold">
+              {isAr ? `اشترِ خطة للوصول لجميع ${sortedAll.length} فرصة متاحة` : `Purchase a plan to access all ${sortedAll.length} available opportunities`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 2. Chart Section at the Very Top */}
       {activeSymbol && (
@@ -145,6 +190,12 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
           {isAr ? 'الفرص القوية المتاحة' : 'Strong Trading Opportunities'}
         </h2>
         <span className="text-xs text-white/40 font-bold">({sortedStrong.length})</span>
+        {!hasActivePlan && (
+          <span className="text-xs text-amber-400 font-bold flex items-center gap-1">
+            <Lock size={12} />
+            {isAr ? 'محدود' : 'Limited'}
+          </span>
+        )}
       </div>
 
       {/* 4. Opportunities List with Detailed Cards */}
@@ -153,14 +204,15 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
           const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.STRONG_BUY];
           const Icon = meta.icon;
           const isSelected = selectedSymbol === res.symbol || (!selectedSymbol && sortedStrong[0].symbol === res.symbol);
+          const isLocked = lockedIds.has(res.symbol + '_' + res.timestamp);
 
           return (
             <motion.div
               key={res.symbol}
               layout
               className={`rounded-2xl p-5 border bg-brand-alt/45 backdrop-blur-md transition-all shadow-lg flex flex-col justify-between ${
-                isSelected ? 'border-primary ring-1 ring-primary bg-brand-alt/80 scale-[1.01]' : 'border-white/5 hover:border-white/10 hover:bg-brand-alt/60'
-              }`}
+                isSelected && !isLocked ? 'border-primary ring-1 ring-primary bg-brand-alt/80 scale-[1.01]' : 'border-white/5 hover:border-white/10 hover:bg-brand-alt/60'
+              } ${isLocked ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <div>
                 {/* Header: Symbol & Signal & Time */}
@@ -180,10 +232,14 @@ export default function ClientDashboard({ results, lang }: ClientDashboardProps)
                   </div>
 
                   <div className="flex flex-col items-end gap-1.5">
-                    <div className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 ${meta.bg} ${meta.border} border`}>
-                      <Icon size={12} className={meta.color} />
-                      <span className={`text-[10px] font-black uppercase ${meta.color}`}>
-                        {isAr ? meta.labelAr : meta.labelEn}
+                    <div className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 ${meta.bg} ${meta.border} border ${isLocked ? 'bg-amber-500/20 border-amber-500/50' : ''}`}>
+                      {isLocked ? (
+                        <Lock size={12} className="text-amber-400" />
+                      ) : (
+                        <Icon size={12} className={meta.color} />
+                      )}
+                      <span className={`text-[10px] font-black uppercase ${isLocked ? 'text-amber-400' : meta.color}`}>
+                        {isLocked ? (isAr ? 'محدود' : 'Limited') : (isAr ? meta.labelAr : meta.labelEn)}
                       </span>
                     </div>
                     <span className="text-[11px] font-black text-white/60 font-mono">

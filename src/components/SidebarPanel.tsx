@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Key, DollarSign, Wallet, Users, Zap, User } from 'lucide-react';
+import { Settings, Key, DollarSign, Wallet, Users, Zap, User, Crown } from 'lucide-react';
 import { Language } from '../lib/i18n';
 
 interface SidebarPanelProps {
@@ -27,6 +27,9 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
     { icon: Users, label: lang === 'ar' ? 'مراقبة العملاء' : 'Client Monitor', page: 'clientMonitor' as const, color: 'from-amber-400 to-amber-600' },
   ] : [
     { icon: User, label: lang === 'ar' ? 'الملف الشخصي' : 'Profile', page: 'profile' as const, color: 'from-amber-400 to-amber-600' },
+    ...(!freemiumDisabled ? [
+      { icon: Crown, label: lang === 'ar' ? 'شراء خطة' : 'Buy Plan', page: 'plans' as const, color: 'from-emerald-400 to-emerald-600' },
+    ] : []),
   ];
 
   return (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, ShieldOff, Trash2, RefreshCw, RotateCcw, X, CheckCircle, Clock, Ban, Shield } from 'lucide-react';
+import { Users, ShieldOff, Trash2, RefreshCw, RotateCcw, X, CheckCircle, Clock, Ban, Shield, Crown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Language } from '../lib/i18n';
 
@@ -165,11 +165,12 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 w-fit ${
                         client.plan === 'paid'
-                          ? 'bg-emerald-500/15 text-emerald-300'
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                           : 'bg-white/5 text-white/70'
                       }`}>
+                        {client.plan === 'paid' && <Crown size={12} />}
                         {client.plan === 'paid' ? (isAr ? 'مدفوعة' : 'Paid') : (isAr ? 'مجانية' : 'Free')}
                       </span>
                     </td>
