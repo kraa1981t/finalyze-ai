@@ -3,6 +3,7 @@ import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 import { fetchMarketContext } from "./marketContextService";
 import { onRateLimited, waitIfRateLimited } from "./rateLimitTracker";
 import { fetchMarketDataDirect, callAIDirect } from './apiDirect';
+import { getCorrelationGroup } from "./portfolioRiskService";
 
 export function getApiKey(): string {
   try {
@@ -74,7 +75,7 @@ function calculateSupplyDemandZones(highs: number[], lows: number[], volumes: nu
  * ROBUST TECHNICAL ENGINE (VERSION 2.0)
  * Works with minimal data (10+ candles) and handles gaps gracefully.
  */
-function calculateTechnicalMetrics(closes: number[], highs: number[], lows: number[], volumes?: number[]) {
+function calculateTechnicalMetrics(closes: number[], highs: number[], lows: number[], volumes?: number[], opens?: number[]) {
   if (!closes || closes.length < 10) return null;
 
   const len = closes.length;
@@ -157,7 +158,97 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     volSurge = lastVol > avgVol * 1.5;
   }
 
-  return { direction, age, totalAge, rsi, emaCross, volSurge, momentumScore: upScore / (upScore + downScore) * 100 };
+  // 6. ATR (14-period Average True Range) — for dynamic SL/TP
+  let atr = 0;
+  if (len >= 15) {
+    let sumTR = 0;
+    for (let i = len - 14; i < len; i++) {
+      const prevClose = closes[i - 1] || closes[i];
+      const tr = Math.max(
+        highs[i] - lows[i],
+        Math.abs(highs[i] - prevClose),
+        Math.abs(lows[i] - prevClose)
+      );
+      sumTR += tr;
+    }
+    atr = sumTR / 14;
+  }
+
+  // 7. Bollinger Bands (20-period SMA + 2 standard deviations)
+  let bbUpper = 0, bbMiddle = 0, bbLower = 0, bbWidth = 0, bbPercentB = 0;
+  if (len >= 20) {
+    const period = 20;
+    const slice = closes.slice(-period);
+    const sma = slice.reduce((a, b) => a + b, 0) / period;
+    const variance = slice.reduce((sum, val) => sum + Math.pow(val - sma, 2), 0) / period;
+    const stdDev = Math.sqrt(variance);
+    bbMiddle = sma;
+    bbUpper = sma + 2 * stdDev;
+    bbLower = sma - 2 * stdDev;
+    bbWidth = bbUpper > 0 ? (bbUpper - bbLower) / bbMiddle : 0;
+    const currentPrice = closes[len - 1];
+    bbPercentB = bbUpper > bbLower ? (currentPrice - bbLower) / (bbUpper - bbLower) : 0.5;
+  }
+
+  // 8. Bollinger Band Pullback Detection (3-5 candles opposite to trend)
+  let bbPullbackCount = 0;
+  let bbTouchLower = false;
+  let bbTouchUpper = false;
+  if (len >= 5 && bbLower > 0) {
+    // Count consecutive opposite candles
+    for (let i = len - 1; i >= Math.max(0, len - 5); i--) {
+      const isBearish = closes[i] < opens[i];
+      const isBullish = closes[i] > opens[i];
+      if (direction === 'uptrend' && isBearish) bbPullbackCount++;
+      else if (direction === 'downtrend' && isBullish) bbPullbackCount++;
+      else break;
+    }
+    // Check if price touched or approached lower/upper band (within 0.3%)
+    const currentPrice = closes[len - 1];
+    bbTouchLower = currentPrice <= bbLower * 1.003;
+    bbTouchUpper = currentPrice >= bbUpper * 0.997;
+  }
+
+  // 9. Reversal Candle Patterns (last candle)
+  let hasHammer = false;
+  let hasPinbar = false;
+  let hasEngulfing = false;
+  let hasShootingStar = false;
+  if (len >= 2) {
+    const currO = opens[len - 1], currC = closes[len - 1], currH = highs[len - 1], currL = lows[len - 1];
+    const prevO = opens[len - 2], prevC = closes[len - 2];
+    const body = Math.abs(currC - currO);
+    const upperWick = currH - Math.max(currO, currC);
+    const lowerWick = Math.min(currO, currC) - currL;
+    const totalRange = currH - currL;
+
+    if (totalRange > 0) {
+      // Hammer: small body at top, long lower wick (>2x body)
+      hasHammer = lowerWick > body * 2 && upperWick < body * 0.5 && body > 0;
+      // Shooting Star: small body at bottom, long upper wick (>2x body)
+      hasShootingStar = upperWick > body * 2 && lowerWick < body * 0.5 && body > 0;
+      // Pinbar: one wick > 2x the other side
+      hasPinbar = (lowerWick > upperWick * 2.5 && lowerWick > body) ||
+                  (upperWick > lowerWick * 2.5 && upperWick > body);
+    }
+    // Bullish Engulfing: prev bearish, curr bullish, curr body engulfs prev
+    const prevBearish = prevC < prevO;
+    const currBullish = currC > currO;
+    hasEngulfing = prevBearish && currBullish && currO <= prevC && currC >= prevO;
+    // Bearish Engulfing: prev bullish, curr bearish, curr body engulfs prev
+    const prevBullish2 = prevC > prevO;
+    const currBearish2 = currC < currO;
+    const hasBearishEngulfing = prevBullish2 && currBearish2 && currO >= prevC && currC <= prevO;
+    if (hasBearishEngulfing) hasEngulfing = true;
+  }
+
+  return {
+    direction, age, totalAge, rsi, emaCross, volSurge, atr,
+    bbUpper, bbMiddle, bbLower, bbWidth, bbPercentB,
+    bbPullbackCount, bbTouchLower, bbTouchUpper,
+    hasHammer, hasPinbar, hasEngulfing, hasShootingStar,
+    momentumScore: upScore / (upScore + downScore) * 100
+  };
 }
 
 // Batch analysis: ONE AI call for ALL symbols — eliminates rate limiting
@@ -181,9 +272,10 @@ async function fetchAndPrepareSymbolData(
     const highs = quotes.high.filter((c: any) => c != null);
     const lows = quotes.low.filter((c: any) => c != null);
     const volumes = quotes.volume?.filter((v: any) => v != null);
+    const opens = quotes.open?.filter((c: any) => c != null) || closes;
     if (closes.length < 10) return { error: `Insufficient data for ${symbol}.` };
 
-    const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes);
+    const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes, opens);
     const supplyDemandZones = calculateSupplyDemandZones(highs, lows, volumes || [], closes);
     const zonesText = supplyDemandZones.length > 0
       ? supplyDemandZones.map(z => `${z.type === 'supply' ? 'Supply' : 'Demand'} zone: ${z.bottom.toFixed(2)}–${z.top.toFixed(2)} (strength ${z.strength.toFixed(0)}%)`).join('. ')
@@ -253,6 +345,61 @@ function generateLocalAnalysis(
     reasons.push({ check: 'Micro TF Alignment', value: microSignal, status: microSignal === 'aligned' ? 'positive' : 'neutral', impact: microSignal === 'aligned' ? 'micro aligns with macro' : 'micro diverging' });
   }
 
+  // Bollinger Bands Strategy — Pullback with Trend
+  if (metrics?.bbLower > 0 && metrics?.bbUpper > 0) {
+    const bbPct = Math.round(metrics.bbPercentB * 100);
+    const isUptrend = metrics.direction === 'uptrend';
+    const isDowntrend = metrics.direction === 'downtrend';
+
+    // BUY SETUP: Uptrend + pullback to lower band + reversal candle
+    if (isUptrend && metrics.bbTouchLower && metrics.bbPullbackCount >= 2 && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing)) {
+      score += 3;
+      reasons.push({
+        check: 'BB Strategy (BUY)',
+        value: `Pullback ${metrics.bbPullbackCount} candles → Lower Band + Reversal`,
+        status: 'positive',
+        impact: `strong buy: trend up + ${metrics.bbPullbackCount} pullback candles + touch lower BB + reversal candle`
+      });
+    }
+    // SELL SETUP: Downtrend + rally to upper band + reversal candle
+    else if (isDowntrend && metrics.bbTouchUpper && metrics.bbPullbackCount >= 2 && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing)) {
+      score -= 3;
+      reasons.push({
+        check: 'BB Strategy (SELL)',
+        value: `Rally ${metrics.bbPullbackCount} candles → Upper Band + Reversal`,
+        status: 'negative',
+        impact: `strong sell: trend down + ${metrics.bbPullbackCount} rally candles + touch upper BB + reversal candle`
+      });
+    }
+    // Partial BB signals
+    else {
+      if (metrics.bbTouchLower && isUptrend) {
+        score += 0.5;
+        reasons.push({ check: 'BB Touch Lower', value: `price at lower band (${bbPct}%)`, status: 'positive', impact: 'approaching lower BB in uptrend' });
+      }
+      if (metrics.bbTouchUpper && isDowntrend) {
+        score -= 0.5;
+        reasons.push({ check: 'BB Touch Upper', value: `price at upper band (${bbPct}%)`, status: 'negative', impact: 'approaching upper BB in downtrend' });
+      }
+      if (metrics.hasHammer || metrics.hasPinbar) {
+        reasons.push({ check: 'Reversal Candle', value: metrics.hasHammer ? 'Hammer' : 'Pinbar', status: 'neutral', impact: 'potential reversal pattern detected' });
+      }
+      reasons.push({ check: 'BB Info', value: `Upper: ${metrics.bbUpper.toFixed(4)} | Mid: ${metrics.bbMiddle.toFixed(4)} | Lower: ${metrics.bbLower.toFixed(4)}`, status: 'neutral', impact: `Bollinger Bands — ${bbPct}%B` });
+    }
+  }
+
+  // Cross-Asset Correlation & Cointelligence Intelligence
+  const corrGroup = getCorrelationGroup(symbol);
+  if (corrGroup) {
+    const corrPct = Math.round(corrGroup.correlation * 100);
+    reasons.push({
+      check: 'Cross-Asset Correlation',
+      value: `${corrGroup.label} (${corrPct}%)`,
+      status: 'neutral',
+      impact: `correlated with ${corrGroup.symbols.filter(s => s !== symbol).join(', ')} — portfolio diversification applies`
+    });
+  }
+
   let rawSignal: SignalType;
   let confidence: number;
   if (score >= 3) { rawSignal = SignalType.STRONG_BUY; confidence = 85; }
@@ -289,7 +436,7 @@ export async function analyzeMarketBatch(
   paramsList: { symbol: string; type: MarketType; timeframe: string; tradingStyle: TradingStyle }[],
   settings: StrategySettings,
   lang: string,
-  onProgress?: (current: string, total: number, index: number) => void
+  onProgress?: (current: string, total: number, index: number, failed?: number) => void
 ): Promise<{ results: AnalysisResult[]; errors: { symbol: string; error: string }[] }> {
   const results: AnalysisResult[] = [];
   const errors: { symbol: string; error: string }[] = [];
@@ -298,7 +445,7 @@ export async function analyzeMarketBatch(
   // Analyze each symbol individually — one AI call per symbol for maximum accuracy
   for (let i = 0; i < total; i++) {
     const p = paramsList[i];
-    if (onProgress) onProgress(p.symbol, total, i);
+    if (onProgress) onProgress(p.symbol, total, i, errors.length);
 
     try {
       // Small delay between calls to avoid rate limiting (skip first)
@@ -352,12 +499,13 @@ export async function analyzeMarket(params: {
     const highs = quotes.high.filter((c: any) => c != null);
     const lows = quotes.low.filter((c: any) => c != null);
     const volumes = quotes.volume?.filter((v: any) => v != null);
+    const opens = quotes.open?.filter((c: any) => c != null) || closes;
 
     if (closes.length < 10) {
       throw new Error(`Insufficient data for ${symbol}.`);
     }
 
-    const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes);
+    const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes, opens);
     const supplyDemandZones = calculateSupplyDemandZones(highs, lows, volumes || [], closes);
     const zonesText = supplyDemandZones.length > 0 
       ? supplyDemandZones.map(z => `${z.type === 'supply' ? 'Supply' : 'Demand'} zone: ${z.bottom.toFixed(2)}–${z.top.toFixed(2)} (strength ${z.strength.toFixed(0)}%)`).join('. ')
@@ -406,6 +554,9 @@ export async function analyzeMarket(params: {
 
 MARKET DATA: RSI ${metrics?.rsi?.toFixed(1)}, Trend ${metrics?.direction}, EMA Cross ${metrics?.emaCross}, Vol Surge ${metrics?.volSurge}, Trend Length ${metrics?.totalAge}c, Momentum ${metrics?.age}c.
 
+BOLLINGER BANDS: Upper ${metrics?.bbUpper?.toFixed(4) || 'N/A'}, Middle ${metrics?.bbMiddle?.toFixed(4) || 'N/A'}, Lower ${metrics?.bbLower?.toFixed(4) || 'N/A'}, %B ${metrics?.bbPercentB ? Math.round(metrics.bbPercentB * 100) : 'N/A'}%, Width ${metrics?.bbWidth ? metrics.bbWidth.toFixed(4) : 'N/A'}.
+BB STRATEGY: Pullback ${metrics?.bbPullbackCount || 0} candles, TouchLower ${metrics?.bbTouchLower || false}, TouchUpper ${metrics?.bbTouchUpper || false}, Hammer ${metrics?.hasHammer || false}, Pinbar ${metrics?.hasPinbar || false}, Engulfing ${metrics?.hasEngulfing || false}, ShootingStar ${metrics?.hasShootingStar || false}.
+
 MICRO (${microTF}): RSI ${microMetrics?.rsi ? microMetrics.rsi.toFixed(1) : 'N/A'}, Trend ${microMetrics?.direction || 'sideways'}, EMA ${microMetrics?.emaCross || 'unknown'}.
 
 CONTEXT: Fear&Greed ${contextFearGreed?.value ?? 'N/A'}/100 (${contextFearGreed?.classification ?? 'Unknown'}). News: ${newsText.substring(0, 300)}. Events: ${eventsText.substring(0, 200)}.
@@ -419,6 +570,7 @@ RULES:
 - Trend age zones: <10 infancy (cap 65), <25 youth (downgrade strong, cap 70), 25-50 mature (full), >50 old (cap 65).
 - Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
 - If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
+- BOLLINGER BANDS STRATEGY: If trend is UP and price pulled back 3-5 candles to touch Lower BB + reversal candle (hammer/pinbar/engulfing) → STRONG BUY. If trend is DOWN and price rallied 3-5 candles to touch Upper BB + reversal candle (shooting star/pinbar/engulfing) → STRONG SELL. This is a premium entry condition — give it HIGH weight in your decision.
 
 LANGUAGE RULES (CRITICAL):
 ${isAr ? `- ALL text fields (summary, detailedReasons impact) MUST be written in formal Arabic (فصحى) using professional financial terminology.
@@ -623,6 +775,20 @@ Return ONLY valid JSON:
       addReason('Micro TF Alignment', resultData.microSignal || 'unknown',
         resultData.microSignal === 'aligned' ? 'positive' : resultData.microSignal === 'pullback' ? 'neutral' : 'neutral',
         resultData.microSignal === 'aligned' ? 'micro aligns with macro' : 'micro diverging from macro');
+      // Bollinger Bands
+      if (metrics?.bbLower > 0) {
+        const bbPct = Math.round(metrics.bbPercentB * 100);
+        if (metrics.bbTouchLower && metrics.direction === 'uptrend' && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing)) {
+          addReason('BB Strategy (BUY)', `Pullback ${metrics.bbPullbackCount}c → Lower + Reversal`, 'positive',
+            `strong buy: trend up + pullback to lower BB + reversal candle`);
+        } else if (metrics.bbTouchUpper && metrics.direction === 'downtrend' && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing)) {
+          addReason('BB Strategy (SELL)', `Rally ${metrics.bbPullbackCount}c → Upper + Reversal`, 'negative',
+            `strong sell: trend down + rally to upper BB + reversal candle`);
+        } else {
+          addReason('Bollinger Bands', `U:${metrics.bbUpper.toFixed(4)} M:${metrics.bbMiddle.toFixed(4)} L:${metrics.bbLower.toFixed(4)} (${bbPct}%B)`, 'neutral',
+            `BB width ${metrics.bbWidth.toFixed(4)}`);
+        }
+      }
       // Fear&Greed
       const fg = contextFearGreed;
       if (fg?.value !== undefined) {
@@ -642,29 +808,46 @@ Return ONLY valid JSON:
         contextEcon.some((e: any) => e.impact === 'High') ? '-10% confidence penalty' : 'no penalty');
     }
 
-    // Fallback calculation for Stop Loss and Take Profit
+    // Fallback calculation for Stop Loss and Take Profit — ATR-based dynamic stops
     const currentPrice = closes[closes.length - 1] || 0;
-    const last10Lows = lows.slice(-10);
-    const last10Highs = highs.slice(-10);
-    const minLow = last10Lows.length > 0 ? Math.min(...last10Lows) : currentPrice * 0.99;
-    const maxHigh = last10Highs.length > 0 ? Math.max(...last10Highs) : currentPrice * 1.01;
+    const atr = metrics?.atr || 0;
 
     let finalStopLoss = Number(resultData.stopLoss) || 0;
     let finalTakeProfit = Number(resultData.takeProfit) || 0;
 
     if (finalSignal.includes('buy')) {
       if (!finalStopLoss || finalStopLoss >= currentPrice) {
-        finalStopLoss = minLow * 0.998;
+        // ATR-based: SL = entry - 2x ATR (minimum 0.3% for forex, 1% for crypto)
+        if (atr > 0) {
+          const minSLDist = type === 'crypto' ? currentPrice * 0.01 : currentPrice * 0.003;
+          const slDist = Math.max(atr * 2, minSLDist);
+          finalStopLoss = currentPrice - slDist;
+        } else {
+          // Fallback: use last 10 lows with wider buffer
+          const last10Lows = lows.slice(-10);
+          const minLow = last10Lows.length > 0 ? Math.min(...last10Lows) : currentPrice * 0.99;
+          finalStopLoss = minLow * 0.995;
+        }
       }
       if (!finalTakeProfit || finalTakeProfit <= currentPrice) {
-        finalTakeProfit = currentPrice + (currentPrice - finalStopLoss) * 1.5;
+        finalTakeProfit = currentPrice + (currentPrice - finalStopLoss) * 2;
       }
     } else if (finalSignal.includes('sell')) {
       if (!finalStopLoss || finalStopLoss <= currentPrice) {
-        finalStopLoss = maxHigh * 1.002;
+        // ATR-based: SL = entry + 2x ATR (minimum 0.3% for forex, 1% for crypto)
+        if (atr > 0) {
+          const minSLDist = type === 'crypto' ? currentPrice * 0.01 : currentPrice * 0.003;
+          const slDist = Math.max(atr * 2, minSLDist);
+          finalStopLoss = currentPrice + slDist;
+        } else {
+          // Fallback: use last 10 highs with wider buffer
+          const last10Highs = highs.slice(-10);
+          const maxHigh = last10Highs.length > 0 ? Math.max(...last10Highs) : currentPrice * 1.01;
+          finalStopLoss = maxHigh * 1.005;
+        }
       }
       if (!finalTakeProfit || finalTakeProfit >= currentPrice) {
-        finalTakeProfit = currentPrice - (finalStopLoss - currentPrice) * 1.5;
+        finalTakeProfit = currentPrice - (finalStopLoss - currentPrice) * 2;
       }
     } else {
       finalStopLoss = 0;

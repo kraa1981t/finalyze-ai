@@ -185,6 +185,9 @@ export default function App() {
     if (!user || isDeveloperSession()) return;
     console.log('[CLIENT] Setting up Firestore polling for shared_results');
 
+    const isFirstLoad = !localStorage.getItem('finalyze_client_signals');
+    let hasPlayedFirstSound = false;
+
     const loadFromFirestore = async () => {
       try {
         console.log('[CLIENT] Polling shared_results collection...');
@@ -232,17 +235,25 @@ export default function App() {
         const strongCount = results.filter((r: any) => r.signal === 'strong_buy' || r.signal === 'strong_sell').length;
         console.log(`[CLIENT] Setting ${results.length} signals (${strongCount} strong)`);
         
-        // Alert for new strong signals
+        // Alert for any new signal (any symbol not seen before)
         const currentSignals = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
         const currentSymbols = new Set(currentSignals.map((s: any) => s.symbol));
-        const hasNewStrong = results.some((r: any) =>
-          !currentSymbols.has(r.symbol) &&
-          r.confidence >= 80 &&
-          (r.signal?.includes('strong') || r.signal?.includes('buy') || r.signal?.includes('sell'))
-        );
-        if (hasNewStrong) {
-          setNewSignalAlert(lang === 'ar' ? '🚀 تم رصد فرصة تداول قوية جديدة!' : '🚀 New strong trading opportunity detected!');
-          setTimeout(() => setNewSignalAlert(null), 8000);
+        const newSignals = results.filter((r: any) => !currentSymbols.has(r.symbol));
+        const hasNewSignal = newSignals.length > 0;
+
+        // Play sound on first load if signals exist
+        if (isFirstLoad && !hasPlayedFirstSound && results.length > 0) {
+          hasPlayedFirstSound = true;
+          const symbols = results.map((r: any) => r.symbol).join(' • ');
+          setNewSignalAlert(lang === 'ar' ? `تنبيه فرصة جديدة — ${symbols}` : `New Opportunity Alert — ${symbols}`);
+          setTimeout(() => setNewSignalAlert(null), 10000);
+          try { playAudio('success'); } catch {}
+        }
+        // Play sound when any new opportunity arrives
+        else if (hasNewSignal) {
+          const newSymbols = newSignals.map((r: any) => r.symbol).join(' • ');
+          setNewSignalAlert(lang === 'ar' ? `تنبيه فرصة جديدة — ${newSymbols}` : `New Opportunity Alert — ${newSymbols}`);
+          setTimeout(() => setNewSignalAlert(null), 10000);
           try { playAudio('success'); } catch {}
         }
         
@@ -489,7 +500,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  const [progress, setProgress] = useState<{ current: string, total: number, index: number } | null>(null);
+  const [progress, setProgress] = useState<{ current: string, total: number, index: number, failed?: number } | null>(null);
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
     try { return JSON.parse(localStorage.getItem('top_signals_persistent') || '[]'); } catch { return []; }
   });
@@ -754,6 +765,7 @@ export default function App() {
 
     // Track ALL results from this scan directly (not via batched React state)
     const scanResults: AnalysisResult[] = [];
+    let scanFailed = 0;
 
     for (const cat of open) {
       if (!autoSettingsRef.current.isEnabled) break;
@@ -775,6 +787,8 @@ export default function App() {
       for (const sym of syms) {
         if (!autoSettingsRef.current.isEnabled) break;
 
+        setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed });
+
         await waitIfRateLimited();
         try {
           const r = await Promise.race([
@@ -784,9 +798,9 @@ export default function App() {
               tradingStyle: s.tradingStyle,
               settings, lang
             }),
-            new Promise<null>((_, rej) => setTimeout(() => rej(new Error('timeout')), 30000))
+            new Promise<any>((_, rej) => setTimeout(() => rej(new Error('timeout')), 45000))
           ]);
-          if (r) {
+          if (r && !(r as any).error) {
             const sig = r.signal || '';
             if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
             if (sig && sig !== 'no_entry') {
@@ -801,9 +815,15 @@ export default function App() {
           const key = getApiKey();
           const d = (key.startsWith('AIzaSy') || key.startsWith('AQ.')) ? 3500 : 2500;
           await new Promise(r => setTimeout(r, d));
-        } catch (e) {
-          console.error("Radar Error:", e);
-          await new Promise(r => setTimeout(r, 3000));
+        } catch (e: any) {
+          const isTimeout = e?.message === 'timeout';
+          const isRateLimit = e?.message?.includes('429') || e?.message?.includes('rate');
+          if (!isTimeout && !isRateLimit) {
+            console.error("Radar Error:", e);
+            scanFailed++;
+            setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed });
+          }
+          await new Promise(r => setTimeout(r, isRateLimit ? 15000 : 3000));
         }
       }
     }
@@ -841,6 +861,9 @@ export default function App() {
     } catch (e) {
       console.warn('Firestore save failed:', e);
     }
+
+    // Clear progress
+    setProgress(null);
   }, [settings, lang, hasActivePlan, user]);
 
   // Radar lifecycle: start on toggle-ON, stop on toggle-OFF
@@ -1415,6 +1438,8 @@ export default function App() {
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isDeveloper={isDeveloperSession()}
         lastSyncStatus={lastSyncStatus}
+        analysisProgress={progress}
+        isAnalyzing={isAnalyzing}
       />
 
       {/* Sidebar Panel - pushes content, doesn't overlay */}
@@ -1604,14 +1629,14 @@ export default function App() {
             lang={lang} 
           />
 
-          <div className="h-[10px] bg-emerald-500 rounded-full my-10 shadow-[0_0_20px_rgba(16,185,129,0.7)] border-t border-emerald-400/20" />
+          <div className="w-full bg-[#D1FAE5]/40 backdrop-blur-xl rounded-full my-10 h-3 border border-[#D1FAE5]/60 shadow-[0_0_25px_rgba(209,250,229,0.3)]" />
 
           <AnalysisForm 
              user={user} lang={lang} settings={settings}
              hasActivePlan={hasActivePlan}
               onUpgrade={() => navigateTo('plans')}
               onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); try { playStart(autoSettings.volume || 0.5); } catch {} }}
-             onProgress={(current, total, index) => setProgress({ current, total, index })}
+             onProgress={(current, total, index, failed) => setProgress({ current, total, index, failed })}
              onResult={(results) => {
                const day = new Date().getDay();
                const allCryptos = ALL_SYMBOLS_DB.crypto || [];

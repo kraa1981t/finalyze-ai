@@ -2,7 +2,7 @@ import React from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { analyzePortfolio, PortfolioAnalysis, ClusterWarning } from '../services/portfolioRiskService';
 import { motion, AnimatePresence } from 'motion/react';
-import { AlertTriangle, TrendingUp, TrendingDown, BarChart3, ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, BarChart3, ChevronDown, ChevronUp, ShieldAlert, Link } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 
@@ -22,6 +22,7 @@ const WARNING_ICONS: Record<string, any> = {
   inverse_conflict: ShieldAlert,
   cluster_hedge: TrendingDown,
   same_symbol: AlertTriangle,
+  correlation_conflict: Link,
 };
 
 export default function PortfolioPanel({ signals, lang }: PortfolioPanelProps) {

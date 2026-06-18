@@ -15,7 +15,7 @@ import { getStatus, subscribe } from '../services/rateLimitTracker';
 interface AnalysisFormProps {
   user: User | null;
   onBegin: () => void;
-  onProgress: (current: string, total: number, index: number) => void;
+  onProgress: (current: string, total: number, index: number, failed?: number) => void;
   onResult: (res: AnalysisResult[]) => void;
   onError: (msg?: string, allFailed?: boolean) => void;
   lang: Language;
@@ -217,7 +217,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
         })),
         settings,
         lang,
-        (current, total, index) => onProgress(current, total, index)
+        (current, total, index, failed) => onProgress(current, total, index, failed)
       );
 
       for (const r of batchResult.results) {

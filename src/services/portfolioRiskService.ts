@@ -1,7 +1,7 @@
 import { AnalysisResult, SignalType, MarketType } from "../types";
 
 export interface ClusterWarning {
-  type: 'cluster_overlap' | 'inverse_conflict' | 'cluster_hedge' | 'same_symbol';
+  type: 'cluster_overlap' | 'inverse_conflict' | 'cluster_hedge' | 'same_symbol' | 'correlation_conflict';
   severity: 'low' | 'medium' | 'high';
   message: string;
   messageAr: string;
@@ -45,12 +45,42 @@ const INVERSE_PAIRS: [string, string][] = [
   ['USDJPY', 'EURJPY'],
 ];
 
+// Cross-Asset Correlation Map (correlation > 0.75 = highly correlated)
+// Each group contains symbols that move together — keep only the strongest
+const CORRELATION_GROUPS: { key: string; label: string; labelAr: string; symbols: string[]; correlation: number }[] = [
+  // Forex — Major USD pairs with same quote currency
+  { key: 'eur_usd_cluster', label: 'EUR/USD Cluster', labelAr: 'مجموعة يورو/دولار', symbols: ['EURUSD', 'GBPUSD', 'AUDUSD', 'NZDUSD'], correlation: 0.85 },
+  { key: 'usd_jpy_cluster', label: 'USD/JPY Cluster', labelAr: 'مجموعة دولار/ين', symbols: ['USDJPY', 'EURJPY', 'GBPJPY', 'AUDJPY', 'NZDJPY', 'CADJPY', 'CHFJPY'], correlation: 0.80 },
+  { key: 'eur_gbp_cross', label: 'EUR/GBP Cross', labelAr: 'زوج يورو/جنيه', symbols: ['EURGBP', 'EURUSD', 'GBPUSD'], correlation: 0.78 },
+  { key: 'aud_nzd_cluster', label: 'AUD/NZD Cluster', labelAr: 'مجموعة أسترالي/نيوزيلندي', symbols: ['AUDUSD', 'NZDUSD', 'AUDNZD', 'AUDCAD', 'NZDCAD'], correlation: 0.82 },
+  { key: 'usd_chf_cluster', label: 'USD/CHF Cluster', labelAr: 'مجموعة دولار/فرنك', symbols: ['USDCHF', 'USDJPY'], correlation: 0.76 },
+  { key: 'eur_aud_cross', label: 'EUR/AUD Cross', labelAr: 'زوج يورو/أسترالي', symbols: ['EURAUD', 'EURUSD', 'AUDUSD'], correlation: 0.77 },
+  // Crypto — Highly correlated
+  { key: 'btc_eth_cluster', label: 'BTC/ETH Cluster', labelAr: 'مجموعة بيتكوين/إيثريوم', symbols: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD'], correlation: 0.90 },
+  { key: 'alt_meme_cluster', label: 'Alt/Meme Cluster', labelAr: 'مجموعة العملات البديلة', symbols: ['DOGEUSD', 'SHIBUSD', 'PEPEUSD', 'WIFUSD', 'BONKUSD', 'XRPUSD', 'ADAUSD'], correlation: 0.85 },
+  // Stocks — Sector correlation
+  { key: 'tech_giants', label: 'Tech Giants', labelAr: 'عمالقة التكنولوجيا', symbols: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA'], correlation: 0.80 },
+  { key: 'energy_sector', label: 'Energy Sector', labelAr: 'قطاع الطاقة', symbols: ['XOM', 'CVX', 'SHEL', 'TTE', 'BP', 'COP', 'SLB'], correlation: 0.85 },
+  { key: 'finance_sector', label: 'Finance Sector', labelAr: 'قطاع المالية', symbols: ['JPM', 'BAC', 'WFC', 'C', 'GS'], correlation: 0.78 },
+  // Metals
+  { key: 'precious_metals', label: 'Precious Metals', labelAr: 'المعادن الثمينة', symbols: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD'], correlation: 0.75 },
+  // Forex — CAD/CHF correlated
+  { key: 'cad_chf_cluster', label: 'CAD/CHF Cluster', labelAr: 'مجموعة كاد/فرنك', symbols: ['USDCAD', 'USDCHF', 'CADCHF'], correlation: 0.77 },
+];
+
 function getClustersForSymbol(symbol: string): string[] {
   const keys: string[] = [];
   for (const c of CLUSTERS) {
     if (c.symbols.includes(symbol)) keys.push(c.key);
   }
   return keys;
+}
+
+export function getCorrelationGroup(symbol: string): { key: string; label: string; labelAr: string; symbols: string[]; correlation: number } | null {
+  for (const group of CORRELATION_GROUPS) {
+    if (group.symbols.includes(symbol)) return group;
+  }
+  return null;
 }
 
 function isBuyLike(signal: SignalType): boolean {
@@ -145,6 +175,32 @@ export function analyzePortfolio(signals: AnalysisResult[]): PortfolioAnalysis {
     }
   }
 
+  // 3. Cross-Asset Correlation conflicts: correlated pairs in same direction
+  for (const group of CORRELATION_GROUPS) {
+    const groupSignals = signals.filter(s => group.symbols.includes(s.symbol));
+    const longs = groupSignals.filter(s => isBuyLike(s.signal));
+    const shorts = groupSignals.filter(s => isSellLike(s.signal));
+
+    if (longs.length >= 2) {
+      warnings.push({
+        type: 'correlation_conflict',
+        severity: 'medium',
+        message: `${group.label}: ${longs.map(s => s.symbol).join(', ')} are highly correlated (${Math.round(group.correlation * 100)}%). Opening multiple long positions is like doubling down on the same trade.`,
+        messageAr: `${group.labelAr}: ${longs.map(s => s.symbol).join(', ')} متصاحبة بقوة (${Math.round(group.correlation * 100)}%). فتح عدة صفقات شراء هو مثل مضاعفة المخاطرة على صفقة واحدة.`,
+        symbols: longs.map(s => s.symbol),
+      });
+    }
+    if (shorts.length >= 2) {
+      warnings.push({
+        type: 'correlation_conflict',
+        severity: 'medium',
+        message: `${group.label}: ${shorts.map(s => s.symbol).join(', ')} are highly correlated (${Math.round(group.correlation * 100)}%). Opening multiple short positions is like doubling down on the same trade.`,
+        messageAr: `${group.labelAr}: ${shorts.map(s => s.symbol).join(', ')} متصاحبة بقوة (${Math.round(group.correlation * 100)}%). فتح عدة صفقات بيع هو مثل مضاعفة المخاطرة على صفقة واحدة.`,
+        symbols: shorts.map(s => s.symbol),
+      });
+    }
+  }
+
   return { warnings, exposures, totalLong, totalShort, netExposure: totalLong - totalShort };
 }
 
@@ -160,9 +216,12 @@ export function resolveConflicts(signals: AnalysisResult[]): AnalysisResult[] {
   const kept = new Set<string>();
   const result: AnalysisResult[] = [];
 
+  // 0. Resolve correlation conflicts (keep strongest per correlation group)
+  const correlationFiltered = resolveCorrelationConflicts(signals);
+
   // 1. Resolve cluster conflicts (buy vs sell in same cluster)
   const clusterMap = new Map<string, AnalysisResult[]>();
-  for (const s of signals) {
+  for (const s of correlationFiltered) {
     const clusters = getClustersForSymbol(s.symbol);
     // If symbol is not in any cluster, add it with empty cluster key
     if (clusters.length === 0) {
@@ -228,4 +287,38 @@ export function resolveConflicts(signals: AnalysisResult[]): AnalysisResult[] {
   }
 
   return result;
+}
+
+// Cross-Asset Correlation & Cointelligence — filter highly correlated pairs
+export function resolveCorrelationConflicts(signals: AnalysisResult[]): AnalysisResult[] {
+  if (signals.length < 2) return signals;
+
+  const result = [...signals];
+  const removed = new Set<string>();
+
+  for (const group of CORRELATION_GROUPS) {
+    const groupSignals = result.filter(s => 
+      group.symbols.includes(s.symbol) && 
+      !removed.has(s.symbol) &&
+      (isBuyLike(s.signal) || isSellLike(s.signal))
+    );
+
+    if (groupSignals.length <= 1) continue;
+
+    // Sort by signal strength (strong signals first, then by confidence)
+    const sorted = groupSignals.sort((a, b) => {
+      const aStrong = a.signal === SignalType.STRONG_BUY || a.signal === SignalType.STRONG_SELL ? 1 : 0;
+      const bStrong = b.signal === SignalType.STRONG_BUY || b.signal === SignalType.STRONG_SELL ? 1 : 0;
+      if (aStrong !== bStrong) return bStrong - aStrong;
+      return b.confidence - a.confidence;
+    });
+
+    // Keep only the strongest, remove the rest
+    const winner = sorted[0];
+    for (let i = 1; i < sorted.length; i++) {
+      removed.add(sorted[i].symbol);
+    }
+  }
+
+  return result.filter(s => !removed.has(s.symbol));
 }

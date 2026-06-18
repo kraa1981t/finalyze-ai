@@ -25,6 +25,8 @@ interface HeaderProps {
   onToggleSidebar: () => void;
   isDeveloper?: boolean;
   lastSyncStatus?: { ok: boolean; count?: number; error?: string; time: number } | null;
+  analysisProgress?: { current: string; total: number; index: number; failed?: number } | null;
+  isAnalyzing?: boolean;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -51,7 +53,9 @@ export default function Header({
   hasApiKey,
   onToggleSidebar,
   isDeveloper = false,
-  lastSyncStatus = null
+  lastSyncStatus = null,
+  analysisProgress = null,
+  isAnalyzing = false
 }: HeaderProps) {
   const t = translations[lang];
   const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
@@ -180,19 +184,55 @@ export default function Header({
               )}
             </div>
 
-            {/* Firestore Sync Status (Developer only) */}
-            {isDeveloper && lastSyncStatus && (
-              <div className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl border-2 transition-all"
+            {/* Analysis Progress & Sync Status (Developer only) */}
+            {isDeveloper && (
+              <div className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-2xl border-2 transition-all min-w-[140px]"
                 style={{
-                  background: lastSyncStatus.ok ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-                  borderColor: lastSyncStatus.ok ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'
+                  background: analysisProgress ? 'rgba(59,130,246,0.15)' : lastSyncStatus?.ok ? 'rgba(16,185,129,0.15)' : lastSyncStatus ? 'rgba(239,68,68,0.15)' : 'rgba(100,100,100,0.1)',
+                  borderColor: analysisProgress ? 'rgba(59,130,246,0.5)' : lastSyncStatus?.ok ? 'rgba(16,185,129,0.4)' : lastSyncStatus ? 'rgba(239,68,68,0.4)' : 'rgba(100,100,100,0.2)'
                 }}
               >
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">{lastSyncStatus.ok ? '✓ Synced' : '✗ Sync Failed'}</span>
-                  {lastSyncStatus.count !== undefined && <span className="text-[10px] font-mono text-emerald-400">{lastSyncStatus.count} signals</span>}
-                </div>
-                {lastSyncStatus.error && <span className="text-[9px] font-mono text-red-400">{lastSyncStatus.error.slice(0,50)}</span>}
+                {analysisProgress ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+                      <span className="text-base font-black text-black uppercase tracking-wider">
+                        {analysisProgress.index + 1}/{analysisProgress.total}
+                      </span>
+                    </div>
+                    <span className="text-sm font-black text-black text-center leading-tight max-w-[140px] truncate">
+                      {analysisProgress.current}
+                    </span>
+                    {analysisProgress.failed !== undefined && analysisProgress.failed > 0 && (
+                      <span className="text-xs font-black text-red-600">
+                        {lang === 'ar' ? `فشل ${analysisProgress.failed}` : `${analysisProgress.failed} failed`}
+                      </span>
+                    )}
+                  </>
+                ) : lastSyncStatus ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      {lastSyncStatus.ok ? (
+                        <span className="text-xl">✓</span>
+                      ) : (
+                        <span className="text-xl">✗</span>
+                      )}
+                      <span className="text-sm font-black uppercase tracking-wider text-black">
+                        {lastSyncStatus.ok ? 'SYNCED' : 'FAILED'}
+                      </span>
+                    </div>
+                    {lastSyncStatus.count !== undefined && (
+                      <span className="text-base font-black text-black">
+                        {lastSyncStatus.count} {lang === 'ar' ? 'إشارة' : 'signals'}
+                      </span>
+                    )}
+                    {lastSyncStatus.error && (
+                      <span className="text-[10px] font-mono text-red-400 text-center leading-tight max-w-[120px] truncate">
+                        {lastSyncStatus.error.slice(0,40)}
+                      </span>
+                    )}
+                  </>
+                ) : null}
               </div>
             )}
 

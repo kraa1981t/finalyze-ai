@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, Zap, ShieldAlert, ChevronDown, ChevronUp, BarChart2, Info, Activity, Clock, Lock } from 'lucide-react';
+import { Activity, Zap, BarChart2, Info, Lock } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
+import LotSizeCalculator from './LotSizeCalculator';
 import { Language, translations } from '../lib/i18n';
 
 interface ClientDashboardProps {
@@ -11,11 +12,11 @@ interface ClientDashboardProps {
   hasActivePlan?: boolean;
 }
 
-const SIGNAL_META: Record<string, { color: string; bg: string; border: string; icon: any; labelAr: string; labelEn: string }> = {
-  [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', icon: TrendingUp, labelAr: 'شراء قوي', labelEn: 'Strong Buy' },
-  [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', icon: ShieldAlert, labelAr: 'بيع قوي', labelEn: 'Strong Sell' },
-  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: TrendingUp, labelAr: 'شراء', labelEn: 'Buy' },
-  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: ShieldAlert, labelAr: 'بيع', labelEn: 'Sell' },
+const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelAr: string; labelEn: string }> = {
+  [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', labelAr: 'شراء قوي', labelEn: 'Strong Buy' },
+  [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', labelAr: 'بيع قوي', labelEn: 'Strong Sell' },
+  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', labelAr: 'شراء', labelEn: 'Buy' },
+  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', labelAr: 'بيع', labelEn: 'Sell' },
 };
 
 const formatPublishDate = (timestamp: string, lang: string) => {
@@ -41,7 +42,8 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
   const isAr = lang === 'ar';
   const t = translations[lang];
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
-  const [expandedReasons, setExpandedReasons] = useState<string | null>(null);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set());
 
   // Filter for active STRONG signals only (less than 20 hours old)
   const maxAgeInMs = 20 * 60 * 60 * 1000;
@@ -198,143 +200,168 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
         )}
       </div>
 
-      {/* 4. Opportunities List with Detailed Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {sortedStrong.map((res) => {
+      {/* 4. Compact Opportunity Cards - 3 per row */}
+      <div className="grid grid-cols-3 gap-2 items-start">
+        {sortedStrong.map((res, idx) => {
           const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.STRONG_BUY];
-          const Icon = meta.icon;
           const isSelected = selectedSymbol === res.symbol || (!selectedSymbol && sortedStrong[0].symbol === res.symbol);
           const isLocked = lockedIds.has(res.symbol + '_' + res.timestamp);
+          const isExpanded = expandedCard === res.symbol;
+
+          // Dynamic SL/TP calc (default lot)
+          const isBuy = res.signal.includes('buy');
+          const isStrong = res.signal === 'strong_buy' || res.signal === 'strong_sell';
+          const isJPY = res.symbol.includes('JPY');
+          const pipSize = isJPY ? 0.01 : 0.0001;
+          const decimals = isJPY ? 3 : 5;
+          const entry = res.entryPrice || (res.stopLoss + res.takeProfit) / 2;
+          const basePips = isStrong ? 40 : 25;
+          const slPips = Math.round(basePips);
+          const tpPips = slPips * 2;
+          const slPrice = isBuy ? entry - slPips * pipSize : entry + slPips * pipSize;
+          const tpPrice = isBuy ? entry + tpPips * pipSize : entry - tpPips * pipSize;
 
           return (
             <motion.div
               key={res.symbol}
               layout
-              className={`rounded-2xl p-5 border bg-brand-alt/45 backdrop-blur-md transition-all shadow-lg flex flex-col justify-between ${
-                isSelected && !isLocked ? 'border-primary ring-1 ring-primary bg-brand-alt/80 scale-[1.01]' : 'border-white/5 hover:border-white/10 hover:bg-brand-alt/60'
-              } ${isLocked ? 'opacity-50 pointer-events-none' : ''}`}
+              className={`rounded-lg border transition-all ${
+                isSelected && !isLocked
+                  ? 'border-primary ring-1 ring-primary bg-brand-alt/80'
+                  : 'border-white/5 bg-brand-alt/45 hover:border-white/10'
+              } ${isLocked ? 'opacity-40 pointer-events-none' : ''}`}
             >
-              <div>
-                {/* Header: Symbol & Signal & Time */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl font-black text-white tracking-tighter italic">{res.symbol}</span>
-                      <span className="text-xs bg-white/5 border border-white/10 text-white/60 px-2 py-0.5 rounded font-black uppercase">
-                        {res.timeframe}
-                      </span>
-                    </div>
-                    {/* Publish Date */}
-                    <div className="flex items-center gap-1.5 text-[10px] text-white/40 font-bold">
-                      <Clock size={10} />
-                      <span>{formatPublishDate(res.timestamp, lang)}</span>
-                    </div>
+              {/* Compact Header - Always Visible */}
+              <button
+                onClick={() => {
+                  if (!isLocked) {
+                    setSelectedSymbol(res.symbol);
+                    setExpandedCard(isExpanded ? null : res.symbol);
+                  }
+                }}
+                className="w-full px-2 py-2 flex flex-col items-center gap-1.5"
+              >
+                {/* Symbol and SL/TP Row */}
+                <div className="flex items-stretch justify-between w-full gap-2 px-1">
+                  {/* Take Profit (TP) Box on Left */}
+                  <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-3 py-3 shrink-0 min-w-[70px] flex items-center justify-center">
+                    <span className="text-sm font-black font-mono text-emerald-400">{tpPrice.toFixed(decimals)}</span>
                   </div>
 
-                  <div className="flex flex-col items-end gap-1.5">
-                    <div className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 ${meta.bg} ${meta.border} border ${isLocked ? 'bg-amber-500/20 border-amber-500/50' : ''}`}>
-                      {isLocked ? (
-                        <Lock size={12} className="text-amber-400" />
-                      ) : (
-                        <Icon size={12} className={meta.color} />
-                      )}
-                      <span className={`text-[10px] font-black uppercase ${isLocked ? 'text-amber-400' : meta.color}`}>
-                        {isLocked ? (isAr ? 'محدود' : 'Limited') : (isAr ? meta.labelAr : meta.labelEn)}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-black text-white/60 font-mono">
-                      {isAr ? `ثقة: ${res.confidence}%` : `Conf: ${res.confidence}%`}
-                    </span>
+                  {/* Symbol in Middle */}
+                  <span className="text-xs font-black text-white italic truncate flex items-center">{res.symbol}</span>
+
+                  {/* Stop Loss (SL) Box on Right */}
+                  <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-3 py-3 shrink-0 min-w-[70px] flex items-center justify-center">
+                    <span className="text-sm font-black font-mono text-red-400">{slPrice.toFixed(decimals)}</span>
                   </div>
                 </div>
 
-                {/* Target Levels: Stop Loss & Take Profit */}
-                {res.stopLoss && res.takeProfit ? (
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-center">
-                      <span className="text-[9px] block text-red-400 font-bold uppercase tracking-wider mb-0.5">
-                        {isAr ? 'وقف الخسارة (SL)' : 'Stop Loss (SL)'}
-                      </span>
-                      <span className="text-sm font-extrabold text-red-500 font-mono">
-                        {res.stopLoss.toFixed(res.symbol.includes('JPY') ? 3 : 5)}
-                      </span>
-                    </div>
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-center">
-                      <span className="text-[9px] block text-emerald-400 font-bold uppercase tracking-wider mb-0.5">
-                        {isAr ? 'جني الأرباح (TP)' : 'Take Profit (TP)'}
-                      </span>
-                      <span className="text-sm font-extrabold text-emerald-500 font-mono">
-                        {res.takeProfit.toFixed(res.symbol.includes('JPY') ? 3 : 5)}
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
+                {/* Signal text */}
+                <span className={`text-[8px] font-black ${meta.color}`}>
+                  {isLocked ? (isAr ? 'محدود' : 'Limited') : (isAr ? meta.labelAr : meta.labelEn)}
+                </span>
 
-                {/* Analysis Reasons Directly Visible */}
-                {res.summary && (
-                  <div className="bg-white/5 rounded-xl p-3 border border-white/5 text-xs text-white/70 leading-relaxed mb-4">
-                    <p className="font-bold">{res.summary}</p>
+                {/* Confidence + Time row */}
+                <div className="flex items-center gap-2">
+                  {isLocked && <Lock size={10} className="text-amber-400 shrink-0" />}
+                  <span className="text-sm font-black text-white font-mono">{res.confidence}%</span>
+                  <div className="flex items-center gap-0.5 text-[8px] text-white/40 font-bold">
+                    <span>{formatPublishDate(res.timestamp, lang)}</span>
                   </div>
-                )}
-
-                {/* Technical Indicator Checks (Collapsible) */}
-                {res.detailedReasons && res.detailedReasons.length > 0 && (
-                  <div className="mt-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedReasons(expandedReasons === res.symbol ? null : res.symbol);
-                      }}
-                      className="flex items-center gap-1 text-[10px] font-bold text-white/50 hover:text-white transition-colors"
-                    >
-                      <Info size={12} />
-                      <span>{isAr ? 'شروط وتفاصيل المؤشرات الفنية' : 'Technical Indicator Checks'}</span>
-                      {expandedReasons === res.symbol ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                    </button>
-                    <AnimatePresence>
-                      {expandedReasons === res.symbol && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="space-y-1.5 mt-2.5 overflow-hidden"
-                        >
-                          {res.detailedReasons.map((reason, i) => (
-                            <div key={i} className="bg-white/[0.02] rounded-lg p-2.5 border border-white/5 flex items-center justify-between text-[10px]">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-1.5 h-1.5 rounded-full ${
-                                  reason.status === 'positive' ? 'bg-emerald-400' :
-                                  reason.status === 'negative' ? 'bg-red-400' : 'bg-white/30'
-                                }`} />
-                                <span className="font-bold text-white/80">{reason.check}</span>
-                              </div>
-                              <div className="text-right">
-                                <span className="text-white/40 font-mono">{reason.value}</span>
-                                {reason.impact && (
-                                  <span className="block text-[9px] text-white/30 mt-0.5">{reason.impact}</span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-              </div>
-
-              {/* View Chart Button */}
-              <button
-                onClick={() => setSelectedSymbol(res.symbol)}
-                className={`w-full mt-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-                  isSelected 
-                    ? 'bg-primary text-white shadow-lg' 
-                    : 'bg-white/5 border border-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <BarChart2 size={12} />
-                <span>{isAr ? 'عرض الشارت التفاعلي' : 'View Interactive Chart'}</span>
+                </div>
               </button>
+
+              {/* Expanded Content */}
+              <AnimatePresence>
+                {isExpanded && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-2 pb-1.5 space-y-1.5 border-t border-white/5 pt-1.5">
+                      {/* Lot Size Calculator */}
+                      {res.stopLoss && res.takeProfit && (
+                        <LotSizeCalculator
+                          symbol={res.symbol}
+                          stopLoss={res.stopLoss}
+                          takeProfit={res.takeProfit}
+                          signal={res.signal as any}
+                          lang={lang}
+                        />
+                      )}
+
+                      {/* Summary */}
+                      {res.summary && (
+                        <div className="bg-white/5 rounded p-1.5 border border-white/5 text-[10px] text-yellow-400/70 leading-relaxed">
+                          <p className="font-bold">{res.summary}</p>
+                        </div>
+                      )}
+
+                      {/* Technical Reasons - Collapsible */}
+                      {res.detailedReasons && res.detailedReasons.length > 0 && (
+                        <div className="space-y-1">
+                          <button
+                            onClick={() => {
+                              const newSet = new Set(expandedReasons);
+                              const key = `${res.symbol}_${idx}`;
+                              if (newSet.has(key)) {
+                                newSet.delete(key);
+                              } else {
+                                newSet.add(key);
+                              }
+                              setExpandedReasons(newSet);
+                            }}
+                            className="w-full flex items-center justify-between text-xs font-bold text-yellow-400/70 hover:text-yellow-400 transition-colors py-1"
+                          >
+                            <div className="flex items-center gap-1">
+                              <Info size={12} />
+                              <span>{isAr ? 'المؤشرات' : 'Indicators'} ({res.detailedReasons.length})</span>
+                            </div>
+                            <span className="text-[10px]">{expandedReasons.has(`${res.symbol}_${idx}`) ? '▼' : '▶'}</span>
+                          </button>
+                          <AnimatePresence>
+                            {expandedReasons.has(`${res.symbol}_${idx}`) && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="space-y-1 pt-1">
+                                  {res.detailedReasons.map((reason, i) => (
+                                    <div key={i} className="bg-white/[0.02] rounded p-1.5 border border-white/5 flex items-center justify-between text-[10px]">
+                                      <div className="flex items-center gap-1">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${
+                                          reason.status === 'positive' ? 'bg-emerald-400' :
+                                          reason.status === 'negative' ? 'bg-red-400' : 'bg-white/30'
+                                        }`} />
+                                        <span className="font-bold text-yellow-400/80">{reason.check}</span>
+                                      </div>
+                                      <span className="text-yellow-400/50 font-mono">{reason.value}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+
+                      {/* View Chart Button */}
+                      <button
+                        onClick={() => setSelectedSymbol(res.symbol)}
+                        className="w-full py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider bg-primary text-white flex items-center justify-center gap-1"
+                      >
+                        <BarChart2 size={12} />
+                        <span>{isAr ? 'عرض الشارت' : 'View Chart'}</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           );
         })}

@@ -7,7 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: stable-v3
+          ref: stable-v2
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -20,6 +20,6 @@ jobs:
           cd dist
           git init
           git add -A
-          git commit -m "ddeploy stable-v3"
+          git commit -m "deploy stable-v2"
           git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git push -f origin HEAD:gh-pages

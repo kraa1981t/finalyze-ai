@@ -2,10 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=0.9, minimum-scale=0.9" />
     <title>Finalyze AI - PWA</title>
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/finalyze-ai/icon.svg" />
+    <link rel="manifest" href="/finalyze-ai/manifest.json" />
     <meta name="theme-color" content="#10B981" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -25,7 +25,6 @@
           for (const name of names) caches.delete(name);
         });
       }
-      // Clear old localStorage keys that cause issues
       try { localStorage.removeItem('radar_scan_finished'); } catch(e) {}
     </script>
   </head>
