@@ -408,18 +408,19 @@ function generateLocalAnalysis(
 
   let rawSignal: SignalType;
   let confidence: number;
-  if (score >= 3) { rawSignal = SignalType.STRONG_BUY; confidence = 85; }
-  else if (score >= 1.5) { rawSignal = SignalType.BUY; confidence = 70; }
-  else if (score <= -3) { rawSignal = SignalType.STRONG_SELL; confidence = 85; }
-  else if (score <= -1.5) { rawSignal = SignalType.SELL; confidence = 70; }
-  else { rawSignal = SignalType.NEUTRAL; confidence = 50; }
+  const absScore = Math.abs(score);
+  if (score >= 3) { rawSignal = SignalType.STRONG_BUY; confidence = Math.min(95, 80 + Math.round((absScore - 3) * 5)); }
+  else if (score >= 1.5) { rawSignal = SignalType.BUY; confidence = Math.round(60 + (absScore - 1.5) * 13.3); }
+  else if (score <= -3) { rawSignal = SignalType.STRONG_SELL; confidence = Math.min(95, 80 + Math.round((absScore - 3) * 5)); }
+  else if (score <= -1.5) { rawSignal = SignalType.SELL; confidence = Math.round(60 + (absScore - 1.5) * 13.3); }
+  else { rawSignal = SignalType.NEUTRAL; confidence = Math.round(40 + absScore * 13.3); }
 
   // Apply age zone caps
   if (totalAge < infantLimit && confidence > 65) confidence = 65;
   else if (totalAge < matureLimit) {
     if (rawSignal === SignalType.STRONG_BUY) rawSignal = SignalType.BUY;
     else if (rawSignal === SignalType.STRONG_SELL) rawSignal = SignalType.SELL;
-    if (confidence > 70) confidence = 70;
+    if (confidence > 75) confidence = 75;
   }
   else if (totalAge > oldLimit && confidence > 65) confidence = 65;
   if (age < minAge && confidence > 65) confidence = 65;
