@@ -1651,6 +1651,8 @@ export default function App() {
                 lang={lang}
                 onBack={() => navigateTo('about')}
                 userName={user?.displayName || user?.email || ''}
+                isDeveloper={isDeveloperSession()}
+                onClearCount={() => setNewSuggestionsCount(0)}
               />
             )}
           </motion.div>
