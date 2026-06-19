@@ -1310,17 +1310,19 @@ export default function App() {
 
   // Fetch new suggestions count for developer notifications
   useEffect(() => {
-    if (!isDeveloperSession()) return;
+    if (!user) return;
     const fetchSuggestionsCount = async () => {
       try {
+        const isDev = isDeveloperSession();
+        if (!isDev) return;
         const snap = await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')));
         setNewSuggestionsCount(snap.size);
       } catch {}
     };
     fetchSuggestionsCount();
-    const interval = setInterval(fetchSuggestionsCount, 60000);
+    const interval = setInterval(fetchSuggestionsCount, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const handleLogin = async () => {
     setActivePage('main');

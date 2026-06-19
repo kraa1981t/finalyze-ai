@@ -26,6 +26,11 @@ interface SuggestionsPageProps {
 export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = false, onClearCount }: SuggestionsPageProps) {
   const isAr = lang === 'ar';
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('finalyze_hidden_suggestions') || '[]'));
+    } catch { return new Set(); }
+  });
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState(userName || '');
@@ -35,6 +40,10 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
   const [error, setError] = useState<string | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  const saveHidden = (ids: Set<string>) => {
+    localStorage.setItem('finalyze_hidden_suggestions', JSON.stringify([...ids]));
+  };
 
   const fetchSuggestions = async () => {
     try {
@@ -72,7 +81,8 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
     }
   }, []);
 
-  const totalVotes = suggestions.reduce((sum, s) => sum + s.votes, 0);
+  const visibleSuggestions = isDeveloper ? suggestions.filter(s => !hiddenIds.has(s.id)) : suggestions;
+  const totalVotes = visibleSuggestions.reduce((sum, s) => sum + s.votes, 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,8 +129,17 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
   const handleDeleteOne = async (id: string) => {
     setDeleting(id);
     try {
-      await deleteDoc(doc(db, 'analysisResults', id));
-      await fetchSuggestions();
+      if (isDeveloper) {
+        // Developer only hides locally
+        const newHidden = new Set(hiddenIds);
+        newHidden.add(id);
+        setHiddenIds(newHidden);
+        saveHidden(newHidden);
+      } else {
+        // Client actually deletes from DB
+        await deleteDoc(doc(db, 'analysisResults', id));
+        await fetchSuggestions();
+      }
     } catch (err) {
       console.error('Failed to delete:', err);
       setError(isAr ? 'فشل الحذف' : 'Failed to delete');
@@ -132,10 +151,19 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
   const handleDeleteAll = async () => {
     setDeleting('all');
     try {
-      const promises = suggestions.map(s => deleteDoc(doc(db, 'analysisResults', s.id)));
-      await Promise.all(promises);
+      if (isDeveloper) {
+        // Developer only hides all locally
+        const newHidden = new Set(hiddenIds);
+        suggestions.forEach(s => newHidden.add(s.id));
+        setHiddenIds(newHidden);
+        saveHidden(newHidden);
+      } else {
+        // Client actually deletes from DB
+        const promises = suggestions.map(s => deleteDoc(doc(db, 'analysisResults', s.id)));
+        await Promise.all(promises);
+        await fetchSuggestions();
+      }
       setConfirmDeleteAll(false);
-      await fetchSuggestions();
     } catch (err) {
       console.error('Failed to delete all:', err);
       setError(isAr ? 'فشل حذف الكل' : 'Failed to delete all');
@@ -145,7 +173,8 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
   };
 
   const canDelete = (s: Suggestion) => {
-    return isDeveloper || s.name === userName;
+    if (isDeveloper) return true;
+    return s.name === userName;
   };
 
   const getPercentage = (votes: number) => {
@@ -192,7 +221,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-brand-alt rounded-2xl border border-white/10 p-4 text-center">
-          <div className="text-2xl font-black text-[#F59E0B]">{suggestions.length}</div>
+          <div className="text-2xl font-black text-[#F59E0B]">{visibleSuggestions.length}</div>
           <div className="text-xs text-white/40 font-bold">{isAr ? 'إجمالي الاقتراحات' : 'Total Suggestions'}</div>
         </div>
         <div className="bg-brand-alt rounded-2xl border border-white/10 p-4 text-center">
@@ -201,7 +230,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         </div>
         <div className="bg-brand-alt rounded-2xl border border-white/10 p-4 text-center">
           <div className="text-2xl font-black text-[#F59E0B]">
-            {suggestions.filter(s => isImplementable(s.votes)).length}
+            {visibleSuggestions.filter(s => isImplementable(s.votes)).length}
           </div>
           <div className="text-xs text-white/40 font-bold">{isAr ? 'تم تطبيقها' : 'Implemented'}</div>
         </div>
@@ -218,7 +247,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
             {isAr ? 'أضف اقتراح' : 'Add Suggestion'}
           </button>
         )}
-        {isDeveloper && suggestions.length > 0 && (
+        {isDeveloper && visibleSuggestions.length > 0 && (
           <>
             {confirmDeleteAll ? (
               <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/40 rounded-xl px-4 py-3">
@@ -362,7 +391,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
           <div className="w-8 h-8 border-b-2 border-[#F59E0B] rounded-full animate-spin mx-auto" />
           <p className="text-white/40 text-sm mt-3">{isAr ? 'جاري التحميل...' : 'Loading...'}</p>
         </div>
-      ) : suggestions.length === 0 ? (
+      ) : visibleSuggestions.length === 0 ? (
         <div className="text-center py-12 space-y-3">
           <Lightbulb size={40} className="text-white/20 mx-auto" />
           <p className="text-white/40 text-sm">
@@ -371,7 +400,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         </div>
       ) : (
         <div className="space-y-3">
-          {suggestions.map((s, i) => {
+          {suggestions.filter(s => isDeveloper ? !hiddenIds.has(s.id) : true).map((s, i) => {
             const pct = getPercentage(s.votes);
             const implementable = isImplementable(s.votes);
             const hasVoted = s.voters?.includes(userName || 'anonymous');
