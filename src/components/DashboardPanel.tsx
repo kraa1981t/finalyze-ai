@@ -46,7 +46,7 @@ export default function DashboardPanel({ isOpen, onClose, lang, onOpenSettings, 
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: 'easeInOut' }}
-            className="overflow-hidden bg-white/95 border-b border-black/10 shadow-lg"
+            className="overflow-hidden bg-[#E8E4DE]/95 border-b border-black/10 shadow-lg"
           >
             <div className="max-w-7xl mx-auto px-6 py-6">
               <div className="flex items-center justify-between mb-4">

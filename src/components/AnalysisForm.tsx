@@ -303,8 +303,8 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   className={cn(
                     "w-full flex items-center justify-between p-4 md:p-5 rounded-[2rem] border-2 transition-all group relative overflow-hidden",
                     selectedType === cat.id 
-                      ? "border-primary bg-primary/10 text-brand-text shadow-[0_0_30px_rgba(16,185,129,0.1)] scale-[1.02]" 
-                      : "border-white/5 bg-brand-alt/50 text-brand-text hover:border-brand-text/20 hover:bg-brand-text/5"
+                      ? "border-emerald-400 bg-emerald-100 text-black shadow-[0_0_30px_rgba(16,185,129,0.15)] scale-[1.02]" 
+                      : "border-black/10 bg-[#F59E0B] text-black hover:bg-[#d97706]"
                   )}
                 >
                   {selectedType === cat.id && (
@@ -316,19 +316,19 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "p-2.5 rounded-xl transition-all", 
-                      selectedType === cat.id ? "bg-primary text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-brand-text/5 text-brand-muted"
+                      selectedType === cat.id ? "bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-black/10 text-black"
                     )}>
                       {ICON_MAP[cat.icon]}
                     </div>
                     <div className="flex flex-col items-start">
-                      <span className="text-base font-black uppercase tracking-widest">{t[cat.id as keyof typeof t]}</span>
-                      <span className="text-xs font-bold opacity-100 uppercase">{t.popularSymbols}</span>
+                      <span className="text-base font-black uppercase tracking-widest text-black">{t[cat.id as keyof typeof t]}</span>
+                      <span className="text-xs font-bold text-black/60 uppercase">{t.popularSymbols}</span>
                     </div>
                   </div>
                   
                   <div className={cn(
                     "p-1.5 rounded-lg transition-all",
-                    activeDropdown === cat.id ? "rotate-180 bg-primary/30 text-primary" : "text-brand-muted"
+                    activeDropdown === cat.id ? "rotate-180 bg-black/10 text-black" : "text-black/60"
                   )}>
                     <ChevronDown size={14} />
                   </div>
@@ -464,8 +464,8 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   className={cn(
                     "text-sm font-black px-4 py-2 rounded-full transition-all",
                     SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols).every(s => selectedSymbols.includes(s))
-                      ? "bg-primary text-white" 
-                      : "bg-brand-text/10 text-brand-text hover:bg-brand-text/20"
+                      ? "bg-emerald-400 text-black" 
+                      : "bg-[#F59E0B] text-black hover:bg-[#d97706]"
                   )}
                 >
                  {SYMBOL_GROUPS[selectedType]?.flatMap(g => g.symbols).every(s => selectedSymbols.includes(s))
@@ -520,12 +520,12 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                           <button
                             type="button"
                             onClick={() => toggleSymbol(sym)}
-                            className={cn(
-                              "w-full flex items-center justify-center p-3 rounded-xl text-sm font-black transition-all border",
-                              selectedSymbols.includes(sym)
-                                ? "bg-primary border-primary/50 text-brand-text shadow-[0_5px_15px_rgba(16,185,129,0.2)]"
-                                : "bg-brand-text/5 border-white/5 text-brand-text hover:bg-brand-text/10 hover:border-brand-text/10"
-                            )}
+                              className={cn(
+                                "w-full flex items-center justify-center p-3 rounded-xl text-sm font-black transition-all border",
+                                selectedSymbols.includes(sym)
+                                  ? "bg-emerald-400 border-emerald-500 text-black shadow-[0_5px_15px_rgba(16,185,129,0.2)]"
+                                  : "bg-[#F59E0B] border-black/10 text-black hover:bg-[#d97706]"
+                              )}
                           >
                             {sym}
                           </button>
@@ -594,8 +594,8 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                                 "px-4 py-2 rounded-xl text-sm font-black border transition-all",
                                 !hasActivePlan && "opacity-50 cursor-not-allowed",
                                 selectedSymbols.includes(sym)
-                                  ? "bg-primary border-primary text-brand-text"
-                                  : "bg-brand-text/5 border-brand-text/10 text-brand-text hover:border-white/30"
+                                  ? "bg-emerald-400 border-emerald-500 text-black"
+                                  : "bg-[#F59E0B] border-black/10 text-black hover:bg-[#d97706]"
                               )}
                             >
                               {sym}
@@ -647,17 +647,17 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   className={cn(
                     "flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left",
                     selectedStyle === style.id 
-                      ? "border-primary bg-primary/30 text-brand-text shadow-lg" 
-                      : "border-brand-text/10 bg-brand-alt text-brand-text hover:border-brand-text/20",
+                      ? "border-emerald-400 bg-emerald-100 text-black shadow-lg" 
+                      : "border-black/10 bg-[#F59E0B] text-black hover:bg-[#d97706]",
                     isLocked && "opacity-40 cursor-not-allowed"
                   )}
                 >
-                  <div className={cn("p-2 rounded-lg", selectedStyle === style.id ? "bg-primary" : "bg-brand-text/10")}>
+                  <div className={cn("p-2 rounded-lg", selectedStyle === style.id ? "bg-emerald-500 text-white" : "bg-black/10 text-black")}>
                     {ICON_MAP[style.icon]}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-base font-black uppercase">{t[style.label as keyof typeof t]}</span>
-                    <span className="text-sm opacity-90">
+                    <span className="text-base font-black uppercase text-black">{t[style.label as keyof typeof t]}</span>
+                    <span className="text-sm text-black/70">
                       {style.id === 'swing_trading' ? (lang === 'ar' ? 'تركيز على الاتجاهات الكبرى (4س/يومي) - الأكثر أماناً' : 'Focus on major trends (H4/D1) - Safest') : ''}
                       {style.id === 'day_trading' ? (lang === 'ar' ? 'تحركات اليوم الحالي فقط' : 'Current day moves only') : ''}
                       {style.id === 'scalping' ? (lang === 'ar' ? 'تحركات لحظية سريعة جداً' : 'Very fast intraday moves') : ''}
@@ -690,8 +690,8 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   className={cn(
                     "p-5 rounded-2xl border-2 transition-all text-base font-black uppercase",
                     selectedTimeframe === tf.id 
-                      ? "border-primary bg-primary/30 text-brand-text shadow-lg" 
-                      : "border-brand-text/10 bg-brand-alt text-brand-text/60 hover:border-brand-text/20 hover:text-brand-text",
+                      ? "border-emerald-400 bg-emerald-100 text-black shadow-lg" 
+                      : "border-black/10 bg-[#F59E0B] text-black hover:bg-[#d97706]",
                     isLocked && "opacity-30 cursor-not-allowed"
                   )}
                 >

@@ -26,6 +26,8 @@ import ApiKeyModal from './components/ApiKeyModal';
 import SubscriptionModal from './components/SubscriptionModal';
 import PaymentModal from './components/PaymentModal';
 import ProfilePage from './components/ProfilePage';
+import AboutPage from './components/AboutPage';
+import SuggestionsPage from './components/SuggestionsPage';
 
 function hasAnyStoredKey(): boolean {
   try {
@@ -97,12 +99,12 @@ export default function App() {
     }
     setNeedsApiKeyState(email);
   };
-  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' => {
+  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' => {
     const hash = window.location.hash.slice(1);
-    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile'].includes(hash)) return hash as any;
+    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions'].includes(hash)) return hash as any;
     return 'main';
   };
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile'>(getPageFromHash);
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions'>(getPageFromHash);
   const navStackRef = useRef<string[]>([]);
 
   const navigateTo = (page: any) => {
@@ -491,7 +493,7 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile'];
+    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions'];
     const onHashChange = () => {
       const hash = window.location.hash.slice(1);
       setActivePage(VALID_PAGES.includes(hash) ? hash as any : 'main');
@@ -789,41 +791,58 @@ export default function App() {
 
         setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed });
 
-        await waitIfRateLimited();
-        try {
-          const r = await Promise.race([
-            analyzeMarket({
-              symbol: sym, type: mt,
-              timeframe: s.timeframe,
-              tradingStyle: s.tradingStyle,
-              settings, lang
-            }),
-            new Promise<any>((_, rej) => setTimeout(() => rej(new Error('timeout')), 45000))
-          ]);
-          if (r && !(r as any).error) {
-            const sig = r.signal || '';
-            if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
-            if (sig && sig !== 'no_entry') {
-              scanResults.push(r);
-              setClientSignals(prev => {
-                const u = [...prev.filter(x => x.symbol !== r.symbol), r];
-                localStorage.setItem('finalyze_client_signals', JSON.stringify(u.slice(-100)));
-                return u.slice(-100);
-              });
+        let lastError: any = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          if (!autoSettingsRef.current.isEnabled) break;
+          await waitIfRateLimited();
+          try {
+            const r = await Promise.race([
+              analyzeMarket({
+                symbol: sym, type: mt,
+                timeframe: s.timeframe,
+                tradingStyle: s.tradingStyle,
+                settings, lang
+              }),
+              new Promise<any>((_, rej) => setTimeout(() => rej(new Error('timeout')), 60000))
+            ]);
+            if (r && !(r as any).error) {
+              const sig = r.signal || '';
+              if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
+              if (sig && sig !== 'no_entry') {
+                scanResults.push(r);
+                setClientSignals(prev => {
+                  const u = [...prev.filter(x => x.symbol !== r.symbol), r];
+                  localStorage.setItem('finalyze_client_signals', JSON.stringify(u.slice(-100)));
+                  return u.slice(-100);
+                });
+              }
+              lastError = null;
+              break;
             }
+          } catch (e: any) {
+            lastError = e;
+            const isTimeout = e?.message === 'timeout';
+            const isRateLimit = e?.message?.includes('429') || e?.message?.includes('rate');
+            if (isRateLimit) {
+              await new Promise(r => setTimeout(r, 15000));
+              continue;
+            }
+            if (isTimeout && attempt === 0) {
+              await new Promise(r => setTimeout(r, 5000));
+              continue;
+            }
+            break;
           }
+        }
+        if (lastError) {
+          console.error(`Radar Error [${sym}]:`, lastError.message);
+          scanFailed++;
+          setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed });
+          await new Promise(r => setTimeout(r, 3000));
+        } else {
           const key = getApiKey();
           const d = (key.startsWith('AIzaSy') || key.startsWith('AQ.')) ? 3500 : 2500;
           await new Promise(r => setTimeout(r, d));
-        } catch (e: any) {
-          const isTimeout = e?.message === 'timeout';
-          const isRateLimit = e?.message?.includes('429') || e?.message?.includes('rate');
-          if (!isTimeout && !isRateLimit) {
-            console.error("Radar Error:", e);
-            scanFailed++;
-            setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed });
-          }
-          await new Promise(r => setTimeout(r, isRateLimit ? 15000 : 3000));
         }
       }
     }
@@ -1599,6 +1618,22 @@ export default function App() {
                 lang={lang}
                 onBack={goBack}
                 isDeveloper={isDeveloperSession()}
+              />
+            )}
+
+            {activePage === 'about' && (
+              <AboutPage
+                lang={lang}
+                onBack={goBack}
+                onGoToSuggestions={() => navigateTo('suggestions')}
+              />
+            )}
+
+            {activePage === 'suggestions' && (
+              <SuggestionsPage
+                lang={lang}
+                onBack={() => navigateTo('about')}
+                userName={user?.displayName || user?.email || ''}
               />
             )}
           </motion.div>

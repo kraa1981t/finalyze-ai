@@ -281,27 +281,31 @@ async function fetchYahooFinance(symbol: string, timeframe: string): Promise<any
 }
 
 export async function fetchMarketDataDirect(symbol: string, timeframe: string): Promise<any> {
-  // 1. Try Binance first (crypto only, no CORS issues)
-  const binancePair = findCryptoPair(symbol);
-  if (binancePair) {
-    try {
-      const interval = TIMEFRAME_MAP[timeframe] || '1d';
-      const limit = LIMIT_MAP[timeframe] || 100;
-      const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), 10000);
-      const r = await fetch(`${BINANCE_BASE}/klines?symbol=${binancePair}&interval=${interval}&limit=${limit}`, { signal: ac.signal });
-      clearTimeout(timeout);
-      if (r.ok) {
-        const klines = await r.json();
-        if (klines && klines.length >= 10) return toYahooFormat(klines, symbol);
-      }
-    } catch {}
-  }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    // 1. Try Binance first (crypto only, no CORS issues)
+    const binancePair = findCryptoPair(symbol);
+    if (binancePair) {
+      try {
+        const interval = TIMEFRAME_MAP[timeframe] || '1d';
+        const limit = LIMIT_MAP[timeframe] || 100;
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 10000);
+        const r = await fetch(`${BINANCE_BASE}/klines?symbol=${binancePair}&interval=${interval}&limit=${limit}`, { signal: ac.signal });
+        clearTimeout(timeout);
+        if (r.ok) {
+          const klines = await r.json();
+          if (klines && klines.length >= 10) return toYahooFormat(klines, symbol);
+        }
+      } catch {}
+    }
 
-  // 2. Try Yahoo Finance (forex + stocks + crypto fallback)
-  try {
-    return await fetchYahooFinance(symbol, timeframe);
-  } catch {}
+    // 2. Try Yahoo Finance (forex + stocks + crypto fallback)
+    try {
+      return await fetchYahooFinance(symbol, timeframe);
+    } catch {}
+
+    if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+  }
 
   throw new Error('Market data currently unavailable from the source.');
 }
@@ -309,36 +313,42 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
 export async function callAIDirect(prompt: string, apiKey: string): Promise<any> {
   if (!apiKey) return { error: 'No API key provided' };
 
-  const isGemini = apiKey.startsWith('AIzaSy') || apiKey.startsWith('AQ.');
-  const isGroq = apiKey.startsWith('gsk_');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const isGemini = apiKey.startsWith('AIzaSy') || apiKey.startsWith('AQ.');
+    const isGroq = apiKey.startsWith('gsk_');
 
-  // Try Groq first (preferred — faster, more reliable for batch)
-  if (isGroq) {
-    const groqResult = await callGroqDirect(prompt, apiKey);
-    if (!groqResult?.error) return groqResult;
-    // If Groq fails, try Gemini as fallback
-    const k2 = localStorage.getItem('finalyze_key2_value') || localStorage.getItem('finalyze_key1_value');
-    if (k2 && k2 !== apiKey) {
-      const gemResult = await callAIDirect(prompt, k2);
-      if (!gemResult?.error) return gemResult;
-    }
-    return groqResult;
-  }
-
-  // Try Gemini
-  if (isGemini) {
-    const gemResult = await callGeminiDirect(prompt, apiKey);
-    if (!gemResult?.error) return gemResult;
-    // If Gemini fails, try Groq as fallback
-    const k2 = localStorage.getItem('finalyze_key2_value') || localStorage.getItem('finalyze_key1_value');
-    if (k2 && k2 !== apiKey) {
-      const groqResult = await callAIDirect(prompt, k2);
+    // Try Groq first (preferred — faster, more reliable for batch)
+    if (isGroq) {
+      const groqResult = await callGroqDirect(prompt, apiKey);
       if (!groqResult?.error) return groqResult;
+      if (attempt === 0) { await new Promise(r => setTimeout(r, 3000)); continue; }
+      // If Groq fails, try Gemini as fallback
+      const k2 = localStorage.getItem('finalyze_key2_value') || localStorage.getItem('finalyze_key1_value');
+      if (k2 && k2 !== apiKey) {
+        const gemResult = await callAIDirect(prompt, k2);
+        if (!gemResult?.error) return gemResult;
+      }
+      return groqResult;
     }
-    return gemResult;
+
+    // Try Gemini
+    if (isGemini) {
+      const gemResult = await callGeminiDirect(prompt, apiKey);
+      if (!gemResult?.error) return gemResult;
+      if (attempt === 0) { await new Promise(r => setTimeout(r, 3000)); continue; }
+      // If Gemini fails, try Groq as fallback
+      const k2 = localStorage.getItem('finalyze_key2_value') || localStorage.getItem('finalyze_key1_value');
+      if (k2 && k2 !== apiKey) {
+        const groqResult = await callAIDirect(prompt, k2);
+        if (!groqResult?.error) return groqResult;
+      }
+      return gemResult;
+    }
+
+    return { error: 'Unrecognized API key format. Use Google Gemini (AIza...) or Groq (gsk_...)' };
   }
 
-  return { error: 'Unrecognized API key format. Use Google Gemini (AIza...) or Groq (gsk_...)' };
+  return { error: 'All AI attempts exhausted' };
 }
 
 async function callGeminiDirect(prompt: string, apiKey: string): Promise<any> {

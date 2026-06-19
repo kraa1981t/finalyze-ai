@@ -13,7 +13,7 @@ export default function ConnectionStatus({ lang }: { lang: Language }) {
   ];
 
   return (
-    <div className="mt-8 p-6 bg-white border border-slate-100 rounded-3xl shadow-sm" dir={isAr ? 'rtl' : 'ltr'}>
+    <div className="mt-8 p-6 bg-[#DDD8D0] border border-slate-300 rounded-3xl shadow-sm" dir={isAr ? 'rtl' : 'ltr'}>
       <div className="flex items-center gap-2 mb-4">
         <Shield className="text-primary" size={20} />
         <h4 className="font-bold text-slate-900 text-sm">{isAr ? 'حالة الربط والبيانات الحية' : 'Live Connection & Data Status'}</h4>

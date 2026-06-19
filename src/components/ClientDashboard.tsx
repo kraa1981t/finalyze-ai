@@ -227,7 +227,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
               layout
               className={`rounded-lg border transition-all ${
                 isSelected && !isLocked
-                  ? 'border-primary ring-1 ring-primary bg-brand-alt/80'
+                  ? 'border-white/10 bg-brand-alt/80'
                   : 'border-white/5 bg-brand-alt/45 hover:border-white/10'
               } ${isLocked ? 'opacity-40 pointer-events-none' : ''}`}
             >
@@ -239,34 +239,34 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                     setExpandedCard(isExpanded ? null : res.symbol);
                   }
                 }}
-                className="w-full px-2 py-2 flex flex-col items-center gap-1.5"
+                className={`w-full px-3 py-3 flex flex-col items-center gap-2 rounded-t-lg transition-all ${isSelected && !isLocked ? 'border-b border-[#F59E0B]/30' : ''}`}
               >
                 {/* Symbol and SL/TP Row */}
                 <div className="flex items-stretch justify-between w-full gap-2 px-1">
                   {/* Take Profit (TP) Box on Left */}
-                  <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-3 py-3 shrink-0 min-w-[70px] flex items-center justify-center">
-                    <span className="text-sm font-black font-mono text-emerald-400">{tpPrice.toFixed(decimals)}</span>
+                  <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-4 py-4 shrink-0 min-w-[90px] flex items-center justify-center">
+                    <span className="text-lg font-black font-mono text-emerald-400">{tpPrice.toFixed(decimals)}</span>
                   </div>
 
                   {/* Symbol in Middle */}
-                  <span className="text-xs font-black text-white italic truncate flex items-center">{res.symbol}</span>
+                  <span className={`text-base font-black italic truncate flex items-center ${meta.color}`}>{res.symbol}</span>
 
                   {/* Stop Loss (SL) Box on Right */}
-                  <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-3 py-3 shrink-0 min-w-[70px] flex items-center justify-center">
-                    <span className="text-sm font-black font-mono text-red-400">{slPrice.toFixed(decimals)}</span>
+                  <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-4 py-4 shrink-0 min-w-[90px] flex items-center justify-center">
+                    <span className="text-lg font-black font-mono text-red-400">{slPrice.toFixed(decimals)}</span>
                   </div>
                 </div>
 
                 {/* Signal text */}
-                <span className={`text-[8px] font-black ${meta.color}`}>
+                <span className={`text-xs font-black ${meta.color}`}>
                   {isLocked ? (isAr ? 'محدود' : 'Limited') : (isAr ? meta.labelAr : meta.labelEn)}
                 </span>
 
                 {/* Confidence + Time row */}
                 <div className="flex items-center gap-2">
-                  {isLocked && <Lock size={10} className="text-amber-400 shrink-0" />}
-                  <span className="text-sm font-black text-white font-mono">{res.confidence}%</span>
-                  <div className="flex items-center gap-0.5 text-[8px] text-white/40 font-bold">
+                  {isLocked && <Lock size={14} className="text-amber-400 shrink-0" />}
+                  <span className={`text-lg font-black font-mono ${meta.color}`}>{res.confidence}%</span>
+                  <div className={`flex items-center gap-0.5 text-[10px] font-bold ${meta.color}/40`}>
                     <span>{formatPublishDate(res.timestamp, lang)}</span>
                   </div>
                 </div>
@@ -276,10 +276,11 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
               <AnimatePresence>
                 {isExpanded && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="overflow-hidden"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    className="origin-top"
                   >
                     <div className="px-2 pb-1.5 space-y-1.5 border-t border-white/5 pt-1.5">
                       {/* Lot Size Calculator */}
@@ -316,31 +317,32 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                             }}
                             className="w-full flex items-center justify-between text-xs font-bold text-yellow-400/70 hover:text-yellow-400 transition-colors py-1"
                           >
-                            <div className="flex items-center gap-1">
-                              <Info size={12} />
-                              <span>{isAr ? 'المؤشرات' : 'Indicators'} ({res.detailedReasons.length})</span>
+                            <div className="flex items-center gap-1.5">
+                              <Info size={14} />
+                              <span className="text-xs">{isAr ? 'المؤشرات' : 'Indicators'} ({res.detailedReasons.length})</span>
                             </div>
-                            <span className="text-[10px]">{expandedReasons.has(`${res.symbol}_${idx}`) ? '▼' : '▶'}</span>
+                            <span className="text-xs">{expandedReasons.has(`${res.symbol}_${idx}`) ? '▼' : '▶'}</span>
                           </button>
                           <AnimatePresence>
                             {expandedReasons.has(`${res.symbol}_${idx}`) && (
                               <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="overflow-hidden"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.8 }}
+                                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                                    className="origin-center"
                               >
-                                <div className="space-y-1 pt-1">
+                                <div className="space-y-1.5 pt-1">
                                   {res.detailedReasons.map((reason, i) => (
-                                    <div key={i} className="bg-white/[0.02] rounded p-1.5 border border-white/5 flex items-center justify-between text-[10px]">
-                                      <div className="flex items-center gap-1">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${
-                                          reason.status === 'positive' ? 'bg-emerald-400' :
-                                          reason.status === 'negative' ? 'bg-red-400' : 'bg-white/30'
+                                    <div key={i} className="bg-white/[0.02] rounded p-2 border border-white/5 flex items-center justify-between text-xs">
+                                      <div className="flex items-center gap-1.5">
+                                        <div className={`w-2 h-2 rounded-full ${
+                                          reason.status === 'positive' ? 'bg-[#F59E0B]' :
+                                          reason.status === 'negative' ? 'bg-[#F59E0B]' : 'bg-[#F59E0B]/50'
                                         }`} />
                                         <span className="font-bold text-yellow-400/80">{reason.check}</span>
                                       </div>
-                                      <span className="text-yellow-400/50 font-mono">{reason.value}</span>
+                                      <span className="text-yellow-400/50 font-mono text-xs">{reason.value}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -353,7 +355,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                       {/* View Chart Button */}
                       <button
                         onClick={() => setSelectedSymbol(res.symbol)}
-                        className="w-full py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider bg-primary text-white flex items-center justify-center gap-1"
+                        className="w-full py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider bg-[#F59E0B] text-black flex items-center justify-center gap-1"
                       >
                         <BarChart2 size={12} />
                         <span>{isAr ? 'عرض الشارت' : 'View Chart'}</span>

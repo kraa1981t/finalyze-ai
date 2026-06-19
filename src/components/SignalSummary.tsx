@@ -69,10 +69,12 @@ export default function SignalSummary({ signals, lang }: SignalSummaryProps) {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
         {categories.map(({ cat, buys, sells, net, color, icon: Icon, labelAr, labelEn }) => (
-          <div key={cat} className="rounded-xl bg-brand-bg/40 border border-brand-text/5 p-3">
+          <div key={cat} className="rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/20 p-3">
             <div className={cn("flex items-center gap-2 mb-2", isRTL ? "flex-row-reverse" : "")}>
-              <Icon size={14} style={{ color }} />
-              <span className="text-[10px] font-black uppercase tracking-wider" style={{ color }}>
+              <div className="p-1.5 rounded-lg bg-[#F59E0B]">
+                <Icon size={14} className="text-black" />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-black">
                 {isRTL ? labelAr : labelEn}
               </span>
             </div>

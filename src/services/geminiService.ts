@@ -79,6 +79,9 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   if (!closes || closes.length < 10) return null;
 
   const len = closes.length;
+  const safeOpens = opens && opens.length >= len ? opens : closes;
+  const safeHighs = highs && highs.length >= len ? highs : closes;
+  const safeLows = lows && lows.length >= len ? lows : closes;
   
   // 1. RSI (14)
   let sumGain = 0;
@@ -165,9 +168,9 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     for (let i = len - 14; i < len; i++) {
       const prevClose = closes[i - 1] || closes[i];
       const tr = Math.max(
-        highs[i] - lows[i],
-        Math.abs(highs[i] - prevClose),
-        Math.abs(lows[i] - prevClose)
+        safeHighs[i] - safeLows[i],
+        Math.abs(safeHighs[i] - prevClose),
+        Math.abs(safeLows[i] - prevClose)
       );
       sumTR += tr;
     }
@@ -197,8 +200,8 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   if (len >= 5 && bbLower > 0) {
     // Count consecutive opposite candles
     for (let i = len - 1; i >= Math.max(0, len - 5); i--) {
-      const isBearish = closes[i] < opens[i];
-      const isBullish = closes[i] > opens[i];
+      const isBearish = closes[i] < safeOpens[i];
+      const isBullish = closes[i] > safeOpens[i];
       if (direction === 'uptrend' && isBearish) bbPullbackCount++;
       else if (direction === 'downtrend' && isBullish) bbPullbackCount++;
       else break;
@@ -215,8 +218,8 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   let hasEngulfing = false;
   let hasShootingStar = false;
   if (len >= 2) {
-    const currO = opens[len - 1], currC = closes[len - 1], currH = highs[len - 1], currL = lows[len - 1];
-    const prevO = opens[len - 2], prevC = closes[len - 2];
+    const currO = safeOpens[len - 1], currC = closes[len - 1], currH = safeHighs[len - 1], currL = safeLows[len - 1];
+    const prevO = safeOpens[len - 2], prevC = closes[len - 2];
     const body = Math.abs(currC - currO);
     const upperWick = currH - Math.max(currO, currC);
     const lowerWick = Math.min(currO, currC) - currL;
@@ -269,10 +272,13 @@ async function fetchAndPrepareSymbolData(
     if (!quotes || !quotes.close) return { error: 'Market data currently unavailable from the source.' };
 
     const closes = quotes.close.filter((c: any) => c != null);
-    const highs = quotes.high.filter((c: any) => c != null);
-    const lows = quotes.low.filter((c: any) => c != null);
+    const highsRaw = quotes.high.filter((c: any) => c != null);
+    const lowsRaw = quotes.low.filter((c: any) => c != null);
+    const highs = highsRaw.length >= closes.length ? highsRaw : closes;
+    const lows = lowsRaw.length >= closes.length ? lowsRaw : closes;
     const volumes = quotes.volume?.filter((v: any) => v != null);
-    const opens = quotes.open?.filter((c: any) => c != null) || closes;
+    const rawOpens1 = quotes.open?.filter((c: any) => c != null) || closes;
+    const opens = rawOpens1.length >= closes.length ? rawOpens1 : closes;
     if (closes.length < 10) return { error: `Insufficient data for ${symbol}.` };
 
     const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes, opens);
@@ -447,25 +453,33 @@ export async function analyzeMarketBatch(
     const p = paramsList[i];
     if (onProgress) onProgress(p.symbol, total, i, errors.length);
 
-    try {
-      // Small delay between calls to avoid rate limiting (skip first)
-      if (i > 0) await new Promise(r => setTimeout(r, 1200));
-      await waitIfRateLimited();
+    let lastError: any = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 5000));
+        if (i > 0 || attempt > 0) await new Promise(r => setTimeout(r, 1200));
+        await waitIfRateLimited();
 
-      console.log(`[Batch] Analyzing ${p.symbol} (${i + 1}/${total})...`);
-      const result = await analyzeMarket({
-        symbol: p.symbol,
-        type: p.type,
-        timeframe: p.timeframe,
-        tradingStyle: p.tradingStyle,
-        settings,
-        lang
-      });
-      console.log(`[Batch] ${p.symbol} → ${result.signal} (${result.confidence}%)`);
-      results.push(result);
-    } catch (e: any) {
-      console.error(`[Batch] FAILED ${p.symbol}:`, e.message);
-      errors.push({ symbol: p.symbol, error: e.message || 'Analysis failed' });
+        console.log(`[Batch] Analyzing ${p.symbol} (${i + 1}/${total}) attempt ${attempt + 1}...`);
+        const result = await analyzeMarket({
+          symbol: p.symbol,
+          type: p.type,
+          timeframe: p.timeframe,
+          tradingStyle: p.tradingStyle,
+          settings,
+          lang
+        });
+        console.log(`[Batch] ${p.symbol} → ${result.signal} (${result.confidence}%)`);
+        results.push(result);
+        lastError = null;
+        break;
+      } catch (e: any) {
+        lastError = e;
+        console.warn(`[Batch] Attempt ${attempt + 1} FAILED ${p.symbol}:`, e.message);
+      }
+    }
+    if (lastError) {
+      errors.push({ symbol: p.symbol, error: lastError.message || 'Analysis failed' });
     }
   }
 
@@ -496,10 +510,13 @@ export async function analyzeMarket(params: {
     }
 
     const closes = quotes.close.filter((c: any) => c != null);
-    const highs = quotes.high.filter((c: any) => c != null);
-    const lows = quotes.low.filter((c: any) => c != null);
+    const highsRaw2 = quotes.high.filter((c: any) => c != null);
+    const lowsRaw2 = quotes.low.filter((c: any) => c != null);
+    const highs = highsRaw2.length >= closes.length ? highsRaw2 : closes;
+    const lows = lowsRaw2.length >= closes.length ? lowsRaw2 : closes;
     const volumes = quotes.volume?.filter((v: any) => v != null);
-    const opens = quotes.open?.filter((c: any) => c != null) || closes;
+    const rawOpens2 = quotes.open?.filter((c: any) => c != null) || closes;
+    const opens = rawOpens2.length >= closes.length ? rawOpens2 : closes;
 
     if (closes.length < 10) {
       throw new Error(`Insufficient data for ${symbol}.`);
@@ -617,18 +634,17 @@ Return ONLY valid JSON:
     const keyValue = getApiKey() || '';
     if (keyValue) mirrorApiKey(keyValue);
 
-    await waitIfRateLimited();
-
-    async function makeSingleAICall(): Promise<any> {
-      return callAIDirect(technicalPrompt, keyValue);
+    let aiResponse: any = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await waitIfRateLimited();
+      aiResponse = await callAIDirect(technicalPrompt, keyValue);
+      if (!aiResponse?.error) break;
+      if (aiResponse.error === 'rate_limited') { onRateLimited(); await new Promise(r => setTimeout(r, 10000)); continue; }
+      if (attempt < 2) await new Promise(r => setTimeout(r, 3000));
     }
 
-    let aiResponse = await makeSingleAICall();
-    if (aiResponse?.error === 'rate_limited') onRateLimited();
-
-    if (aiResponse?.error) {
-      if (aiResponse.error === 'rate_limited') onRateLimited();
-      throw new Error(aiResponse.error);
+    if (!aiResponse || aiResponse?.error) {
+      throw new Error(aiResponse?.error || "AI service unavailable");
     }
 
     if (!aiResponse?.choices?.[0]?.message?.content) {

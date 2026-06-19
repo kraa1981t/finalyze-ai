@@ -142,7 +142,7 @@ export default function Header({
             </div>
 
             {/* Auto Analysis - toggle for dev, status for clients */}
-            <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex flex-col items-center gap-1 px-4 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:shadow-md transition-shadow">
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">
                 {lang === 'ar' ? 'التحليل التلقائي' : 'Auto Analysis'}
               </span>
@@ -153,7 +153,7 @@ export default function Header({
                     onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled });
                   }}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-xl transition-all border-2 shadow-lg",
+                    "flex items-center gap-2 px-6 py-2.5 rounded-xl transition-all border-2 shadow-lg",
                     autoSettings.isEnabled
                       ? (isWaiting
                         ? 'bg-yellow-500 border-yellow-600 text-white shadow-yellow-500/40'
@@ -172,7 +172,7 @@ export default function Header({
                   </span>
                 </button>
               ) : (
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border-2 border-emerald-500/40">
+                <div className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-500/20 border-2 border-emerald-500/40">
                   <div className="relative">
                     <Zap size={18} className="text-emerald-400" fill="currentColor" />
                     <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
