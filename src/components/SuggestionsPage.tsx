@@ -21,9 +21,10 @@ interface SuggestionsPageProps {
   userName?: string;
   isDeveloper?: boolean;
   onClearCount?: () => void;
+  onHideCount?: (n: number) => void;
 }
 
-export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = false, onClearCount }: SuggestionsPageProps) {
+export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = false, onClearCount, onHideCount }: SuggestionsPageProps) {
   const isAr = lang === 'ar';
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
@@ -130,13 +131,12 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
     setDeleting(id);
     try {
       if (isDeveloper) {
-        // Developer only hides locally
         const newHidden = new Set(hiddenIds);
         newHidden.add(id);
         setHiddenIds(newHidden);
         saveHidden(newHidden);
+        if (onHideCount) onHideCount(1);
       } else {
-        // Client actually deletes from DB
         await deleteDoc(doc(db, 'analysisResults', id));
         await fetchSuggestions();
       }
@@ -152,13 +152,13 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
     setDeleting('all');
     try {
       if (isDeveloper) {
-        // Developer only hides all locally
         const newHidden = new Set(hiddenIds);
-        suggestions.forEach(s => newHidden.add(s.id));
+        const toHide = visibleSuggestions.length;
+        visibleSuggestions.forEach(s => newHidden.add(s.id));
         setHiddenIds(newHidden);
         saveHidden(newHidden);
+        if (onHideCount) onHideCount(toHide);
       } else {
-        // Client actually deletes from DB
         const promises = suggestions.map(s => deleteDoc(doc(db, 'analysisResults', s.id)));
         await Promise.all(promises);
         await fetchSuggestions();

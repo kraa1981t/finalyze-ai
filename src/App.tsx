@@ -1655,6 +1655,7 @@ export default function App() {
                 userName={user?.displayName || user?.email || ''}
                 isDeveloper={isDeveloperSession()}
                 onClearCount={() => setNewSuggestionsCount(0)}
+                onHideCount={(n) => setNewSuggestionsCount(prev => Math.max(0, prev - n))}
               />
             )}
           </motion.div>
