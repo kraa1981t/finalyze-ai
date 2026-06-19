@@ -1315,6 +1315,11 @@ export default function App() {
       try {
         const isDev = isDeveloperSession();
         if (!isDev) return;
+        // If developer is on suggestions page, keep count at 0
+        if (activePage === 'suggestions') {
+          setNewSuggestionsCount(0);
+          return;
+        }
         const snap = await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')));
         setNewSuggestionsCount(snap.size);
       } catch {}
@@ -1322,7 +1327,7 @@ export default function App() {
     fetchSuggestionsCount();
     const interval = setInterval(fetchSuggestionsCount, 30000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, activePage]);
 
   const handleLogin = async () => {
     setActivePage('main');
