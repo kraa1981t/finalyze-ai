@@ -415,15 +415,21 @@ function generateLocalAnalysis(
   else if (score <= -1.5) { rawSignal = SignalType.SELL; confidence = Math.round(60 + (absScore - 1.5) * 13.3); }
   else { rawSignal = SignalType.NEUTRAL; confidence = Math.round(40 + absScore * 13.3); }
 
-  // Apply age zone caps
-  if (totalAge < infantLimit && confidence > 65) confidence = 65;
+  // Apply age zone caps — proportional reduction instead of fixed values
+  if (totalAge < infantLimit) {
+    confidence = Math.round(confidence * 0.7);
+  }
   else if (totalAge < matureLimit) {
     if (rawSignal === SignalType.STRONG_BUY) rawSignal = SignalType.BUY;
     else if (rawSignal === SignalType.STRONG_SELL) rawSignal = SignalType.SELL;
-    if (confidence > 75) confidence = 75;
+    confidence = Math.round(confidence * 0.85);
   }
-  else if (totalAge > oldLimit && confidence > 65) confidence = 65;
-  if (age < minAge && confidence > 65) confidence = 65;
+  else if (totalAge > oldLimit) {
+    confidence = Math.round(confidence * 0.75);
+  }
+  if (age < minAge) {
+    confidence = Math.round(confidence * 0.8);
+  }
   const minConf = settings?.minConfidence || 55;
   if (confidence < minConf) rawSignal = SignalType.NEUTRAL;
 
@@ -687,28 +693,28 @@ Return ONLY valid JSON:
     const matureLimit = isCrypto ? matureAgeThreshold * 2 : matureAgeThreshold;
     const oldLimit = isCrypto ? oldAgeThreshold * 2 : oldAgeThreshold;
 
-    // Zone 1: Too young — confidence cap
+    // Zone 1: Too young — proportional confidence reduction
     if (totalAge < infantLimit) {
-      if (finalConfidence > 65) finalConfidence = 65;
+      finalConfidence = Math.round(finalConfidence * 0.7);
     }
     // Zone 2: Infant — downgrade strong signals to normal
     else if (totalAge < matureLimit) {
       if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
       else if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
-      if (finalConfidence > 70) finalConfidence = 70;
+      finalConfidence = Math.round(finalConfidence * 0.85);
     }
     // Zone 3: Mature — full strength allowed (no modification)
     else if (totalAge <= oldLimit) {
       // Strong signals pass through at full confidence
     }
-    // Zone 4: Old/Exhaustion — confidence cap
+    // Zone 4: Old/Exhaustion — proportional confidence reduction
     else {
-      if (finalConfidence > 65) finalConfidence = 65;
+      finalConfidence = Math.round(finalConfidence * 0.75);
     }
 
     // Also cap confidence if consecutive momentum (age) is too short
-    if (age < minAge && finalConfidence > 65) {
-      finalConfidence = 65;
+    if (age < minAge) {
+      finalConfidence = Math.round(finalConfidence * 0.8);
     }
 
     // STRICT MATHEMATICAL ENFORCEMENT OF SETTINGS
