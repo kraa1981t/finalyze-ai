@@ -1315,11 +1315,6 @@ export default function App() {
       try {
         const isDev = isDeveloperSession();
         if (!isDev) return;
-        // If developer is on suggestions page, keep count at 0
-        if (activePage === 'suggestions') {
-          setNewSuggestionsCount(0);
-          return;
-        }
         const snap = await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')));
         setNewSuggestionsCount(snap.size);
       } catch {}
@@ -1327,7 +1322,7 @@ export default function App() {
     fetchSuggestionsCount();
     const interval = setInterval(fetchSuggestionsCount, 30000);
     return () => clearInterval(interval);
-  }, [user, activePage]);
+  }, [user]);
 
   const handleLogin = async () => {
     setActivePage('main');
@@ -1481,7 +1476,7 @@ export default function App() {
         lastSyncStatus={lastSyncStatus}
         analysisProgress={progress}
         isAnalyzing={isAnalyzing}
-        newSuggestionsCount={newSuggestionsCount}
+        newSuggestionsCount={activePage === 'suggestions' ? 0 : newSuggestionsCount}
         onNavigateSuggestions={() => navigateTo('suggestions')}
       />
 
@@ -1659,7 +1654,6 @@ export default function App() {
                 onBack={() => navigateTo('about')}
                 userName={user?.displayName || user?.email || ''}
                 isDeveloper={isDeveloperSession()}
-                onClearCount={() => setNewSuggestionsCount(0)}
                 onHideCount={(n) => setNewSuggestionsCount(prev => Math.max(0, prev - n))}
               />
             )}
