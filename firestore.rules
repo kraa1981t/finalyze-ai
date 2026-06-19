@@ -48,10 +48,9 @@ service cloud.firestore {
       allow write: if true;
     }
 
-    // Suggestions — anyone can write, signed in to read
+    // Suggestions — anyone can read/write
     match /suggestions/{suggestionId} {
-      allow read: if isSignedIn();
-      allow write: if true;
+      allow read, write: if true;
     }
   }
 }

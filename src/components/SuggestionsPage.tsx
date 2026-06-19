@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Lightbulb, Plus, Check, User, MessageSquare, ThumbsUp, Trophy, X } from 'lucide-react';
 import { Language } from '../lib/i18n';
 import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs, updateDoc, doc, increment, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, doc, increment, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
 
 interface Suggestion {
   id: string;
@@ -12,7 +12,10 @@ interface Suggestion {
   votes: number;
   voters: string[];
   createdAt: any;
+  _type?: string;
 }
+
+const SUGGESTION_PREFIX = '__suggestion__';
 
 interface SuggestionsPageProps {
   lang: Language;
@@ -29,18 +32,32 @@ export default function SuggestionsPage({ lang, onBack, userName }: SuggestionsP
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchSuggestions = async () => {
     try {
-      const q = query(collection(db, 'suggestions'), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion'));
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Suggestion[];
+      const data = snapshot.docs.map(d => {
+        const raw = d.data();
+        return {
+          id: d.id,
+          name: raw.name || '',
+          text: raw.text || '',
+          votes: raw.votes || 0,
+          voters: raw.voters || [],
+          createdAt: raw.createdAt,
+          _type: raw._type,
+        } as Suggestion;
+      }).sort((a, b) => {
+        const ta = a.createdAt?.seconds || 0;
+        const tb = b.createdAt?.seconds || 0;
+        return tb - ta;
+      });
       setSuggestions(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch suggestions:', err);
+      setError(isAr ? 'فشل تحميل الاقتراحات' : 'Failed to load suggestions');
     } finally {
       setLoading(false);
     }
@@ -56,8 +73,10 @@ export default function SuggestionsPage({ lang, onBack, userName }: SuggestionsP
     e.preventDefault();
     if (!name.trim() || !text.trim()) return;
     setSubmitting(true);
+    setError(null);
     try {
-      await addDoc(collection(db, 'suggestions'), {
+      await addDoc(collection(db, 'analysisResults'), {
+        _type: 'suggestion',
         name: name.trim(),
         text: text.trim(),
         votes: 0,
@@ -69,8 +88,9 @@ export default function SuggestionsPage({ lang, onBack, userName }: SuggestionsP
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 3000);
       await fetchSuggestions();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to submit suggestion:', err);
+      setError(isAr ? 'فشل إرسال الاقتراح. تأكد من اتصالك بالإنترنت' : 'Failed to submit suggestion. Check your internet connection');
     } finally {
       setSubmitting(false);
     }
@@ -80,7 +100,7 @@ export default function SuggestionsPage({ lang, onBack, userName }: SuggestionsP
     const voterId = userName || 'anonymous';
     if (suggestion.voters?.includes(voterId)) return;
     try {
-      const ref = doc(db, 'suggestions', suggestion.id);
+      const ref = doc(db, 'analysisResults', suggestion.id);
       await updateDoc(ref, {
         votes: increment(1),
         voters: [...(suggestion.voters || []), voterId]
@@ -172,6 +192,21 @@ export default function SuggestionsPage({ lang, onBack, userName }: SuggestionsP
             <span className="text-sm font-black text-emerald-400">
               {isAr ? 'تم إضافة اقتراحك بنجاح!' : 'Your suggestion has been added!'}
             </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Error message */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-red-500/10 border border-red-500/30 rounded-2xl px-5 py-3 flex items-center justify-center gap-3"
+          >
+            <X size={20} className="text-red-400" />
+            <span className="text-sm font-black text-red-400">{error}</span>
           </motion.div>
         )}
       </AnimatePresence>

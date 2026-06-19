@@ -1313,7 +1313,7 @@ export default function App() {
     if (!isDeveloperSession()) return;
     const fetchSuggestionsCount = async () => {
       try {
-        const snap = await getDocs(collection(db, 'suggestions'));
+        const snap = await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')));
         setNewSuggestionsCount(snap.size);
       } catch {}
     };
