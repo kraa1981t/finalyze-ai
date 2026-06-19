@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Lightbulb, Plus, Check, User, ThumbsUp, Trophy, X, Trash2, AlertTriangle } from 'lucide-react';
 import { Language } from '../lib/i18n';
 import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, increment, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, increment, serverTimestamp, query, where, setDoc } from 'firebase/firestore';
 
 interface Suggestion {
   id: string;
@@ -27,11 +27,7 @@ interface SuggestionsPageProps {
 export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = false, onClearCount, onHideCount }: SuggestionsPageProps) {
   const isAr = lang === 'ar';
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem('finalyze_hidden_suggestions') || '[]'));
-    } catch { return new Set(); }
-  });
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState(userName || '');
@@ -42,8 +38,22 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const saveHidden = (ids: Set<string>) => {
-    localStorage.setItem('finalyze_hidden_suggestions', JSON.stringify([...ids]));
+  const hiddenDocId = isDeveloper ? 'dev_hidden_suggestions' : `hidden_${userName || 'anonymous'}`;
+
+  const fetchHidden = async () => {
+    try {
+      const snap = await getDocs(query(collection(db, 'userPreferences'), where('__name__', '==', hiddenDocId)));
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
+        setHiddenIds(new Set(data.hiddenIds || []));
+      }
+    } catch {}
+  };
+
+  const saveHidden = async (ids: Set<string>) => {
+    try {
+      await setDoc(doc(db, 'userPreferences', hiddenDocId), { hiddenIds: [...ids] }, { merge: true });
+    } catch {}
   };
 
   const fetchSuggestions = async () => {
@@ -77,8 +87,9 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
 
   useEffect(() => {
     fetchSuggestions();
-    if (isDeveloper && onClearCount) {
-      onClearCount();
+    if (isDeveloper) {
+      fetchHidden();
+      if (onClearCount) onClearCount();
     }
   }, []);
 
@@ -134,7 +145,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         const newHidden = new Set(hiddenIds);
         newHidden.add(id);
         setHiddenIds(newHidden);
-        saveHidden(newHidden);
+        await saveHidden(newHidden);
         if (onHideCount) onHideCount(1);
       } else {
         await deleteDoc(doc(db, 'analysisResults', id));
@@ -156,7 +167,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         const toHide = visibleSuggestions.length;
         visibleSuggestions.forEach(s => newHidden.add(s.id));
         setHiddenIds(newHidden);
-        saveHidden(newHidden);
+        await saveHidden(newHidden);
         if (onHideCount) onHideCount(toHide);
       } else {
         const promises = suggestions.map(s => deleteDoc(doc(db, 'analysisResults', s.id)));

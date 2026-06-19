@@ -1316,7 +1316,17 @@ export default function App() {
         const isDev = isDeveloperSession();
         if (!isDev) return;
         const snap = await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')));
-        setNewSuggestionsCount(snap.size);
+        const total = snap.size;
+        // Fetch hidden count
+        let hiddenCount = 0;
+        try {
+          const hiddenSnap = await getDocs(query(collection(db, 'userPreferences'), where('__name__', '==', 'dev_hidden_suggestions')));
+          if (!hiddenSnap.empty) {
+            const hiddenData = hiddenSnap.docs[0].data();
+            hiddenCount = (hiddenData.hiddenIds || []).length;
+          }
+        } catch {}
+        setNewSuggestionsCount(Math.max(0, total - hiddenCount));
       } catch {}
     };
     fetchSuggestionsCount();

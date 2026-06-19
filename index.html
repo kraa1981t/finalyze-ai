@@ -19,13 +19,12 @@
           }
         });
       }
-      // Clear all caches
+      // Clear ALL caches aggressively
       if ('caches' in window) {
         caches.keys().then(names => {
           for (const name of names) caches.delete(name);
         });
       }
-      try { localStorage.removeItem('radar_scan_finished'); } catch(e) {}
     </script>
   </head>
   <body translate="no" class="notranslate">
