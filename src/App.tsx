@@ -76,6 +76,7 @@ export default function App() {
   }, []);
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('theme') !== 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [newSuggestionsCount, setNewSuggestionsCount] = useState(0);
   const [freemiumDisabled, setFreemiumDisabled] = useState(() => localStorage.getItem('finalyze_freemium_disabled') === 'true');
   const [needsApiKey, setNeedsApiKeyState] = useState<string | null>(() => {
     try { return localStorage.getItem('finalyze_needs_api_key'); } catch { return null; }
@@ -1307,6 +1308,20 @@ export default function App() {
     }
   };
 
+  // Fetch new suggestions count for developer notifications
+  useEffect(() => {
+    if (!isDeveloperSession()) return;
+    const fetchSuggestionsCount = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'suggestions'));
+        setNewSuggestionsCount(snap.size);
+      } catch {}
+    };
+    fetchSuggestionsCount();
+    const interval = setInterval(fetchSuggestionsCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleLogin = async () => {
     setActivePage('main');
     setPaymentPlan(null);
@@ -1459,6 +1474,8 @@ export default function App() {
         lastSyncStatus={lastSyncStatus}
         analysisProgress={progress}
         isAnalyzing={isAnalyzing}
+        newSuggestionsCount={newSuggestionsCount}
+        onNavigateSuggestions={() => navigateTo('suggestions')}
       />
 
       {/* Sidebar Panel - pushes content, doesn't overlay */}

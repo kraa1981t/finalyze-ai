@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings } from '../types';
 import { initAudio } from '../lib/audioEngine';
@@ -27,6 +27,8 @@ interface HeaderProps {
   lastSyncStatus?: { ok: boolean; count?: number; error?: string; time: number } | null;
   analysisProgress?: { current: string; total: number; index: number; failed?: number } | null;
   isAnalyzing?: boolean;
+  newSuggestionsCount?: number;
+  onNavigateSuggestions?: () => void;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -55,7 +57,9 @@ export default function Header({
   isDeveloper = false,
   lastSyncStatus = null,
   analysisProgress = null,
-  isAnalyzing = false
+  isAnalyzing = false,
+  newSuggestionsCount = 0,
+  onNavigateSuggestions
 }: HeaderProps) {
   const t = translations[lang];
   const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
@@ -128,6 +132,22 @@ export default function Header({
           </div>
 
           <div className="flex items-center gap-3 mb-2">
+            {/* Suggestions Notifications - developer only */}
+            {isDeveloper && newSuggestionsCount > 0 && (
+              <button
+                onClick={onNavigateSuggestions}
+                className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm hover:bg-white/20 transition-all"
+              >
+                <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">{lang === 'ar' ? 'مقترحات' : 'Suggestions'}</span>
+                <div className="relative p-2 rounded-xl bg-[#F59E0B] border border-black/10 text-black shadow-md">
+                  <Bell size={18} />
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 shadow-lg">
+                    {newSuggestionsCount}
+                  </span>
+                </div>
+              </button>
+            )}
+
             {/* Contact Us - Messenger */}
             <div className="flex flex-col items-center gap-1 px-3 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-sm">
               <span className="text-[10px] font-black uppercase text-black tracking-[0.25em] leading-none">{lang === 'ar' ? 'تواصل معنا' : 'Contact Us'}</span>
