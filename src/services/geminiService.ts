@@ -838,8 +838,24 @@ Return ONLY valid JSON:
     let finalStopLoss = 0;
     let finalTakeProfit = 0;
 
-    if (currentPrice > 0 && atr > 0) {
-      const slDist = atr * 2.5;
+    if (currentPrice > 0) {
+      // Determine SL distance: use ATR or percentage-based fallback
+      let slDist = 0;
+      if (atr > 0) {
+        slDist = atr * 2.5;
+      } else {
+        // Fallback: use 3% for crypto, 1% for forex/stocks
+        slDist = type === 'crypto' ? currentPrice * 0.03 : currentPrice * 0.01;
+      }
+
+      // Cap SL distance at max 8% of current price
+      const maxSL = currentPrice * 0.08;
+      slDist = Math.min(slDist, maxSL);
+
+      // Ensure minimum SL distance (at least 0.5% of price)
+      const minSL = currentPrice * 0.005;
+      slDist = Math.max(slDist, minSL);
+
       if (finalSignal.includes('buy')) {
         finalStopLoss = currentPrice - slDist;
         finalTakeProfit = currentPrice + slDist * 2;
@@ -847,24 +863,9 @@ Return ONLY valid JSON:
         finalStopLoss = currentPrice + slDist;
         finalTakeProfit = currentPrice - slDist * 2;
       } else {
-        // Neutral: use ATR-based levels as reference
+        // Neutral
         finalStopLoss = currentPrice - slDist;
         finalTakeProfit = currentPrice + slDist;
-      }
-    } else if (currentPrice > 0) {
-      const last10Lows = lows.slice(-10);
-      const last10Highs = highs.slice(-10);
-      const minLow = last10Lows.length > 0 ? Math.min(...last10Lows) : currentPrice * 0.97;
-      const maxHigh = last10Highs.length > 0 ? Math.max(...last10Highs) : currentPrice * 1.03;
-      if (finalSignal.includes('buy')) {
-        finalStopLoss = minLow * 0.998;
-        finalTakeProfit = currentPrice + (currentPrice - finalStopLoss) * 2;
-      } else if (finalSignal.includes('sell')) {
-        finalStopLoss = maxHigh * 1.002;
-        finalTakeProfit = currentPrice - (finalStopLoss - currentPrice) * 2;
-      } else {
-        finalStopLoss = minLow * 0.998;
-        finalTakeProfit = maxHigh * 1.002;
       }
     }
 
