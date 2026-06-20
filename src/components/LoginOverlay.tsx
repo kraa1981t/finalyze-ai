@@ -286,12 +286,6 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
               {lang === 'ar' ? 'حلل الأسواق بذكاء مفرط' : 'Analyze Markets with Hyper-Intelligence'}
             </h1>
             
-            <p className="text-slate-400 text-lg mb-10 max-w-lg ml-auto leading-relaxed">
-              {lang === 'ar' 
-                ? 'انضم لأكثر من 5000 متداول يستخدمون Finalyze AI للحصول على رؤى دقيقة وتوقعات لحظية للاتجاهات.'
-                : 'Join over 5000+ traders using Finalyze AI to gain accurate insights and real-time trend predictions.'}
-            </p>
-
             <div className="grid grid-cols-2 gap-4 mb-10">
               {[
                 { icon: <BarChart3 size={18} />, label: lang === 'ar' ? 'تحليل لحظي' : 'Real-time Analysis' },
