@@ -12,9 +12,15 @@ interface LotSizeCalculatorProps {
 
 function detectInstrumentType(symbol: string): 'forex_jpy' | 'forex' | 'crypto' | 'stock' {
   const s = symbol.toUpperCase();
+  // Crypto patterns
+  if (s.includes('BTC') || s.includes('ETH') || s.includes('DOGE') || s.includes('SOL') || s.includes('XRP') || s.includes('ADA') || s.includes('DOT') || s.includes('SHIB') || s.includes('AVAX') || s.includes('MATIC') || s.includes('LINK') || s.includes('UNI') || s.includes('ATOM') || s.includes('LTC') || s.includes('BCH') || s.includes('NEAR') || s.includes('FIL') || s.includes('APT') || s.includes('ARB') || s.includes('OP') || s.includes('SUI') || s.includes('SEI') || s.includes('PEPE') || s.includes('WIF') || s.includes('BONK')) return 'crypto';
+  if (s.includes('-USD') || s.endsWith('USD') && !s.startsWith('EUR') && !s.startsWith('GBP') && !s.startsWith('AUD') && !s.startsWith('NZD') && !s.startsWith('CAD') && !s.startsWith('CHF')) return 'crypto';
+  // Forex JPY
   if (s.includes('JPY')) return 'forex_jpy';
-  if (s.includes('BTC') || s.includes('ETH') || s.includes('DOGE') || s.includes('SOL') || s.includes('XRP') || s.includes('ADA') || s.includes('DOT') || s.includes('SHIB') || s.includes('AVAX') || s.includes('MATIC') || s.includes('LINK') || s.includes('UNI') || s.includes('ATOM') || s.includes('LTC') || s.includes('BCH') || s.includes('NEAR') || s.includes('FIL') || s.includes('-USD') || s.includes('USD')) return 'crypto';
+  // Forex major/minor pairs
   if (s.includes('USD') && (s.startsWith('EUR') || s.startsWith('GBP') || s.startsWith('AUD') || s.startsWith('NZD') || s.startsWith('CAD') || s.startsWith('CHF'))) return 'forex';
+  if (s.includes('EUR') || s.includes('GBP') || s.includes('AUD') || s.includes('NZD') || s.includes('CAD') || s.includes('CHF')) return 'forex';
+  // Default to stock
   return 'stock';
 }
 
@@ -82,6 +88,10 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
     const slPips = Math.round(slDistance / pipSize);
     const tpPips = Math.round(adjustedTpDistance / pipSize);
 
+    // Percentage distances
+    const slPercent = entry > 0 ? (slDistance / entry * 100) : 0;
+    const tpPercent = entry > 0 ? (adjustedTpDistance / entry * 100) : 0;
+
     const pipValuePerLot = (pipSize * contractSize);
     const pipValue = lotSize * pipValuePerLot;
 
@@ -97,6 +107,8 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
       slDistance,
       adjustedTpDistance,
       adjustedTpPrice,
+      slPercent,
+      tpPercent,
       pipValue,
       riskDollars,
       rewardDollars,
@@ -128,7 +140,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
             {formatNum(stopLoss, decimals)}
           </span>
           <div className="text-xs font-black text-red-400 font-mono mt-0.5">
-            {calculations.slPips} {instConfig.pipLabel}
+            {calculations.slPips} {instConfig.pipLabel} ({calculations.slPercent.toFixed(1)}%)
           </div>
           <div className="text-[10px] text-red-400/70 font-mono">
             -{formatNum(calculations.riskDollars)}$
@@ -144,7 +156,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
             {formatNum(calculations.adjustedTpPrice, decimals)}
           </span>
           <div className="text-xs font-black text-emerald-400 font-mono mt-0.5">
-            {calculations.tpPips} {instConfig.pipLabel}
+            {calculations.tpPips} {instConfig.pipLabel} ({calculations.tpPercent.toFixed(1)}%)
           </div>
           <div className="text-[10px] text-emerald-400/70 font-mono">
             +{formatNum(calculations.rewardDollars)}$

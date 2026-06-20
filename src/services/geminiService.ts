@@ -839,22 +839,25 @@ Return ONLY valid JSON:
     let finalTakeProfit = 0;
 
     if (currentPrice > 0) {
-      // Determine SL distance: use ATR or percentage-based fallback
+      // Determine SL distance based on instrument type and ATR
       let slDist = 0;
+      const isCrypto = type === 'crypto';
+
       if (atr > 0) {
-        slDist = atr * 2.5;
-      } else {
-        // Fallback: use 3% for crypto, 1% for forex/stocks
-        slDist = type === 'crypto' ? currentPrice * 0.03 : currentPrice * 0.01;
+        // Use ATR with appropriate multiplier per instrument type
+        const atrMultiplier = isCrypto ? 3 : 2;
+        slDist = atr * atrMultiplier;
       }
 
-      // Cap SL distance at max 8% of current price
-      const maxSL = currentPrice * 0.08;
-      slDist = Math.min(slDist, maxSL);
+      // Percentage-based minimums and maximums per instrument type
+      const minSLPercent = isCrypto ? 0.03 : 0.015;   // 3% crypto, 1.5% forex
+      const maxSLPercent = isCrypto ? 0.12 : 0.05;     // 12% crypto, 5% forex
+      const minSL = currentPrice * minSLPercent;
+      const maxSL = currentPrice * maxSLPercent;
 
-      // Ensure minimum SL distance (at least 0.5% of price)
-      const minSL = currentPrice * 0.005;
+      // Apply min/max constraints
       slDist = Math.max(slDist, minSL);
+      slDist = Math.min(slDist, maxSL);
 
       if (finalSignal.includes('buy')) {
         finalStopLoss = currentPrice - slDist;
