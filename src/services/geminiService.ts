@@ -289,12 +289,20 @@ async function fetchAndPrepareSymbolData(
 
     let microMetrics = null;
     let microCloses: number[] = [];
+    let microHighs: number[] = [];
+    let microLows: number[] = [];
+    let microOpens: number[] = [];
+    let microVolumes: number[] = [];
     try {
       const microData = await fetchMarketDataDirect(symbol, microTF).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } }));
       const microQuotes = microData.chart?.result?.[0]?.indicators?.quote?.[0];
       if (microQuotes && microQuotes.close) {
         microCloses = microQuotes.close.filter((c: any) => c != null);
-        if (microCloses.length >= 10) microMetrics = calculateTechnicalMetrics(microCloses, [], [], []);
+        microHighs = microQuotes.high?.filter((c: any) => c != null) || microCloses;
+        microLows = microQuotes.low?.filter((c: any) => c != null) || microCloses;
+        microOpens = microQuotes.open?.filter((c: any) => c != null) || microCloses;
+        microVolumes = microQuotes.volume?.filter((c: any) => c != null) || [];
+        if (microCloses.length >= 10) microMetrics = calculateTechnicalMetrics(microCloses, microHighs, microLows, microVolumes.length > 0 ? microVolumes : undefined, microOpens);
       }
     } catch {}
     let contextFearGreed = null, contextNews: any[] = [], contextEcon: any[] = [];
@@ -391,6 +399,44 @@ function generateLocalAnalysis(
         reasons.push({ check: 'Reversal Candle', value: metrics.hasHammer ? 'Hammer' : 'Pinbar', status: 'neutral', impact: 'potential reversal pattern detected' });
       }
       reasons.push({ check: 'BB Info', value: `Upper: ${metrics.bbUpper.toFixed(4)} | Mid: ${metrics.bbMiddle.toFixed(4)} | Lower: ${metrics.bbLower.toFixed(4)}`, status: 'neutral', impact: `Bollinger Bands — ${bbPct}%B` });
+    }
+  }
+
+  // Micro BB Strategy — Pullback on lower timeframe confirms entry
+  if (microMetrics?.bbLower > 0 && microMetrics?.bbUpper > 0) {
+    const isUptrend = metrics?.direction === 'uptrend';
+    const isDowntrend = metrics?.direction === 'downtrend';
+
+    // BUY: Macro uptrend + Micro BB touch lower + pullback 3-5 + reversal candle
+    if (isUptrend && microMetrics.bbTouchLower && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 5 && (microMetrics.hasHammer || microMetrics.hasPinbar || microMetrics.hasEngulfing)) {
+      score += 3;
+      reasons.push({
+        check: `Micro BB (${microTF}) Strategy (BUY)`,
+        value: `Pullback ${microMetrics.bbPullbackCount}c → Lower Band + Reversal on ${microTF}`,
+        status: 'positive',
+        impact: `strong buy: macro uptrend + micro pullback ${microMetrics.bbPullbackCount} candles + touch lower BB + reversal candle`
+      });
+    }
+    // SELL: Macro downtrend + Micro BB touch upper + rally 3-5 + reversal candle
+    else if (isDowntrend && microMetrics.bbTouchUpper && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 5 && (microMetrics.hasShootingStar || microMetrics.hasPinbar || microMetrics.hasEngulfing)) {
+      score -= 3;
+      reasons.push({
+        check: `Micro BB (${microTF}) Strategy (SELL)`,
+        value: `Rally ${microMetrics.bbPullbackCount}c → Upper Band + Reversal on ${microTF}`,
+        status: 'negative',
+        impact: `strong sell: macro downtrend + micro rally ${microMetrics.bbPullbackCount} candles + touch upper BB + reversal candle`
+      });
+    }
+    // Partial micro BB signals
+    else {
+      if (microMetrics.bbTouchLower && isUptrend) {
+        score += 0.5;
+        reasons.push({ check: `Micro BB (${microTF}) Touch Lower`, value: `price at lower band on ${microTF}`, status: 'positive', impact: `micro timeframe approaching lower BB in macro uptrend` });
+      }
+      if (microMetrics.bbTouchUpper && isDowntrend) {
+        score -= 0.5;
+        reasons.push({ check: `Micro BB (${microTF}) Touch Upper`, value: `price at upper band on ${microTF}`, status: 'negative', impact: `micro timeframe approaching upper BB in macro downtrend` });
+      }
     }
   }
 
@@ -546,8 +592,12 @@ export async function analyzeMarket(params: {
       const microQuotes = microData.chart?.result?.[0]?.indicators?.quote?.[0];
       if (microQuotes && microQuotes.close) {
         microCloses = microQuotes.close.filter((c: any) => c != null);
+        const microHighsRaw = microQuotes.high?.filter((c: any) => c != null) || microCloses;
+        const microLowsRaw = microQuotes.low?.filter((c: any) => c != null) || microCloses;
+        const microOpensRaw = microQuotes.open?.filter((c: any) => c != null) || microCloses;
+        const microVolsRaw = microQuotes.volume?.filter((c: any) => c != null) || [];
         if (microCloses.length >= 10) {
-          microMetrics = calculateTechnicalMetrics(microCloses, [], [], []);
+          microMetrics = calculateTechnicalMetrics(microCloses, microHighsRaw, microLowsRaw, microVolsRaw.length > 0 ? microVolsRaw : undefined, microOpensRaw);
         }
       }
     } catch (e) {
@@ -581,7 +631,7 @@ MARKET DATA: RSI ${metrics?.rsi?.toFixed(1)}, Trend ${metrics?.direction}, EMA C
 BOLLINGER BANDS: Upper ${metrics?.bbUpper?.toFixed(4) || 'N/A'}, Middle ${metrics?.bbMiddle?.toFixed(4) || 'N/A'}, Lower ${metrics?.bbLower?.toFixed(4) || 'N/A'}, %B ${metrics?.bbPercentB ? Math.round(metrics.bbPercentB * 100) : 'N/A'}%, Width ${metrics?.bbWidth ? metrics.bbWidth.toFixed(4) : 'N/A'}.
 BB STRATEGY: Pullback ${metrics?.bbPullbackCount || 0} candles, TouchLower ${metrics?.bbTouchLower || false}, TouchUpper ${metrics?.bbTouchUpper || false}, Hammer ${metrics?.hasHammer || false}, Pinbar ${metrics?.hasPinbar || false}, Engulfing ${metrics?.hasEngulfing || false}, ShootingStar ${metrics?.hasShootingStar || false}.
 
-MICRO (${microTF}): RSI ${microMetrics?.rsi ? microMetrics.rsi.toFixed(1) : 'N/A'}, Trend ${microMetrics?.direction || 'sideways'}, EMA ${microMetrics?.emaCross || 'unknown'}.
+MICRO (${microTF}): RSI ${microMetrics?.rsi ? microMetrics.rsi.toFixed(1) : 'N/A'}, Trend ${microMetrics?.direction || 'sideways'}, EMA ${microMetrics?.emaCross || 'unknown'}, BB Upper ${microMetrics?.bbUpper?.toFixed(4) || 'N/A'}, BB Lower ${microMetrics?.bbLower?.toFixed(4) || 'N/A'}, BB %B ${microMetrics?.bbPercentB ? Math.round(microMetrics.bbPercentB * 100) : 'N/A'}%, TouchLower ${microMetrics?.bbTouchLower || false}, TouchUpper ${microMetrics?.bbTouchUpper || false}, Pullback ${microMetrics?.bbPullbackCount || 0}c, Hammer ${microMetrics?.hasHammer || false}, Pinbar ${microMetrics?.hasPinbar || false}, Engulfing ${microMetrics?.hasEngulfing || false}.
 
 CONTEXT: Fear&Greed ${contextFearGreed?.value ?? 'N/A'}/100 (${contextFearGreed?.classification ?? 'Unknown'}). News: ${newsText.substring(0, 300)}. Events: ${eventsText.substring(0, 200)}.
 
@@ -595,6 +645,7 @@ RULES:
 - Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
 - If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
 - BOLLINGER BANDS STRATEGY: If trend is UP and price pulled back 3-5 candles to touch Lower BB + reversal candle (hammer/pinbar/engulfing) → STRONG BUY. If trend is DOWN and price rallied 3-5 candles to touch Upper BB + reversal candle (shooting star/pinbar/engulfing) → STRONG SELL. This is a premium entry condition — give it HIGH weight in your decision.
+- MICRO BB STRATEGY: Use the MICRO timeframe BB data to confirm entry timing. If MACRO trend is UP and MICRO BB touches Lower band with 3-5 pullback candles + reversal candle → STRONG BUY (early entry at pullback). If MACRO trend is DOWN and MICRO BB touches Upper band with 3-5 rally candles + reversal candle → STRONG SELL (early entry at correction). This is the MOST PREMIUM entry — catching the start of correction on the lower timeframe.
 
 LANGUAGE RULES (CRITICAL):
 ${isAr ? `- ALL text fields (summary, detailedReasons impact) MUST be written in formal Arabic (فصحى) using professional financial terminology.
@@ -810,6 +861,24 @@ Return ONLY valid JSON:
         } else {
           addReason('Bollinger Bands', `U:${metrics.bbUpper.toFixed(4)} M:${metrics.bbMiddle.toFixed(4)} L:${metrics.bbLower.toFixed(4)} (${bbPct}%B)`, 'neutral',
             `BB width ${metrics.bbWidth.toFixed(4)}`);
+        }
+      }
+      // Micro BB Strategy
+      if (microMetrics?.bbLower > 0) {
+        const isUptrend = metrics?.direction === 'uptrend';
+        const isDowntrend = metrics?.direction === 'downtrend';
+        if (isUptrend && microMetrics.bbTouchLower && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 5 && (microMetrics.hasHammer || microMetrics.hasPinbar || microMetrics.hasEngulfing)) {
+          addReason(`Micro BB (${microTF}) Strategy (BUY)`, `Pullback ${microMetrics.bbPullbackCount}c → Lower + Reversal on ${microTF}`, 'positive',
+            `strong buy: macro uptrend + micro pullback ${microMetrics.bbPullbackCount} candles + touch lower BB + reversal candle`);
+        } else if (isDowntrend && microMetrics.bbTouchUpper && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 5 && (microMetrics.hasShootingStar || microMetrics.hasPinbar || microMetrics.hasEngulfing)) {
+          addReason(`Micro BB (${microTF}) Strategy (SELL)`, `Rally ${microMetrics.bbPullbackCount}c → Upper + Reversal on ${microTF}`, 'negative',
+            `strong sell: macro downtrend + micro rally ${microMetrics.bbPullbackCount} candles + touch upper BB + reversal candle`);
+        } else if (microMetrics.bbTouchLower && isUptrend) {
+          addReason(`Micro BB (${microTF}) Touch Lower`, `price at lower band on ${microTF}`, 'positive',
+            `micro timeframe approaching lower BB in macro uptrend`);
+        } else if (microMetrics.bbTouchUpper && isDowntrend) {
+          addReason(`Micro BB (${microTF}) Touch Upper`, `price at upper band on ${microTF}`, 'negative',
+            `micro timeframe approaching upper BB in macro downtrend`);
         }
       }
       // Fear&Greed
