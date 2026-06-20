@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Activity, Zap, BarChart2, Info, Lock } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
 import LotSizeCalculator from './LotSizeCalculator';
 import { Language, translations } from '../lib/i18n';
-import { playClick } from '../lib/audioEngine';
+import { playClick, initAudio } from '../lib/audioEngine';
 
 interface ClientDashboardProps {
   results: AnalysisResult[];
@@ -45,6 +45,15 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set());
+  const audioInitRef = useRef(false);
+
+  const handleClick = useCallback(() => {
+    if (!audioInitRef.current) {
+      initAudio();
+      audioInitRef.current = true;
+    }
+    handleClick();
+  }, []);
 
   // Filter for active STRONG signals only (less than 20 hours old)
   const maxAgeInMs = 20 * 60 * 60 * 1000;
@@ -228,7 +237,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
               {/* Compact Header - Always Visible */}
               <button
                 onClick={() => {
-                  playClick();
+                  handleClick();
                   if (!isLocked) {
                     setSelectedSymbol(res.symbol);
                     setExpandedCard(isExpanded ? null : res.symbol);
@@ -304,7 +313,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                         <div className="space-y-1">
                           <button
                             onClick={() => {
-                              playClick();
+                              handleClick();
                               const newSet = new Set(expandedReasons);
                               const key = `${res.symbol}_${idx}`;
                               if (newSet.has(key)) {
@@ -353,7 +362,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
 
                       {/* View Chart Button */}
                       <button
-                        onClick={() => { playClick(); setSelectedSymbol(res.symbol); }}
+                        onClick={() => { handleClick(); setSelectedSymbol(res.symbol); }}
                         className="w-full py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider bg-[#F59E0B] text-black flex items-center justify-center gap-1"
                       >
                         <BarChart2 size={12} />

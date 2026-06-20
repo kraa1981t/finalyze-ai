@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { AnalysisResult, SignalType, StrategySettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Zap, ShieldAlert, MessageSquare, BarChart2, ChevronDown } from 'lucide-react';
@@ -6,7 +6,7 @@ import TradingViewWidget from './TradingViewWidget';
 import LotSizeCalculator from './LotSizeCalculator';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
-import { playClick } from '../lib/audioEngine';
+import { playClick, initAudio } from '../lib/audioEngine';
 
 interface AnalysisResultViewProps {
   results: AnalysisResult[];
@@ -29,6 +29,15 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set());
+  const audioInitRef = useRef(false);
+
+  const handleClick = useCallback(() => {
+    if (!audioInitRef.current) {
+      initAudio();
+      audioInitRef.current = true;
+    }
+    handleClick();
+  }, []);
 
   const formatPublishDate = (timestamp: string) => {
     try { const d = new Date(timestamp); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
@@ -114,7 +123,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
               {/* Compact Header - Always Visible */}
               <button
                 onClick={() => {
-                  playClick();
+                  handleClick();
                   setSelectedIndex(idx);
                   setExpandedCard(isExpanded ? null : `${res.symbol}_${idx}`);
                 }}
@@ -194,7 +203,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                         <div className="space-y-1.5">
                           <button
                             onClick={() => {
-                              playClick();
+                              handleClick();
                               const newSet = new Set(expandedReasons);
                               const key = `${res.symbol}_${idx}`;
                               if (newSet.has(key)) {
@@ -243,7 +252,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
 
                       {/* View Chart Button */}
                       <button
-                        onClick={() => { playClick(); setSelectedIndex(idx); }}
+                        onClick={() => { handleClick(); setSelectedIndex(idx); }}
                         className={`w-full py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 ${
                           isSelected
                             ? 'bg-[#F59E0B] text-black'
