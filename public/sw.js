@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v4.1.0';
+const CACHE_VERSION = 'v5.0.0';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
@@ -7,11 +7,11 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) => {
-      return Promise.all(keys.filter(k => k !== CACHE_VERSION).map((k) => caches.delete(k)));
+      return Promise.all(keys.map((k) => caches.delete(k)));
     }).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', (e) => {
-  return; // Do nothing, let network handle everything
+  return;
 });

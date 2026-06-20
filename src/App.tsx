@@ -1518,7 +1518,7 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <main className={`flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-28 relative transition-all duration-300 ${isSidebarOpen ? (lang === 'ar' ? 'mr-56' : 'ml-56') : ''}`}>
+      <main className={`flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-24 relative transition-all duration-300 ${isSidebarOpen ? (lang === 'ar' ? 'mr-56' : 'ml-56') : ''}`}>
         {/* Dedicated pages (from dashboard) */}
         {activePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -1727,7 +1727,7 @@ export default function App() {
         </div>
 
         {/* CLIENT DASHBOARD - shows for non-developers on main page */}
-        {!isDeveloperSession() && !analysisResults && !isAnalyzing && activePage === 'main' && !needsApiKey && (
+        {!isDeveloperSession() && !analysisResults && !isAnalyzing && activePage === 'main' && (
           <div className="max-w-7xl mx-auto px-4">
             <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} />
           </div>

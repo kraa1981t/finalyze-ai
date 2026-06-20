@@ -63,8 +63,8 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
 
   const sortedAll = [...filtered].sort((a, b) => signalOrder(a.signal) - signalOrder(b.signal) || b.confidence - a.confidence);
 
-  // Apply per-category limit (2 symbols per category) when free plan is disabled
-  const FREE_LIMIT = 2;
+  // Apply per-category limit (1 symbol per category) when free plan is disabled
+  const FREE_LIMIT = 1;
   const sortedStrong = hasActivePlan
     ? sortedAll
     : (() => {
@@ -284,15 +284,14 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                   >
                     <div className="px-2 pb-1.5 space-y-1.5 border-t border-white/5 pt-1.5">
                       {/* Lot Size Calculator */}
-                      {res.stopLoss && res.takeProfit && (
-                        <LotSizeCalculator
-                          symbol={res.symbol}
-                          stopLoss={res.stopLoss}
-                          takeProfit={res.takeProfit}
-                          signal={res.signal as any}
-                          lang={lang}
-                        />
-                      )}
+                      <LotSizeCalculator
+                        symbol={res.symbol}
+                        stopLoss={res.stopLoss || slPrice}
+                        takeProfit={res.takeProfit || tpPrice}
+                        entryPrice={entry}
+                        signal={res.signal as any}
+                        lang={lang}
+                      />
 
                       {/* Summary */}
                       {res.summary && (
@@ -337,12 +336,12 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                                     <div key={i} className="bg-white/[0.02] rounded p-2 border border-white/5 flex items-center justify-between text-xs">
                                       <div className="flex items-center gap-1.5">
                                         <div className={`w-2 h-2 rounded-full ${
-                                          reason.status === 'positive' ? 'bg-[#F59E0B]' :
-                                          reason.status === 'negative' ? 'bg-[#F59E0B]' : 'bg-[#F59E0B]/50'
+                                          reason.status === 'positive' ? 'bg-emerald-400' :
+                                          reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'
                                         }`} />
-                                        <span className="font-bold text-yellow-400/80">{reason.check}</span>
+                                        <span className={`font-bold ${reason.status === 'positive' ? 'text-emerald-400/80' : reason.status === 'negative' ? 'text-red-400/80' : 'text-slate-400/80'}`}>{reason.check}</span>
                                       </div>
-                                      <span className="text-yellow-400/50 font-mono text-xs">{reason.value}</span>
+                                      <span className={`font-mono text-xs ${reason.status === 'positive' ? 'text-emerald-400/50' : reason.status === 'negative' ? 'text-red-400/50' : 'text-slate-400/50'}`}>{reason.value}</span>
                                     </div>
                                   ))}
                                 </div>

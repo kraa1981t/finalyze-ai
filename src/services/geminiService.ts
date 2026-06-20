@@ -358,7 +358,7 @@ function generateLocalAnalysis(
     const isDowntrend = metrics.direction === 'downtrend';
 
     // BUY SETUP: Uptrend + pullback to lower band + reversal candle
-    if (isUptrend && metrics.bbTouchLower && metrics.bbPullbackCount >= 2 && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing)) {
+    if (isUptrend && metrics.bbTouchLower && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 5 && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing)) {
       score += 3;
       reasons.push({
         check: 'BB Strategy (BUY)',
@@ -368,7 +368,7 @@ function generateLocalAnalysis(
       });
     }
     // SELL SETUP: Downtrend + rally to upper band + reversal candle
-    else if (isDowntrend && metrics.bbTouchUpper && metrics.bbPullbackCount >= 2 && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing)) {
+    else if (isDowntrend && metrics.bbTouchUpper && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 5 && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing)) {
       score -= 3;
       reasons.push({
         check: 'BB Strategy (SELL)',
