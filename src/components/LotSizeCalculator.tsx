@@ -6,7 +6,7 @@ interface LotSizeCalculatorProps {
   stopLoss: number;
   takeProfit: number;
   entryPrice?: number;
-  signal: 'strong_buy' | 'buy' | 'sell' | 'strong_sell';
+  signal: 'strong_buy' | 'buy' | 'sell' | 'strong_sell' | 'neutral' | 'no_entry';
   lang: 'ar' | 'en';
 }
 
@@ -50,6 +50,18 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
   const isAr = lang === 'ar';
   const isBuy = signal === 'strong_buy' || signal === 'buy';
   const isStrongSignal = signal === 'strong_buy' || signal === 'strong_sell';
+
+  // Signal type display with colors
+  const signalDisplay = useMemo(() => {
+    switch (signal) {
+      case 'strong_buy': return { text: isAr ? 'شراء قوي' : 'Strong Buy', color: 'text-emerald-400' };
+      case 'buy': return { text: isAr ? 'شراء' : 'Buy', color: 'text-emerald-400' };
+      case 'strong_sell': return { text: isAr ? 'بيع قوي' : 'Strong Sell', color: 'text-red-400' };
+      case 'sell': return { text: isAr ? 'بيع' : 'Sell', color: 'text-red-400' };
+      case 'neutral': return { text: isAr ? 'محايد' : 'Neutral', color: 'text-slate-300' };
+      default: return { text: '', color: 'text-white/60' };
+    }
+  }, [signal, isAr]);
 
   const instType = detectInstrumentType(symbol);
   const instConfig = getInstrumentConfig(instType);
@@ -143,6 +155,20 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
 
   return (
     <div className="space-y-2">
+      {/* Symbol name between icons */}
+      <div className="flex items-center justify-center gap-2">
+        <TrendingDown size={14} className="text-red-400" />
+        <span className="text-sm font-extrabold text-white font-mono">{symbol}</span>
+        <TrendingUp size={14} className="text-emerald-400" />
+      </div>
+
+      {/* Signal type with color */}
+      <div className="flex items-center justify-center">
+        <span className={`text-xs font-bold ${signalDisplay.color}`}>
+          {signalDisplay.text}
+        </span>
+      </div>
+
       <div className="grid grid-cols-2 gap-1.5">
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-1.5 text-center">
           <div className="flex items-center justify-center gap-1 mb-0.5">
