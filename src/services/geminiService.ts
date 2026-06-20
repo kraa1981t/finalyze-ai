@@ -841,19 +841,31 @@ Return ONLY valid JSON:
     if (currentPrice > 0) {
       // Determine SL distance based on instrument type and ATR
       let slDist = 0;
-      const isCrypto = type === 'crypto';
+      const isForex = type === MarketType.FOREX;
+      const isCrypto = type === MarketType.CRYPTO;
 
       if (atr > 0) {
-        // Use ATR with appropriate multiplier per instrument type
         const atrMultiplier = isCrypto ? 3 : 2;
         slDist = atr * atrMultiplier;
       }
 
-      // Percentage-based minimums and maximums per instrument type
-      const minSLPercent = isCrypto ? 0.03 : 0.015;   // 3% crypto, 1.5% forex
-      const maxSLPercent = isCrypto ? 0.12 : 0.05;     // 12% crypto, 5% forex
-      const minSL = currentPrice * minSLPercent;
-      const maxSL = currentPrice * maxSLPercent;
+      let minSL: number;
+      let maxSL: number;
+
+      if (isForex) {
+        // Forex: use pip-based min/max (pipSize = 0.0001 for most, 0.01 for JPY)
+        const pipSize = symbol.toUpperCase().includes('JPY') ? 0.01 : 0.0001;
+        const minPips = 30;   // 30 pips minimum SL
+        const maxPips = 200;  // 200 pips maximum SL
+        minSL = minPips * pipSize;
+        maxSL = maxPips * pipSize;
+      } else if (isCrypto) {
+        minSL = currentPrice * 0.03;  // 3%
+        maxSL = currentPrice * 0.12;  // 12%
+      } else {
+        minSL = currentPrice * 0.02;  // 2%
+        maxSL = currentPrice * 0.08;  // 8%
+      }
 
       // Apply min/max constraints
       slDist = Math.max(slDist, minSL);

@@ -11,16 +11,29 @@ interface LotSizeCalculatorProps {
 }
 
 function detectInstrumentType(symbol: string): 'forex_jpy' | 'forex' | 'crypto' | 'stock' {
-  const s = symbol.toUpperCase();
-  // Crypto patterns
-  if (s.includes('BTC') || s.includes('ETH') || s.includes('DOGE') || s.includes('SOL') || s.includes('XRP') || s.includes('ADA') || s.includes('DOT') || s.includes('SHIB') || s.includes('AVAX') || s.includes('MATIC') || s.includes('LINK') || s.includes('UNI') || s.includes('ATOM') || s.includes('LTC') || s.includes('BCH') || s.includes('NEAR') || s.includes('FIL') || s.includes('APT') || s.includes('ARB') || s.includes('OP') || s.includes('SUI') || s.includes('SEI') || s.includes('PEPE') || s.includes('WIF') || s.includes('BONK')) return 'crypto';
-  if (s.includes('-USD') || s.endsWith('USD') && !s.startsWith('EUR') && !s.startsWith('GBP') && !s.startsWith('AUD') && !s.startsWith('NZD') && !s.startsWith('CAD') && !s.startsWith('CHF')) return 'crypto';
-  // Forex JPY
-  if (s.includes('JPY')) return 'forex_jpy';
-  // Forex major/minor pairs
-  if (s.includes('USD') && (s.startsWith('EUR') || s.startsWith('GBP') || s.startsWith('AUD') || s.startsWith('NZD') || s.startsWith('CAD') || s.startsWith('CHF'))) return 'forex';
-  if (s.includes('EUR') || s.includes('GBP') || s.includes('AUD') || s.includes('NZD') || s.includes('CAD') || s.includes('CHF')) return 'forex';
-  // Default to stock
+  const s = symbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  // Crypto names (BTC, ETH, SOL, etc.) - NOT forex pairs like BTCUSD
+  const cryptoNames = ['BTC', 'ETH', 'DOGE', 'SOL', 'XRP', 'ADA', 'DOT', 'SHIB', 'AVAX', 'MATIC', 'LINK', 'UNI', 'ATOM', 'LTC', 'BCH', 'NEAR', 'FIL', 'APT', 'ARB', 'OP', 'SUI', 'SEI', 'PEPE', 'WIF', 'BONK', 'TON', 'TRX', 'RENDER', 'FET', 'INJ'];
+  // Pure crypto if symbol contains a crypto name (not as part of a forex pair)
+  for (const c of cryptoNames) {
+    if (s.startsWith(c) && s.endsWith('USD')) return 'crypto';
+  }
+  // If it's just a crypto ticker with no forex context
+  if (cryptoNames.some(c => s === c || s === c + 'USD' || s === c + 'USDT')) return 'crypto';
+
+  // All forex currency codes
+  const currencies = ['EUR', 'GBP', 'AUD', 'NZD', 'CAD', 'CHF', 'USD', 'JPY', 'TRY', 'ZAR', 'MXN', 'SEK', 'NOK', 'DKK', 'SGD', 'HKD', 'CNY', 'INR', 'THB', 'PLN', 'HUF', 'CZK', 'ILS', 'PHP', 'IDR', 'MYR', 'KRW', 'TWD'];
+
+  // Count how many currency codes appear in the symbol
+  const found = currencies.filter(c => s.includes(c));
+  // If 2+ currency codes -> it's forex
+  if (found.length >= 2) {
+    if (s.includes('JPY')) return 'forex_jpy';
+    return 'forex';
+  }
+
+  // Default to stock (AAPL, TSLA, MSFT, etc.)
   return 'stock';
 }
 
