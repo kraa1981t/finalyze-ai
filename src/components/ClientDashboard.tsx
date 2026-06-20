@@ -235,17 +235,19 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                 className={`w-full px-3 py-3 flex flex-col items-center gap-2 rounded-t-lg transition-all ${isSelected && !isLocked ? 'border-b border-[#F59E0B]/30' : ''}`}
               >
                 {/* Symbol and SL/TP Row */}
-                <div className="flex items-stretch justify-between w-full gap-2 px-1">
-                  {/* Take Profit (TP) Box on Left */}
-                  <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-4 py-4 shrink-0 min-w-[90px] flex items-center justify-center">
+                <div className="flex items-center gap-1 px-1">
+                  {/* Take Profit (TP) Box */}
+                  <div className="flex-1 bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-3 py-3 shrink-0 flex items-center justify-center">
                     <span className="text-lg font-black font-mono text-emerald-400">{tp ? tp.toFixed(decimals) : '—'}</span>
                   </div>
 
                   {/* Symbol in Middle */}
-                  <span className={`text-base font-black italic truncate flex items-center ${meta.color}`}>{res.symbol}</span>
+                  <div className="flex items-center justify-center min-w-[48px] shrink-0">
+                    <span className={`text-sm font-black font-mono ${meta.color}`}>{res.symbol}</span>
+                  </div>
 
-                  {/* Stop Loss (SL) Box on Right */}
-                  <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-4 py-4 shrink-0 min-w-[90px] flex items-center justify-center">
+                  {/* Stop Loss (SL) Box */}
+                  <div className="flex-1 bg-red-500/15 border border-red-500/30 rounded-xl px-3 py-3 shrink-0 flex items-center justify-center">
                     <span className="text-lg font-black font-mono text-red-400">{sl ? sl.toFixed(decimals) : '—'}</span>
                   </div>
                 </div>
