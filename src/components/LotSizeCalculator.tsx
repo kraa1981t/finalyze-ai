@@ -41,6 +41,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
   const [lotSize, setLotSize] = useState(0.01);
   const [accountBalance, setAccountBalance] = useState(1000);
   const [balanceInput, setBalanceInput] = useState('1000');
+  const [rrRatio, setRrRatio] = useState(2);
 
   const formatNum = (n: number, dec: number = 2): string => n.toFixed(dec);
 
@@ -73,16 +74,19 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
 
   const calculations = useMemo(() => {
     const slDistance = Math.abs(entry - stopLoss);
-    const tpDistance = Math.abs(takeProfit - entry);
+
+    // Adjust TP based on R:R ratio
+    const adjustedTpDistance = slDistance * rrRatio;
+    const adjustedTpPrice = isBuy ? entry + adjustedTpDistance : entry - adjustedTpDistance;
 
     const slPips = Math.round(slDistance / pipSize);
-    const tpPips = Math.round(tpDistance / pipSize);
+    const tpPips = Math.round(adjustedTpDistance / pipSize);
 
     const pipValuePerLot = (pipSize * contractSize);
     const pipValue = lotSize * pipValuePerLot;
 
     const riskDollars = slDistance * lotSize * contractSize;
-    const rewardDollars = tpDistance * lotSize * contractSize;
+    const rewardDollars = adjustedTpDistance * lotSize * contractSize;
     const riskOfBalance = accountBalance > 0 ? (riskDollars / accountBalance * 100) : 0;
 
     const riskLevel = riskOfBalance <= 1 ? 'safe' : riskOfBalance <= 3 ? 'ok' : riskOfBalance <= 5 ? 'warn' : 'danger';
@@ -91,17 +95,19 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
       slPips,
       tpPips,
       slDistance,
-      tpDistance,
+      adjustedTpDistance,
+      adjustedTpPrice,
       pipValue,
       riskDollars,
       rewardDollars,
       riskOfBalance,
       riskLevel,
     };
-  }, [entry, stopLoss, takeProfit, lotSize, accountBalance, pipSize, contractSize]);
+  }, [entry, stopLoss, rrRatio, lotSize, accountBalance, pipSize, contractSize, isBuy]);
 
   const lotPresets = [0.01, 0.05, 0.1, 0.5, 1.0];
   const balancePresets = [500, 1000, 5000, 10000];
+  const rrPresets = [1, 2, 3];
 
   const riskColors: Record<string, string> = {
     safe: 'text-emerald-400',
@@ -122,7 +128,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
             {formatNum(stopLoss, decimals)}
           </span>
           <div className="text-xs font-black text-red-400 font-mono mt-0.5">
-            {calculations.slPips} {isAr ? instConfig.pipLabel : instConfig.pipLabel}
+            {calculations.slPips} {instConfig.pipLabel}
           </div>
           <div className="text-[10px] text-red-400/70 font-mono">
             -{formatNum(calculations.riskDollars)}$
@@ -135,14 +141,34 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
             <span className="text-[10px] text-emerald-400 font-bold uppercase">{isAr ? 'جني الأرباح' : 'TP'}</span>
           </div>
           <span className="text-lg font-extrabold text-emerald-500 font-mono block">
-            {formatNum(takeProfit, decimals)}
+            {formatNum(calculations.adjustedTpPrice, decimals)}
           </span>
           <div className="text-xs font-black text-emerald-400 font-mono mt-0.5">
-            {calculations.tpPips} {isAr ? instConfig.pipLabel : instConfig.pipLabel}
+            {calculations.tpPips} {instConfig.pipLabel}
           </div>
           <div className="text-[10px] text-emerald-400/70 font-mono">
             +{formatNum(calculations.rewardDollars)}$
           </div>
+        </div>
+      </div>
+
+      {/* R:R Ratio Selector */}
+      <div className="flex items-center justify-center gap-2">
+        <span className="text-xs text-white/60 font-bold uppercase">{isAr ? 'العائد' : 'R:R'}</span>
+        <div className="flex gap-1">
+          {rrPresets.map(r => (
+            <button
+              key={r}
+              onClick={() => setRrRatio(r)}
+              className={`text-xs font-black px-3 py-1 rounded-lg transition-all ${
+                rrRatio === r
+                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                  : 'bg-white/5 text-white/40 hover:bg-white/10'
+              }`}
+            >
+              1:{r}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -211,7 +237,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
           </button>
         </div>
         <div className="text-[10px] text-primary font-mono">
-          ${formatNum(calculations.pipValue)}/{isAr ? instConfig.pipLabel : instConfig.pipLabel}
+          ${formatNum(calculations.pipValue)}/{instConfig.pipLabel}
         </div>
       </div>
 
@@ -240,9 +266,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
         </div>
         <span className="text-white/30">|</span>
         <span className="text-white/60">
-          {calculations.tpPips > 0 && calculations.slPips > 0
-            ? `${(calculations.tpPips / calculations.slPips).toFixed(1)}:1`
-            : '—'} {isAr ? 'عائد' : 'R:R'}
+          1:{rrRatio} {isAr ? 'عائد' : 'R:R'}
         </span>
       </div>
     </div>
