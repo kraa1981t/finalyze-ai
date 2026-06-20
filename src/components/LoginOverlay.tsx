@@ -321,11 +321,8 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
             </div>
 
             <div className="text-center mb-8 relative z-10">
-              <div className="text-primary text-sm font-black mb-2 uppercase tracking-tighter">
-                {lang === 'ar' ? 'ابدأ الآن' : 'Get Started'}
-              </div>
-              <h3 className="text-2xl font-bold text-white">
-                {lang === 'ar' ? 'اشتراك شهري مرن' : 'Flexible Monthly Plan'}
+              <h3 className="text-lg font-bold text-white/80 leading-relaxed">
+                {lang === 'ar' ? 'انضم لأكثر من 5000 متداول يستخدمون Finalyze AI للحصول على رؤى دقيقة وتوقعات لحظية للاتجاهات.' : 'Join over 5000 traders using Finalyze AI for accurate insights and real-time market predictions.'}
               </h3>
             </div>
 
