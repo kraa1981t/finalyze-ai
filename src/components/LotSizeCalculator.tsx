@@ -22,8 +22,8 @@ function getInstrumentConfig(type: ReturnType<typeof detectInstrumentType>) {
   switch (type) {
     case 'forex': return { decimals: 5, pipSize: 0.0001, pipLabel: 'pip', contractSize: 100000 };
     case 'forex_jpy': return { decimals: 3, pipSize: 0.01, pipLabel: 'pip', contractSize: 100000 };
-    case 'crypto': return { decimals: 2, pipSize: 0.01, pipLabel: 'point', contractSize: 1 };
-    case 'stock': return { decimals: 2, pipSize: 0.01, pipLabel: 'point', contractSize: 1 };
+    case 'crypto': return { decimals: 2, pipSize: 0.01, pipLabel: 'point', contractSize: 100 };
+    case 'stock': return { decimals: 2, pipSize: 0.01, pipLabel: 'point', contractSize: 100 };
   }
 }
 

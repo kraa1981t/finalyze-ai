@@ -831,59 +831,37 @@ Return ONLY valid JSON:
         contextEcon.some((e: any) => e.impact === 'High') ? '-10% confidence penalty' : 'no penalty');
     }
 
-    // Fallback calculation for Stop Loss and Take Profit — ATR-based dynamic stops
+    // ALWAYS calculate SL/TP from ATR/price data — AI values are unreliable
     const currentPrice = closes[closes.length - 1] || 0;
     const atr = metrics?.atr || 0;
 
-    let finalStopLoss = Number(resultData.stopLoss) || 0;
-    let finalTakeProfit = Number(resultData.takeProfit) || 0;
+    let finalStopLoss = 0;
+    let finalTakeProfit = 0;
 
-    // Validate AI-returned SL/TP: must be reasonable distance from current price (max 20%)
-    const maxSLDistance = currentPrice * 0.20;
-    if (finalStopLoss && Math.abs(finalStopLoss - currentPrice) > maxSLDistance) {
-      finalStopLoss = 0; // Reject, will use ATR fallback
-    }
-    if (finalTakeProfit && Math.abs(finalTakeProfit - currentPrice) > maxSLDistance * 2) {
-      finalTakeProfit = 0; // Reject, will use ATR fallback
-    }
-
-    if (finalSignal.includes('buy')) {
-      if (!finalStopLoss || finalStopLoss >= currentPrice) {
-        // ATR-based: SL = entry - 2x ATR (minimum 0.3% for forex, 1% for crypto)
+    if (currentPrice > 0) {
+      if (finalSignal.includes('buy')) {
         if (atr > 0) {
-          const minSLDist = type === 'crypto' ? currentPrice * 0.01 : currentPrice * 0.003;
-          const slDist = Math.max(atr * 2, minSLDist);
+          const slDist = atr * 2.5;
           finalStopLoss = currentPrice - slDist;
+          finalTakeProfit = currentPrice + slDist * 2;
         } else {
-          // Fallback: use last 10 lows with wider buffer
           const last10Lows = lows.slice(-10);
-          const minLow = last10Lows.length > 0 ? Math.min(...last10Lows) : currentPrice * 0.99;
-          finalStopLoss = minLow * 0.995;
+          const minLow = last10Lows.length > 0 ? Math.min(...last10Lows) : currentPrice * 0.97;
+          finalStopLoss = minLow * 0.998;
+          finalTakeProfit = currentPrice + (currentPrice - finalStopLoss) * 2;
         }
-      }
-      if (!finalTakeProfit || finalTakeProfit <= currentPrice) {
-        finalTakeProfit = currentPrice + (currentPrice - finalStopLoss) * 2;
-      }
-    } else if (finalSignal.includes('sell')) {
-      if (!finalStopLoss || finalStopLoss <= currentPrice) {
-        // ATR-based: SL = entry + 2x ATR (minimum 0.3% for forex, 1% for crypto)
+      } else if (finalSignal.includes('sell')) {
         if (atr > 0) {
-          const minSLDist = type === 'crypto' ? currentPrice * 0.01 : currentPrice * 0.003;
-          const slDist = Math.max(atr * 2, minSLDist);
+          const slDist = atr * 2.5;
           finalStopLoss = currentPrice + slDist;
+          finalTakeProfit = currentPrice - slDist * 2;
         } else {
-          // Fallback: use last 10 highs with wider buffer
           const last10Highs = highs.slice(-10);
-          const maxHigh = last10Highs.length > 0 ? Math.max(...last10Highs) : currentPrice * 1.01;
-          finalStopLoss = maxHigh * 1.005;
+          const maxHigh = last10Highs.length > 0 ? Math.max(...last10Highs) : currentPrice * 1.03;
+          finalStopLoss = maxHigh * 1.002;
+          finalTakeProfit = currentPrice - (finalStopLoss - currentPrice) * 2;
         }
       }
-      if (!finalTakeProfit || finalTakeProfit >= currentPrice) {
-        finalTakeProfit = currentPrice - (finalStopLoss - currentPrice) * 2;
-      }
-    } else {
-      finalStopLoss = 0;
-      finalTakeProfit = 0;
     }
 
     return {
