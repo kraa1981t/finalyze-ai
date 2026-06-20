@@ -888,6 +888,7 @@ Return ONLY valid JSON:
       historicalMatch: resultData.historicalMatch || "",
       timestamp: new Date().toISOString(),
       userId: "",
+      entryPrice: currentPrice,
       stopLoss: finalStopLoss,
       takeProfit: finalTakeProfit
     };
