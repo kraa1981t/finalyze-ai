@@ -163,7 +163,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
       </div>
 
       {/* SL - Symbol - TP */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <div className="flex-1 bg-red-500/10 border border-red-500/20 rounded-lg p-1.5 text-center">
           <div className="flex items-center justify-center gap-1 mb-0.5">
             <TrendingDown size={12} className="text-red-400" />
@@ -181,10 +181,8 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
         </div>
 
         {/* Symbol name between SL and TP */}
-        <div className="flex flex-col items-center justify-center px-1">
-          <TrendingDown size={12} className="text-red-400 mb-0.5" />
-          <span className="text-xs font-extrabold text-white font-mono leading-none">{symbol}</span>
-          <TrendingUp size={12} className="text-emerald-400 mt-0.5" />
+        <div className="flex items-center justify-center min-w-[40px]">
+          <span className="text-sm font-black text-emerald-400 font-mono">{symbol}</span>
         </div>
 
         <div className="flex-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5 text-center">
