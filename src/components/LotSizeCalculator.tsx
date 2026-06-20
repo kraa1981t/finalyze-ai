@@ -155,13 +155,6 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
 
   return (
     <div className="space-y-2">
-      {/* Symbol name between icons */}
-      <div className="flex items-center justify-center gap-2">
-        <TrendingDown size={14} className="text-red-400" />
-        <span className="text-sm font-extrabold text-white font-mono">{symbol}</span>
-        <TrendingUp size={14} className="text-emerald-400" />
-      </div>
-
       {/* Signal type with color */}
       <div className="flex items-center justify-center">
         <span className={`text-xs font-bold ${signalDisplay.color}`}>
@@ -169,8 +162,9 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5">
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-1.5 text-center">
+      {/* SL - Symbol - TP */}
+      <div className="flex items-center gap-1">
+        <div className="flex-1 bg-red-500/10 border border-red-500/20 rounded-lg p-1.5 text-center">
           <div className="flex items-center justify-center gap-1 mb-0.5">
             <TrendingDown size={12} className="text-red-400" />
             <span className="text-[10px] text-red-400 font-bold uppercase">{isAr ? 'وقف الخسارة' : 'SL'}</span>
@@ -186,7 +180,14 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
           </div>
         </div>
 
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5 text-center">
+        {/* Symbol name between SL and TP */}
+        <div className="flex flex-col items-center justify-center px-1">
+          <TrendingDown size={12} className="text-red-400 mb-0.5" />
+          <span className="text-xs font-extrabold text-white font-mono leading-none">{symbol}</span>
+          <TrendingUp size={12} className="text-emerald-400 mt-0.5" />
+        </div>
+
+        <div className="flex-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5 text-center">
           <div className="flex items-center justify-center gap-1 mb-0.5">
             <TrendingUp size={12} className="text-emerald-400" />
             <span className="text-[10px] text-emerald-400 font-bold uppercase">{isAr ? 'جني الأرباح' : 'TP'}</span>
