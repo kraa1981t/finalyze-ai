@@ -259,7 +259,7 @@ export default function LoginOverlay({ onLogin, onBypassLogin, lang, loginError,
         </div>
         <div className="flex flex-col text-left">
           <span className="text-3xl font-display font-black tracking-tighter text-white drop-shadow-sm leading-none">
-            Finalyze.<span className="text-primary italic">AI</span>
+            Joseph.<span className="text-primary italic">Trading</span>
           </span>
           <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 mt-1">Institutional Engine</span>
         </div>
