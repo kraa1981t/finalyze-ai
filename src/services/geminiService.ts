@@ -245,11 +245,22 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     if (hasBearishEngulfing) hasEngulfing = true;
   }
 
+  // 10. Bullish/Bearish Candle (simple direction candle)
+  let hasBullishCandle = false;
+  let hasBearishCandle = false;
+  if (len >= 1) {
+    const lastO = safeOpens[len - 1];
+    const lastC = closes[len - 1];
+    hasBullishCandle = lastC > lastO;
+    hasBearishCandle = lastC < lastO;
+  }
+
   return {
     direction, age, totalAge, rsi, emaCross, volSurge, atr,
     bbUpper, bbMiddle, bbLower, bbWidth, bbPercentB,
     bbPullbackCount, bbTouchLower, bbTouchUpper,
     hasHammer, hasPinbar, hasEngulfing, hasShootingStar,
+    hasBullishCandle, hasBearishCandle,
     momentumScore: upScore / (upScore + downScore) * 100
   };
 }
@@ -366,17 +377,17 @@ function generateLocalAnalysis(
     const isDowntrend = metrics.direction === 'downtrend';
 
     // BUY SETUP: Uptrend + pullback to lower band + reversal candle
-    if (isUptrend && metrics.bbTouchLower && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 5 && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing)) {
+    if (isUptrend && metrics.bbTouchLower && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 6 && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBullishCandle)) {
       score += 3;
       reasons.push({
         check: 'BB Strategy (BUY)',
-        value: `Pullback ${metrics.bbPullbackCount} candles → Lower Band + Reversal`,
+        value: `Pullback ${metrics.bbPullbackCount}c → Lower Band + Reversal`,
         status: 'positive',
         impact: `strong buy: trend up + ${metrics.bbPullbackCount} pullback candles + touch lower BB + reversal candle`
       });
     }
     // SELL SETUP: Downtrend + rally to upper band + reversal candle
-    else if (isDowntrend && metrics.bbTouchUpper && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 5 && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing)) {
+    else if (isDowntrend && metrics.bbTouchUpper && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 6 && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBearishCandle)) {
       score -= 3;
       reasons.push({
         check: 'BB Strategy (SELL)',
@@ -408,7 +419,7 @@ function generateLocalAnalysis(
     const isDowntrend = metrics?.direction === 'downtrend';
 
     // BUY: Macro uptrend + Micro BB touch lower + pullback 3-5 + reversal candle
-    if (isUptrend && microMetrics.bbTouchLower && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 5 && (microMetrics.hasHammer || microMetrics.hasPinbar || microMetrics.hasEngulfing)) {
+    if (isUptrend && microMetrics.bbTouchLower && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasHammer || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBullishCandle)) {
       score += 3;
       reasons.push({
         check: `Micro BB (${microTF}) Strategy (BUY)`,
@@ -417,8 +428,8 @@ function generateLocalAnalysis(
         impact: `strong buy: macro uptrend + micro pullback ${microMetrics.bbPullbackCount} candles + touch lower BB + reversal candle`
       });
     }
-    // SELL: Macro downtrend + Micro BB touch upper + rally 3-5 + reversal candle
-    else if (isDowntrend && microMetrics.bbTouchUpper && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 5 && (microMetrics.hasShootingStar || microMetrics.hasPinbar || microMetrics.hasEngulfing)) {
+    // SELL: Macro downtrend + Micro BB touch upper + rally 3-6 + reversal candle
+    else if (isDowntrend && microMetrics.bbTouchUpper && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasShootingStar || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBearishCandle)) {
       score -= 3;
       reasons.push({
         check: `Micro BB (${microTF}) Strategy (SELL)`,
@@ -644,8 +655,8 @@ RULES:
 - Trend age zones: <10 infancy (cap 65), <25 youth (downgrade strong, cap 70), 25-50 mature (full), >50 old (cap 65).
 - Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
 - If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
-- BOLLINGER BANDS STRATEGY: If trend is UP and price pulled back 3-5 candles to touch Lower BB + reversal candle (hammer/pinbar/engulfing) → STRONG BUY. If trend is DOWN and price rallied 3-5 candles to touch Upper BB + reversal candle (shooting star/pinbar/engulfing) → STRONG SELL. This is a premium entry condition — give it HIGH weight in your decision.
-- MICRO BB STRATEGY: Use the MICRO timeframe BB data to confirm entry timing. If MACRO trend is UP and MICRO BB touches Lower band with 3-5 pullback candles + reversal candle → STRONG BUY (early entry at pullback). If MACRO trend is DOWN and MICRO BB touches Upper band with 3-5 rally candles + reversal candle → STRONG SELL (early entry at correction). This is the MOST PREMIUM entry — catching the start of correction on the lower timeframe.
+- BOLLINGER BANDS STRATEGY: If trend is UP and price pulled back 3-6 candles to touch Lower BB + reversal candle (hammer/pinbar/engulfing/green bullish candle) → STRONG BUY. If trend is DOWN and price rallied 3-6 candles to touch Upper BB + reversal candle (shooting star/pinbar/engulfing/red bearish candle) → STRONG SELL. This is a premium entry condition — give it HIGH weight in your decision.
+- MICRO BB STRATEGY: Use the MICRO timeframe BB data to confirm entry timing. If MACRO trend is UP and MICRO BB touches Lower band with 3-6 pullback candles + reversal candle → STRONG BUY (early entry at pullback). If MACRO trend is DOWN and MICRO BB touches Upper band with 3-6 rally candles + reversal candle → STRONG SELL (early entry at correction). This is the MOST PREMIUM entry — catching the start of correction on the lower timeframe.
 
 LANGUAGE RULES (CRITICAL):
 ${isAr ? `- ALL text fields (summary, detailedReasons impact) MUST be written in formal Arabic (فصحى) using professional financial terminology.
@@ -852,10 +863,10 @@ Return ONLY valid JSON:
       // Bollinger Bands
       if (metrics?.bbLower > 0) {
         const bbPct = Math.round(metrics.bbPercentB * 100);
-        if (metrics.bbTouchLower && metrics.direction === 'uptrend' && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing)) {
+        if (metrics.bbTouchLower && metrics.direction === 'uptrend' && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBullishCandle)) {
           addReason('BB Strategy (BUY)', `Pullback ${metrics.bbPullbackCount}c → Lower + Reversal`, 'positive',
             `strong buy: trend up + pullback to lower BB + reversal candle`);
-        } else if (metrics.bbTouchUpper && metrics.direction === 'downtrend' && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing)) {
+        } else if (metrics.bbTouchUpper && metrics.direction === 'downtrend' && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBearishCandle)) {
           addReason('BB Strategy (SELL)', `Rally ${metrics.bbPullbackCount}c → Upper + Reversal`, 'negative',
             `strong sell: trend down + rally to upper BB + reversal candle`);
         } else {
@@ -867,10 +878,10 @@ Return ONLY valid JSON:
       if (microMetrics?.bbLower > 0) {
         const isUptrend = metrics?.direction === 'uptrend';
         const isDowntrend = metrics?.direction === 'downtrend';
-        if (isUptrend && microMetrics.bbTouchLower && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 5 && (microMetrics.hasHammer || microMetrics.hasPinbar || microMetrics.hasEngulfing)) {
+        if (isUptrend && microMetrics.bbTouchLower && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasHammer || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBullishCandle)) {
           addReason(`Micro BB (${microTF}) Strategy (BUY)`, `Pullback ${microMetrics.bbPullbackCount}c → Lower + Reversal on ${microTF}`, 'positive',
             `strong buy: macro uptrend + micro pullback ${microMetrics.bbPullbackCount} candles + touch lower BB + reversal candle`);
-        } else if (isDowntrend && microMetrics.bbTouchUpper && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 5 && (microMetrics.hasShootingStar || microMetrics.hasPinbar || microMetrics.hasEngulfing)) {
+        } else if (isDowntrend && microMetrics.bbTouchUpper && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasShootingStar || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBearishCandle)) {
           addReason(`Micro BB (${microTF}) Strategy (SELL)`, `Rally ${microMetrics.bbPullbackCount}c → Upper + Reversal on ${microTF}`, 'negative',
             `strong sell: macro downtrend + micro rally ${microMetrics.bbPullbackCount} candles + touch upper BB + reversal candle`);
         } else if (microMetrics.bbTouchLower && isUptrend) {
