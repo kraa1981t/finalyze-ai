@@ -92,14 +92,10 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
           const isBuy = res.signal.includes('buy');
           const isStrong = res.signal === 'strong_buy' || res.signal === 'strong_sell';
           const isJPY = res.symbol.includes('JPY');
-          const pipSize = isJPY ? 0.01 : 0.0001;
           const decimals = isJPY ? 3 : 5;
-          const entry = res.entryPrice || (res.stopLoss + res.takeProfit) / 2;
-          const basePips = isStrong ? 40 : 25;
-          const slPips = Math.round(basePips);
-          const tpPips = slPips * 2;
-          const slPrice = isBuy ? entry - slPips * pipSize : entry + slPips * pipSize;
-          const tpPrice = isBuy ? entry + tpPips * pipSize : entry - tpPips * pipSize;
+          const entry = res.entryPrice || 0;
+          const tp = res.takeProfit || 0;
+          const sl = res.stopLoss || 0;
 
           return (
             <motion.div
@@ -129,7 +125,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                 <div className="flex items-stretch justify-between w-full gap-2 px-1">
                   {/* Take Profit (TP) Box on Left */}
                   <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-4 py-4 shrink-0 min-w-[90px] flex items-center justify-center">
-                    <span className="text-lg font-black font-mono text-emerald-400">{tpPrice.toFixed(decimals)}</span>
+                    <span className="text-lg font-black font-mono text-emerald-400">{tp ? tp.toFixed(decimals) : '—'}</span>
                   </div>
 
                   {/* Symbol in Middle */}
@@ -137,7 +133,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
 
                   {/* Stop Loss (SL) Box on Right */}
                   <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-4 py-4 shrink-0 min-w-[90px] flex items-center justify-center">
-                    <span className="text-lg font-black font-mono text-red-400">{slPrice.toFixed(decimals)}</span>
+                    <span className="text-lg font-black font-mono text-red-400">{sl ? sl.toFixed(decimals) : '—'}</span>
                   </div>
                 </div>
 
@@ -173,8 +169,8 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                       {/* Lot Size Calculator */}
                       <LotSizeCalculator
                         symbol={res.symbol}
-                        stopLoss={res.stopLoss || slPrice}
-                        takeProfit={res.takeProfit || tpPrice}
+                        stopLoss={sl}
+                        takeProfit={tp}
                         entryPrice={entry}
                         signal={res.signal as any}
                         lang={lang}

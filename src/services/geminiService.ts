@@ -838,6 +838,15 @@ Return ONLY valid JSON:
     let finalStopLoss = Number(resultData.stopLoss) || 0;
     let finalTakeProfit = Number(resultData.takeProfit) || 0;
 
+    // Validate AI-returned SL/TP: must be reasonable distance from current price (max 20%)
+    const maxSLDistance = currentPrice * 0.20;
+    if (finalStopLoss && Math.abs(finalStopLoss - currentPrice) > maxSLDistance) {
+      finalStopLoss = 0; // Reject, will use ATR fallback
+    }
+    if (finalTakeProfit && Math.abs(finalTakeProfit - currentPrice) > maxSLDistance * 2) {
+      finalTakeProfit = 0; // Reject, will use ATR fallback
+    }
+
     if (finalSignal.includes('buy')) {
       if (!finalStopLoss || finalStopLoss >= currentPrice) {
         // ATR-based: SL = entry - 2x ATR (minimum 0.3% for forex, 1% for crypto)
