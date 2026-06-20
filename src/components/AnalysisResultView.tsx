@@ -6,6 +6,7 @@ import TradingViewWidget from './TradingViewWidget';
 import LotSizeCalculator from './LotSizeCalculator';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
+import { playClick } from '../lib/audioEngine';
 
 interface AnalysisResultViewProps {
   results: AnalysisResult[];
@@ -113,6 +114,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
               {/* Compact Header - Always Visible */}
               <button
                 onClick={() => {
+                  playClick();
                   setSelectedIndex(idx);
                   setExpandedCard(isExpanded ? null : `${res.symbol}_${idx}`);
                 }}
@@ -192,6 +194,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                         <div className="space-y-1.5">
                           <button
                             onClick={() => {
+                              playClick();
                               const newSet = new Set(expandedReasons);
                               const key = `${res.symbol}_${idx}`;
                               if (newSet.has(key)) {
@@ -240,7 +243,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
 
                       {/* View Chart Button */}
                       <button
-                        onClick={() => setSelectedIndex(idx)}
+                        onClick={() => { playClick(); setSelectedIndex(idx); }}
                         className={`w-full py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 ${
                           isSelected
                             ? 'bg-[#F59E0B] text-black'

@@ -104,3 +104,7 @@ export function playCompletion(volume: number = 0.5) {
   setTimeout(() => playTone(784, 0.15, 'sine', volume), 240);
   setTimeout(() => playTone(1047, 0.3, 'sine', volume), 360);
 }
+
+export function playClick(volume: number = 0.3) {
+  playTone(1200, 0.05, 'sine', volume);
+}

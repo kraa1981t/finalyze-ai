@@ -5,6 +5,7 @@ import { Activity, Zap, BarChart2, Info, Lock } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
 import LotSizeCalculator from './LotSizeCalculator';
 import { Language, translations } from '../lib/i18n';
+import { playClick } from '../lib/audioEngine';
 
 interface ClientDashboardProps {
   results: AnalysisResult[];
@@ -227,6 +228,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
               {/* Compact Header - Always Visible */}
               <button
                 onClick={() => {
+                  playClick();
                   if (!isLocked) {
                     setSelectedSymbol(res.symbol);
                     setExpandedCard(isExpanded ? null : res.symbol);
@@ -302,6 +304,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                         <div className="space-y-1">
                           <button
                             onClick={() => {
+                              playClick();
                               const newSet = new Set(expandedReasons);
                               const key = `${res.symbol}_${idx}`;
                               if (newSet.has(key)) {
@@ -350,7 +353,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
 
                       {/* View Chart Button */}
                       <button
-                        onClick={() => setSelectedSymbol(res.symbol)}
+                        onClick={() => { playClick(); setSelectedSymbol(res.symbol); }}
                         className="w-full py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider bg-[#F59E0B] text-black flex items-center justify-center gap-1"
                       >
                         <BarChart2 size={12} />
