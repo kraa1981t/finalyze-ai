@@ -129,7 +129,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                   </div>
 
                   {/* Symbol in Middle */}
-                  <span className="text-base font-black text-yellow-400 italic truncate flex items-center">{res.symbol}</span>
+                  <span className={`text-base font-black italic truncate flex items-center ${meta.color}`}>{res.symbol}</span>
 
                   {/* Stop Loss (SL) Box on Right */}
                   <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-4 py-4 shrink-0 min-w-[90px] flex items-center justify-center">
@@ -138,14 +138,14 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                 </div>
 
                 {/* Signal text */}
-                <span className="text-xs font-black text-yellow-400">
+                <span className={`text-xs font-black ${meta.color}`}>
                   {isAr ? meta.labelAr : meta.labelEn}
                 </span>
 
                 {/* Confidence + Time row */}
                 <div className="flex items-center gap-2">
-                  <span className="text-lg font-black text-yellow-400 font-mono">{res.confidence}%</span>
-                  <div className="flex items-center gap-0.5 text-[10px] text-yellow-400/60 font-bold">
+                  <span className={`text-lg font-black font-mono ${meta.color}`}>{res.confidence}%</span>
+                  <div className={`flex items-center gap-0.5 text-[10px] font-bold ${meta.color}/40`}>
                     <span>{formatPublishDate(res.timestamp)}</span>
                   </div>
                 </div>
