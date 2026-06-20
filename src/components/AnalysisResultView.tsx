@@ -166,15 +166,17 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                     className="origin-top"
                   >
                     <div className="px-2 pb-2 space-y-2 border-t border-white/5 pt-2">
-                      {/* Lot Size Calculator */}
-                      <LotSizeCalculator
-                        symbol={res.symbol}
-                        stopLoss={sl}
-                        takeProfit={tp}
-                        entryPrice={entry}
-                        signal={res.signal as any}
-                        lang={lang}
-                      />
+                      {/* Lot Size Calculator - hidden for neutral */}
+                      {res.signal !== 'neutral' && res.signal !== 'no_entry' && (
+                        <LotSizeCalculator
+                          symbol={res.symbol}
+                          stopLoss={sl}
+                          takeProfit={tp}
+                          entryPrice={entry}
+                          signal={res.signal as any}
+                          lang={lang}
+                        />
+                      )}
 
                       {/* Summary */}
                       {res.summary && (

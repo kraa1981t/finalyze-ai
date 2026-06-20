@@ -276,15 +276,17 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                     className="origin-top"
                   >
                     <div className="px-2 pb-1.5 space-y-1.5 border-t border-white/5 pt-1.5">
-                      {/* Lot Size Calculator */}
-                      <LotSizeCalculator
-                        symbol={res.symbol}
-                        stopLoss={sl}
-                        takeProfit={tp}
-                        entryPrice={entry}
-                        signal={res.signal as any}
-                        lang={lang}
-                      />
+                      {/* Lot Size Calculator - hidden for neutral */}
+                      {res.signal !== 'neutral' && res.signal !== 'no_entry' && (
+                        <LotSizeCalculator
+                          symbol={res.symbol}
+                          stopLoss={sl}
+                          takeProfit={tp}
+                          entryPrice={entry}
+                          signal={res.signal as any}
+                          lang={lang}
+                        />
+                      )}
 
                       {/* Summary */}
                       {res.summary && (
