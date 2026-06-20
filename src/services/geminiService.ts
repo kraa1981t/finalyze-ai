@@ -838,29 +838,33 @@ Return ONLY valid JSON:
     let finalStopLoss = 0;
     let finalTakeProfit = 0;
 
-    if (currentPrice > 0) {
+    if (currentPrice > 0 && atr > 0) {
+      const slDist = atr * 2.5;
       if (finalSignal.includes('buy')) {
-        if (atr > 0) {
-          const slDist = atr * 2.5;
-          finalStopLoss = currentPrice - slDist;
-          finalTakeProfit = currentPrice + slDist * 2;
-        } else {
-          const last10Lows = lows.slice(-10);
-          const minLow = last10Lows.length > 0 ? Math.min(...last10Lows) : currentPrice * 0.97;
-          finalStopLoss = minLow * 0.998;
-          finalTakeProfit = currentPrice + (currentPrice - finalStopLoss) * 2;
-        }
+        finalStopLoss = currentPrice - slDist;
+        finalTakeProfit = currentPrice + slDist * 2;
       } else if (finalSignal.includes('sell')) {
-        if (atr > 0) {
-          const slDist = atr * 2.5;
-          finalStopLoss = currentPrice + slDist;
-          finalTakeProfit = currentPrice - slDist * 2;
-        } else {
-          const last10Highs = highs.slice(-10);
-          const maxHigh = last10Highs.length > 0 ? Math.max(...last10Highs) : currentPrice * 1.03;
-          finalStopLoss = maxHigh * 1.002;
-          finalTakeProfit = currentPrice - (finalStopLoss - currentPrice) * 2;
-        }
+        finalStopLoss = currentPrice + slDist;
+        finalTakeProfit = currentPrice - slDist * 2;
+      } else {
+        // Neutral: use ATR-based levels as reference
+        finalStopLoss = currentPrice - slDist;
+        finalTakeProfit = currentPrice + slDist;
+      }
+    } else if (currentPrice > 0) {
+      const last10Lows = lows.slice(-10);
+      const last10Highs = highs.slice(-10);
+      const minLow = last10Lows.length > 0 ? Math.min(...last10Lows) : currentPrice * 0.97;
+      const maxHigh = last10Highs.length > 0 ? Math.max(...last10Highs) : currentPrice * 1.03;
+      if (finalSignal.includes('buy')) {
+        finalStopLoss = minLow * 0.998;
+        finalTakeProfit = currentPrice + (currentPrice - finalStopLoss) * 2;
+      } else if (finalSignal.includes('sell')) {
+        finalStopLoss = maxHigh * 1.002;
+        finalTakeProfit = currentPrice - (finalStopLoss - currentPrice) * 2;
+      } else {
+        finalStopLoss = minLow * 0.998;
+        finalTakeProfit = maxHigh * 1.002;
       }
     }
 
