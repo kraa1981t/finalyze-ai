@@ -237,11 +237,11 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
               {/* Compact Header - Always Visible */}
               <button
                 onClick={() => {
-                  handleClick();
                   if (!isLocked) {
                     setSelectedSymbol(res.symbol);
                     setExpandedCard(isExpanded ? null : res.symbol);
                   }
+                  handleClick();
                 }}
                 className={`w-full px-3 py-3 flex flex-col items-center gap-2 rounded-t-lg transition-all ${isSelected && !isLocked ? 'border-b border-[#F59E0B]/30' : ''}`}
               >
@@ -362,7 +362,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
 
                       {/* View Chart Button */}
                       <button
-                        onClick={() => { handleClick(); setSelectedSymbol(res.symbol); }}
+                        onClick={() => { setSelectedSymbol(res.symbol); handleClick(); }}
                         className="w-full py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider bg-[#F59E0B] text-black flex items-center justify-center gap-1"
                       >
                         <BarChart2 size={12} />

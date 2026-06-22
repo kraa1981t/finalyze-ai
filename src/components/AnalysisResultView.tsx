@@ -123,9 +123,9 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
               {/* Compact Header - Always Visible */}
               <button
                 onClick={() => {
-                  handleClick();
                   setSelectedIndex(idx);
                   setExpandedCard(isExpanded ? null : `${res.symbol}_${idx}`);
+                  handleClick();
                 }}
                 className={cn(
                   "w-full px-2 py-2 flex flex-col items-center gap-1.5 rounded-t-lg transition-all",
@@ -252,7 +252,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
 
                       {/* View Chart Button */}
                       <button
-                        onClick={() => { handleClick(); setSelectedIndex(idx); }}
+                        onClick={() => { setSelectedIndex(idx); handleClick(); }}
                         className={`w-full py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 ${
                           isSelected
                             ? 'bg-[#F59E0B] text-black'
@@ -262,6 +262,13 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                         <BarChart2 size={12} />
                         <span>{isAr ? 'عرض الشارت' : 'View Chart'}</span>
                       </button>
+
+                      {/* TradingView Chart */}
+                      {isSelected && (
+                        <div className="rounded-lg overflow-hidden border border-white/5" style={{ height: 300 }}>
+                          <TradingViewWidget symbol={res.symbol} />
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}
