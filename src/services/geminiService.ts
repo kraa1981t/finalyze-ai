@@ -338,26 +338,102 @@ function generateLocalAnalysis(
   let score = 0;
   const reasons: any[] = [];
 
+  // ════════════════════════════════════════════════════════════════
+  // ═══ 4 PRIMARY CONDITIONS (Entry Gates) ═══
+  // ═══ These 4 conditions determine IF a signal exists ═══
+  // ═══ Remaining conditions only BOOST signal strength ═══
+  // ════════════════════════════════════════════════════════════════
+
+  let bbPullbackMet = false;
+  let supplyDemandMet = false;
+  let trendAgeMet = false;
+  let newsMet = false;
+
+  // ── PRIMARY 1: Bollinger Bands Pullback (Entry Pullback) ──
+  if (metrics?.bbLower > 0 && metrics?.bbUpper > 0) {
+    const bbPct = Math.round(metrics.bbPercentB * 100);
+    const isUptrend = metrics.direction === 'uptrend';
+    const isDowntrend = metrics.direction === 'downtrend';
+
+    if (isUptrend && metrics.bbTouchLower && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 6 && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBullishCandle)) {
+      score += 3; bbPullbackMet = true;
+      reasons.push({ check: 'BB Pullback (BUY)', value: `Pullback ${metrics.bbPullbackCount}c → Lower Band + Reversal`, status: 'positive', impact: `strong: trend up + ${metrics.bbPullbackCount} pullback candles + touch lower BB + reversal`, primary: true });
+    } else if (isDowntrend && metrics.bbTouchUpper && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 6 && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBearishCandle)) {
+      score -= 3; bbPullbackMet = true;
+      reasons.push({ check: 'BB Pullback (SELL)', value: `Rally ${metrics.bbPullbackCount}c → Upper Band + Reversal`, status: 'negative', impact: `strong: trend down + ${metrics.bbPullbackCount} rally candles + touch upper BB + reversal`, primary: true });
+    } else if (metrics.bbTouchLower && isUptrend) {
+      score += 1;
+      reasons.push({ check: 'BB Pullback (BUY)', value: `Near Lower Band (${bbPct}%) — ${metrics.bbPullbackCount}c pullback`, status: 'positive', impact: 'partial: approaching lower BB in uptrend', primary: true });
+    } else if (metrics.bbTouchUpper && isDowntrend) {
+      score -= 1;
+      reasons.push({ check: 'BB Pullback (SELL)', value: `Near Upper Band (${bbPct}%) — ${metrics.bbPullbackCount}c rally`, status: 'negative', impact: 'partial: approaching upper BB in downtrend', primary: true });
+    } else {
+      reasons.push({ check: 'BB Pullback', value: `No pullback — ${bbPct}%B`, status: 'neutral', impact: 'BB pullback condition NOT met', primary: true });
+    }
+  } else {
+    reasons.push({ check: 'BB Pullback', value: 'BB data unavailable', status: 'neutral', impact: 'cannot evaluate BB pullback', primary: true });
+  }
+
+  // ── PRIMARY 2: Supply/Demand Zones ──
+  if (supplyDemandZones?.length > 0) {
+    const z = supplyDemandZones[0];
+    const isUptrend = metrics?.direction === 'uptrend';
+    const isDowntrend = metrics?.direction === 'downtrend';
+    if (z.type === 'demand' && (isUptrend || !isDowntrend)) {
+      score += 2; supplyDemandMet = true;
+      reasons.push({ check: 'Supply/Demand', value: `Demand ${z.bottom.toFixed(2)}-${z.top.toFixed(2)} (${Math.round(z.strength)}%)`, status: 'positive', impact: `demand zone supports buy — strength ${Math.round(z.strength)}%`, primary: true });
+    } else if (z.type === 'supply' && (isDowntrend || !isUptrend)) {
+      score -= 2; supplyDemandMet = true;
+      reasons.push({ check: 'Supply/Demand', value: `Supply ${z.bottom.toFixed(2)}-${z.top.toFixed(2)} (${Math.round(z.strength)}%)`, status: 'negative', impact: `supply zone supports sell — strength ${Math.round(z.strength)}%`, primary: true });
+    } else if (z.type === 'demand') {
+      score -= 0.5;
+      reasons.push({ check: 'Supply/Demand', value: `Demand zone vs Downtrend`, status: 'negative', impact: 'demand zone conflicts with downtrend', primary: true });
+    } else {
+      score += 0.5;
+      reasons.push({ check: 'Supply/Demand', value: `Supply zone vs Uptrend`, status: 'positive', impact: 'supply zone conflicts with uptrend', primary: true });
+    }
+  } else {
+    reasons.push({ check: 'Supply/Demand', value: 'No zones detected', status: 'neutral', impact: 'no supply/demand zones nearby', primary: true });
+  }
+
+  // ── PRIMARY 3: Trend Age ──
+  if (totalAge >= matureLimit && totalAge <= oldLimit) {
+    trendAgeMet = true;
+    reasons.push({ check: 'Trend Age', value: `${totalAge}c — Mature (${matureLimit}-${oldLimit})`, status: 'positive', impact: 'trend mature — full signal strength allowed', primary: true });
+  } else if (totalAge < infantLimit) {
+    reasons.push({ check: 'Trend Age', value: `${totalAge}c — Infant (<${infantLimit})`, status: 'negative', impact: 'trend too young — confidence capped', primary: true });
+  } else if (totalAge < matureLimit) {
+    reasons.push({ check: 'Trend Age', value: `${totalAge}c — Youth (${infantLimit}-${matureLimit})`, status: 'neutral', impact: 'trend developing — strong signals may downgrade', primary: true });
+  } else {
+    reasons.push({ check: 'Trend Age', value: `${totalAge}c — Old (>${oldLimit})`, status: 'negative', impact: 'trend exhausting — confidence reduced', primary: true });
+  }
+
+  // ── PRIMARY 4: News Sentiment (Economic/Political) ──
+  const hasNews = false;
+  if (!hasNews) {
+    newsMet = true;
+    reasons.push({ check: 'News Sentiment', value: 'No active events', status: 'neutral', impact: 'no blocking news — signal allowed', primary: true });
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // ═══ SUPPORTING CONDITIONS (Signal Strength Boost) ═══
+  // ═══ These conditions increase/decrease signal confidence ═══
+  // ════════════════════════════════════════════════════════════════
+
   if (metrics?.rsi !== undefined) {
     const rsi = metrics.rsi;
-    if (rsi < 30) { score += 2; reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'positive', impact: 'oversold, bounce potential' }); }
-    else if (rsi > 70) { score -= 2; reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'negative', impact: 'overbought, caution' }); }
+    if (rsi < 30) { score += 1; reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'positive', impact: 'oversold — supports buy' }); }
+    else if (rsi > 70) { score -= 1; reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'negative', impact: 'overbought — supports sell' }); }
     else { reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'neutral', impact: 'neutral zone' }); }
   }
-  if (metrics?.emaCross === 'bullish') { score += 1.5; reasons.push({ check: 'EMA Cross', value: 'bullish', status: 'positive', impact: 'supports upward bias' }); }
-  else if (metrics?.emaCross === 'bearish') { score -= 1.5; reasons.push({ check: 'EMA Cross', value: 'bearish', status: 'negative', impact: 'supports downward bias' }); }
-  if (metrics?.direction === 'uptrend') { score += 1; reasons.push({ check: 'Trend Direction', value: 'uptrend', status: 'positive', impact: 'price making higher highs' }); }
-  else if (metrics?.direction === 'downtrend') { score -= 1; reasons.push({ check: 'Trend Direction', value: 'downtrend', status: 'negative', impact: 'price making lower lows' }); }
+  if (metrics?.emaCross === 'bullish') { score += 1; reasons.push({ check: 'EMA Cross', value: 'bullish', status: 'positive', impact: 'supports upward bias' }); }
+  else if (metrics?.emaCross === 'bearish') { score -= 1; reasons.push({ check: 'EMA Cross', value: 'bearish', status: 'negative', impact: 'supports downward bias' }); }
+  if (metrics?.direction === 'uptrend') { score += 0.5; reasons.push({ check: 'Trend Direction', value: 'uptrend', status: 'positive', impact: 'price making higher highs' }); }
+  else if (metrics?.direction === 'downtrend') { score -= 0.5; reasons.push({ check: 'Trend Direction', value: 'downtrend', status: 'negative', impact: 'price making lower lows' }); }
   else { reasons.push({ check: 'Trend Direction', value: 'sideways', status: 'neutral', impact: 'no clear direction' }); }
   if (metrics?.volSurge) {
     score += score >= 0 ? 0.5 : -0.5;
     reasons.push({ check: 'Volume Surge', value: 'true', status: score >= 0 ? 'positive' : 'negative', impact: 'confirms momentum' });
-  }
-  if (supplyDemandZones?.length > 0) {
-    const z = supplyDemandZones[0];
-    reasons.push({ check: 'Supply/Demand Zone', value: `${z.type === 'supply' ? 'Supply' : 'Demand'} ${z.bottom.toFixed(2)}-${z.top.toFixed(2)}`, status: 'neutral', impact: `nearest ${z.type} zone` });
-    if (z.type === 'demand') score += 0.5;
-    else score -= 0.5;
   }
   if (microMetrics) {
     let microScore = 0;
@@ -368,88 +444,20 @@ function generateLocalAnalysis(
     reasons.push({ check: 'Micro TF Alignment', value: microSignal, status: microSignal === 'aligned' ? 'positive' : 'neutral', impact: microSignal === 'aligned' ? 'micro aligns with macro' : 'micro diverging' });
   }
 
-  // Bollinger Bands Strategy — Pullback with Trend
-  if (metrics?.bbLower > 0 && metrics?.bbUpper > 0) {
-    const bbPct = Math.round(metrics.bbPercentB * 100);
-    const isUptrend = metrics.direction === 'uptrend';
-    const isDowntrend = metrics.direction === 'downtrend';
-
-    // BUY SETUP: Uptrend + pullback to lower band + reversal candle
-    if (isUptrend && metrics.bbTouchLower && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 6 && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBullishCandle)) {
-      score += 3;
-      reasons.push({
-        check: 'BB Strategy (BUY)',
-        value: `Pullback ${metrics.bbPullbackCount}c → Lower Band + Reversal`,
-        status: 'positive',
-        impact: `strong buy: trend up + ${metrics.bbPullbackCount} pullback candles + touch lower BB + reversal candle`
-      });
-    }
-    // SELL SETUP: Downtrend + rally to upper band + reversal candle
-    else if (isDowntrend && metrics.bbTouchUpper && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 6 && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBearishCandle)) {
-      score -= 3;
-      reasons.push({
-        check: 'BB Strategy (SELL)',
-        value: `Rally ${metrics.bbPullbackCount} candles → Upper Band + Reversal`,
-        status: 'negative',
-        impact: `strong sell: trend down + ${metrics.bbPullbackCount} rally candles + touch upper BB + reversal candle`
-      });
-    }
-    // Partial BB signals
-    else {
-      if (metrics.bbTouchLower && isUptrend) {
-        score += 0.5;
-        reasons.push({ check: 'BB Touch Lower', value: `price at lower band (${bbPct}%) — ${metrics.bbPullbackCount}c pullback`, status: 'positive', impact: 'approaching lower BB in uptrend' });
-      }
-      if (metrics.bbTouchUpper && isDowntrend) {
-        score -= 0.5;
-        reasons.push({ check: 'BB Touch Upper', value: `price at upper band (${bbPct}%) — ${metrics.bbPullbackCount}c rally`, status: 'negative', impact: 'approaching upper BB in downtrend' });
-      }
-      if (metrics.hasHammer || metrics.hasPinbar) {
-        reasons.push({ check: 'Reversal Candle', value: metrics.hasHammer ? 'Hammer' : 'Pinbar', status: 'neutral', impact: 'potential reversal pattern detected' });
-      }
-      reasons.push({ check: 'BB Info', value: `Upper: ${metrics.bbUpper.toFixed(4)} | Mid: ${metrics.bbMiddle.toFixed(4)} | Lower: ${metrics.bbLower.toFixed(4)}`, status: 'neutral', impact: `Bollinger Bands — ${bbPct}%B` });
-    }
-  }
-
-  // Micro BB Strategy — Pullback on lower timeframe confirms entry
+  // Micro BB Strategy (Supporting)
   if (microMetrics?.bbLower > 0 && microMetrics?.bbUpper > 0) {
     const isUptrend = metrics?.direction === 'uptrend';
     const isDowntrend = metrics?.direction === 'downtrend';
-
-    // BUY: Macro uptrend + Micro BB touch lower + pullback 3-6 + reversal candle
     if (isUptrend && microMetrics.bbTouchLower && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasHammer || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBullishCandle)) {
-      score += 3;
-      reasons.push({
-        check: `Micro BB (${microTF}) Strategy (BUY)`,
-        value: `Pullback ${microMetrics.bbPullbackCount}c → Lower Band + Reversal on ${microTF}`,
-        status: 'positive',
-        impact: `strong buy: macro uptrend + micro pullback ${microMetrics.bbPullbackCount} candles + touch lower BB + reversal candle`
-      });
-    }
-    // SELL: Macro downtrend + Micro BB touch upper + rally 3-6 + reversal candle
-    else if (isDowntrend && microMetrics.bbTouchUpper && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasShootingStar || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBearishCandle)) {
-      score -= 3;
-      reasons.push({
-        check: `Micro BB (${microTF}) Strategy (SELL)`,
-        value: `Rally ${microMetrics.bbPullbackCount}c → Upper Band + Reversal on ${microTF}`,
-        status: 'negative',
-        impact: `strong sell: macro downtrend + micro rally ${microMetrics.bbPullbackCount} candles + touch upper BB + reversal candle`
-      });
-    }
-    // Partial micro BB signals
-    else {
-      if (microMetrics.bbTouchLower && isUptrend) {
-        score += 0.5;
-        reasons.push({ check: `Micro BB (${microTF}) Touch Lower`, value: `price at lower band on ${microTF}`, status: 'positive', impact: `micro timeframe approaching lower BB in macro uptrend` });
-      }
-      if (microMetrics.bbTouchUpper && isDowntrend) {
-        score -= 0.5;
-        reasons.push({ check: `Micro BB (${microTF}) Touch Upper`, value: `price at upper band on ${microTF}`, status: 'negative', impact: `micro timeframe approaching upper BB in macro downtrend` });
-      }
+      score += 2;
+      reasons.push({ check: `Micro BB (${microTF}) Strategy (BUY)`, value: `Pullback ${microMetrics.bbPullbackCount}c → Lower Band + Reversal on ${microTF}`, status: 'positive', impact: `micro pullback confirms buy entry on ${microTF}` });
+    } else if (isDowntrend && microMetrics.bbTouchUpper && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasShootingStar || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBearishCandle)) {
+      score -= 2;
+      reasons.push({ check: `Micro BB (${microTF}) Strategy (SELL)`, value: `Rally ${microMetrics.bbPullbackCount}c → Upper Band + Reversal on ${microTF}`, status: 'negative', impact: `micro rally confirms sell entry on ${microTF}` });
     }
   }
 
-  // Cross-Asset Correlation & Cointelligence Intelligence
+  // Cross-Asset Correlation (Supporting)
   const corrGroup = getCorrelationGroup(symbol);
   if (corrGroup) {
     const corrPct = Math.round(corrGroup.correlation * 100);
@@ -465,13 +473,25 @@ function generateLocalAnalysis(
   let confidence: number;
   const absScore = Math.abs(score);
 
-  const bbPullbackMet = reasons.some(r => r.check.includes('BB Strategy') || r.check.includes('Micro BB'));
+  const primaryMetCount = [bbPullbackMet, supplyDemandMet, trendAgeMet, newsMet].filter(Boolean).length;
+  const hasDirection = score >= 1 || score <= -1;
 
-  if (score >= 3) { rawSignal = bbPullbackMet ? SignalType.STRONG_BUY : SignalType.BUY; confidence = bbPullbackMet ? Math.min(95, 80 + Math.round((absScore - 3) * 5)) : Math.round(60 + (absScore - 1.5) * 13.3); }
-  else if (score >= 1.5) { rawSignal = SignalType.BUY; confidence = Math.round(60 + (absScore - 1.5) * 13.3); }
-  else if (score <= -3) { rawSignal = bbPullbackMet ? SignalType.STRONG_SELL : SignalType.SELL; confidence = bbPullbackMet ? Math.min(95, 80 + Math.round((absScore - 3) * 5)) : Math.round(60 + (absScore - 1.5) * 13.3); }
-  else if (score <= -1.5) { rawSignal = SignalType.SELL; confidence = Math.round(60 + (absScore - 1.5) * 13.3); }
-  else { rawSignal = SignalType.NEUTRAL; confidence = Math.round(40 + absScore * 13.3); }
+  if (score >= 4 && bbPullbackMet && primaryMetCount >= 3) {
+    rawSignal = SignalType.STRONG_BUY;
+    confidence = Math.min(95, 80 + Math.round((absScore - 4) * 3));
+  } else if (score >= 1.5 && hasDirection) {
+    rawSignal = SignalType.BUY;
+    confidence = Math.round(55 + (absScore - 1.5) * 10);
+  } else if (score <= -4 && bbPullbackMet && primaryMetCount >= 3) {
+    rawSignal = SignalType.STRONG_SELL;
+    confidence = Math.min(95, 80 + Math.round((absScore - 4) * 3));
+  } else if (score <= -1.5 && hasDirection) {
+    rawSignal = SignalType.SELL;
+    confidence = Math.round(55 + (absScore - 1.5) * 10);
+  } else {
+    rawSignal = SignalType.NEUTRAL;
+    confidence = Math.round(35 + absScore * 10);
+  }
 
   // Apply age zone caps — proportional reduction instead of fixed values
   if (totalAge < infantLimit) {
@@ -652,12 +672,16 @@ SETTINGS: NewsGuard ${settings.useNewsGuard ? 'ON' : 'OFF'}, Volume ${settings.u
 SUPPLY & DEMAND ZONES: ${zonesText}
 
 RULES:
-- ONLY "strong_buy"/"strong_sell" if micro (${microTF}) is ALIGNED with macro. If micro is in pullback → downgrade to "buy"/"sell".
-- Trend age zones: <10 infancy (cap 65), <25 youth (downgrade strong, cap 70), 25-50 mature (full), >50 old (cap 65).
-- Fear&Greed: Extreme Fear (0-25)=contrarian, Greed (55-75)=trend follow, Extreme Greed (75-100)=cap confidence at 75.
-- If HIGH impact economic event within 24h, warn in summary and reduce confidence -10% if NewsGuard is ON.
-- BOLLINGER BANDS STRATEGY: If trend is UP and price pulled back 3-6 candles to touch Lower BB + reversal candle (hammer/pinbar/engulfing/green bullish candle) → STRONG BUY. If trend is DOWN and price rallied 3-6 candles to touch Upper BB + reversal candle (shooting star/pinbar/engulfing/red bearish candle) → STRONG SELL. This is a premium entry condition — give it HIGH weight in your decision.
-- MICRO BB STRATEGY: Use the MICRO timeframe BB data to confirm entry timing. If MACRO trend is UP and MICRO BB touches Lower band with 3-6 pullback candles + reversal candle → STRONG BUY (early entry at pullback). If MACRO trend is DOWN and MICRO BB touches Upper band with 3-6 rally candles + reversal candle → STRONG SELL (early entry at correction). This is the MOST PREMIUM entry — catching the start of correction on the lower timeframe.
+- 4 PRIMARY CONDITIONS (must ALL be favorable for strong signal):
+  1. BB Pullback: trend + 3-6 pullback candles + touch BB + reversal candle → STRONG BUY/SELL
+  2. Supply/Demand: demand zone + uptrend = confirms buy; supply zone + downtrend = confirms sell
+  3. Trend Age: <10 infant, <25 youth, 25-50 mature (full strength), >50 old (reduced)
+  4. News Sentiment: negative news blocks strong signal; no news = allowed
+- ONLY "strong_buy"/"strong_sell" if ALL 4 primary conditions are favorable + micro (${microTF}) aligned.
+- If any primary condition fails → "buy"/"sell" (not strong).
+- Supporting conditions (RSI, EMA, Volume, Micro BB) add boost only.
+- BOLLINGER BANDS STRATEGY: If trend is UP and price pulled back 3-6 candles to touch Lower BB (or within 1.5%) + reversal candle → STRONG BUY. If trend is DOWN and price rallied 3-6 candles to touch Upper BB (or within 1.5%) + reversal candle → STRONG SELL.
+- MICRO BB STRATEGY: Same conditions on micro timeframe → adds +2 boost.
 
 LANGUAGE RULES (CRITICAL):
 ${isAr ? `- ALL text fields (summary, detailedReasons impact) MUST be written in formal Arabic (فصحى) using professional financial terminology.
@@ -795,15 +819,37 @@ Return ONLY valid JSON:
         finalSignal = SignalType.SELL;
       }
       // Rule 3: If signal is buy/sell but confidence meets or exceeds minStrongConfidence threshold, upgrade it
-      // ONLY if BB pullback strategy was triggered (mandatory condition for strong signals)
+      // ONLY if BB pullback + Supply/Demand + Trend Age + News are all favorable (4 primary conditions)
       else if (finalSignal === SignalType.BUY && finalConfidence >= strongConf) {
-        const bbMet = detailedReasons?.some((r: any) => r.check?.includes('BB Strategy') || r.check?.includes('Micro BB'));
-        finalSignal = bbMet ? SignalType.STRONG_BUY : SignalType.BUY;
-        if (!bbMet) detailedReasons?.push({ check: 'Strong Signal Block', value: 'BB pullback not triggered', status: 'negative', impact: 'strong signal requires BB pullback confirmation' });
+        const bbMet = detailedReasons?.some((r: any) => r.check?.includes('BB Pullback') || r.check?.includes('BB Strategy'));
+        const sdMet = detailedReasons?.some((r: any) => r.check?.includes('Supply/Demand'));
+        const ageMet = detailedReasons?.some((r: any) => r.check?.includes('Trend Age') && r.status === 'positive');
+        const newsMet2 = detailedReasons?.some((r: any) => r.check?.includes('News Sentiment') && r.status !== 'negative');
+        const allPrimary = bbMet && sdMet && ageMet && newsMet2;
+        finalSignal = allPrimary ? SignalType.STRONG_BUY : SignalType.BUY;
+        if (!allPrimary) {
+          const missing = [];
+          if (!bbMet) missing.push('BB Pullback');
+          if (!sdMet) missing.push('S/D Zone');
+          if (!ageMet) missing.push('Trend Age');
+          if (!newsMet2) missing.push('News');
+          detailedReasons?.push({ check: 'Strong Signal Block', value: `Missing: ${missing.join(', ')}`, status: 'negative', impact: 'strong signal requires all 4 primary conditions' });
+        }
       } else if (finalSignal === SignalType.SELL && finalConfidence >= strongConf) {
-        const bbMet = detailedReasons?.some((r: any) => r.check?.includes('BB Strategy') || r.check?.includes('Micro BB'));
-        finalSignal = bbMet ? SignalType.STRONG_SELL : SignalType.SELL;
-        if (!bbMet) detailedReasons?.push({ check: 'Strong Signal Block', value: 'BB pullback not triggered', status: 'negative', impact: 'strong signal requires BB pullback confirmation' });
+        const bbMet = detailedReasons?.some((r: any) => r.check?.includes('BB Pullback') || r.check?.includes('BB Strategy'));
+        const sdMet = detailedReasons?.some((r: any) => r.check?.includes('Supply/Demand'));
+        const ageMet = detailedReasons?.some((r: any) => r.check?.includes('Trend Age') && r.status === 'positive');
+        const newsMet2 = detailedReasons?.some((r: any) => r.check?.includes('News Sentiment') && r.status !== 'negative');
+        const allPrimary = bbMet && sdMet && ageMet && newsMet2;
+        finalSignal = allPrimary ? SignalType.STRONG_SELL : SignalType.SELL;
+        if (!allPrimary) {
+          const missing = [];
+          if (!bbMet) missing.push('BB Pullback');
+          if (!sdMet) missing.push('S/D Zone');
+          if (!ageMet) missing.push('Trend Age');
+          if (!newsMet2) missing.push('News');
+          detailedReasons?.push({ check: 'Strong Signal Block', value: `Missing: ${missing.join(', ')}`, status: 'negative', impact: 'strong signal requires all 4 primary conditions' });
+        }
       }
     }
 
@@ -838,17 +884,15 @@ Return ONLY valid JSON:
           isUp ? 'price making higher highs' :
           metrics.direction === 'downtrend' ? 'price making lower lows' : 'no clear direction');
       }
-      // Trend Age Zone
-      const ageZoneDesc = totalAge < infantLimit ? `infancy (<${infantLimit})` :
-        totalAge < matureLimit ? `youth (${infantLimit}-${matureLimit})` :
-        totalAge <= oldLimit ? `mature (${matureLimit}-${oldLimit})` : `old (>${oldLimit})`;
-      const zoneStatus = totalAge < infantLimit ? 'neutral' :
-        totalAge < matureLimit ? 'neutral' :
-        totalAge <= oldLimit ? 'positive' : 'neutral';
-      addReason('Trend Age Zone', `${totalAge}c — ${ageZoneDesc}`, zoneStatus,
-        totalAge < infantLimit ? 'confidence capped at 65' :
-        totalAge < matureLimit ? 'strong signals downgraded' :
-        totalAge <= oldLimit ? 'full confidence allowed' : 'confidence capped at 65');
+      // Trend Age Zone (Primary 3)
+      const ageZoneDesc = totalAge < infantLimit ? `Infant (<${infantLimit})` :
+        totalAge < matureLimit ? `Youth (${infantLimit}-${matureLimit})` :
+        totalAge <= oldLimit ? `Mature (${matureLimit}-${oldLimit})` : `Old (>${oldLimit})`;
+      const zoneStatus = totalAge >= matureLimit && totalAge <= oldLimit ? 'positive' :
+        totalAge < infantLimit ? 'negative' : 'neutral';
+      addReason('Trend Age', `${totalAge}c — ${ageZoneDesc}`, zoneStatus,
+        zoneStatus === 'positive' ? 'trend mature — full signal allowed' :
+        zoneStatus === 'negative' ? 'trend age issue — confidence reduced' : 'trend developing');
       // Volume Surge
       if (metrics?.volSurge !== undefined) {
         addReason('Volume Surge', metrics.volSurge ? 'true' : 'false',
@@ -858,27 +902,34 @@ Return ONLY valid JSON:
       // Supply/Demand Zones
       if (supplyDemandZones.length > 0) {
         const nearestZone = supplyDemandZones[0];
-        addReason('Supply/Demand Zone',
-          `${nearestZone.type === 'supply' ? 'Supply' : 'Demand'} ${nearestZone.bottom.toFixed(2)}-${nearestZone.top.toFixed(2)} strength ${nearestZone.strength.toFixed(0)}%`,
-          'neutral', `nearest ${nearestZone.type} zone identified`);
+        const isUptrend2 = metrics?.direction === 'uptrend';
+        const isDowntrend2 = metrics?.direction === 'downtrend';
+        const aligned = (nearestZone.type === 'demand' && isUptrend2) || (nearestZone.type === 'supply' && isDowntrend2);
+        addReason('Supply/Demand',
+          `${nearestZone.type === 'supply' ? 'Supply' : 'Demand'} ${nearestZone.bottom.toFixed(2)}-${nearestZone.top.toFixed(2)} (${Math.round(nearestZone.strength)}%)`,
+          aligned ? 'positive' : 'negative', `nearest ${nearestZone.type} zone ${aligned ? 'confirms direction' : 'conflicts with trend'}`);
+      } else {
+        addReason('Supply/Demand', 'No zones detected', 'neutral', 'no supply/demand zones nearby');
       }
       // Micro TF
       addReason('Micro TF Alignment', resultData.microSignal || 'unknown',
         resultData.microSignal === 'aligned' ? 'positive' : resultData.microSignal === 'pullback' ? 'neutral' : 'neutral',
         resultData.microSignal === 'aligned' ? 'micro aligns with macro' : 'micro diverging from macro');
-      // Bollinger Bands
+      // Bollinger Bands (Primary 1)
       if (metrics?.bbLower > 0) {
         const bbPct = Math.round(metrics.bbPercentB * 100);
-        if (metrics.bbTouchLower && metrics.direction === 'uptrend' && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBullishCandle)) {
-          addReason('BB Strategy (BUY)', `Pullback ${metrics.bbPullbackCount}c → Lower + Reversal`, 'positive',
-            `strong buy: trend up + pullback to lower BB + reversal candle`);
-        } else if (metrics.bbTouchUpper && metrics.direction === 'downtrend' && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBearishCandle)) {
-          addReason('BB Strategy (SELL)', `Rally ${metrics.bbPullbackCount}c → Upper + Reversal`, 'negative',
-            `strong sell: trend down + rally to upper BB + reversal candle`);
+        const isUp = metrics.direction === 'uptrend';
+        const isDown = metrics.direction === 'downtrend';
+        if (isUp && metrics.bbTouchLower && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 6 && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBullishCandle)) {
+          addReason('BB Pullback (BUY)', `Pullback ${metrics.bbPullbackCount}c → Lower + Reversal`, 'positive', `strong: trend up + pullback to lower BB + reversal`);
+        } else if (isDown && metrics.bbTouchUpper && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 6 && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBearishCandle)) {
+          addReason('BB Pullback (SELL)', `Rally ${metrics.bbPullbackCount}c → Upper + Reversal`, 'negative', `strong: trend down + rally to upper BB + reversal`);
+        } else if (metrics.bbTouchLower && isUp) {
+          addReason('BB Pullback (BUY)', `Near Lower (${bbPct}%) — ${metrics.bbPullbackCount}c`, 'positive', 'partial: approaching lower BB');
+        } else if (metrics.bbTouchUpper && isDown) {
+          addReason('BB Pullback (SELL)', `Near Upper (${bbPct}%) — ${metrics.bbPullbackCount}c`, 'negative', 'partial: approaching upper BB');
         } else {
-          const touchStatus = metrics.bbTouchLower ? 'Touch Lower' : metrics.bbTouchUpper ? 'Touch Upper' : bbPct < 30 ? 'Near Lower' : bbPct > 70 ? 'Near Upper' : 'Mid Band';
-          addReason('Bollinger Bands', `${touchStatus} | ${metrics.bbPullbackCount}c pullback | ${bbPct}%B`, 'neutral',
-            `BB: U:${metrics.bbUpper.toFixed(4)} M:${metrics.bbMiddle.toFixed(4)} L:${metrics.bbLower.toFixed(4)}`);
+          addReason('BB Pullback', `No pullback — ${bbPct}%B`, 'neutral', 'BB pullback NOT met');
         }
       }
       // Micro BB Strategy
@@ -907,10 +958,12 @@ Return ONLY valid JSON:
           fgStatus === 'positive' ? 'contrarian buy signal' :
           fgStatus === 'negative' ? 'extreme greed, cap confidence' : 'neutral sentiment');
       }
-      // News
+      // News Sentiment (Primary 4)
       if (contextNews.length > 0) {
         const sources = [...new Set(contextNews.map(n => n.source).filter(Boolean))];
         addReason('News Sentiment', `${contextNews.length} articles`, 'neutral', 'check summary for details', sources.join(', '));
+      } else {
+        addReason('News Sentiment', 'No active events', 'neutral', 'no blocking news — signal allowed');
       }
       // Economic Events
       addReason('Economic Events', contextEcon.length > 0 ? `${contextEcon.length} events this week` : 'no major events',
