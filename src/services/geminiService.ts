@@ -206,8 +206,8 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
       else break;
     }
     const currentPrice = closes[len - 1];
-    bbTouchLower = currentPrice <= bbLower * 1.005;
-    bbTouchUpper = currentPrice >= bbUpper * 0.995;
+    bbTouchLower = currentPrice <= bbLower * 1.015;
+    bbTouchUpper = currentPrice >= bbUpper * 0.985;
   }
 
   // 9. Reversal Candle Patterns (last candle)
