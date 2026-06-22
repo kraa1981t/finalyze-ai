@@ -193,23 +193,21 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     bbPercentB = bbUpper > bbLower ? (currentPrice - bbLower) / (bbUpper - bbLower) : 0.5;
   }
 
-  // 8. Bollinger Band Pullback Detection (3-5 candles opposite to trend)
+  // 8. Bollinger Band Pullback Detection (3-6 candles opposite to trend)
   let bbPullbackCount = 0;
   let bbTouchLower = false;
   let bbTouchUpper = false;
-  if (len >= 5 && bbLower > 0) {
-    // Count consecutive opposite candles
-    for (let i = len - 1; i >= Math.max(0, len - 5); i--) {
+  if (len >= 3 && bbLower > 0) {
+    for (let i = len - 1; i >= Math.max(0, len - 7); i--) {
       const isBearish = closes[i] < safeOpens[i];
       const isBullish = closes[i] > safeOpens[i];
       if (direction === 'uptrend' && isBearish) bbPullbackCount++;
       else if (direction === 'downtrend' && isBullish) bbPullbackCount++;
       else break;
     }
-    // Check if price touched or approached lower/upper band (within 0.3%)
     const currentPrice = closes[len - 1];
-    bbTouchLower = currentPrice <= bbLower * 1.003;
-    bbTouchUpper = currentPrice >= bbUpper * 0.997;
+    bbTouchLower = currentPrice <= bbLower * 1.005;
+    bbTouchUpper = currentPrice >= bbUpper * 0.995;
   }
 
   // 9. Reversal Candle Patterns (last candle)
@@ -400,11 +398,11 @@ function generateLocalAnalysis(
     else {
       if (metrics.bbTouchLower && isUptrend) {
         score += 0.5;
-        reasons.push({ check: 'BB Touch Lower', value: `price at lower band (${bbPct}%)`, status: 'positive', impact: 'approaching lower BB in uptrend' });
+        reasons.push({ check: 'BB Touch Lower', value: `price at lower band (${bbPct}%) — ${metrics.bbPullbackCount}c pullback`, status: 'positive', impact: 'approaching lower BB in uptrend' });
       }
       if (metrics.bbTouchUpper && isDowntrend) {
         score -= 0.5;
-        reasons.push({ check: 'BB Touch Upper', value: `price at upper band (${bbPct}%)`, status: 'negative', impact: 'approaching upper BB in downtrend' });
+        reasons.push({ check: 'BB Touch Upper', value: `price at upper band (${bbPct}%) — ${metrics.bbPullbackCount}c rally`, status: 'negative', impact: 'approaching upper BB in downtrend' });
       }
       if (metrics.hasHammer || metrics.hasPinbar) {
         reasons.push({ check: 'Reversal Candle', value: metrics.hasHammer ? 'Hammer' : 'Pinbar', status: 'neutral', impact: 'potential reversal pattern detected' });
@@ -418,7 +416,7 @@ function generateLocalAnalysis(
     const isUptrend = metrics?.direction === 'uptrend';
     const isDowntrend = metrics?.direction === 'downtrend';
 
-    // BUY: Macro uptrend + Micro BB touch lower + pullback 3-5 + reversal candle
+    // BUY: Macro uptrend + Micro BB touch lower + pullback 3-6 + reversal candle
     if (isUptrend && microMetrics.bbTouchLower && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasHammer || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBullishCandle)) {
       score += 3;
       reasons.push({
@@ -870,8 +868,9 @@ Return ONLY valid JSON:
           addReason('BB Strategy (SELL)', `Rally ${metrics.bbPullbackCount}c → Upper + Reversal`, 'negative',
             `strong sell: trend down + rally to upper BB + reversal candle`);
         } else {
-          addReason('Bollinger Bands', `U:${metrics.bbUpper.toFixed(4)} M:${metrics.bbMiddle.toFixed(4)} L:${metrics.bbLower.toFixed(4)} (${bbPct}%B)`, 'neutral',
-            `BB width ${metrics.bbWidth.toFixed(4)}`);
+          const touchStatus = metrics.bbTouchLower ? 'Touch Lower' : metrics.bbTouchUpper ? 'Touch Upper' : bbPct < 30 ? 'Near Lower' : bbPct > 70 ? 'Near Upper' : 'Mid Band';
+          addReason('Bollinger Bands', `${touchStatus} | ${metrics.bbPullbackCount}c pullback | ${bbPct}%B`, 'neutral',
+            `BB: U:${metrics.bbUpper.toFixed(4)} M:${metrics.bbMiddle.toFixed(4)} L:${metrics.bbLower.toFixed(4)}`);
         }
       }
       // Micro BB Strategy
