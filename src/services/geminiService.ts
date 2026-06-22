@@ -491,27 +491,41 @@ function generateLocalAnalysis(
   const primaryMetCount = [bbPullbackMet, supplyDemandMet, trendAgeMet, newsMet].filter(Boolean).length;
   const supportRatio = supportTotal > 0 ? supportAligned / supportTotal : 0;
 
-  // ═══ CONFIDENCE = Primary (50%) + Supporting (20%) + Base (30%) ═══
-  const primaryConf = primaryScore !== 0 ? Math.min(50, Math.round(Math.abs(primaryScore) / 5 * 50)) : 0;
-  const supportConf = supportTotal > 0 ? Math.min(20, Math.round(supportRatio * 20)) : 0;
-  const baseConf = 30;
-  confidence = primaryConf + supportConf + baseConf;
+  const pBB = settings?.primaryBBWeight ?? 15;
+  const pSD = settings?.primarySDWeight ?? 15;
+  const pAge = settings?.primaryAgeWeight ?? 10;
+  const pNews = settings?.primaryNewsWeight ?? 10;
+  const sRSI = settings?.supportRSIWeight ?? 5;
+  const sEMA = settings?.supportEMAWeight ?? 5;
+  const sDir = settings?.supportDirWeight ?? 3;
+  const sVol = settings?.supportVolWeight ?? 2;
+  const sMicroBB = settings?.supportMicroBBWeight ?? 3;
+  const sMicroAlign = settings?.supportMicroAlignWeight ?? 2;
+  const baseConf = settings?.baseConfidence ?? 30;
+  const strongThresh = settings?.strongThreshold ?? 70;
+  const buyThresh = settings?.buyThreshold ?? 50;
 
-  // ═══ SIGNAL TYPE based on confidence ═══
+  const maxPrimary = pBB + pSD + pAge + pNews;
+  const maxSupport = sRSI + sEMA + sDir + sVol + sMicroBB + sMicroAlign;
+
+  const primaryConf = maxPrimary > 0 ? Math.round(Math.abs(primaryScore) / 5 * maxPrimary) : 0;
+  const supportConf = supportTotal > 0 ? Math.round(supportRatio * maxSupport) : 0;
+  confidence = Math.min(100, primaryConf + supportConf + baseConf);
+
   const isBuy = totalScore > 0;
   const isSell = totalScore < 0;
 
-  if (confidence >= 70 && bbPullbackMet && primaryMetCount >= 3 && isBuy) {
+  if (confidence >= strongThresh && bbPullbackMet && primaryMetCount >= 3 && isBuy) {
     rawSignal = SignalType.STRONG_BUY;
-  } else if (confidence >= 50 && isBuy) {
+  } else if (confidence >= buyThresh && isBuy) {
     rawSignal = SignalType.BUY;
-  } else if (confidence >= 70 && bbPullbackMet && primaryMetCount >= 3 && isSell) {
+  } else if (confidence >= strongThresh && bbPullbackMet && primaryMetCount >= 3 && isSell) {
     rawSignal = SignalType.STRONG_SELL;
-  } else if (confidence >= 50 && isSell) {
+  } else if (confidence >= buyThresh && isSell) {
     rawSignal = SignalType.SELL;
   } else {
     rawSignal = SignalType.NEUTRAL;
-    confidence = Math.min(confidence, 49);
+    confidence = Math.min(confidence, buyThresh - 1);
   }
 
   // Apply age zone caps — proportional reduction
@@ -531,12 +545,12 @@ function generateLocalAnalysis(
   }
 
   // Re-check signal based on final confidence
-  if (confidence >= 70 && (rawSignal === SignalType.BUY || rawSignal === SignalType.STRONG_BUY) && bbPullbackMet && primaryMetCount >= 3) {
+  if (confidence >= strongThresh && (rawSignal === SignalType.BUY || rawSignal === SignalType.STRONG_BUY) && bbPullbackMet && primaryMetCount >= 3) {
     rawSignal = SignalType.STRONG_BUY;
-  } else if (confidence >= 70 && (rawSignal === SignalType.SELL || rawSignal === SignalType.STRONG_SELL) && bbPullbackMet && primaryMetCount >= 3) {
+  } else if (confidence >= strongThresh && (rawSignal === SignalType.SELL || rawSignal === SignalType.STRONG_SELL) && bbPullbackMet && primaryMetCount >= 3) {
     rawSignal = SignalType.STRONG_SELL;
   } else if (rawSignal === SignalType.STRONG_BUY || rawSignal === SignalType.STRONG_SELL) {
-    rawSignal = confidence >= 50 ? (rawSignal === SignalType.STRONG_BUY ? SignalType.BUY : SignalType.SELL) : SignalType.NEUTRAL;
+    rawSignal = confidence >= buyThresh ? (rawSignal === SignalType.STRONG_BUY ? SignalType.BUY : SignalType.SELL) : SignalType.NEUTRAL;
   }
 
   const minConf = settings?.minConfidence || 45;

@@ -276,104 +276,113 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
     </div>
   );
 
+  const NumberInput = ({ label, value, onChange, min = 0, max = 100, step = 1, color = 'text-primary', desc }: {
+    label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; color?: string; desc?: string;
+  }) => (
+    <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-bold text-brand-text">{label}</div>
+        {desc && <div className="text-[10px] text-brand-text/40 mt-0.5">{desc}</div>}
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button onClick={() => onChange(Math.max(min, value - step))}
+          className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-brand-muted hover:bg-white/10 hover:text-brand-text transition-all flex items-center justify-center text-sm font-bold leading-none">−</button>
+        <div className="relative">
+          <input type="number" min={min} max={max} step={step} value={value}
+            onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v))); }}
+            className={`w-16 text-center text-sm font-black font-mono ${color} bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} />
+        </div>
+        <button onClick={() => onChange(Math.min(max, value + step))}
+          className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-brand-muted hover:bg-white/10 hover:text-brand-text transition-all flex items-center justify-center text-sm font-bold leading-none">+</button>
+        <span className="text-[10px] text-brand-text/30 font-mono w-2">%</span>
+      </div>
+    </div>
+  );
+
   const modalBody = (
-    <div className="p-6 overflow-y-auto space-y-8 flex-1 custom-scrollbar" dir="rtl">
+    <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar" dir="rtl">
       
-      {/* Section 1: Candle Metrics */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-bold text-brand-text/50 uppercase tracking-wider flex items-center gap-2">
-          <LayoutTemplate size={16} /> {isAr ? 'الزخم والسيولة' : 'Momentum & Liquidity'}
+      {/* ═══ Section 1: Confidence Thresholds ═══ */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
+          <span className="text-[#F59E0B]">◆</span> {isAr ? 'عتبات الثقة' : 'Confidence Thresholds'}
         </h3>
-        
-        <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-6">
-          <div>
-            <div className="flex justify-between mb-2">
-              <label className="text-sm font-semibold text-brand-text">{isAr ? 'نسبة قوة الزخم المطلوبة (%)' : 'Required Momentum Strength (%)'}</label>
-              <span className="text-primary font-mono text-sm">{settings.momentumThreshold}%</span>
-            </div>
-            <input 
-              type="range" min="50" max="100" step="5"
-              value={settings.momentumThreshold}
-              onChange={(e) => handleChange('momentumThreshold', Number(e.target.value))}
-              className="w-full accent-primary"
-            />
-          </div>
+        <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+          <NumberInput label={isAr ? 'حد الإشارة القوية' : 'Strong Signal Threshold'} value={settings.strongThreshold} onChange={(v) => handleChange('strongThreshold', v)} color="text-[#F59E0B]" desc={isAr ? 'الثقة المطلوبة لإشارة قوية (≥)' : 'Confidence required for strong signal (≥)'} />
+          <NumberInput label={isAr ? 'حد الإشارة العادية' : 'Buy/Sell Threshold'} value={settings.buyThreshold} onChange={(v) => handleChange('buyThreshold', v)} color="text-primary" desc={isAr ? 'الثقة المطلوبة لشراء/بيع عادي (≥)' : 'Confidence required for regular buy/sell (≥)'} />
+          <NumberInput label={isAr ? 'الثقة الأساسية' : 'Base Confidence'} value={settings.baseConfidence} onChange={(v) => handleChange('baseConfidence', v)} color="text-emerald-400" desc={isAr ? 'نسبة أساسية ثابتة تُضاف لكل إشارة' : 'Fixed base percentage added to all signals'} />
         </div>
       </div>
 
-      {/* Section 2: Supply & Demand */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-bold text-brand-text/50 uppercase tracking-wider flex items-center gap-2">
-          <Layers size={16} /> {isAr ? 'مناطق العرض والطلب' : 'Supply & Demand Zones'}
+      {/* ═══ Section 2: Primary Conditions (Entry Gates) ═══ */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
+          <span className="text-[#F59E0B]">◆</span> {isAr ? 'الشروط الأساسية (أبواب الدخول)' : 'Primary Conditions (Entry Gates)'}
+          <span className="text-[10px] text-brand-text/30 font-mono mr-auto">{isAr ? 'النسبة القصوى 50%' : 'Max 50%'}</span>
         </h3>
-        
-        <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-6">
-          <div>
-            <div className="flex justify-between mb-2">
-              <label className="text-sm font-semibold text-brand-text">{isAr ? 'قوة مناطق العرض والطلب المطلوبة (%)' : 'Required Supply & Demand Strength (%)'}</label>
-              <span className="text-primary font-mono text-sm">{settings.supplyDemandStrength}%</span>
-            </div>
-            <input 
-              type="range" min="50" max="100" step="5"
-              value={settings.supplyDemandStrength}
-              onChange={(e) => handleChange('supplyDemandStrength', Number(e.target.value))}
-              className="w-full accent-primary"
-            />
-            <p className="text-xs text-brand-text/40 mt-1">{isAr ? 'مدى صرامة الذكاء الاصطناعي في مطابقة وتأكيد المناطق القوية.' : 'How strictly the AI matches and confirms strong zones.'}</p>
-          </div>
-
-          <div className="pt-4 border-t border-white/5">
-            <div className="flex justify-between mb-2">
-              <label className="text-sm font-semibold text-brand-text text-secondary">{isAr ? 'عتبة "القرار القوي" والتوصيات (%)' : 'Strong Decision & Recommendation Threshold (%)'}</label>
-              <span className="text-secondary font-mono text-sm">{settings.minStrongConfidence}%</span>
-            </div>
-            <input 
-              type="range" min="50" max="100" step="1"
-              value={settings.minStrongConfidence}
-              onChange={(e) => handleChange('minStrongConfidence', Number(e.target.value))}
-              className="w-full accent-secondary"
-            />
-            <p className="text-xs text-brand-text/40 mt-1">{isAr ? 'النسبة التي يبدأ عندها البوت بإعطاء (بيع/شراء قوي) وتثبيت الرمز في الصفحة الرئيسية.' : 'The threshold at which the bot issues (strong buy/sell) and pins the symbol on the main page.'}</p>
-          </div>
+        <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+          <NumberInput label={isAr ? '① BB Pullback — تراجع بولينجر' : '① BB Pullback — Bollinger Pullback'} value={settings.primaryBBWeight} onChange={(v) => handleChange('primaryBBWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'تراجع 3-6 شموع + لمس BB + شمعة انتكاس' : '3-6 candle pullback + touch BB + reversal candle'} />
+          <NumberInput label={isAr ? '② Supply/Demand — مناطق العرض والطلب' : '② Supply/Demand Zones'} value={settings.primarySDWeight} onChange={(v) => handleChange('primarySDWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'منطقة طلب + صعود = شراء / منطقة عرض + هبوط = بيع' : 'Demand+uptrend=buy / Supply+downtrend=sell'} />
+          <NumberInput label={isAr ? '③ Trend Age — عمر الاتجاه' : '③ Trend Age'} value={settings.primaryAgeWeight} onChange={(v) => handleChange('primaryAgeWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'ناضج (25-50) = كامل / رضيع أو قديم = تخفيف' : 'Mature (25-50)=full / Infant or Old=reduced'} />
+          <NumberInput label={isAr ? '④ News — أخبار اقتصادية وسياسية' : '④ News Sentiment'} value={settings.primaryNewsWeight} onChange={(v) => handleChange('primaryNewsWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'أخبار سلبية = حظر / لا أخبار = مسموح' : 'Negative news=block / No news=allowed'} />
         </div>
       </div>
 
-      {/* Section 3: Toggles */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-bold text-brand-text/50 uppercase tracking-wider flex items-center gap-2">
-          <Activity size={16} /> {isAr ? 'فلاتر وشروط إضافية' : 'Additional Filters & Conditions'}
+      {/* ═══ Section 3: Supporting Conditions (Signal Boost) ═══ */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
+          <span className="text-[#F59E0B]">◆</span> {isAr ? 'الشروط الداعمة (تعزيز الإشارة)' : 'Supporting Conditions (Signal Boost)'}
+          <span className="text-[10px] text-brand-text/30 font-mono mr-auto">{isAr ? 'النسبة القصوى 20%' : 'Max 20%'}</span>
         </h3>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <label className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl cursor-pointer hover:bg-white/10 transition-colors">
-            <div>
-              <div className="text-sm font-semibold text-brand-text">{isAr ? 'تفعيل المؤشرات الفنية' : 'Enable Technical Indicators'}</div>
-              <div className="text-xs text-brand-text/40">{isAr ? 'فحص RSI و الموفينج افريج كشرط دخول' : 'Check RSI & Moving Average as entry conditions'}</div>
-            </div>
-            <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${settings.useIndicators ? 'bg-primary' : 'bg-white/20'}`}>
-              <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings.useIndicators ? 'translate-x-0' : '-translate-x-4'}`} />
-            </div>
-            <input type="checkbox" className="hidden" checked={settings.useIndicators} onChange={(e) => handleChange('useIndicators', e.target.checked)} />
-          </label>
-
-          <label className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl cursor-pointer hover:bg-white/10 transition-colors">
-            <div>
-              <div className="text-sm font-semibold text-brand-text">{isAr ? 'رصد الأخبار اليومية' : 'Daily News Monitoring'}</div>
-              <div className="text-xs text-brand-text/40">{isAr ? 'تجنب التداول وقت الأخبار القوية' : 'Avoid trading during major news events'}</div>
-            </div>
-            <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${settings.useNewsGuard ? 'bg-primary' : 'bg-white/20'}`}>
-              <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings.useNewsGuard ? 'translate-x-0' : '-translate-x-4'}`} />
-            </div>
-            <input type="checkbox" className="hidden" checked={settings.useNewsGuard} onChange={(e) => handleChange('useNewsGuard', e.target.checked)} />
-          </label>
+        <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+          <NumberInput label={isAr ? 'RSI' : 'RSI'} value={settings.supportRSIWeight} onChange={(v) => handleChange('supportRSIWeight', v)} color="text-primary" desc={isAr ? 'تشبع بيع (RSI<30) = شراء / تشبع شراء (RSI>70) = بيع' : 'Oversold (<30)=buy / Overbought (>70)=sell'} />
+          <NumberInput label={isAr ? 'EMA Cross — تقاطع المتوسط' : 'EMA Cross'} value={settings.supportEMAWeight} onChange={(v) => handleChange('supportEMAWeight', v)} color="text-primary" desc={isAr ? 'صاعد = دعم شراء / هابط = دعم بيع' : 'Bullish=supports buy / Bearish=supports sell'} />
+          <NumberInput label={isAr ? 'Trend Direction — اتجاه الاتجاه' : 'Trend Direction'} value={settings.supportDirWeight} onChange={(v) => handleChange('supportDirWeight', v)} color="text-primary" desc={isAr ? 'صاعد/هابط = يدعم الاتجاه' : 'Uptrend/Downtrend supports direction'} />
+          <NumberInput label={isAr ? 'Volume Surge — ارتفاع الحجم' : 'Volume Surge'} value={settings.supportVolWeight} onChange={(v) => handleChange('supportVolWeight', v)} color="text-primary" desc={isAr ? 'ارتفاع الحجم = تأكيد الزخم' : 'Volume surge confirms momentum'} />
+          <NumberInput label={isAr ? 'Micro BB — بولينجر المصغر' : 'Micro BB Strategy'} value={settings.supportMicroBBWeight} onChange={(v) => handleChange('supportMicroBBWeight', v)} color="text-primary" desc={isAr ? 'تراجع مصغر على الإطار الأصغر = تأكيد دخول مبكر' : 'Micro pullback on lower TF = early entry confirm'} />
+          <NumberInput label={isAr ? 'Micro Alignment — توافق الإطارات' : 'Micro TF Alignment'} value={settings.supportMicroAlignWeight} onChange={(v) => handleChange('supportMicroAlignWeight', v)} color="text-primary" desc={isAr ? 'الإطار المصغر يتوافق مع الكبير' : 'Lower TF aligns with higher TF'} />
         </div>
       </div>
 
-      {/* Section 4: Developer Trend Age Settings (مطور فقط) */}
+      {/* ═══ Section 4: Toggles ═══ */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
+          <span className="text-[#F59E0B]">◆</span> {isAr ? 'مفاتيح التفعيل' : 'Feature Toggles'}
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { key: 'useIndicators', label: isAr ? 'المؤشرات الفنية' : 'Technical Indicators', desc: isAr ? 'RSI + EMA + Volume' : 'RSI + EMA + Volume' },
+            { key: 'useNewsGuard', label: isAr ? 'حماية الأخبار' : 'News Guard', desc: isAr ? 'تجنب الأخبار القوية' : 'Avoid major news' },
+            { key: 'useHigherTimeframe', label: isAr ? 'الإطار الأعلى' : 'Higher Timeframe', desc: isAr ? 'تأكيد من الإطار الأكبر' : 'Confirm from higher TF' },
+            { key: 'useVolumeAnalysis', label: isAr ? 'تحليل الحجم' : 'Volume Analysis', desc: isAr ? 'تحليل تدفق الحجم' : 'Volume flow analysis' },
+          ].map((item) => (
+            <button key={item.key} onClick={() => handleChange(item.key as keyof StrategySettings, !(settings as any)[item.key])}
+              className={`flex items-center justify-between p-3.5 rounded-xl border-2 transition-all text-right ${
+                (settings as any)[item.key]
+                  ? 'bg-[#F59E0B]/10 border-[#F59E0B]/40 text-[#F59E0B]'
+                  : 'bg-white/5 border-white/5 text-brand-muted'
+              }`}>
+              <div>
+                <div className="text-xs font-bold">{item.label}</div>
+                <div className="text-[10px] opacity-60 mt-0.5">{item.desc}</div>
+              </div>
+              <div className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${
+                (settings as any)[item.key] ? 'bg-[#F59E0B]' : 'bg-white/20'
+              }`}>
+                <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${
+                  (settings as any)[item.key] ? 'translate-x-4' : 'translate-x-0'
+                }`} />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══ Section 5: Developer Trend Age Zones ═══ */}
       {user && (user.email === currentDevEmail || user.email === 'bachasalman69@gmail.com' || localStorage.getItem('finalyze_dev_bypass_active') === 'true') && (
-        <div className="space-y-4 pt-6 border-t border-white/10">
-          <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
-            <Activity size={16} /> {isAr ? '🛠 إعدادات مناطق عمر الاتجاه (مطور)' : '🛠 Trend Age Zones (Developer)'}
+        <div className="space-y-3 pt-4 border-t border-white/10">
+          <h3 className="text-xs font-black text-amber-400 uppercase tracking-widest flex items-center gap-2">
+            <span className="text-amber-400">◆</span> {isAr ? '🔧 مناطق عمر الاتجاه (مطور)' : '🔧 Trend Age Zones (Dev)'}
           </h3>
           <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-5 space-y-6">
 

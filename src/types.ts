@@ -63,6 +63,19 @@ export interface StrategySettings {
   minInfantAge: number;
   minMatureAge: number;
   maxMatureAge: number;
+  primaryBBWeight: number;
+  primarySDWeight: number;
+  primaryAgeWeight: number;
+  primaryNewsWeight: number;
+  supportRSIWeight: number;
+  supportEMAWeight: number;
+  supportDirWeight: number;
+  supportVolWeight: number;
+  supportMicroBBWeight: number;
+  supportMicroAlignWeight: number;
+  baseConfidence: number;
+  strongThreshold: number;
+  buyThreshold: number;
 }
 
 export interface AutoAnalysisSettings {
