@@ -36,7 +36,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
       initAudio();
       audioInitRef.current = true;
     }
-    handleClick();
+    playClick();
   }, []);
 
   const formatPublishDate = (timestamp: string) => {
@@ -262,13 +262,6 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                         <BarChart2 size={12} />
                         <span>{isAr ? 'عرض الشارت' : 'View Chart'}</span>
                       </button>
-
-                      {/* TradingView Chart */}
-                      {isSelected && (
-                        <div className="rounded-lg overflow-hidden border border-white/5" style={{ height: 300 }}>
-                          <TradingViewWidget symbol={res.symbol} />
-                        </div>
-                      )}
                     </div>
                   </motion.div>
                 )}
