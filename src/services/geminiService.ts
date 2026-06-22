@@ -335,8 +335,12 @@ function generateLocalAnalysis(
   const minAge = settings?.minTrendAge ?? 2;
   const age = metrics?.age || 0;
   const totalAge = metrics?.totalAge || 0;
-  let score = 0;
+  let primaryScore = 0;
+  let supportScore = 0;
+  let supportAligned = 0;
+  let supportTotal = 0;
   const reasons: any[] = [];
+  const direction = metrics?.direction || 'sideways';
 
   // ════════════════════════════════════════════════════════════════
   // ═══ 4 PRIMARY CONDITIONS (Entry Gates) ═══
@@ -356,16 +360,16 @@ function generateLocalAnalysis(
     const isDowntrend = metrics.direction === 'downtrend';
 
     if (isUptrend && metrics.bbTouchLower && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 6 && (metrics.hasHammer || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBullishCandle)) {
-      score += 3; bbPullbackMet = true;
+      primaryScore += 3; bbPullbackMet = true;
       reasons.push({ check: 'BB Pullback (BUY)', value: `Pullback ${metrics.bbPullbackCount}c → Lower Band + Reversal`, status: 'positive', impact: `strong: trend up + ${metrics.bbPullbackCount} pullback candles + touch lower BB + reversal`, primary: true });
     } else if (isDowntrend && metrics.bbTouchUpper && metrics.bbPullbackCount >= 3 && metrics.bbPullbackCount <= 6 && (metrics.hasShootingStar || metrics.hasPinbar || metrics.hasEngulfing || metrics.hasBearishCandle)) {
-      score -= 3; bbPullbackMet = true;
+      primaryScore -= 3; bbPullbackMet = true;
       reasons.push({ check: 'BB Pullback (SELL)', value: `Rally ${metrics.bbPullbackCount}c → Upper Band + Reversal`, status: 'negative', impact: `strong: trend down + ${metrics.bbPullbackCount} rally candles + touch upper BB + reversal`, primary: true });
     } else if (metrics.bbTouchLower && isUptrend) {
-      score += 1;
+      primaryScore += 1;
       reasons.push({ check: 'BB Pullback (BUY)', value: `Near Lower Band (${bbPct}%) — ${metrics.bbPullbackCount}c pullback`, status: 'positive', impact: 'partial: approaching lower BB in uptrend', primary: true });
     } else if (metrics.bbTouchUpper && isDowntrend) {
-      score -= 1;
+      primaryScore -= 1;
       reasons.push({ check: 'BB Pullback (SELL)', value: `Near Upper Band (${bbPct}%) — ${metrics.bbPullbackCount}c rally`, status: 'negative', impact: 'partial: approaching upper BB in downtrend', primary: true });
     } else {
       reasons.push({ check: 'BB Pullback', value: `No pullback — ${bbPct}%B`, status: 'neutral', impact: 'BB pullback condition NOT met', primary: true });
@@ -380,16 +384,16 @@ function generateLocalAnalysis(
     const isUptrend = metrics?.direction === 'uptrend';
     const isDowntrend = metrics?.direction === 'downtrend';
     if (z.type === 'demand' && (isUptrend || !isDowntrend)) {
-      score += 2; supplyDemandMet = true;
+      primaryScore += 2; supplyDemandMet = true;
       reasons.push({ check: 'Supply/Demand', value: `Demand ${z.bottom.toFixed(2)}-${z.top.toFixed(2)} (${Math.round(z.strength)}%)`, status: 'positive', impact: `demand zone supports buy — strength ${Math.round(z.strength)}%`, primary: true });
     } else if (z.type === 'supply' && (isDowntrend || !isUptrend)) {
-      score -= 2; supplyDemandMet = true;
+      primaryScore -= 2; supplyDemandMet = true;
       reasons.push({ check: 'Supply/Demand', value: `Supply ${z.bottom.toFixed(2)}-${z.top.toFixed(2)} (${Math.round(z.strength)}%)`, status: 'negative', impact: `supply zone supports sell — strength ${Math.round(z.strength)}%`, primary: true });
     } else if (z.type === 'demand') {
-      score -= 0.5;
+      primaryScore -= 0.5;
       reasons.push({ check: 'Supply/Demand', value: `Demand zone vs Downtrend`, status: 'negative', impact: 'demand zone conflicts with downtrend', primary: true });
     } else {
-      score += 0.5;
+      primaryScore += 0.5;
       reasons.push({ check: 'Supply/Demand', value: `Supply zone vs Uptrend`, status: 'positive', impact: 'supply zone conflicts with uptrend', primary: true });
     }
   } else {
@@ -422,25 +426,32 @@ function generateLocalAnalysis(
 
   if (metrics?.rsi !== undefined) {
     const rsi = metrics.rsi;
-    if (rsi < 30) { score += 1; reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'positive', impact: 'oversold — supports buy' }); }
-    else if (rsi > 70) { score -= 1; reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'negative', impact: 'overbought — supports sell' }); }
+    supportTotal++;
+    const isBuyRsi = rsi < 30;
+    const isSellRsi = rsi > 70;
+    if (isBuyRsi) { supportScore += 1; if (primaryScore > 0) supportAligned++; reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'positive', impact: 'oversold — supports buy' }); }
+    else if (isSellRsi) { supportScore -= 1; if (primaryScore < 0) supportAligned++; reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'negative', impact: 'overbought — supports sell' }); }
     else { reasons.push({ check: 'RSI', value: rsi.toFixed(1), status: 'neutral', impact: 'neutral zone' }); }
   }
-  if (metrics?.emaCross === 'bullish') { score += 1; reasons.push({ check: 'EMA Cross', value: 'bullish', status: 'positive', impact: 'supports upward bias' }); }
-  else if (metrics?.emaCross === 'bearish') { score -= 1; reasons.push({ check: 'EMA Cross', value: 'bearish', status: 'negative', impact: 'supports downward bias' }); }
-  if (metrics?.direction === 'uptrend') { score += 0.5; reasons.push({ check: 'Trend Direction', value: 'uptrend', status: 'positive', impact: 'price making higher highs' }); }
-  else if (metrics?.direction === 'downtrend') { score -= 0.5; reasons.push({ check: 'Trend Direction', value: 'downtrend', status: 'negative', impact: 'price making lower lows' }); }
-  else { reasons.push({ check: 'Trend Direction', value: 'sideways', status: 'neutral', impact: 'no clear direction' }); }
+  if (metrics?.emaCross === 'bullish') { supportScore += 1; supportTotal++; if (primaryScore > 0) supportAligned++; reasons.push({ check: 'EMA Cross', value: 'bullish', status: 'positive', impact: 'supports upward bias' }); }
+  else if (metrics?.emaCross === 'bearish') { supportScore -= 1; supportTotal++; if (primaryScore < 0) supportAligned++; reasons.push({ check: 'EMA Cross', value: 'bearish', status: 'negative', impact: 'supports downward bias' }); }
+  if (metrics?.direction === 'uptrend') { supportScore += 0.5; supportTotal++; if (primaryScore > 0) supportAligned++; reasons.push({ check: 'Trend Direction', value: 'uptrend', status: 'positive', impact: 'price making higher highs' }); }
+  else if (metrics?.direction === 'downtrend') { supportScore -= 0.5; supportTotal++; if (primaryScore < 0) supportAligned++; reasons.push({ check: 'Trend Direction', value: 'downtrend', status: 'negative', impact: 'price making lower lows' }); }
+  else { supportTotal++; reasons.push({ check: 'Trend Direction', value: 'sideways', status: 'neutral', impact: 'no clear direction' }); }
   if (metrics?.volSurge) {
-    score += score >= 0 ? 0.5 : -0.5;
-    reasons.push({ check: 'Volume Surge', value: 'true', status: score >= 0 ? 'positive' : 'negative', impact: 'confirms momentum' });
+    supportTotal++;
+    supportScore += primaryScore >= 0 ? 0.5 : -0.5;
+    if ((primaryScore > 0 && metrics.direction === 'uptrend') || (primaryScore < 0 && metrics.direction === 'downtrend')) supportAligned++;
+    reasons.push({ check: 'Volume Surge', value: 'true', status: primaryScore >= 0 ? 'positive' : 'negative', impact: 'confirms momentum' });
   }
   if (microMetrics) {
     let microScore = 0;
     if (microMetrics.rsi !== undefined) { if (microMetrics.rsi < 30) microScore += 1; else if (microMetrics.rsi > 70) microScore -= 1; }
     if (microMetrics.emaCross === 'bullish') microScore += 1;
     else if (microMetrics.emaCross === 'bearish') microScore -= 1;
-    const microSignal = (microScore > 0 && score > 0) ? 'aligned' : (microScore < 0 && score < 0) ? 'aligned' : 'pullback';
+    const microSignal = (microScore > 0 && primaryScore > 0) ? 'aligned' : (microScore < 0 && primaryScore < 0) ? 'aligned' : 'pullback';
+    supportTotal++;
+    if (microSignal === 'aligned') supportAligned++;
     reasons.push({ check: 'Micro TF Alignment', value: microSignal, status: microSignal === 'aligned' ? 'positive' : 'neutral', impact: microSignal === 'aligned' ? 'micro aligns with macro' : 'micro diverging' });
   }
 
@@ -449,10 +460,12 @@ function generateLocalAnalysis(
     const isUptrend = metrics?.direction === 'uptrend';
     const isDowntrend = metrics?.direction === 'downtrend';
     if (isUptrend && microMetrics.bbTouchLower && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasHammer || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBullishCandle)) {
-      score += 2;
+      supportScore += 2; supportTotal++;
+      if (primaryScore > 0) supportAligned++;
       reasons.push({ check: `Micro BB (${microTF}) Strategy (BUY)`, value: `Pullback ${microMetrics.bbPullbackCount}c → Lower Band + Reversal on ${microTF}`, status: 'positive', impact: `micro pullback confirms buy entry on ${microTF}` });
     } else if (isDowntrend && microMetrics.bbTouchUpper && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasShootingStar || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBearishCandle)) {
-      score -= 2;
+      supportScore -= 2; supportTotal++;
+      if (primaryScore < 0) supportAligned++;
       reasons.push({ check: `Micro BB (${microTF}) Strategy (SELL)`, value: `Rally ${microMetrics.bbPullbackCount}c → Upper Band + Reversal on ${microTF}`, status: 'negative', impact: `micro rally confirms sell entry on ${microTF}` });
     }
   }
@@ -471,29 +484,37 @@ function generateLocalAnalysis(
 
   let rawSignal: SignalType;
   let confidence: number;
-  const absScore = Math.abs(score);
+  const absScore = Math.abs(primaryScore);
+  const absSupport = Math.abs(supportScore);
+  const totalScore = primaryScore + supportScore;
 
   const primaryMetCount = [bbPullbackMet, supplyDemandMet, trendAgeMet, newsMet].filter(Boolean).length;
-  const hasDirection = score >= 1 || score <= -1;
+  const supportRatio = supportTotal > 0 ? supportAligned / supportTotal : 0;
 
-  if (score >= 4 && bbPullbackMet && primaryMetCount >= 3) {
+  // ═══ CONFIDENCE = Primary (50%) + Supporting (20%) + Base (30%) ═══
+  const primaryConf = primaryScore !== 0 ? Math.min(50, Math.round(Math.abs(primaryScore) / 5 * 50)) : 0;
+  const supportConf = supportTotal > 0 ? Math.min(20, Math.round(supportRatio * 20)) : 0;
+  const baseConf = 30;
+  confidence = primaryConf + supportConf + baseConf;
+
+  // ═══ SIGNAL TYPE based on confidence ═══
+  const isBuy = totalScore > 0;
+  const isSell = totalScore < 0;
+
+  if (confidence >= 70 && bbPullbackMet && primaryMetCount >= 3 && isBuy) {
     rawSignal = SignalType.STRONG_BUY;
-    confidence = Math.min(95, 80 + Math.round((absScore - 4) * 3));
-  } else if (score >= 1.5 && hasDirection) {
+  } else if (confidence >= 50 && isBuy) {
     rawSignal = SignalType.BUY;
-    confidence = Math.round(55 + (absScore - 1.5) * 10);
-  } else if (score <= -4 && bbPullbackMet && primaryMetCount >= 3) {
+  } else if (confidence >= 70 && bbPullbackMet && primaryMetCount >= 3 && isSell) {
     rawSignal = SignalType.STRONG_SELL;
-    confidence = Math.min(95, 80 + Math.round((absScore - 4) * 3));
-  } else if (score <= -1.5 && hasDirection) {
+  } else if (confidence >= 50 && isSell) {
     rawSignal = SignalType.SELL;
-    confidence = Math.round(55 + (absScore - 1.5) * 10);
   } else {
     rawSignal = SignalType.NEUTRAL;
-    confidence = Math.round(35 + absScore * 10);
+    confidence = Math.min(confidence, 49);
   }
 
-  // Apply age zone caps — proportional reduction instead of fixed values
+  // Apply age zone caps — proportional reduction
   if (totalAge < infantLimit) {
     confidence = Math.round(confidence * 0.7);
   }
@@ -508,7 +529,17 @@ function generateLocalAnalysis(
   if (age < minAge) {
     confidence = Math.round(confidence * 0.8);
   }
-  const minConf = settings?.minConfidence || 55;
+
+  // Re-check signal based on final confidence
+  if (confidence >= 70 && (rawSignal === SignalType.BUY || rawSignal === SignalType.STRONG_BUY) && bbPullbackMet && primaryMetCount >= 3) {
+    rawSignal = SignalType.STRONG_BUY;
+  } else if (confidence >= 70 && (rawSignal === SignalType.SELL || rawSignal === SignalType.STRONG_SELL) && bbPullbackMet && primaryMetCount >= 3) {
+    rawSignal = SignalType.STRONG_SELL;
+  } else if (rawSignal === SignalType.STRONG_BUY || rawSignal === SignalType.STRONG_SELL) {
+    rawSignal = confidence >= 50 ? (rawSignal === SignalType.STRONG_BUY ? SignalType.BUY : SignalType.SELL) : SignalType.NEUTRAL;
+  }
+
+  const minConf = settings?.minConfidence || 45;
   if (confidence < minConf) rawSignal = SignalType.NEUTRAL;
 
   const dir = metrics?.direction || 'sideways';
