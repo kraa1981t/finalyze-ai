@@ -464,9 +464,12 @@ function generateLocalAnalysis(
   let rawSignal: SignalType;
   let confidence: number;
   const absScore = Math.abs(score);
-  if (score >= 3) { rawSignal = SignalType.STRONG_BUY; confidence = Math.min(95, 80 + Math.round((absScore - 3) * 5)); }
+
+  const bbPullbackMet = reasons.some(r => r.check.includes('BB Strategy') || r.check.includes('Micro BB'));
+
+  if (score >= 3) { rawSignal = bbPullbackMet ? SignalType.STRONG_BUY : SignalType.BUY; confidence = bbPullbackMet ? Math.min(95, 80 + Math.round((absScore - 3) * 5)) : Math.round(60 + (absScore - 1.5) * 13.3); }
   else if (score >= 1.5) { rawSignal = SignalType.BUY; confidence = Math.round(60 + (absScore - 1.5) * 13.3); }
-  else if (score <= -3) { rawSignal = SignalType.STRONG_SELL; confidence = Math.min(95, 80 + Math.round((absScore - 3) * 5)); }
+  else if (score <= -3) { rawSignal = bbPullbackMet ? SignalType.STRONG_SELL : SignalType.SELL; confidence = bbPullbackMet ? Math.min(95, 80 + Math.round((absScore - 3) * 5)) : Math.round(60 + (absScore - 1.5) * 13.3); }
   else if (score <= -1.5) { rawSignal = SignalType.SELL; confidence = Math.round(60 + (absScore - 1.5) * 13.3); }
   else { rawSignal = SignalType.NEUTRAL; confidence = Math.round(40 + absScore * 13.3); }
 
@@ -792,10 +795,15 @@ Return ONLY valid JSON:
         finalSignal = SignalType.SELL;
       }
       // Rule 3: If signal is buy/sell but confidence meets or exceeds minStrongConfidence threshold, upgrade it
+      // ONLY if BB pullback strategy was triggered (mandatory condition for strong signals)
       else if (finalSignal === SignalType.BUY && finalConfidence >= strongConf) {
-        finalSignal = SignalType.STRONG_BUY;
+        const bbMet = detailedReasons?.some((r: any) => r.check?.includes('BB Strategy') || r.check?.includes('Micro BB'));
+        finalSignal = bbMet ? SignalType.STRONG_BUY : SignalType.BUY;
+        if (!bbMet) detailedReasons?.push({ check: 'Strong Signal Block', value: 'BB pullback not triggered', status: 'negative', impact: 'strong signal requires BB pullback confirmation' });
       } else if (finalSignal === SignalType.SELL && finalConfidence >= strongConf) {
-        finalSignal = SignalType.STRONG_SELL;
+        const bbMet = detailedReasons?.some((r: any) => r.check?.includes('BB Strategy') || r.check?.includes('Micro BB'));
+        finalSignal = bbMet ? SignalType.STRONG_SELL : SignalType.SELL;
+        if (!bbMet) detailedReasons?.push({ check: 'Strong Signal Block', value: 'BB pullback not triggered', status: 'negative', impact: 'strong signal requires BB pullback confirmation' });
       }
     }
 
