@@ -4,6 +4,9 @@ const ALTERNATIVE_BASE = 'https://api.alternative.me';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const GROQ_BASE = 'https://api.groq.com/openai/v1';
 
+const _dataCache = new Map<string, { data: any; ts: number }>();
+const CACHE_TTL = 120_000;
+
 const TIMEFRAME_MAP: Record<string, string> = {
   '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
   '1h': '1h', '2h': '2h', '4h': '4h', '6h': '6h', '8h': '8h', '12h': '12h',
@@ -158,6 +161,8 @@ export async function fetchCryptoPricesDirect(): Promise<any> {
 
 const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 const CORS_PROXY_2 = 'https://corsproxy.io/?url=';
+const CORS_PROXY_3 = 'https://cors.lol/?url=';
+const CORS_PROXIES = [CORS_PROXY, CORS_PROXY_2, CORS_PROXY_3];
 
 function symbolToYahooForex(symbol: string): string | null {
   const upper = symbol.toUpperCase().replace(/ /g, '');
@@ -229,22 +234,20 @@ async function fetchYahooFinance(symbol: string, timeframe: string): Promise<any
         try {
           const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(attempt)}?interval=${it}&range=${r}`;
 
-          const ac = new AbortController();
-          const timeout = setTimeout(() => ac.abort(), 5000);
-
-          // Always use CORS proxy for GitHub Pages
-          const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-          let resp: Response;
-          try {
-            resp = await fetch(proxyUrl, { signal: ac.signal });
-          } catch {
-            // Try second proxy
-            const proxy2 = `${CORS_PROXY_2}${encodeURIComponent(url)}`;
-            resp = await fetch(proxy2, { signal: ac.signal });
+          // Try all 3 CORS proxies in shuffled order
+          let resp: Response | null = null;
+          const shuffled = [...CORS_PROXIES].sort(() => Math.random() - 0.5);
+          for (const proxy of shuffled) {
+            const ac = new AbortController();
+            const timer = setTimeout(() => ac.abort(), 6000);
+            try {
+              resp = await fetch(`${proxy}${encodeURIComponent(url)}`, { signal: ac.signal });
+              clearTimeout(timer);
+              if (resp.ok) break;
+              resp = null;
+            } catch { clearTimeout(timer); resp = null; }
           }
-          clearTimeout(timeout);
-
-          if (!resp.ok) continue;
+          if (!resp || !resp.ok) continue;
           const data = await resp.json();
           const result = data?.chart?.result?.[0];
           if (!result) continue;
@@ -281,6 +284,10 @@ async function fetchYahooFinance(symbol: string, timeframe: string): Promise<any
 }
 
 export async function fetchMarketDataDirect(symbol: string, timeframe: string): Promise<any> {
+  const cacheKey = `${symbol}_${timeframe}`;
+  const cached = _dataCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+
   for (let attempt = 0; attempt < 2; attempt++) {
     // 1. Try Binance first (crypto only, no CORS issues)
     const binancePair = findCryptoPair(symbol);
@@ -289,22 +296,24 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
         const interval = TIMEFRAME_MAP[timeframe] || '1d';
         const limit = LIMIT_MAP[timeframe] || 100;
         const ac = new AbortController();
-        const timeout = setTimeout(() => ac.abort(), 10000);
+        const timeout = setTimeout(() => ac.abort(), 6000);
         const r = await fetch(`${BINANCE_BASE}/klines?symbol=${binancePair}&interval=${interval}&limit=${limit}`, { signal: ac.signal });
         clearTimeout(timeout);
         if (r.ok) {
           const klines = await r.json();
-          if (klines && klines.length >= 10) return toYahooFormat(klines, symbol);
+          if (klines && klines.length >= 10) { const d = toYahooFormat(klines, symbol); _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
         }
       } catch {}
     }
 
     // 2. Try Yahoo Finance (forex + stocks + crypto fallback)
     try {
-      return await fetchYahooFinance(symbol, timeframe);
+      const d = await fetchYahooFinance(symbol, timeframe);
+      _dataCache.set(cacheKey, { data: d, ts: Date.now() });
+      return d;
     } catch {}
 
-    if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+    if (attempt < 1) await new Promise(r => setTimeout(r, 1000));
   }
 
   throw new Error('Market data currently unavailable from the source.');
