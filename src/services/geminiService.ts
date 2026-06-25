@@ -549,8 +549,20 @@ export async function analyzeMarket(params: {
     const currentIndex = TF_PROGRESSION.indexOf(timeframe);
     const macro1 = TF_PROGRESSION[Math.min(currentIndex + 1, TF_PROGRESSION.length - 1)];
     
-    // Fetch Data
-    const rawData = await fetchMarketDataDirect(symbol, timeframe).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } }));
+    const macro2 = TF_PROGRESSION[Math.min(currentIndex + 2, TF_PROGRESSION.length - 1)];
+    const microTF = currentIndex > 0 ? TF_PROGRESSION[currentIndex - 1] : TF_PROGRESSION[0];
+
+    // Fetch ALL data sources in PARALLEL — saves ~10-15s per symbol
+    const [rawData, microDataRaw, ctxResult] = await Promise.all([
+      fetchMarketDataDirect(symbol, timeframe).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } })),
+      fetchMarketDataDirect(symbol, microTF).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } })),
+      fetchMarketContext(symbol).catch(() => ({ fearGreed: null, news: [], econEvents: [] })),
+    ]);
+
+    let contextFearGreed = ctxResult.fearGreed;
+    let contextNews: { title: string; source: string }[] = ctxResult.news || [];
+    let contextEcon: any[] = ctxResult.econEvents || [];
+
     const quotes = rawData.chart?.result?.[0]?.indicators?.quote?.[0];
     
     if (!quotes || !quotes.close) {
@@ -575,16 +587,12 @@ export async function analyzeMarket(params: {
     const zonesText = supplyDemandZones.length > 0 
       ? supplyDemandZones.map(z => `${z.type === 'supply' ? 'Supply' : 'Demand'} zone: ${z.bottom.toFixed(2)}–${z.top.toFixed(2)} (strength ${z.strength.toFixed(0)}%)`).join('. ')
       : 'No clear zones detected.';
-
-    const macro2 = TF_PROGRESSION[Math.min(currentIndex + 2, TF_PROGRESSION.length - 1)];
-    const microTF = currentIndex > 0 ? TF_PROGRESSION[currentIndex - 1] : TF_PROGRESSION[0];
     
-    // Fetch Lower Timeframe (Micro) Data for Wave Confirmation
+    // Process micro data (already fetched in parallel above)
     let microCloses: number[] = [];
     let microMetrics = null;
     try {
-      const microData = await fetchMarketDataDirect(symbol, microTF).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } }));
-      const microQuotes = microData.chart?.result?.[0]?.indicators?.quote?.[0];
+      const microQuotes = microDataRaw.chart?.result?.[0]?.indicators?.quote?.[0];
       if (microQuotes && microQuotes.close) {
         microCloses = microQuotes.close.filter((c: any) => c != null);
         const microHighsRaw = microQuotes.high?.filter((c: any) => c != null) || microCloses;
@@ -599,18 +607,6 @@ export async function analyzeMarket(params: {
       console.warn("Failed to fetch micro timeframe data:", e);
     }
     
-    // Fetch real market context (Fear & Greed, News, Economic Events)
-    let contextFearGreed = null;
-    let contextNews: { title: string; source: string }[] = [];
-    let contextEcon: any[] = [];
-    try {
-      const ctx = await fetchMarketContext(symbol);
-      contextFearGreed = ctx.fearGreed;
-      contextNews = ctx.news;
-      contextEcon = ctx.econEvents;
-    } catch (e) {
-      console.warn("[Context] Failed to fetch market context:", e);
-    }
     const newsText = contextNews.length > 0
       ? contextNews.map(n => `• ${n.title} (${n.source})`).join('\n')
       : 'No recent news available.';

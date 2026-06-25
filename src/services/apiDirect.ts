@@ -223,14 +223,14 @@ async function fetchYahooFinance(symbol: string, timeframe: string): Promise<any
   const ranges = [range, '1mo']; // fallback to shorter range
   const intervals = [interval, '1d']; // fallback to daily
 
-  for (const r of ranges) {
-    for (const it of intervals) {
+  for (const r of [range]) {
+    for (const it of [interval, '1d']) {
       for (const attempt of attempts) {
         try {
           const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(attempt)}?interval=${it}&range=${r}`;
 
           const ac = new AbortController();
-          const timeout = setTimeout(() => ac.abort(), 8000);
+          const timeout = setTimeout(() => ac.abort(), 5000);
 
           // Always use CORS proxy for GitHub Pages
           const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
