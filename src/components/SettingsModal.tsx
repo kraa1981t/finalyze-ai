@@ -309,6 +309,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         </h3>
         <div className="bg-white/5 border border-white/5 rounded-xl p-4">
           <NumberInput label={isAr ? 'حد الإشارة القوية' : 'Strong Signal Threshold'} value={settings.strongThreshold} onChange={(v) => handleChange('strongThreshold', v)} color="text-[#F59E0B]" desc={isAr ? 'الثقة المطلوبة لإشارة قوية (≥)' : 'Confidence required for strong signal (≥)'} />
+          <NumberInput label={isAr ? 'الشروط الداعمة للقوة' : 'Min Support for Strong'} value={settings.minStrongSupport} onChange={(v) => handleChange('minStrongSupport', v)} color="text-[#F59E0B]" desc={isAr ? 'نسبة الشروط الداعمة المطلوبة لإشارة قوية (≥%)' : 'Support ratio required for strong signal (≥%)'} />
           <NumberInput label={isAr ? 'حد الإشارة العادية' : 'Buy/Sell Threshold'} value={settings.buyThreshold} onChange={(v) => handleChange('buyThreshold', v)} color="text-primary" desc={isAr ? 'الثقة المطلوبة لشراء/بيع عادي (≥)' : 'Confidence required for regular buy/sell (≥)'} />
           <NumberInput label={isAr ? 'الثقة الأساسية' : 'Base Confidence'} value={settings.baseConfidence} onChange={(v) => handleChange('baseConfidence', v)} color="text-emerald-400" desc={isAr ? 'نسبة أساسية ثابتة تُضاف لكل إشارة' : 'Fixed base percentage added to all signals'} />
         </div>

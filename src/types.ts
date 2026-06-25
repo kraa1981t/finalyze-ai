@@ -76,6 +76,7 @@ export interface StrategySettings {
   baseConfidence: number;
   strongThreshold: number;
   buyThreshold: number;
+  minStrongSupport: number;
 }
 
 export interface AutoAnalysisSettings {

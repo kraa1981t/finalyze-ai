@@ -26,6 +26,7 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   baseConfidence: 30,
   strongThreshold: 70,
   buyThreshold: 50,
+  minStrongSupport: 50,
 };
 
 export const DEFAULT_AUTO_SETTINGS = {
