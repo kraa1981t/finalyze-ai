@@ -809,7 +809,7 @@ export default function App() {
             if (r && !(r as any).error) {
               const sig = r.signal || '';
               if (sig.includes('strong_buy') || sig.includes('strong_sell')) updateTopSignals([r]);
-              if (sig && sig !== 'no_entry') {
+              if (sig && sig !== 'no_entry' && sig !== 'neutral') {
                 scanResults.push(r);
                 setClientSignals(prev => {
                   const u = [...prev.filter(x => x.symbol !== r.symbol), r];
@@ -1764,7 +1764,7 @@ export default function App() {
                 </button>
               </div>
             )}
-            <AnalysisResultView results={analysisResults.filter(r => r.signal !== 'no_entry')} lang={lang} settings={settings} />
+            <AnalysisResultView results={analysisResults.filter(r => r.signal !== 'no_entry' && r.signal !== 'neutral')} lang={lang} settings={settings} />
           </motion.div>
         )}
 
