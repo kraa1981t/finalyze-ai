@@ -330,7 +330,7 @@ async function fetchAndPrepareSymbolData(
 
 function generateLocalAnalysis(
   metrics: any, zonesText: string, supplyDemandZones: any[], microMetrics: any, microTF: string,
-  settings: StrategySettings, type: MarketType, lang: string, symbol: string, infantLimit: number, matureLimit: number, oldLimit: number,
+  settings: StrategySettings, type: MarketType, lang: string, symbol: string, timeframe: string, infantLimit: number, matureLimit: number, oldLimit: number,
   contextFearGreed?: { value: number; classification: string } | null
 ): AnalysisResult {
   const minAge = settings?.minTrendAge ?? 2;
@@ -718,12 +718,12 @@ Return ONLY valid JSON:
 
     if (!aiResponse || aiResponse?.error) {
       console.warn(`[Engine] AI unavailable for ${symbol}, using local analysis:`, aiResponse?.error);
-      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, infantLimit, matureLimit, oldLimit, contextFearGreed);
+      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, timeframe, infantLimit, matureLimit, oldLimit, contextFearGreed);
     }
 
     if (!aiResponse?.choices?.[0]?.message?.content) {
       console.warn(`[Engine] AI returned no content for ${symbol}, using local analysis`);
-      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, infantLimit, matureLimit, oldLimit, contextFearGreed);
+      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, timeframe, infantLimit, matureLimit, oldLimit, contextFearGreed);
     }
 
     const rawText = aiResponse.choices[0].message.content;
