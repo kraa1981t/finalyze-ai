@@ -503,28 +503,15 @@ export async function analyzeMarketBatch(
   const results: AnalysisResult[] = [];
   const errors: { symbol: string; error: string }[] = [];
   const total = paramsList.length;
+  const BATCH_SIZE = 3;
 
-  // Analyze each symbol individually — one AI call per symbol for maximum accuracy
-  for (let i = 0; i < total; i++) {
-    const p = paramsList[i];
-    if (onProgress) onProgress(p.symbol, total, i, errors.length);
-
+  async function analyzeOne(p: { symbol: string; type: MarketType; timeframe: string; tradingStyle: TradingStyle }, idx: number): Promise<void> {
     let lastError: any = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        if (attempt > 0) await new Promise(r => setTimeout(r, 5000));
-        if (i > 0 || attempt > 0) await new Promise(r => setTimeout(r, 1200));
+        if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
         await waitIfRateLimited();
-
-        console.log(`[Batch] Analyzing ${p.symbol} (${i + 1}/${total}) attempt ${attempt + 1}...`);
-        const result = await analyzeMarket({
-          symbol: p.symbol,
-          type: p.type,
-          timeframe: p.timeframe,
-          tradingStyle: p.tradingStyle,
-          settings,
-          lang
-        });
+        const result = await analyzeMarket({ symbol: p.symbol, type: p.type, timeframe: p.timeframe, tradingStyle: p.tradingStyle, settings, lang });
         console.log(`[Batch] ${p.symbol} → ${result.signal} (${result.confidence}%)`);
         results.push(result);
         lastError = null;
@@ -534,9 +521,14 @@ export async function analyzeMarketBatch(
         console.warn(`[Batch] Attempt ${attempt + 1} FAILED ${p.symbol}:`, e.message);
       }
     }
-    if (lastError) {
-      errors.push({ symbol: p.symbol, error: lastError.message || 'Analysis failed' });
-    }
+    if (lastError) errors.push({ symbol: p.symbol, error: lastError.message || 'Analysis failed' });
+  }
+
+  for (let i = 0; i < total; i += BATCH_SIZE) {
+    const batch = paramsList.slice(i, i + BATCH_SIZE);
+    if (onProgress) onProgress(batch[0].symbol, total, i, errors.length);
+    await Promise.all(batch.map((p, j) => analyzeOne(p, i + j)));
+    if (i + BATCH_SIZE < total) await new Promise(r => setTimeout(r, 800));
   }
 
   return { results, errors };
@@ -720,12 +712,12 @@ Return ONLY valid JSON:
     const oldLimit = isCrypto ? oldAgeThreshold * 2 : oldAgeThreshold;
 
     let aiResponse: any = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       await waitIfRateLimited();
       aiResponse = await callAIDirect(technicalPrompt, keyValue);
       if (!aiResponse?.error) break;
-      if (aiResponse.error === 'rate_limited') { onRateLimited(); await new Promise(r => setTimeout(r, 10000)); continue; }
-      if (attempt < 2) await new Promise(r => setTimeout(r, 3000));
+      if (aiResponse.error === 'rate_limited') { onRateLimited(); await new Promise(r => setTimeout(r, 8000)); continue; }
+      if (attempt < 1) await new Promise(r => setTimeout(r, 2000));
     }
 
     if (!aiResponse || aiResponse?.error) {

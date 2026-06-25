@@ -281,7 +281,7 @@ async function fetchYahooFinance(symbol: string, timeframe: string): Promise<any
 }
 
 export async function fetchMarketDataDirect(symbol: string, timeframe: string): Promise<any> {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     // 1. Try Binance first (crypto only, no CORS issues)
     const binancePair = findCryptoPair(symbol);
     if (binancePair) {
@@ -304,7 +304,7 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
       return await fetchYahooFinance(symbol, timeframe);
     } catch {}
 
-    if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+    if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
   }
 
   throw new Error('Market data currently unavailable from the source.');
