@@ -1,0 +1,6 @@
+{
+  "name": "EPIC Trading",
+  "description": "Professional Trading Universe - Advanced Financial Market Analysis Platform using AI, technical indicators, and real-time subscription-based insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

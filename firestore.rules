@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Clients collection — allow read/write for registration and verification
+    match /clients/{clientId} {
+      allow read, write: if true;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return (isSignedIn() && request.auth.uid == userId) || userId != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    match /analysisResults/{resultId} {
+      allow read, write: if true;
+    }
+
+    match /userPreferences/{userId} {
+      allow read, write: if true;
+    }
+
+    // Shared results — anyone can write (fixes persistent permission issue), clients must be signed in to read
+    match /shared_results/{docId} {
+      allow read: if isSignedIn();
+      allow write: if true;
+    }
+
+    // Shared alerts — anyone can write, clients must be signed in to read
+    match /shared_alerts/{docId} {
+      allow read: if isSignedIn();
+      allow write: if true;
+    }
+
+    // Shared radar status — developer writes running state, clients read to show banner
+    match /shared_status/{docId} {
+      allow read: if isSignedIn();
+      allow write: if true;
+    }
+
+    // Shared settings (freemium state) — anyone can write, signed in to read
+    match /shared_settings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if true;
+    }
+
+    // Suggestions — anyone can read/write
+    match /suggestions/{suggestionId} {
+      allow read, write: if true;
+    }
+  }
+}

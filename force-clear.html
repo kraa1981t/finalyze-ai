@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Force Clear Results</title>
+  <style>
+    body { font-family: sans-serif; background: #1a1a2e; color: #fff; padding: 40px; text-align: center; }
+    button { padding: 15px 30px; font-size: 16px; cursor: pointer; border-radius: 8px; border: none; margin: 10px; }
+    #clear { background: #e74c3c; color: white; }
+    #verify { background: #2ecc71; color: white; }
+    #log { background: #16213e; color: #0f0; padding: 20px; margin-top: 20px; border-radius: 8px; text-align: left; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>Force Clear Shared Results</h2>
+  <p>You must be signed in as developer (Google) on this browser first.</p>
+  <button id="clear" onclick="doClear()">Force Delete + Write Empty</button>
+  <button id="verify" onclick="doVerify()">Verify Current State</button>
+  <div id="log"></div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getFirestore, doc, deleteDoc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCvMayEuNTlQ5CWbjrrqw3aft_H044-uQM",
+      authDomain: "trading-made-easy-e8450.firebaseapp.com",
+      projectId: "trading-made-easy-e8450",
+      storageBucket: "trading-made-easy-e8450.firebasestorage.app",
+      messagingSenderId: "554434637233",
+      appId: "1:554434637233:web:2983b2058339d9d681be44"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const logEl = document.getElementById('log');
+
+    function log(msg) {
+      logEl.textContent += new Date().toLocaleTimeString() + ' | ' + msg + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(msg);
+    }
+
+    async function ensureAuth() {
+      if (auth.currentUser) {
+        log('Already signed in as: ' + auth.currentUser.email);
+        return auth.currentUser;
+      }
+      log('Signing in with Google...');
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      log('Signed in as: ' + result.user.email);
+      return result.user;
+    }
+
+    window.doClear = async function() {
+      try {
+        const user = await ensureAuth();
+        if (!user.email.includes('taybekraa') && !user.email.includes('bachasalman')) {
+          log('ERROR: Not a developer email! ' + user.email);
+          return;
+        }
+
+        const ref = doc(db, 'shared_results', 'latest');
+
+        log('Step 1: Deleting document...');
+        await deleteDoc(ref);
+        log('Step 1: Document deleted.');
+
+        log('Step 2: Writing empty results + resetToken...');
+        const resetToken = 'FORCE_CLEAR_' + Date.now();
+        await setDoc(ref, {
+          results: [],
+          resetToken: resetToken,
+          timestamp: new Date().toISOString(),
+          developerEmail: user.email
+        });
+        log('Step 2: Document written with resetToken: ' + resetToken);
+
+        log('Step 3: Verifying by reading back...');
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          log('Document exists. resetToken = ' + data.resetToken);
+          log('results length = ' + (data.results ? data.results.length : 'null'));
+          log('developerEmail = ' + data.developerEmail);
+          if (data.resetToken === resetToken && data.results.length === 0) {
+            log('SUCCESS: Document cleared and verified!');
+          } else {
+            log('WARNING: Token mismatch or results not empty!');
+          }
+        } else {
+          log('ERROR: Document does not exist after write!');
+        }
+      } catch (e) {
+        log('ERROR: ' + e.message);
+        console.error(e);
+      }
+    }
+
+    window.doVerify = async function() {
+      try {
+        await ensureAuth();
+        const ref = doc(db, 'shared_results', 'latest');
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          log('=== Current Firestore State ===');
+          log('resetToken: ' + (data.resetToken || 'NONE'));
+          log('results count: ' + (data.results ? data.results.length : 'null'));
+          log('timestamp: ' + (data.timestamp || 'NONE'));
+          log('developerEmail: ' + (data.developerEmail || 'NONE'));
+          if (data.results && data.results.length > 0) {
+            log('Symbols: ' + data.results.map(r => r.symbol).join(', '));
+          }
+        } else {
+          log('Document does not exist (already cleared).');
+        }
+      } catch (e) {
+        log('ERROR: ' + e.message);
+      }
+    }
+  </script>
+</body>
+</html>
