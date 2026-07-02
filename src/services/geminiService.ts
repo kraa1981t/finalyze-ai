@@ -416,14 +416,14 @@ function generateLocalAnalysis(
   // ΓöÇΓöÇ PRIMARY 3: Trend Age ΓöÇΓöÇ
   if (totalAge >= matureLimit && totalAge <= oldLimit) {
     trendAgeMet = true;
-    reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Mature`, status: 'positive', impact: 'trend mature ΓÇö full signal', primary: true });
+    reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Mature (ناضج)`, status: 'positive', impact: 'trend mature ΓÇö full signal', primary: true });
   } else if (totalAge < infantLimit) {
-    reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Infant`, status: 'negative', impact: 'trend too young ΓÇö low confidence', primary: true });
+    reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Infant (طفل)`, status: 'negative', impact: 'trend too young ΓÇö low confidence', primary: true });
   } else if (totalAge < matureLimit) {
     trendAgeMet = true;
-    reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Youth`, status: 'positive', impact: 'trend developing ΓÇö allowed', primary: true });
+    reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Youth (شاب)`, status: 'positive', impact: 'trend developing ΓÇö allowed', primary: true });
   } else {
-    reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Old`, status: 'negative', impact: 'trend exhausting', primary: true });
+    reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Old (شيخ)`, status: 'negative', impact: 'trend exhausting', primary: true });
   }
 
   // ΓöÇΓöÇ PRIMARY 4: News ΓöÇΓöÇ
@@ -513,17 +513,16 @@ function generateLocalAnalysis(
   let rawSignal: SignalType;
 
   // Sideways + no strong evidence = NEUTRAL
-  const CONF_BUFFER = 5; // Confidence buffer to prevent borderline flips
   if (!isUp && !isDown && !hasStrongEvidence) {
     rawSignal = SignalType.NEUTRAL;
     confidence = Math.min(confidence, 35);
   } else if (totalScore > 0 && primaryMetCount >= 3) {
-    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet) rawSignal = SignalType.STRONG_BUY;
-    else if (confidence >= (buyThresh - CONF_BUFFER)) rawSignal = SignalType.BUY;
+    if (confidence >= strongThresh && bbPullbackMet) rawSignal = SignalType.STRONG_BUY;
+    else if (confidence >= buyThresh) rawSignal = SignalType.BUY;
     else rawSignal = SignalType.NEUTRAL;
   } else if (totalScore < 0 && primaryMetCount >= 3) {
-    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet) rawSignal = SignalType.STRONG_SELL;
-    else if (confidence >= (buyThresh - CONF_BUFFER)) rawSignal = SignalType.SELL;
+    if (confidence >= strongThresh && bbPullbackMet) rawSignal = SignalType.STRONG_SELL;
+    else if (confidence >= buyThresh) rawSignal = SignalType.SELL;
     else rawSignal = SignalType.NEUTRAL;
   } else {
     rawSignal = SignalType.NEUTRAL;
@@ -532,9 +531,13 @@ function generateLocalAnalysis(
 
   // Age zone caps
   if (totalAge < infantLimit) { confidence = Math.round(confidence * 0.7); rawSignal = rawSignal === SignalType.STRONG_BUY ? SignalType.BUY : rawSignal === SignalType.STRONG_SELL ? SignalType.SELL : rawSignal; }
-  else if (totalAge < matureLimit) { if (rawSignal === SignalType.STRONG_BUY) rawSignal = SignalType.BUY; if (rawSignal === SignalType.STRONG_SELL) rawSignal = SignalType.SELL; confidence = Math.round(confidence * 0.85); }
-  else if (totalAge > oldLimit) { confidence = Math.round(confidence * 0.75); }
-  if (age < minAge) confidence = Math.round(confidence * 0.8);
+  else if (totalAge < matureLimit) { confidence = Math.round(confidence * 0.85); }
+  else if (totalAge > oldLimit) { confidence = Math.round(confidence * 0.75); rawSignal = rawSignal === SignalType.STRONG_BUY ? SignalType.BUY : rawSignal === SignalType.STRONG_SELL ? SignalType.SELL : rawSignal; }
+  if (age < minAge) { confidence = Math.round(confidence * 0.5); rawSignal = SignalType.NEUTRAL; }
+
+  // Downgrade STRONG to regular if confidence dropped below strong threshold
+  if (rawSignal === SignalType.STRONG_BUY && confidence < strongThresh) rawSignal = SignalType.BUY;
+  if (rawSignal === SignalType.STRONG_SELL && confidence < strongThresh) rawSignal = SignalType.SELL;
 
   const minConf = settings?.minConfidence || 45;
   if (confidence < minConf) rawSignal = SignalType.NEUTRAL;
@@ -807,21 +810,27 @@ Return ONLY valid JSON:
       if (attempt < 1) await new Promise(r => setTimeout(r, 2000));
     }
 
-    if (!aiResponse || aiResponse?.error) {
-      console.warn(`[Engine] AI unavailable for ${symbol}, using local analysis:`, aiResponse?.error);
-      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, timeframe, infantLimit, matureLimit, oldLimit, contextFearGreed);
+    let resultData: any = null;
+    if (aiResponse && !aiResponse?.error && aiResponse?.choices?.[0]?.message?.content) {
+      const rawText = aiResponse.choices[0].message.content;
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try { resultData = JSON.parse(jsonMatch[0]); } catch (e) { resultData = null; }
+      }
     }
 
-    if (!aiResponse?.choices?.[0]?.message?.content) {
-      console.warn(`[Engine] AI returned no content for ${symbol}, using local analysis`);
-      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, timeframe, infantLimit, matureLimit, oldLimit, contextFearGreed);
+    if (!resultData) {
+      console.warn(`[Engine] AI unavailable for ${symbol}, using metrics-based enforcement engine`);
+      const mDir = metrics?.direction || 'sideways';
+      resultData = {
+        signal: mDir === 'uptrend' ? 'buy' : mDir === 'downtrend' ? 'sell' : 'neutral',
+        confidence: 50,
+        detailedReasons: [],
+        summary: '',
+        microSignal: 'unknown', microTrend: '', technicalScore: 50, sentimentScore: 50, historicalMatch: '',
+        stopLoss: 0, takeProfit: 0,
+      };
     }
-
-    const rawText = aiResponse.choices[0].message.content;
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("AI Synthesis Error: Invalid JSON structure.");
-    
-    const resultData = JSON.parse(jsonMatch[0]);
 
     // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     // LOCKED (v6): SIGNAL ENGINE RULES ΓÇö DO NOT MODIFY
@@ -885,22 +894,23 @@ Return ONLY valid JSON:
         const sources = [...new Set(contextNews.map(n => n.source).filter(Boolean))];
         addReason('News Sentiment', `${contextNews.length} articles`, 'neutral', 'check summary for details', sources.join(', '));
       } else {
-        addReason('News Sentiment', 'No active events', 'neutral', 'no blocking news ΓÇö signal allowed');
+        addReason('News Sentiment', 'No active events', 'positive', 'no blocking news \u2014 signal allowed');
       }
       addReason('Economic Events', contextEcon.length > 0 ? `${contextEcon.length} events this week` : 'no major events',
-        contextEcon.some((e: any) => e.impact === 'High') ? 'negative' : 'neutral',
-        contextEcon.some((e: any) => e.impact === 'High') ? '-10% confidence penalty' : 'no penalty');
+        contextEcon.some((e: any) => e.impact === 'High') ? 'negative' : 'positive',
+        contextEcon.some((e: any) => e.impact === 'High') ? '-10% confidence penalty' : 'no high-impact events \u2014 signal allowed');
     }
 
     // ΓöÇΓöÇ STEP 1b: Trend Age Zone fallback reason ΓöÇΓöÇ
     if (!detailedReasons.some((r: any) => r.check?.includes('Trend Age'))) {
+      const ageZoneAr = totalAge < infantLimit ? '\u0637\u0641\u0644' : totalAge < matureLimit ? '\u0634\u0627\u0628' : totalAge <= oldLimit ? '\u0646\u0627\u0636\u062c' : '\u0634\u064a\u062e';
       const ageZoneDesc = totalAge < infantLimit ? `Infant (<${infantLimit})` :
         totalAge < matureLimit ? `Youth (${infantLimit}-${matureLimit})` :
         totalAge <= oldLimit ? `Mature (${matureLimit}-${oldLimit})` : `Old (>${oldLimit})`;
       const zoneStatus = totalAge >= matureLimit && totalAge <= oldLimit ? 'positive' :
         totalAge < infantLimit ? 'negative' : 'neutral';
       detailedReasons.push({
-        check: 'Trend Age', value: `${totalAge}c ΓÇö ${ageZoneDesc}`, status: zoneStatus,
+        check: 'Trend Age', value: `${totalAge}c ΓÇö ${ageZoneDesc} (${ageZoneAr})`, status: zoneStatus,
         impact: zoneStatus === 'positive' ? 'trend mature ΓÇö full signal allowed' :
           zoneStatus === 'negative' ? 'trend age issue ΓÇö confidence reduced' : 'trend developing'
       });
@@ -1078,22 +1088,7 @@ Return ONLY valid JSON:
     let finalConfidence = Number(resultData.confidence) || 50;
 
     // ΓöÇΓöÇ STEP 4: Age zone adjustments ΓöÇΓöÇ
-    if (totalAge < infantLimit) {
-      finalConfidence = Math.round(finalConfidence * 0.7);
-      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
-      if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
-    } else if (totalAge < matureLimit) {
-      // Youth ΓÇö ONLY zone allowing STRONG
-    } else if (totalAge <= oldLimit) {
-      // Mature ΓÇö downgrade STRONG to regular
-      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
-      if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
-    } else {
-      finalConfidence = Math.round(finalConfidence * 0.75);
-      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
-      if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
-    }
-    if (age < minAge) finalConfidence = Math.round(finalConfidence * 0.8);
+    // NOTE: age zone caps applied AFTER confidence is computed in STEP 5
 
     // ΓöÇΓöÇ STEP 5: Compute confidence from metrics ΓöÇΓöÇ
     const maxPrimary = settings?.maxPrimaryWeight ?? 50;
@@ -1103,6 +1098,25 @@ Return ONLY valid JSON:
     const supportConf = Math.round(supportRatio * maxSupport);
     const computedConfidence = baseConf + primaryConf + supportConf;
     finalConfidence = computedConfidence;
+
+    // ΓöÇΓöÇ STEP 4b: Age zone adjustments (after confidence computed) ΓöÇΓöÇ
+    if (totalAge < infantLimit) {
+      finalConfidence = Math.round(finalConfidence * 0.7);
+      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
+      if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
+    } else if (totalAge < matureLimit) {
+      // Youth — STRONG allowed
+    } else if (totalAge <= oldLimit) {
+      // Mature — STRONG allowed (full strength)
+    } else {
+      finalConfidence = Math.round(finalConfidence * 0.75);
+      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
+      if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
+    }
+    if (age < minAge) {
+      finalConfidence = Math.round(finalConfidence * 0.5);
+      finalSignal = SignalType.NEUTRAL;
+    }
 
     // Multi-TF Direction: penalize if current direction conflicts with higher timeframe
     const directionConflicts = (isUp && isMacroDown) || (isDown && isMacroUp);
@@ -1157,19 +1171,18 @@ Return ONLY valid JSON:
       const strongThreshold = settings?.strongThreshold ?? 60;
       const buyThreshold = settings?.buyThreshold ?? 40;
       const minStrongSupport = (settings?.minStrongSupport ?? 50) / 100;
-      const CONF_BUFFER = 5; // Confidence buffer to prevent borderline flips
       if (direction === 'buy') {
-        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER)) {
+        if (supportRatio >= minStrongSupport && finalConfidence >= strongThreshold) {
           finalSignal = SignalType.STRONG_BUY;
-        } else if (finalConfidence >= (buyThreshold - CONF_BUFFER)) {
+        } else if (finalConfidence >= buyThreshold) {
           finalSignal = SignalType.BUY;
         } else {
           finalSignal = SignalType.NEUTRAL;
         }
       } else if (direction === 'sell') {
-        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER)) {
+        if (supportRatio >= minStrongSupport && finalConfidence >= strongThreshold) {
           finalSignal = SignalType.STRONG_SELL;
-        } else if (finalConfidence >= (buyThreshold - CONF_BUFFER)) {
+        } else if (finalConfidence >= buyThreshold) {
           finalSignal = SignalType.SELL;
         } else {
           finalSignal = SignalType.NEUTRAL;
@@ -1177,11 +1190,15 @@ Return ONLY valid JSON:
       } else {
         finalSignal = SignalType.NEUTRAL;
       }
-      // Youth-only STRONG enforcement
-      const isYouth = totalAge >= infantLimit && totalAge < matureLimit;
-      if (!isYouth && (finalSignal === SignalType.STRONG_BUY || finalSignal === SignalType.STRONG_SELL)) {
+      // Youth+Mature STRONG enforcement (only Infant and Old downgrade)
+      const isInfant = totalAge < infantLimit;
+      const isOld = totalAge > oldLimit;
+      if ((isInfant || isOld) && (finalSignal === SignalType.STRONG_BUY || finalSignal === SignalType.STRONG_SELL)) {
         finalSignal = finalSignal === SignalType.STRONG_BUY ? SignalType.BUY : SignalType.SELL;
       }
+      // Downgrade STRONG to regular if confidence dropped below strong threshold
+      if (finalSignal === SignalType.STRONG_BUY && finalConfidence < (settings?.strongThreshold ?? 60)) finalSignal = SignalType.BUY;
+      if (finalSignal === SignalType.STRONG_SELL && finalConfidence < (settings?.strongThreshold ?? 60)) finalSignal = SignalType.SELL;
     }
 
     // ΓöÇΓöÇ STEP 7: Fear&Greed — supporting condition only (NO flip) ΓöÇΓöÇ
@@ -1268,7 +1285,7 @@ Return ONLY valid JSON:
       symbol, type, timeframe,
       signal: finalSignal,
       confidence: finalConfidence,
-      summary: resultData.summary,
+      summary: resultData.summary || '',
       detailedReasons,
       newsSources: [...new Set(detailedReasons
         .filter((r: any) => r.check === 'News Sentiment' && r.source)

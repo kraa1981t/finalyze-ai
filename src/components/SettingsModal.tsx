@@ -327,7 +327,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         <div className="bg-white/5 border border-white/5 rounded-xl p-4">
           <NumberInput label={isAr ? '① BB Pullback — تراجع بولينجر' : '① BB Pullback — Bollinger Pullback'} value={settings.primaryBBWeight} onChange={(v) => handleChange('primaryBBWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'تراجع 3-6 شموع + لمس BB + شمعة انتكاس' : '3-6 candle pullback + touch BB + reversal candle'} />
           <NumberInput label={isAr ? '② Supply/Demand — مناطق العرض والطلب' : '② Supply/Demand Zones'} value={settings.primarySDWeight} onChange={(v) => handleChange('primarySDWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'منطقة طلب + صعود = شراء / منطقة عرض + هبوط = بيع' : 'Demand+uptrend=buy / Supply+downtrend=sell'} />
-          <NumberInput label={isAr ? '③ Trend Age — عمر الاتجاه' : '③ Trend Age'} value={settings.primaryAgeWeight} onChange={(v) => handleChange('primaryAgeWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'ناضج (25-50) = كامل / رضيع أو قديم = تخفيف' : 'Mature (25-50)=full / Infant or Old=reduced'} />
+          <NumberInput label={isAr ? '③ Trend Age — عمر الاتجاه' : '③ Trend Age'} value={settings.primaryAgeWeight} onChange={(v) => handleChange('primaryAgeWeight', v)} color="text-[#F59E0B]" desc={isAr ? `ناضج (${settings.minMatureAge}-${settings.maxMatureAge}) = كامل / رضيع أو قديم = تخفيف` : `Mature (${settings.minMatureAge}-${settings.maxMatureAge})=full / Infant or Old=reduced`} />
           <NumberInput label={isAr ? '④ News — أخبار اقتصادية وسياسية' : '④ News Sentiment'} value={settings.primaryNewsWeight} onChange={(v) => handleChange('primaryNewsWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'أخبار سلبية = حظر / لا أخبار = مسموح' : 'Negative news=block / No news=allowed'} />
         </div>
       </div>
@@ -397,16 +397,16 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
               </div>
               <div className="flex h-6 rounded-lg overflow-hidden text-[9px] font-black">
                 <div className="flex-1 bg-red-500/30 border-r border-black/30 flex items-center justify-center text-red-300">
-                  {isAr ? 'رضيع <10' : 'Infant <10'}
+                  {isAr ? `رضيع <${settings.minInfantAge}` : `Infant <${settings.minInfantAge}`}
                 </div>
                 <div className="flex-1 bg-amber-500/30 border-r border-black/30 flex items-center justify-center text-amber-300">
-                  {isAr ? 'طفل 10-25' : 'Youth 10-25'}
+                  {isAr ? `طفل ${settings.minInfantAge}-${settings.minMatureAge}` : `Youth ${settings.minInfantAge}-${settings.minMatureAge}`}
                 </div>
                 <div className="flex-1 bg-emerald-500/30 border-r border-black/30 flex items-center justify-center text-emerald-300">
-                  {isAr ? 'ناضج 25-50' : 'Mature 25-50'}
+                  {isAr ? `ناضج ${settings.minMatureAge}-${settings.maxMatureAge}` : `Mature ${settings.minMatureAge}-${settings.maxMatureAge}`}
                 </div>
                 <div className="flex-1 bg-red-500/30 flex items-center justify-center text-red-300">
-                  {isAr ? 'عجوز >50' : 'Aging >50'}
+                  {isAr ? `شيخ >${settings.maxMatureAge}` : `Aging >${settings.maxMatureAge}`}
                 </div>
               </div>
               <div className="flex justify-between mt-1 text-[8px] text-brand-text/30 font-mono px-1">
@@ -429,7 +429,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                     className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
                 </div>
               </div>
-              <p className="text-xs text-brand-text/40">{isAr ? 'عدد الشموع المتتالية المطلوب قبل السماح بدخول الصفقة. افتراضي: 2' : 'Required consecutive candles before allowing entry. Default: 2'}</p>
+              <p className="text-xs text-brand-text/40">{isAr ? 'عدد الشموع المتتالية المطلوب قبل السماح بدخول الصفقة. افتراضي: 25' : 'Required consecutive candles before allowing entry. Default: 25'}</p>
             </div>
 
             {/* Infant Age Threshold */}
@@ -474,7 +474,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                     className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
                 </div>
               </div>
-              <p className="text-xs text-brand-text/40">{isAr ? 'فوق هذه القيمة ← اتجاه عجوز (خطر انعكاس، تخفيف الثقة). للكريبتو: ×2. افتراضي: 50' : 'Above this → aging trend (reversal risk, confidence cap). For crypto: ×2. Default: 50'}</p>
+              <p className="text-xs text-brand-text/40">{isAr ? 'فوق هذه القيمة ← اتجاه عجوز (خطر انعكاس، تخفيف الثقة). للكريبتو: ×2. افتراضي: 75' : 'Above this → aging trend (reversal risk, confidence cap). For crypto: ×2. Default: 75'}</p>
             </div>
           </div>
         </div>

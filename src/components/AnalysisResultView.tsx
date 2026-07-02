@@ -235,20 +235,50 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                                 transition={{ duration: 0.2, ease: 'easeOut' }}
                                 className="origin-center"
                               >
-                                <div className="space-y-1.5 pt-1">
-                                  {res.detailedReasons.map((reason, i) => (
-                                    <div key={i} className="bg-white/[0.02] rounded p-2 border border-white/5 flex items-center justify-between text-xs">
-                                      <div className="flex items-center gap-1.5">
-                                        <div className={`w-2 h-2 rounded-full ${
-                                          reason.status === 'positive' ? 'bg-emerald-400' :
-                                          reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'
-                                        }`} />
-                                        <span className={`font-bold ${reason.status === 'positive' ? 'text-emerald-400/80' : reason.status === 'negative' ? 'text-red-400/80' : 'text-slate-400/80'}`}>{reason.check}</span>
-                                      </div>
-                                      <span className={`font-mono text-xs ${reason.status === 'positive' ? 'text-emerald-400/50' : reason.status === 'negative' ? 'text-red-400/50' : 'text-slate-400/50'}`}>{reason.value}</span>
+                                {(() => {
+                                  const primaryChecks = ['BB Pullback', 'Bollinger Bands', 'BB Strategy', 'Supply/Demand', 'Trend Age', 'News Sentiment', 'Economic Events'];
+                                  const primaryReasons = res.detailedReasons.filter(r => primaryChecks.some(c => r.check.includes(c)));
+                                  const supportingReasons = res.detailedReasons.filter(r => !primaryChecks.some(c => r.check.includes(c)));
+                                  return (
+                                    <div className="space-y-2 pt-1">
+                                      {primaryReasons.length > 0 && (
+                                        <div className="space-y-1">
+                                          <div className="text-[9px] font-black text-emerald-400/60 uppercase tracking-wider px-1">{isAr ? '\u0623\u0633\u0627\u0633\u064a\u0629' : 'Primary'}</div>
+                                          {primaryReasons.map((reason, i) => {
+                                            const isTrendAge = reason.check.includes('Trend Age');
+                                            const ageStage = reason.value.match(/\((\u0637\u0641\u0644|\u0634\u0627\u0628|\u0646\u0627\u0636\u062c|\u0634\u064a\u062e)\)/);
+                                            return (
+                                              <div key={`p-${i}`} className={`rounded p-2 border flex items-center justify-between text-xs ${reason.status === 'positive' ? 'bg-emerald-500/10 border-emerald-500/20' : reason.status === 'negative' ? 'bg-red-500/10 border-red-500/20' : 'bg-white/[0.02] border-white/5'}`}>
+                                                <div className="flex items-center gap-1.5">
+                                                  <div className={`w-2 h-2 rounded-full ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'}`} />
+                                                  <span className={`font-bold text-[11px] ${reason.status === 'positive' ? 'text-emerald-400/90' : reason.status === 'negative' ? 'text-red-400/90' : 'text-slate-400/90'}`}>{reason.check}</span>
+                                                  {isTrendAge && ageStage && (
+                                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">{ageStage[1]}</span>
+                                                  )}
+                                                </div>
+                                                <span className={`font-mono text-[10px] text-right ${reason.status === 'positive' ? 'text-emerald-400/60' : reason.status === 'negative' ? 'text-red-400/60' : 'text-slate-400/60'}`}>{reason.value}</span>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                      {supportingReasons.length > 0 && (
+                                        <div className="space-y-1">
+                                          <div className="text-[9px] font-black text-slate-500/60 uppercase tracking-wider px-1">{isAr ? '\u062f\u0627\u0639\u0645\u0629' : 'Supporting'}</div>
+                                          {supportingReasons.map((reason, i) => (
+                                            <div key={`s-${i}`} className="bg-white/[0.02] rounded p-2 border border-white/5 flex items-center justify-between text-xs">
+                                              <div className="flex items-center gap-1.5">
+                                                <div className={`w-2 h-2 rounded-full ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'}`} />
+                                                <span className={`font-bold text-[11px] ${reason.status === 'positive' ? 'text-emerald-400/80' : reason.status === 'negative' ? 'text-red-400/80' : 'text-slate-400/80'}`}>{reason.check}</span>
+                                              </div>
+                                              <span className={`font-mono text-[10px] text-right ${reason.status === 'positive' ? 'text-emerald-400/50' : reason.status === 'negative' ? 'text-red-400/50' : 'text-slate-400/50'}`}>{reason.value}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
-                                  ))}
-                                </div>
+                                  );
+                                })()}
                               </motion.div>
                             )}
                           </AnimatePresence>

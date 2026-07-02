@@ -224,8 +224,15 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
         r.userId = user?.uid || 'anonymous';
         results.push(r);
         if (user?.uid) {
+          const strip = (obj: any): any => {
+            if (obj === null || typeof obj !== 'object') return obj;
+            if (Array.isArray(obj)) return obj.map(strip);
+            const out: Record<string, any> = {};
+            for (const [k, v] of Object.entries(obj)) { if (v !== undefined) out[k] = strip(v); }
+            return out;
+          };
           addDoc(collection(db, "analysisResults"), {
-            ...r,
+            ...strip(r),
             timestamp: serverTimestamp(),
           }).catch(() => {});
         }

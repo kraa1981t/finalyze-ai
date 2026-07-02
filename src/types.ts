@@ -26,15 +26,15 @@ export interface AnalysisResult {
   type: MarketType;
   timeframe: string;
   signal: SignalType;
-  confidence: number; // New field for percentage
+  confidence: number;
   summary: string;
-  detailedReasons?: { check: string; value: string; status: string; impact: string; source?: string }[];
+  detailedReasons?: { check: string; value: string; status: string; impact: string; source?: string; primary?: boolean }[];
   newsSources?: string[];
   technicalScore: number;
   sentimentScore: number;
   historicalMatch?: string;
-  trendMaturity?: 'infancy' | 'youth' | 'aging' | 'unknown';
-  trendAge?: number; // Number of candles
+  trendMaturity?: 'infancy' | 'youth' | 'mature' | 'aging' | 'unknown';
+  trendAge?: number;
   microTF?: string;
   microSignal?: 'pullback' | 'aligned' | 'unknown';
   microTrend?: string;

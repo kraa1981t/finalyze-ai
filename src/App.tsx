@@ -30,6 +30,14 @@ import ProfilePage from './components/ProfilePage';
 import AboutPage from './components/AboutPage';
 import SuggestionsPage from './components/SuggestionsPage';
 
+function stripUndefined(obj: any): any {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(stripUndefined);
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) { if (v !== undefined) out[k] = stripUndefined(v); }
+  return out;
+}
+
 function hasAnyStoredKey(): boolean {
   try {
     const k1 = localStorage.getItem('finalyze_key1_value');
@@ -588,7 +596,7 @@ export default function App() {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
       syncTimeoutRef.current = setTimeout(() => {
         setDoc(doc(db, 'shared_results', 'latest'), {
-          results: topSignals,
+          results: stripUndefined(topSignals),
           timestamp: new Date().toISOString(),
           developerEmail: user?.email || '',
         }).then(() => {
@@ -797,7 +805,7 @@ export default function App() {
     if (isDeveloperSession()) {
       try {
         await setDoc(doc(db, 'shared_results', 'latest'), {
-          results: updated,
+          results: stripUndefined(updated),
           timestamp: new Date().toISOString(),
           developerEmail: user?.email || '',
         });
@@ -884,7 +892,7 @@ export default function App() {
       try {
         const resetToken = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
         await setDoc(doc(db, 'shared_results', 'latest'), {
-          results: filtered,
+          results: stripUndefined(filtered),
           resetToken,
           timestamp: new Date().toISOString(),
           developerEmail: user?.email || '',
@@ -1017,7 +1025,7 @@ export default function App() {
       if (merged.length > 0) {
         await Promise.race([
           setDoc(doc(db, 'shared_results', 'latest'), {
-            results: merged.slice(-100),
+            results: stripUndefined(merged.slice(-100)),
             timestamp: new Date().toISOString(),
             developerEmail: user?.email || '',
           }),
