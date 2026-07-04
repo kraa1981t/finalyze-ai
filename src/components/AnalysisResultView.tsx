@@ -203,57 +203,125 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                         </div>
                       )}
 
-                      {/* Technical Reasons - Collapsible */}
+                      {/* Expand/Collapse Conditions Button */}
                       {res.detailedReasons && res.detailedReasons.length > 0 && (
-                        <div className="space-y-1.5">
-                          <button
-                            onClick={() => {
-                              handleClick();
-                              const newSet = new Set(expandedReasons);
-                              const key = `${res.symbol}_${idx}`;
-                              if (newSet.has(key)) {
-                                newSet.delete(key);
-                              } else {
-                                newSet.add(key);
-                              }
-                              setExpandedReasons(newSet);
-                            }}
-                            className="w-full flex items-center justify-between text-xs font-bold text-yellow-400/70 hover:text-yellow-400 transition-colors py-1"
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <MessageSquare size={14} />
-                              <span>{isAr ? '\u0627\u0644\u0645\u0639\u0644\u0648\u0645\u0627\u062a' : 'Indicators'} ({res.detailedReasons.length})</span>
-                            </div>
-                            <span className="text-xs">{expandedReasons.has(`${res.symbol}_${idx}`) ? '\u25B2' : '\u25BC'}</span>
-                          </button>
-                           <AnimatePresence>
-                            {expandedReasons.has(`${res.symbol}_${idx}`) && (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                transition={{ duration: 0.2, ease: 'easeOut' }}
-                                className="origin-center"
-                              >
-                                <div className="space-y-1.5 pt-1">
-                                  {res.detailedReasons.map((reason, i) => (
-                                    <div key={i} className="bg-white/[0.02] rounded p-2 border border-white/5 flex items-center justify-between text-xs">
-                                      <div className="flex items-center gap-1.5">
-                                        <div className={`w-2 h-2 rounded-full ${
-                                          reason.status === 'positive' ? 'bg-emerald-400' :
-                                          reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'
-                                        }`} />
-                                        <span className={`font-bold ${reason.status === 'positive' ? 'text-emerald-400/80' : reason.status === 'negative' ? 'text-red-400/80' : 'text-slate-400/80'}`}>{reason.check}</span>
-                                      </div>
-                                      <span className={`font-mono text-xs ${reason.status === 'positive' ? 'text-emerald-400/50' : reason.status === 'negative' ? 'text-red-400/50' : 'text-slate-400/50'}`}>{reason.value}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
+                        <button
+                          onClick={() => {
+                            handleClick();
+                            const newSet = new Set(expandedReasons);
+                            const key = `${res.symbol}_${idx}`;
+                            if (newSet.has(key)) newSet.delete(key); else newSet.add(key);
+                            setExpandedReasons(newSet);
+                          }}
+                          className="w-full flex items-center justify-between text-xs font-bold text-yellow-400/70 hover:text-yellow-400 transition-colors py-1"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <MessageSquare size={14} />
+                            <span>{isAr ? '\u0627\u0644\u0634\u0631\u0648\u0637 \u0627\u0644\u062a\u0642\u064a\u064a\u0645\u064a\u0629' : 'Conditions'} ({res.detailedReasons.length})</span>
+                          </div>
+                          <span className="text-xs">{expandedReasons.has(`${res.symbol}_${idx}`) ? '\u25B2' : '\u25BC'}</span>
+                        </button>
                       )}
+
+                      {/* Primary & Supporting Reasons - Split into 2 sections */}
+                      <AnimatePresence>
+                      {expandedReasons.has(`${res.symbol}_${idx}`) && res.detailedReasons && res.detailedReasons.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2, ease: 'easeOut' }}
+                          className="overflow-hidden"
+                        >
+                          {(() => {
+                        const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'News', 'Economic Events'];
+                        const primaryReasons = res.detailedReasons.filter((r: any) => PRIMARY_CHECKS.some(p => r.check?.includes(p)));
+                        const supportingReasons = res.detailedReasons.filter((r: any) => !PRIMARY_CHECKS.some(p => r.check?.includes(p)));
+
+                        const getAgeBadge = () => {
+                          if (res.trendAge === undefined) return null;
+                          const age = res.trendAge;
+                          if (age < 10) return { label: isAr ? '\u0637\u0641\u0644' : 'Infant', color: 'text-red-400 bg-red-500/15 border-red-500/30' };
+                          if (age < 25) return { label: isAr ? '\u0634\u0627\u0628' : 'Youth', color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30' };
+                          if (age <= 75) return { label: isAr ? '\u0646\u0627\u0636\u062c' : 'Mature', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' };
+                          return { label: isAr ? '\u0634\u064a\u062e' : 'Old', color: 'text-orange-400 bg-orange-500/15 border-orange-500/30' };
+                        };
+                        const ageBadge = getAgeBadge();
+
+                        const renderReason = (reason: any, i: number) => (
+                          <div key={i} className="bg-white/[0.02] rounded-lg p-2.5 border border-white/5" title={reason.impact || ''}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <div className={`w-2 h-2 rounded-full shrink-0 ${
+                                  reason.status === 'positive' ? 'bg-emerald-400' :
+                                  reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'
+                                }`} />
+                                <span className={`font-bold text-xs truncate ${reason.status === 'positive' ? 'text-emerald-400' : reason.status === 'negative' ? 'text-red-400' : 'text-slate-400'}`}>
+                                  {reason.check}
+                                </span>
+                              </div>
+                              <span className={`font-mono text-[10px] shrink-0 ${reason.status === 'positive' ? 'text-emerald-400/60' : reason.status === 'negative' ? 'text-red-400/60' : 'text-slate-400/60'}`}>
+                                {reason.value}
+                              </span>
+                            </div>
+                            {reason.impact && (
+                              <p className={`text-[9px] mt-1 leading-relaxed ${reason.status === 'positive' ? 'text-emerald-400/40' : reason.status === 'negative' ? 'text-red-400/40' : 'text-slate-400/40'}`}>
+                                {reason.impact}
+                              </p>
+                            )}
+                          </div>
+                        );
+
+                        return (
+                          <div className="space-y-2">
+                            {/* Primary Conditions Section */}
+                            {primaryReasons.length > 0 && (
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                                      {isAr ? '\u0627\u0644\u0634\u0631\u0648\u0637 \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629' : 'PRIMARY CONDITIONS'}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-amber-400/50 bg-amber-500/10 px-1.5 py-0.5 rounded-full">
+                                      {primaryReasons.length}
+                                    </span>
+                                  </div>
+                                  {ageBadge && (
+                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${ageBadge.color}`}>
+                                      {ageBadge.label} ({res.trendAge}c)
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="space-y-1">
+                                  {primaryReasons.map(renderReason)}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Supporting Conditions Section */}
+                            {supportingReasons.length > 0 && (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider">
+                                    {isAr ? '\u0627\u0644\u0634\u0631\u0648\u0637 \u0627\u0644\u062f\u0627\u0639\u0645\u0629' : 'SUPPORTING CONDITIONS'}
+                                  </span>
+                                  <span className="text-[9px] font-bold text-blue-400/50 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
+                                    {supportingReasons.length}
+                                  </span>
+                                </div>
+                                <div className="space-y-1">
+                                  {supportingReasons.map(renderReason)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                        </motion.div>
+                      )}
+                      </AnimatePresence>
 
                       {/* View Chart Button */}
                       <button

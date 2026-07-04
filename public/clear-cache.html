@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مسح الكاش - Finalyze AI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0a0a1a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .container { max-width: 400px; padding: 40px; text-align: center; }
+    h1 { color: #f0b90b; margin-bottom: 20px; font-size: 1.5rem; }
+    p { color: #999; margin-bottom: 30px; line-height: 1.8; }
+    .btn { display: block; width: 100%; padding: 16px; margin: 12px 0; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-primary { background: #f0b90b; color: #000; }
+    .btn-primary:hover { background: #d4a30a; }
+    .btn-danger { background: #dc3545; color: #fff; }
+    .btn-danger:hover { background: #bb2d3b; }
+    .btn-home { background: #333; color: #fff; margin-top: 20px; }
+    .btn-home:hover { background: #444; }
+    #status { margin-top: 20px; padding: 15px; border-radius: 10px; background: #1a1a2e; display: none; }
+    #status.show { display: block; }
+    #status.success { border: 1px solid #28a745; color: #28a745; }
+    #status.error { border: 1px solid #dc3545; color: #dc3545; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>مسح الكاش والبيانات المؤقتة</h1>
+    <p>إذا كان التطبيق لا يتحدث أو يعرض أخطاء، اضغط الزر الأصفر أولاً، ثم الأحمر إذا لزم الأمر.</p>
+
+    <button class="btn btn-primary" onclick="clearSW()">مسح Service Worker و الكاش</button>
+    <button class="btn btn-danger" onclick="clearAll()">مسح كل شيء (Cookies + Storage + Cache)</button>
+    <button class="btn btn-home" onclick="goHome()">العودة للتطبيق</button>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    function show(msg, type) {
+      var el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'show ' + type;
+    }
+
+    async function clearSW() {
+      try {
+        if ('serviceWorker' in navigator) {
+          var regs = await navigator.serviceWorker.getRegistrations();
+          for (var reg of regs) { await reg.unregister(); }
+        }
+        if ('caches' in window) {
+          var keys = await caches.keys();
+          for (var k of keys) { await caches.delete(k); }
+        }
+        show('تم مسح Service Worker و الكاش بنجاح! اضغط على التطبيق للتحديث.', 'success');
+      } catch (e) {
+        show('خطأ: ' + e.message, 'error');
+      }
+    }
+
+    async function clearAll() {
+      try {
+        await clearSW();
+        localStorage.clear();
+        sessionStorage.clear();
+        document.cookie.split(';').forEach(function(c) {
+          document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+        });
+        show('تم مسح كل شيء! أعد فتح التطبيق.', 'success');
+      } catch (e) {
+        show('خطأ: ' + e.message, 'error');
+      }
+    }
+
+    function goHome() {
+      window.location.href = './';
+    }
+  </script>
+</body>
+</html>

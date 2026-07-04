@@ -4,6 +4,26 @@ const ALTERNATIVE_BASE = 'https://api.alternative.me';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const GROQ_BASE = 'https://api.groq.com/openai/v1';
 
+const CORS_PROXIES = [
+  'https://cors-anywhere.com/',
+  'https://api.allorigins.win/raw?url=',
+  'https://whateverorigin.org/get?url=',
+  'https://corsproxy.io/?url=',
+];
+
+async function fetchWithProxy(url: string, opts?: RequestInit): Promise<Response> {
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), 8000);
+      const r = await fetch(`${proxy}${encodeURIComponent(url)}`, { ...opts, signal: ac.signal });
+      clearTimeout(t);
+      if (r.ok) return r;
+    } catch {}
+  }
+  throw new Error('All CORS proxies failed');
+}
+
 const _dataCache = new Map<string, { data: any; ts: number }>();
 const CACHE_TTL = 120_000;
 
@@ -84,7 +104,7 @@ export async function fetchFearGreedDirect(): Promise<{ value: number; classific
     if (!r.ok || r.status === 0) {
       const ac2 = new AbortController();
       const timeout2 = setTimeout(() => ac2.abort(), 10000);
-      r = await fetch(CORS_PROXY + encodeURIComponent(url), { signal: ac2.signal });
+      r = await fetchWithProxy(url);
       clearTimeout(timeout2);
     }
     const d = await r.json();
@@ -105,7 +125,7 @@ export async function fetchEconCalendarDirect(): Promise<any[]> {
     if (!r.ok || r.status === 0) {
       const ac2 = new AbortController();
       const timeout2 = setTimeout(() => ac2.abort(), 10000);
-      r = await fetch(CORS_PROXY + encodeURIComponent(url), { signal: ac2.signal });
+      r = await fetchWithProxy(url);
       clearTimeout(timeout2);
     }
     const data = await r.json();
@@ -128,7 +148,7 @@ export async function fetchNewsDirect(query: string): Promise<any[]> {
     if (!r.ok || r.status === 0) {
       const ac2 = new AbortController();
       const timeout2 = setTimeout(() => ac2.abort(), 10000);
-      r = await fetch(CORS_PROXY + encodeURIComponent(url), { signal: ac2.signal });
+      r = await fetchWithProxy(url);
       clearTimeout(timeout2);
     }
     const xml = await r.text();
@@ -158,11 +178,6 @@ export async function fetchCryptoPricesDirect(): Promise<any> {
     };
   }
 }
-
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
-const CORS_PROXY_2 = 'https://corsproxy.io/?url=';
-const CORS_PROXY_3 = 'https://cors.lol/?url=';
-const CORS_PROXIES = [CORS_PROXY, CORS_PROXY_2, CORS_PROXY_3];
 
 function symbolToYahooForex(symbol: string): string | null {
   const upper = symbol.toUpperCase().replace(/ /g, '');
