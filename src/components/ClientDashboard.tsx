@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { AnalysisResult, SignalType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Activity, Zap, BarChart2, Info, Lock } from 'lucide-react';
+import { Activity, Zap, BarChart2, Info, Lock, MessageSquare } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
 import LotSizeCalculator from './LotSizeCalculator';
 import { Language, translations } from '../lib/i18n';
@@ -52,7 +52,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
       initAudio();
       audioInitRef.current = true;
     }
-    handleClick();
+    playClick();
   }, []);
 
   // Filter for active signals (less than 20 hours old)
@@ -323,29 +323,126 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                         </div>
                       )}
 
-                      {/* Technical Reasons - shown directly when card expanded */}
-                      {res.detailedReasons && res.detailedReasons.length > 0 && (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-yellow-400/70 py-1">
-                            <Info size={14} />
-                            <span>{isAr ? '\u0627\u0644\u0645\u0639\u0644\u0648\u0645\u0627\u062a' : 'Indicators'} ({res.detailedReasons.length})</span>
-                          </div>
-                          <div className="space-y-1.5">
-                            {res.detailedReasons.map((reason, i) => (
-                              <div key={i} className="bg-white/[0.02] rounded p-2 border border-white/5 flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-1.5">
-                                  <div className={`w-2 h-2 rounded-full ${
-                                    reason.status === 'positive' ? 'bg-emerald-400' :
-                                    reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'
-                                  }`} />
-                                  <span className={`font-bold ${reason.status === 'positive' ? 'text-emerald-400/80' : reason.status === 'negative' ? 'text-red-400/80' : 'text-slate-400/80'}`}>{reason.check}</span>
-                                </div>
-                                <span className={`font-mono text-xs ${reason.status === 'positive' ? 'text-emerald-400/50' : reason.status === 'negative' ? 'text-red-400/50' : 'text-slate-400/50'}`}>{reason.value}</span>
+                      {/* Primary & Supporting Reasons - Split into 2 sections */}
+                      {res.detailedReasons && res.detailedReasons.length > 0 && (() => {
+                        const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'News', 'Economic Events'];
+                        const primaryReasons = res.detailedReasons.filter((r: any) => PRIMARY_CHECKS.some(p => r.check?.includes(p)));
+                        const supportingReasons = res.detailedReasons.filter((r: any) => !PRIMARY_CHECKS.some(p => r.check?.includes(p)));
+
+                        const getAgeBadge = () => {
+                          if (res.trendAge === undefined) return null;
+                          const age = res.trendAge;
+                          if (age < 10) return { label: isAr ? '\u0637\u0641\u0644' : 'Infant', color: 'text-red-400 bg-red-500/15 border-red-500/30' };
+                          if (age < 25) return { label: isAr ? '\u0634\u0627\u0628' : 'Youth', color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30' };
+                          if (age <= 75) return { label: isAr ? '\u0646\u0627\u0636\u062c' : 'Mature', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' };
+                          return { label: isAr ? '\u0634\u064a\u062e' : 'Old', color: 'text-orange-400 bg-orange-500/15 border-orange-500/30' };
+                        };
+                        const ageBadge = getAgeBadge();
+
+                        const renderReason = (reason: any, i: number) => (
+                          <div key={i} className="bg-white/[0.02] rounded-lg p-2.5 border border-white/5" title={reason.impact || ''}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <div className={`w-2 h-2 rounded-full shrink-0 ${
+                                  reason.status === 'positive' ? 'bg-emerald-400' :
+                                  reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'
+                                }`} />
+                                <span className={`font-bold text-xs truncate ${reason.status === 'positive' ? 'text-emerald-400' : reason.status === 'negative' ? 'text-red-400' : 'text-slate-400'}`}>
+                                  {reason.check}
+                                </span>
                               </div>
-                            ))}
+                              <span className={`font-mono text-[10px] shrink-0 ${reason.status === 'positive' ? 'text-emerald-400/60' : reason.status === 'negative' ? 'text-red-400/60' : 'text-slate-400/60'}`}>
+                                {reason.value}
+                              </span>
+                            </div>
+                            {reason.impact && (
+                              <p className={`text-[9px] mt-1 leading-relaxed ${reason.status === 'positive' ? 'text-emerald-400/40' : reason.status === 'negative' ? 'text-red-400/40' : 'text-slate-400/40'}`}>
+                                {reason.impact}
+                              </p>
+                            )}
                           </div>
-                        </div>
-                      )}
+                        );
+
+                        const isReasonsExpanded = expandedReasons.has(res.symbol);
+
+                        return (
+                          <div className="space-y-2">
+                            {/* Expand/Collapse Button */}
+                            <button
+                              onClick={() => {
+                                handleClick();
+                                const newSet = new Set(expandedReasons);
+                                if (isReasonsExpanded) newSet.delete(res.symbol); else newSet.add(res.symbol);
+                                setExpandedReasons(newSet);
+                              }}
+                              className="w-full flex items-center justify-between text-xs font-bold text-yellow-400/70 hover:text-yellow-400 transition-colors py-1"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <MessageSquare size={14} />
+                                <span>{isAr ? '\u0627\u0644\u0634\u0631\u0648\u0637 \u0627\u0644\u062a\u0642\u064a\u064a\u0645\u064a\u0629' : 'Conditions'} ({res.detailedReasons.length})</span>
+                              </div>
+                              <span className="text-xs">{isReasonsExpanded ? '\u25B2' : '\u25BC'}</span>
+                            </button>
+
+                            <AnimatePresence>
+                            {isReasonsExpanded && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.2, ease: 'easeOut' }}
+                                className="overflow-hidden"
+                              >
+                              <div className="space-y-2 pt-1">
+                                {/* Primary Conditions */}
+                                {primaryReasons.length > 0 && (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                        <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                                          {isAr ? '\u0627\u0644\u0634\u0631\u0648\u0637 \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629' : 'PRIMARY CONDITIONS'}
+                                        </span>
+                                        <span className="text-[9px] font-bold text-amber-400/50 bg-amber-500/10 px-1.5 py-0.5 rounded-full">
+                                          {primaryReasons.length}
+                                        </span>
+                                      </div>
+                                      {ageBadge && (
+                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${ageBadge.color}`}>
+                                          {ageBadge.label} ({res.trendAge}c)
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="space-y-1">
+                                      {primaryReasons.map(renderReason)}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Supporting Conditions */}
+                                {supportingReasons.length > 0 && (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                      <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider">
+                                        {isAr ? '\u0627\u0644\u0634\u0631\u0648\u0637 \u0627\u0644\u062f\u0627\u0639\u0645\u0629' : 'SUPPORTING CONDITIONS'}
+                                      </span>
+                                      <span className="text-[9px] font-bold text-blue-400/50 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
+                                        {supportingReasons.length}
+                                      </span>
+                                    </div>
+                                    <div className="space-y-1">
+                                      {supportingReasons.map(renderReason)}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              </motion.div>
+                            )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })()}
 
                       {/* View Chart Button */}
                       <button
