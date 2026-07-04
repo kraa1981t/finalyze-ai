@@ -220,8 +220,8 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
         )}
       </div>
 
-      {/* 4. Compact Opportunity Cards - 3 per row */}
-      <div className="grid grid-cols-3 gap-2 items-start">
+      {/* 4. Compact Opportunity Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 items-start px-2 sm:px-0">
         {sortedStrong.map((res, idx) => {
           const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.STRONG_BUY];
           const isSelected = selectedSymbol === res.symbol || (!selectedSymbol && sortedStrong[0].symbol === res.symbol);
@@ -253,41 +253,41 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                   }
                   handleClick();
                 }}
-                className={`w-full px-3 py-3 flex flex-col items-center gap-2 rounded-t-lg transition-all ${isSelected && !isLocked ? 'border-b border-[#F59E0B]/30' : ''}`}
+                className={`w-full px-1.5 sm:px-3 py-1.5 sm:py-3 flex flex-col items-center gap-1 sm:gap-2 rounded-t-lg transition-all ${isSelected && !isLocked ? 'border-b border-[#F59E0B]/30' : ''}`}
               >
                 {/* Symbol and SL/TP Row */}
-                <div className="flex items-center gap-1 px-1">
+                <div className="flex items-center gap-0.5 sm:gap-1 px-0.5">
                   {/* Take Profit (TP) Box */}
-                  <div className="flex-1 bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-3 py-3 shrink-0 flex items-center justify-center">
-                    <span className="text-lg font-black font-mono text-emerald-400">{tp ? tp.toFixed(decimals) : '—'}</span>
+                  <div className="flex-1 bg-emerald-500/15 border border-emerald-500/30 rounded-lg sm:rounded-xl px-1.5 sm:px-3 py-1.5 sm:py-3 shrink-0 flex items-center justify-center">
+                    <span className="text-xs sm:text-lg font-black font-mono text-emerald-400">{tp ? tp.toFixed(decimals) : '—'}</span>
                   </div>
 
                   {/* Symbol in Middle */}
-                  <div className="flex items-center justify-center min-w-[48px] shrink-0">
-                    <span className={`text-sm font-black font-mono ${meta.color}`}>{res.symbol}</span>
+                  <div className="flex items-center justify-center min-w-[36px] sm:min-w-[48px] shrink-0">
+                    <span className={`text-[10px] sm:text-sm font-black font-mono ${meta.color}`}>{res.symbol}</span>
                   </div>
 
                   {/* Stop Loss (SL) Box */}
-                  <div className="flex-1 bg-red-500/15 border border-red-500/30 rounded-xl px-3 py-3 shrink-0 flex items-center justify-center">
-                    <span className="text-lg font-black font-mono text-red-400">{sl ? sl.toFixed(decimals) : '—'}</span>
+                  <div className="flex-1 bg-red-500/15 border border-red-500/30 rounded-lg sm:rounded-xl px-1.5 sm:px-3 py-1.5 sm:py-3 shrink-0 flex items-center justify-center">
+                    <span className="text-xs sm:text-lg font-black font-mono text-red-400">{sl ? sl.toFixed(decimals) : '—'}</span>
                   </div>
                 </div>
 
                 {/* Signal text */}
-                <span className={`text-xs font-black ${meta.color}`}>
+                <span className={`text-[10px] sm:text-xs font-black ${meta.color}`}>
                   {isLocked ? (isAr ? 'محدود' : 'Limited') : (isAr ? meta.labelAr : meta.labelEn)}
                 </span>
 
                 {/* Confidence + Time row */}
-                <div className="flex items-center gap-2">
-                  {isLocked && <Lock size={14} className="text-amber-400 shrink-0" />}
-                  <span className={`text-lg font-black font-mono ${meta.color}`}>{res.confidence}%</span>
+                <div className="flex items-center gap-1 sm:gap-2">
+                  {isLocked && <Lock size={10} className="text-amber-400 shrink-0" />}
+                  <span className={`text-sm sm:text-lg font-black font-mono ${meta.color}`}>{res.confidence}%</span>
                   {res.confidence < 40 && (
-                    <span className="text-[9px] font-black text-yellow-600 bg-yellow-100 px-1.5 py-0.5 rounded-full" title={isAr ? 'نتيجة غير مؤكدة — اتجاه غير واضح' : 'Low confidence — uncertain direction'}>
-                      {isAr ? '⚠️ غير مؤكد' : '⚠️ LOW'}
+                    <span className="text-[8px] sm:text-[9px] font-black text-yellow-600 bg-yellow-100 px-1 sm:px-1.5 py-0.5 rounded-full" title={isAr ? 'نتيجة غير مؤكدة' : 'Low confidence'}>
+                      {isAr ? '⚠️' : '⚠️ LOW'}
                     </span>
                   )}
-                  <div className={`flex items-center gap-0.5 text-[10px] font-bold ${meta.color}/40`}>
+                  <div className={`flex items-center gap-0.5 text-[8px] sm:text-[10px] font-bold ${meta.color}/40`}>
                     <span>{formatPublishDate(res.timestamp, lang)}</span>
                   </div>
                 </div>
