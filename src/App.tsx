@@ -1830,16 +1830,13 @@ export default function App() {
           <ConnectionStatus lang={lang} />
         </div>
 
-        {!isDeveloperSession() && (
-          <AdSlot position="between" lang={lang} />
-        )}
+        {/* Ads for all users */}
+        <AdSlot position="between" lang={lang} />
 
         {/* CLIENT DASHBOARD - shows for non-developers on main page */}
         {!isDeveloperSession() && !analysisResults && !isAnalyzing && activePage === 'main' && (
           <div className="max-w-7xl mx-auto px-4">
-            {!isDeveloperSession() && (
-              <AdSlot position="header" lang={lang} />
-            )}
+            <AdSlot position="header" lang={lang} />
             <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} />
           </div>
         )}
