@@ -39,6 +39,8 @@ function hasAnyStoredKey(): boolean {
   } catch { return false; }
 }
 import ClientMonitor from './components/ClientMonitor';
+import AdsManager from './components/AdsManager';
+import { AdSlot } from './components/AdsManager';
 import RadarSettingsPage from './components/RadarSettingsPage';
 
 
@@ -107,12 +109,12 @@ export default function App() {
     }
     setNeedsApiKeyState(email);
   };
-  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' => {
+  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' => {
     const hash = window.location.hash.slice(1);
-    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions'].includes(hash)) return hash as any;
+    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads'].includes(hash)) return hash as any;
     return 'main';
   };
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions'>(getPageFromHash);
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads'>(getPageFromHash);
   const navStackRef = useRef<string[]>([]);
 
   const navigateTo = (page: any) => {
@@ -1738,6 +1740,10 @@ export default function App() {
               />
             )}
 
+            {activePage === 'ads' && isDeveloperSession() && (
+              <AdsManager lang={lang} onBack={() => goBack()} />
+            )}
+
             {activePage === 'profile' && (
               <ProfilePage
                 user={user}
@@ -1823,9 +1829,16 @@ export default function App() {
           <ConnectionStatus lang={lang} />
         </div>
 
+        {!isDeveloperSession() && (
+          <AdSlot position="between" lang={lang} />
+        )}
+
         {/* CLIENT DASHBOARD - shows for non-developers on main page */}
         {!isDeveloperSession() && !analysisResults && !isAnalyzing && activePage === 'main' && (
           <div className="max-w-7xl mx-auto px-4">
+            {!isDeveloperSession() && (
+              <AdSlot position="header" lang={lang} />
+            )}
             <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} />
           </div>
         )}

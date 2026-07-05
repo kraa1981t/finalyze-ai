@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell, ExternalLink, Smartphone, Tablet, X, Settings, Key, DollarSign, Wallet, Users, User, Crown, Info, Lightbulb } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell, ExternalLink, Smartphone, Tablet, X, Settings, Key, DollarSign, Wallet, Users, User, Crown, Info, Lightbulb, Monitor } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings } from '../types';
 import { initAudio } from '../lib/audioEngine';
@@ -33,7 +33,7 @@ interface HeaderProps {
   showRadarComplete?: boolean;
   onPreview?: (device: 'phone' | 'tablet') => void;
   isPWA?: boolean;
-  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions') => void;
+  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads') => void;
   freemiumDisabled?: boolean;
 }
 
@@ -304,6 +304,11 @@ export default function Header({
                         {newSuggestionsCount} {lang === 'ar' ? 'جديد' : 'new'}
                       </span>
                     )}
+                  </button>
+                  <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('ads'); }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 transition-all shadow-sm">
+                    <Monitor size={18} className="text-[#F59E0B]" />
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'إعلاناتي' : 'My Ads'}</span>
                   </button>
                 </>
               ) : (
