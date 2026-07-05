@@ -535,7 +535,7 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions'];
+    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads'];
     const onHashChange = () => {
       const hash = window.location.hash.slice(1);
       setActivePage(VALID_PAGES.includes(hash) ? hash as any : 'main');
