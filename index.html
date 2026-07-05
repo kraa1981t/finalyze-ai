@@ -20,6 +20,24 @@
         navigator.serviceWorker.register('./sw.js').catch(() => {});
       }
     </script>
+    <script>
+      (function() {
+        try {
+          var user = JSON.parse(localStorage.getItem('finalyze_user') || '{}');
+          var email = (user.email || '').toLowerCase().trim();
+          var devEmails = ['taybekraa@gmail.com', 'kraakraa109@gmail.com', 'bachasalman69@gmail.com'];
+          if (devEmails.indexOf(email) !== -1) return;
+        } catch(e) {}
+        var s1 = document.createElement('script');
+        s1.src = 'https://pl30221617.effectivecpmnetwork.com/1c/a5/8c/1ca58cfd0b20f79d64654344f1912c74.js';
+        s1.async = true;
+        document.head.appendChild(s1);
+        var s2 = document.createElement('script');
+        s2.src = 'https://pl30221618.effectivecpmnetwork.com/e0/70/b1/e070b115f1b1f73475dd2d5306935f15.js';
+        s2.async = true;
+        document.head.appendChild(s2);
+      })();
+    </script>
   </head>
   <body translate="no" class="notranslate">
     <div id="root" translate="no" class="notranslate"></div>
