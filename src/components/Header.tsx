@@ -506,7 +506,7 @@ export default function Header({
                   </div>
                 </button>
               )}
-              <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center overflow-hidden shadow-2xl shadow-sky-500/40 rotate-3 hover:rotate-0 transition-all cursor-pointer border-2 border-white/50">
+              <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center overflow-hidden shadow-2xl shadow-sky-500/40 rotate-3 hover:rotate-0 transition-all pointer-events-none border-2 border-white/50">
                 <img src={customLogo || `${BASE_URL}logo.png`} alt="Joseph Trading" className="w-full h-full object-cover" />
               </div>
               <div className="flex flex-col">

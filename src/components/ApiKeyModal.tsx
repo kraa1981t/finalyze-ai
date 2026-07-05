@@ -44,7 +44,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [logoClicks, setLogoClicks] = useState(0);
 
   const isAr = lang === 'ar';
 
@@ -57,58 +56,20 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     }
   }, []);
 
+  const DEV_EMAILS = ['taybekraa@gmail.com', 'kraakraa109@gmail.com', 'bachasalman69@gmail.com'];
   const isDeveloperSession = () => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.has('dev') || params.get('owner') === '1') {
-        localStorage.setItem('finalyze_dev_bypass_active', 'true');
-        return true;
-      }
-    }
-    if (localStorage.getItem('finalyze_permanent_owner') === 'true') return true;
-    if (localStorage.getItem('finalyze_dev_bypass_active') === 'true') return true;
     if (!user) return false;
-    const email = user.email || '';
-    const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
-    return email === activeDevEmail ||
-           email === 'bachasalman69@gmail.com' ||
-           email === 'taybekraa@gmail.com' ||
-           email.includes('dev');
+    const email = (user.email || '').toLowerCase().trim();
+    return DEV_EMAILS.includes(email);
   };
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-        e.preventDefault();
-        localStorage.setItem('finalyze_dev_bypass_active', 'true');
-        localStorage.setItem('finalyze_permanent_owner', 'true');
-        onSaved('__dev_bypass__');
-        onClose();
-      }
-    };
-    if (isOpen) window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
       setKeyValue(loadKey().value);
       setError(null);
       setSuccess(false);
-      setLogoClicks(0);
     }
   }, [isOpen]);
-
-  const handleLogoClick = () => {
-    const next = logoClicks + 1;
-    setLogoClicks(next);
-    if (next >= 5) {
-      localStorage.setItem('finalyze_dev_bypass_active', 'true');
-      localStorage.setItem('finalyze_permanent_owner', 'true');
-      onSaved('__dev_bypass__');
-      onClose();
-    }
-  };
 
   const handleLogout = async () => {
     if (onLogout) {
@@ -206,9 +167,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     <>
       <div className="flex items-center gap-4 mb-6 border-b border-white/5 pb-5">
         <div
-          className="w-12 h-12 bg-sky-500/10 rounded-2xl flex items-center justify-center text-sky-400 border border-sky-500/20 cursor-pointer select-none"
-          onClick={handleLogoClick}
-          title={logoClicks > 0 ? `${5 - logoClicks} more clicks...` : ''}
+          className="w-12 h-12 bg-sky-500/10 rounded-2xl flex items-center justify-center text-sky-400 border border-sky-500/20 pointer-events-none"
         >
           <Key size={24} />
         </div>

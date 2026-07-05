@@ -383,7 +383,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
       </div>
 
       {/* Section 5: Developer Trend Age Zones */}
-      {user && (user.email === currentDevEmail || user.email === 'bachasalman69@gmail.com' || localStorage.getItem('finalyze_dev_bypass_active') === 'true') && (
+      {user && (user.email === 'taybekraa@gmail.com' || user.email === 'kraakraa109@gmail.com' || user.email === 'bachasalman69@gmail.com') && (
         <div className="space-y-3 pt-4 border-t border-white/10">
           <h3 className="text-xs font-black text-amber-400 uppercase tracking-widest flex items-center gap-2">
             <span className="text-amber-400">◆</span> {isAr ? '🔧 مناطق عمر الاتجاه (مطور)' : '🔧 Trend Age Zones (Dev)'}
@@ -481,7 +481,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
       )}
 
       {/* Section 5: Developer Dynamic Credentials Security (Only visible to the developer) */}
-      {user && (user.email === currentDevEmail || user.email === 'bachasalman69@gmail.com' || localStorage.getItem('finalyze_dev_bypass_active') === 'true') && (
+      {user && (user.email === 'taybekraa@gmail.com' || user.email === 'kraakraa109@gmail.com' || user.email === 'bachasalman69@gmail.com') && (
         <div className="space-y-4 pt-6 border-t border-white/10">
           <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
             <ShieldCheck size={16} /> {isAr ? '🔐 بوابة حماية المطور والتحقق الثنائي (2FA)' : '🔐 Developer Security Gateway & 2FA'}

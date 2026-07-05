@@ -172,25 +172,12 @@ export default function App() {
     } catch { return null; }
   });
 
+  const DEV_EMAILS = ['taybekraa@gmail.com', 'kraakraa109@gmail.com', 'bachasalman69@gmail.com'];
+
   const isDeveloperSession = () => {
     if (!user) return false;
     const email = (user.email || '').toLowerCase().trim();
-    const activeDevEmail = (localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com').toLowerCase().trim();
-    const isDevEmail = email === activeDevEmail ||
-                       email === 'bachasalman69@gmail.com' ||
-                       email === 'taybekraa@gmail.com' ||
-                       email.includes('dev');
-    // URL parameter bypass ΓÇö only for known developer emails
-    if (isDevEmail && typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.has('dev') || params.get('owner') === '1') {
-        localStorage.setItem('finalyze_dev_bypass_active', 'true');
-        return true;
-      }
-    }
-    // Bypass flag ΓÇö only for known developer emails
-    if (isDevEmail && localStorage.getItem('finalyze_dev_bypass_active') === 'true') return true;
-    return isDevEmail;
+    return DEV_EMAILS.includes(email);
   };
 
   // CLIENT: Mirror results from developer via Firestore ΓÇö poll collection every 10s, NO orderBy
@@ -1164,11 +1151,6 @@ export default function App() {
                             email === 'taybekraa@gmail.com' || 
                             email.includes('dev');
 
-        // Clear dev bypass if current user is not a developer
-        if (!isDeveloper) {
-          localStorage.removeItem('finalyze_dev_bypass_active');
-        }
-
         if (isDeveloper) {
           // Keep developer session active forever
           setUser(savedUser);
@@ -1199,7 +1181,6 @@ export default function App() {
             // Session expired! Clear custom keys
             localStorage.removeItem('finalyze_auth_user');
             localStorage.removeItem('finalyze_auth_timestamp');
-            localStorage.removeItem('finalyze_dev_bypass_active');
           }
         }
       } catch (e) {
@@ -1221,13 +1202,8 @@ export default function App() {
         const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
         const isDeveloper = email === activeDevEmail || email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
 
-        // Clear dev bypass for non-developer users
-        if (!isDeveloper) {
-          localStorage.removeItem('finalyze_dev_bypass_active');
-        }
-
         // Fetch clients list for developer session
-        if (isDeveloper || localStorage.getItem('finalyze_dev_bypass_active') === 'true') {
+        if (isDeveloper) {
           fetchClients();
         }
         
@@ -1241,10 +1217,6 @@ export default function App() {
         };
         localStorage.setItem('finalyze_auth_user', JSON.stringify(mockCompactUser));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-        if (isDeveloper) {
-          localStorage.setItem('finalyze_dev_bypass_active', 'true');
-        }
-
         const localKey = localStorage.getItem('finalyze_key1_value') || localStorage.getItem('finalyze_user_groq_api_key');
         if (localKey) {
           setHasApiKey(true);
@@ -1362,7 +1334,6 @@ export default function App() {
             // Auto sign-in anonymously and redirect to API key setup
             localStorage.setItem('finalyze_auth_user', JSON.stringify({ email: vEmail, placeholder: true }));
             localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-            localStorage.removeItem('finalyze_dev_bypass_active');
             localStorage.removeItem('active_subscription');
             const cred = await signInAnonymously(auth);
             const mockUser = {
@@ -1390,7 +1361,6 @@ export default function App() {
     if (email === 'taybekraa@gmail.com' || email === 'bachasalman69@gmail.com' || email.includes('dev')) {
       localStorage.setItem('finalyze_auth_user', JSON.stringify({ uid: 'dev_' + email.replace(/[^a-zA-Z0-9]/g, ''), email, displayName: 'Developer', emailVerified: true }));
       localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-      localStorage.setItem('finalyze_dev_bypass_active', 'true');
       setUser({ uid: 'dev_' + email.replace(/[^a-zA-Z0-9]/g, ''), email, displayName: 'Developer', emailVerified: true } as User);
       setHasApiKey(true);
       persistNeedsApiKey(null);
@@ -1419,7 +1389,6 @@ export default function App() {
       // Set session via localStorage FIRST
       localStorage.setItem('finalyze_auth_user', JSON.stringify({ uid: email, email, displayName: displayName || 'Client', photoURL: photoURL || '', emailVerified: true }));
       localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-      localStorage.removeItem('finalyze_dev_bypass_active');
 
       // Set user in state
       setUser({ uid: email, email, displayName: displayName || 'Client', photoURL: photoURL || '', emailVerified: true } as User);
@@ -1525,56 +1494,12 @@ export default function App() {
     }
   };
 
-  const handleBypassLogin = (email?: string) => {
-    setActivePage('main');
-    setPaymentPlan(null);
-    setAnalysisResults(null);
-    setIsSidebarOpen(false);
-    const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
-    const finalEmail = email || activeDevEmail;
-    
-    const isDeveloper = finalEmail === activeDevEmail || 
-                        finalEmail === 'bachasalman69@gmail.com' || 
-                        finalEmail === 'taybekraa@gmail.com' || 
-                        finalEmail.includes('dev');
-                        
-    const mockUser = {
-      uid: 'mock_uid_' + finalEmail.replace(/[^a-zA-Z0-9]/g, ''),
-      email: finalEmail,
-      displayName: isDeveloper ? 'Developer' : 'Premium Subscriber',
-      photoURL: isDeveloper 
-        ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150'
-        : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150',
-      emailVerified: true,
-    } as User;
-
-    setUser(mockUser);
-    localStorage.setItem('finalyze_auth_user', JSON.stringify(mockUser));
-    localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-    
-    if (isDeveloper) {
-      localStorage.setItem('finalyze_dev_bypass_active', 'true');
-      fetchClients();
-    } else {
-      localStorage.removeItem('finalyze_dev_bypass_active');
-      // Grant premium access for bypass login clients
-      const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000 * 10).toISOString();
-      const premiumSub = { label: 'Premium', amount: 0, expiryDate: farFuture };
-      localStorage.setItem('active_subscription', JSON.stringify(premiumSub));
-      setActiveSubscription(premiumSub);
-    }
-    
-    setHasApiKey(hasAnyStoredKey());
-    setLoginError(null);
-  };
-
   const handleLogout = async () => {
     try {
       await signOut(auth);
     } catch (e) {
       console.warn("SignOut firebase warning:", e);
     }
-    localStorage.removeItem('finalyze_dev_bypass_active');
     localStorage.removeItem('finalyze_auth_user');
     localStorage.removeItem('finalyze_auth_timestamp');
     localStorage.removeItem('finalyze_verify_link');
@@ -1621,7 +1546,6 @@ export default function App() {
         {!user && !loading && (
           <LoginOverlay 
             onLogin={handleLogin} 
-            onBypassLogin={handleBypassLogin}
             lang={lang} 
             loginError={loginError}
             onClearError={() => { setLoginError(null); setPendingVerifyLink(null); }}
