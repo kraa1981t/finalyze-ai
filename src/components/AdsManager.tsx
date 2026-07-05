@@ -51,7 +51,21 @@ function generateId(): string {
 function loadAds(): Ad[] {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    if (stored.length === 0) {
+    const migrated = stored.map((ad: any) => ({
+      id: ad.id || generateId(),
+      name: ad.name || 'Untitled Ad',
+      code: ad.code || '',
+      type: ad.type || 'adsterra',
+      adUnitType: ad.adUnitType || 'banner',
+      position: ad.position || 'header',
+      size: ad.size || undefined,
+      adsterraId: ad.adsterraId || undefined,
+      enabled: ad.enabled !== false,
+      paused: ad.paused || false,
+      assignedClients: Array.isArray(ad.assignedClients) ? ad.assignedClients : [],
+      createdAt: ad.createdAt || Date.now(),
+    }));
+    if (migrated.length === 0) {
       const defaultAds: Ad[] = [
         {
           id: generateId(),
@@ -71,7 +85,8 @@ function loadAds(): Ad[] {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultAds));
       return defaultAds;
     }
-    return stored;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+    return migrated;
   } catch { return []; }
 }
 
