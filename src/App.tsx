@@ -1897,6 +1897,9 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Popup/Popunder ads */}
+      <AdSlot position="popup" lang={lang} />
     </div>
   );
 }
