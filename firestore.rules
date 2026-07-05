@@ -54,6 +54,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Site ads config — developer writes, signed-in users read
+    match /config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if true;
+    }
+
     // Suggestions — anyone can read/write
     match /suggestions/{suggestionId} {
       allow read, write: if true;

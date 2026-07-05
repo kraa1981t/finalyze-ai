@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Eye, EyeOff, Pause, Play, Monitor, Code, X, Copy, Check, Globe, Users, Tag, ArrowLeft, ExternalLink, Clipboard, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
+import { db } from '../lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export interface Ad {
   id: string;
@@ -48,10 +50,12 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
-function loadAds(): Ad[] {
+const ADS_DOC = 'config/site_ads';
+
+function loadAdsLocal(): Ad[] {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const migrated = stored.map((ad: any) => ({
+    return stored.map((ad: any) => ({
       id: ad.id || generateId(),
       name: ad.name || 'Untitled Ad',
       code: ad.code || '',
@@ -65,33 +69,88 @@ function loadAds(): Ad[] {
       assignedClients: Array.isArray(ad.assignedClients) ? ad.assignedClients : [],
       createdAt: ad.createdAt || Date.now(),
     }));
-    if (migrated.length === 0) {
-      const defaultAds: Ad[] = [
-        {
-          id: generateId(),
-          name: 'Adsterra Social Bar',
-          code: '<script src="https://pl30221617.effectivecpmnetwork.com/1c/a5/8c/1ca58cfd0b20f79d64654344f1912c74.js"></script>',
-          type: 'adsterra',
-          adUnitType: 'social_bar',
-          position: 'between',
-          size: 'Responsive',
-          adsterraId: '30121119',
-          enabled: true,
-          paused: false,
-          assignedClients: [],
-          createdAt: Date.now(),
-        },
-      ];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultAds));
-      return defaultAds;
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-    return migrated;
   } catch { return []; }
 }
 
+export async function loadAdsFromFirestore(): Promise<Ad[]> {
+  try {
+    const snap = await getDoc(doc(db, ADS_DOC));
+    if (snap.exists()) {
+      const data = snap.data();
+      const ads = (data.ads || []).map((ad: any) => ({
+        id: ad.id || generateId(),
+        name: ad.name || 'Untitled Ad',
+        code: ad.code || '',
+        type: ad.type || 'adsterra',
+        adUnitType: ad.adUnitType || 'banner',
+        position: ad.position || 'header',
+        size: ad.size || undefined,
+        adsterraId: ad.adsterraId || undefined,
+        enabled: ad.enabled !== false,
+        paused: ad.paused || false,
+        assignedClients: Array.isArray(ad.assignedClients) ? ad.assignedClients : [],
+        createdAt: ad.createdAt || Date.now(),
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(ads));
+      return ads;
+    }
+    return [];
+  } catch {
+    return loadAdsLocal();
+  }
+}
+
+export async function saveAdsToFirestore(ads: Ad[]): Promise<void> {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ads));
+    await setDoc(doc(db, ADS_DOC), { ads, updatedAt: Date.now() }, { merge: true });
+  } catch {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ads));
+  }
+}
+
+function loadAds(): Ad[] {
+  const local = loadAdsLocal();
+  if (local.length === 0) {
+    const defaultAds: Ad[] = [
+      {
+        id: generateId(),
+        name: 'Adsterra Social Bar',
+        code: '<script src="https://pl30221617.effectivecpmnetwork.com/1c/a5/8c/1ca58cfd0b20f79d64654344f1912c74.js"></script>',
+        type: 'adsterra',
+        adUnitType: 'social_bar',
+        position: 'between',
+        size: 'Responsive',
+        adsterraId: '30121119',
+        enabled: true,
+        paused: false,
+        assignedClients: [],
+        createdAt: Date.now(),
+      },
+      {
+        id: generateId(),
+        name: 'Adsterra Popunder',
+        code: '<script src="https://pl30221618.effectivecpmnetwork.com/e0/70/b1/e070b115f1b1f73475dd2d5306935f15.js"></script>',
+        type: 'adsterra',
+        adUnitType: 'popunder',
+        position: 'popup',
+        size: 'Full Page',
+        adsterraId: '30121118',
+        enabled: true,
+        paused: false,
+        assignedClients: [],
+        createdAt: Date.now(),
+      },
+    ];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultAds));
+    saveAdsToFirestore(defaultAds).catch(() => {});
+    return defaultAds;
+  }
+  return local;
+}
+
 function saveAds(ads: Ad[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ads));
+  saveAdsToFirestore(ads).catch(() => {});
 }
 
 function loadClientEmails(): string[] {
@@ -810,8 +869,21 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
   const [ads, setAds] = useState<Ad[]>([]);
 
   useEffect(() => {
-    setAds(loadAds());
-    const interval = setInterval(() => setAds(loadAds()), 5000);
+    loadAdsFromFirestore().then(firestoreAds => {
+      if (firestoreAds.length > 0) {
+        setAds(firestoreAds);
+      } else {
+        setAds(loadAds());
+      }
+    }).catch(() => {
+      setAds(loadAds());
+    });
+
+    const interval = setInterval(() => {
+      loadAdsFromFirestore().then(firestoreAds => {
+        if (firestoreAds.length > 0) setAds(firestoreAds);
+      }).catch(() => {});
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
