@@ -62,7 +62,7 @@ export default function App() {
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'ar');
+  const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'en');
   useEffect(() => {
     localStorage.setItem('language', lang);
   }, [lang]);
@@ -1548,7 +1548,8 @@ export default function App() {
         {!user && !loading && (
           <LoginOverlay 
             onLogin={handleLogin} 
-            lang={lang} 
+            lang={lang}
+            onLangChange={setLang}
             loginError={loginError}
             onClearError={() => { setLoginError(null); setPendingVerifyLink(null); }}
             redirecting={redirecting}
