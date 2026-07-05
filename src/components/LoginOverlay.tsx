@@ -149,15 +149,6 @@ export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, 
               <ShieldCheck size={48} className="text-primary/10" />
             </div>
 
-            <div className="text-center mb-6 relative z-10">
-              <div className="text-primary text-sm font-black mb-2 uppercase tracking-tighter">
-                {isAr ? 'ابدأ الآن' : 'Get Started'}
-              </div>
-              <h3 className="text-2xl font-bold text-white">
-                {isAr ? 'اشتراك شهري مرن' : 'Flexible Monthly Plan'}
-              </h3>
-            </div>
-
             <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-center space-y-5">
               <div className="flex items-center gap-2 text-emerald-400 justify-center font-bold text-sm">
                 <ShieldCheck size={18} />
