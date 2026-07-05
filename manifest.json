@@ -1,0 +1,84 @@
+﻿{
+  "name": "Joseph.Trading - AI Trading Signals",
+  "short_name": "JosephTrading",
+  "description": "Professional AI-powered trading signals engine with institutional-grade analysis. Real-time buy/sell signals for Forex, Crypto, Stocks, and Commodities with Bollinger Bands, RSI, EMA, and multi-timeframe analysis.",
+  "start_url": "/finalyze-ai/",
+  "scope": "/finalyze-ai/",
+  "id": "com.joseph.trading",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0F172A",
+  "theme_color": "#10B981",
+  "lang": "en",
+  "dir": "auto",
+  "categories": ["finance", "business", "productivity"],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "shortcuts": [
+    {
+      "name": "Analyze Markets",
+      "short_name": "Analyze",
+      "description": "Start analyzing all market symbols",
+      "url": "/finalyze-ai/#/radar",
+      "icons": [
+        {
+          "src": "/finalyze-ai/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "short_name": "Settings",
+      "description": "Configure analysis parameters",
+      "url": "/finalyze-ai/#/settings",
+      "icons": [
+        {
+          "src": "/finalyze-ai/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/finalyze-ai/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/finalyze-ai/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/finalyze-ai/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/finalyze-ai/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "handle_links": "preferred",
+  "share_target": {
+    "action": "/finalyze-ai/",
+    "method": "GET",
+    "params": {
+      "title": "name",
+      "text": "description",
+      "url": "link"
+    }
+  }
+}

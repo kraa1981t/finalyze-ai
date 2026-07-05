@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=0.9, minimum-scale=0.9, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Joseph.Trading - AI Trading Signals</title>
+    <meta name="description" content="Professional AI-powered trading signals engine with institutional-grade analysis for Forex, Crypto, Stocks, and Commodities." />
+    <meta name="keywords" content="trading, signals, forex, crypto, stocks, AI, analysis, Bollinger Bands, RSI, EMA" />
+    <meta name="author" content="Joseph.Trading" />
+    <meta name="robots" content="index, follow" />
+    <link rel="icon" type="image/svg+xml" href="/finalyze-ai/icon.svg" />
+    <link rel="manifest" href="/finalyze-ai/manifest.json" />
+    <meta name="theme-color" content="#10B981" />
+    <meta name="msapplication-TileColor" content="#10B981" />
+    <meta name="msapplication-TileImage" content="/finalyze-ai/icon-192x192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="JosephTrading" />
+    <link rel="apple-touch-icon" href="/finalyze-ai/icon-192x192.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="JosephTrading" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="msapplication-navbutton-color" content="#10B981" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <style>
+      body { margin: 0; padding: 0; background: #0F172A; overflow: hidden; }
+      #splash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0F172A; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 99999; transition: opacity 0.3s; }
+      #splash.hidden { opacity: 0; pointer-events: none; }
+      #splash img { width: 120px; height: 120px; animation: pulse 1.5s infinite; }
+      #splash h1 { color: #10B981; font-family: system-ui; font-size: 24px; margin-top: 20px; }
+      #splash p { color: #94A3B8; font-family: system-ui; font-size: 14px; margin-top: 8px; }
+      @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    </style>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(reg => {
+          if (reg) {
+            reg.update().then(() => {
+              if (reg.waiting) {
+                reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+          } else {
+            navigator.serviceWorker.register('/finalyze-ai/sw.js').catch(() => {});
+          }
+        });
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        });
+      }
+      // Force clear ALL caches on load
+      if ('caches' in window) {
+        caches.keys().then(names => names.forEach(name => caches.delete(name)));
+      }
+      // Unregister old service workers and re-register
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(r => r.unregister());
+          navigator.serviceWorker.register('/finalyze-ai/sw.js').catch(() => {});
+        });
+      }
+    </script>
+    <script type="module" crossorigin src="/finalyze-ai/assets/index-wVeZmlWI.js"></script>
+    <link rel="stylesheet" crossorigin href="/finalyze-ai/assets/index-CW3-JiFn.css">
+  </head>
+  <body translate="no" class="notranslate">
+    <div id="splash">
+      <img src="/finalyze-ai/icon-512x512.png" alt="JosephTrading" />
+      <h1>Joseph.Trading</h1>
+      <p>Institutional Engine</p>
+    </div>
+    <div id="root" translate="no" class="notranslate"></div>
+    <script>
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const splash = document.getElementById('splash');
+          if (splash) { splash.classList.add('hidden'); setTimeout(() => splash.remove(), 300); }
+        }, 1500);
+      });
+    </script>
+  </body>
+</html>

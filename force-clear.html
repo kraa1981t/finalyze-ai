@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="UTF-8"><title>Finalyze Diagnostics</title>
+<style>
+  body { font-family: monospace; background: #111; color: #eee; padding: 20px; max-width: 800px; margin: auto; }
+  h1 { color: #0ff; }
+  pre { background: #1a1a2e; padding: 10px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap; }
+  button { background: #0ff; color: #000; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 4px; }
+  button.danger { background: #f44; }
+  .error { color: #f44; }
+  .success { color: #0f0; }
+  .info { color: #ff0; }
+  .loading { color: #aaa; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+</style>
+</head>
+<body>
+<h1>🔍 Finalyze Firestore Diagnostics</h1>
+<div id="status" class="loading">Loading Firebase...</div>
+<div id="buttons" style="display:none">
+  <button onclick="checkFirestore()">📋 Read shared_results</button>
+  <button onclick="addTestDoc()">➕ Add test doc</button>
+  <button class="danger" onclick="deleteAll()">🗑️ Delete ALL shared_results</button>
+  <button onclick="checkAlerts()">📢 Read shared_alerts</button>
+</div>
+<div id="output"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+function log(msg, type = 'info') {
+  const el = document.getElementById('output');
+  el.innerHTML += `<pre class="${type}">${msg}</pre>`;
+}
+
+function showStatus(msg, type = 'loading') {
+  document.getElementById('status').innerHTML = `<span class="${type}">${msg}</span>`;
+}
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCvMayEuNTlQ5CWbjrrqw3aft_H044-uQM",
+  authDomain: "trading-made-easy-e8450.firebaseapp.com",
+  projectId: "trading-made-easy-e8450",
+  storageBucket: "trading-made-easy-e8450.firebasestorage.app",
+  messagingSenderId: "693217251684",
+  appId: "1:693217251684:web:f27779dc51e21fabceaa71"
+};
+
+let db = null;
+
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  showStatus('✅ Firebase loaded (anonymous auth disabled, queries will show permission errors)', 'info');
+  document.getElementById('buttons').style.display = 'block';
+  log('ℹ️ This tool reads Firestore directly. Errors shown here reveal the root cause.', 'info');
+} catch (err) {
+  showStatus('❌ Firebase init error: ' + err.message, 'error');
+  log('Firebase init error: ' + err.message, 'error');
+}
+
+function getTimestamp(raw) {
+  if (!raw) return { val: 0, str: 'N/A' };
+  if (typeof raw === 'string') {
+    const d = new Date(raw);
+    return { val: d.getTime(), str: raw };
+  }
+  if (typeof raw === 'object' && raw.toMillis) {
+    return { val: raw.toMillis(), str: raw.toDate ? raw.toDate().toISOString() : String(raw) };
+  }
+  if (raw instanceof Date) {
+    return { val: raw.getTime(), str: raw.toISOString() };
+  }
+  if (typeof raw === 'number') {
+    return { val: raw, str: new Date(raw).toISOString() };
+  }
+  return { val: 0, str: String(raw) };
+}
+
+async function checkFirestore() {
+  document.getElementById('output').innerHTML = '';
+  log('📋 Reading ALL docs from shared_results collection (no orderBy)...');
+  try {
+    const snap = await db.collection('shared_results').get();
+    log(`✅ Found ${snap.size} document(s)`, snap.size > 0 ? 'success' : 'info');
+    
+    if (snap.size > 0) {
+      let latest = null;
+      let latestTs = 0;
+      
+      snap.forEach(doc => {
+        const data = doc.data();
+        const ts = getTimestamp(data.timestamp);
+        log(`📄 ID: ${doc.id} | ts: ${ts.str} | results: ${data.results?.length ?? 0} | email: ${data.developerEmail || '?'}`);
+        if (data.results && data.results.length > 0) {
+          data.results.slice(0, 3).forEach(r => {
+            log(`   ${r.symbol}: ${r.signal} (${r.confidence}%)`, 'info');
+          });
+          if (data.results.length > 3) log(`   ... and ${data.results.length - 3} more`, 'info');
+          const strong = data.results.filter(r => r.signal === 'strong_buy' || r.signal === 'strong_sell');
+          log(`   Strong signals: ${strong.length}`, strong.length > 0 ? 'success' : 'info');
+        }
+        if (ts.val >= latestTs) { latestTs = ts.val; latest = data; }
+      });
+      
+      if (latest) {
+        log(`\n🏆 LATEST doc: ${latest.results?.length ?? 0} results`, 'success');
+      }
+    } else {
+      log('⚠️ No documents found.', 'warning');
+    }
+  } catch (err) {
+    log(`❌ ERROR: ${err.message}`, 'error');
+    // Check for common error patterns
+    if (err.message.includes('index')) {
+      log('👉 This means the Firestore index is missing! Click "➕ Add test doc" then retry.', 'info');
+    } else if (err.message.includes('permission') || err.message.includes('denied')) {
+      log('👉 Permission denied (expected without auth). But the MAIN APP has Google auth, so this is NOT the issue.', 'info');
+    }
+  }
+}
+
+async function addTestDoc() {
+  document.getElementById('output').innerHTML = '';
+  log('➕ Adding test document to shared_results...');
+  try {
+    const ref = await db.collection('shared_results').add({
+      results: [
+        { symbol: 'TESTBTC', signal: 'strong_buy', confidence: 99, timestamp: new Date().toISOString(), summary: 'Diagnostic test — ignore' }
+      ],
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      developerEmail: 'diagnostics@finalyze.local'
+    });
+    log(`✅ Added test doc with ID: ${ref.id}`, 'success');
+  } catch (err) {
+    log(`❌ ERROR: ${err.message}`, 'error');
+    if (err.message.includes('permission') || err.message.includes('denied')) {
+      log('👉 Permission denied. This tool has no auth. Use the main app for authenticated access.', 'info');
+    }
+  }
+}
+
+async function deleteAll() {
+  if (!confirm('Delete ALL shared_results documents? This cannot be undone!')) return;
+  document.getElementById('output').innerHTML = '';
+  log('🗑️ Delete requires auth — will likely fail.');
+  try {
+    const snap = await db.collection('shared_results').get();
+    let count = 0;
+    const promises = [];
+    snap.forEach(doc => { promises.push(doc.ref.delete()); count++; });
+    await Promise.all(promises);
+    log(`✅ Deleted ${count} document(s)`, 'success');
+  } catch (err) {
+    log(`❌ ERROR: ${err.message}`, 'error');
+  }
+}
+
+async function checkAlerts() {
+  document.getElementById('output').innerHTML = '';
+  log('📢 Reading ALL docs from shared_alerts collection...');
+  try {
+    const snap = await db.collection('shared_alerts').get();
+    log(`✅ Found ${snap.size} document(s)`, snap.size > 0 ? 'success' : 'info');
+    snap.forEach(doc => {
+      const data = doc.data();
+      const ts = getTimestamp(data.timestamp);
+      log(`📄 ID: ${doc.id} | ts: ${ts.str} | autoSettings: ${!!data.autoSettings}`);
+    });
+  } catch (err) {
+    log(`❌ ERROR: ${err.message}`, 'error');
+  }
+}
+</script>
+</body>
+</html>

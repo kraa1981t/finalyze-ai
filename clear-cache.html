@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>مسح الكاش - Joseph.Trading</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui; background: #0F172A; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+    .box { background: #1E293B; border-radius: 16px; padding: 30px; max-width: 400px; width: 100%; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+    h1 { font-size: 20px; margin-bottom: 10px; color: #10B981; }
+    p { color: #94A3B8; font-size: 14px; margin-bottom: 20px; line-height: 1.6; }
+    .btn { background: #10B981; color: #000; border: none; padding: 14px 28px; border-radius: 12px; font-size: 16px; font-weight: 900; cursor: pointer; width: 100%; transition: all 0.2s; }
+    .btn:active { transform: scale(0.96); }
+    .btn.red { background: #EF4444; margin-top: 10px; }
+    #result { margin-top: 15px; font-size: 13px; color: #10B981; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>🔧 مسح الكاش</h1>
+    <p>إذا ما تغير التطبيق، اضغط الزر لمسح الكاش وتحديث التطبيق</p>
+    <button class="btn" onclick="clearAll()">مسح الكاش وتحديث</button>
+    <button class="btn red" onclick="unregister()">إلغاء Service Worker</button>
+    <div id="result"></div>
+  </div>
+  <script>
+    async function clearAll() {
+      const r = document.getElementById('result');
+      r.textContent = 'جاري المسح...';
+      try {
+        if ('caches' in window) {
+          const names = await caches.keys();
+          for (const name of names) { await caches.delete(name); }
+          r.textContent = '✅ تم مسح ' + names.length + ' كاش';
+        }
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const reg of regs) { await reg.unregister(); }
+          r.textContent += ' ✅ تم إلغاء SW';
+        }
+        setTimeout(() => { window.location.href = '/finalyze-ai/?t=' + Date.now(); }, 500);
+      } catch(e) { r.textContent = '❌ خطأ: ' + e.message; }
+    }
+    async function unregister() {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) { await reg.unregister(); }
+        document.getElementById('result').textContent = '✅ تم إلغاء Service Worker';
+      }
+    }
+  </script>
+</body>
+</html>
