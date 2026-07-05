@@ -23,7 +23,24 @@ const STORAGE_KEY = 'finalyze_ads_config';
 
 function loadAds(): Ad[] {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (stored.length === 0) {
+      const defaultAds: Ad[] = [
+        {
+          id: 'adsterra-socialbar-default',
+          name: 'Adsterra Social Bar',
+          code: '<script src="https://pl30221617.effectivecpmnetwork.com/1c/a5/8c/1ca58cfd0b20f79d64654344f1912c74.js"></script>',
+          type: 'adsterra',
+          position: 'between',
+          enabled: true,
+          paused: false,
+          createdAt: Date.now(),
+        },
+      ];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultAds));
+      return defaultAds;
+    }
+    return stored;
   } catch { return []; }
 }
 
@@ -321,6 +338,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
 // Public component to render ads on pages
 export function AdSlot({ position, lang }: { position: Ad['position']; lang: Language }) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const [ads, setAds] = useState<Ad[]>([]);
 
   useEffect(() => {
@@ -329,19 +347,51 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!containerRef.current || ads.length === 0) return;
+    const visibleAds = ads.filter(a => a.enabled && !a.paused && a.position === position);
+    const container = containerRef.current;
+    container.innerHTML = '';
+
+    visibleAds.forEach(ad => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'my-4 flex justify-center';
+      wrapper.setAttribute('data-ad-id', ad.id);
+
+      if (ad.code.includes('<script')) {
+        const temp = document.createElement('div');
+        temp.innerHTML = ad.code;
+        const scripts = temp.querySelectorAll('script');
+        const nonScript = temp.innerHTML.replace(/<script[\s\S]*?<\/script>/gi, '');
+
+        if (nonScript.trim()) {
+          const content = document.createElement('div');
+          content.innerHTML = nonScript;
+          wrapper.appendChild(content);
+        }
+
+        scripts.forEach(oldScript => {
+          const script = document.createElement('script');
+          if (oldScript.src) {
+            script.src = oldScript.src;
+          } else {
+            script.textContent = oldScript.textContent;
+          }
+          Array.from(oldScript.attributes).forEach(attr => script.setAttribute(attr.name, attr.value));
+          wrapper.appendChild(script);
+        });
+      } else {
+        wrapper.innerHTML = ad.code;
+      }
+
+      container.appendChild(wrapper);
+    });
+
+    return () => { if (container) container.innerHTML = ''; };
+  }, [ads, position]);
+
   const visibleAds = ads.filter(a => a.enabled && !a.paused && a.position === position);
   if (visibleAds.length === 0) return null;
 
-  return (
-    <>
-      {visibleAds.map(ad => (
-        <div key={ad.id} className="my-4 flex justify-center">
-          <div
-            dangerouslySetInnerHTML={{ __html: ad.code }}
-            className="max-w-full overflow-hidden"
-          />
-        </div>
-      ))}
-    </>
-  );
+  return <div ref={containerRef} className="max-w-full overflow-hidden" />;
 }
