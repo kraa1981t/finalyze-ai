@@ -110,47 +110,11 @@ export async function saveAdsToFirestore(ads: Ad[]): Promise<void> {
 }
 
 function loadAds(): Ad[] {
-  const local = loadAdsLocal();
-  if (local.length === 0) {
-    const defaultAds: Ad[] = [
-      {
-        id: generateId(),
-        name: 'Adsterra Social Bar',
-        code: '<script src="https://pl30221617.effectivecpmnetwork.com/1c/a5/8c/1ca58cfd0b20f79d64654344f1912c74.js"></script>',
-        type: 'adsterra',
-        adUnitType: 'social_bar',
-        position: 'between',
-        size: 'Responsive',
-        adsterraId: '30121119',
-        enabled: true,
-        paused: false,
-        assignedClients: [],
-        createdAt: Date.now(),
-      },
-      {
-        id: generateId(),
-        name: 'Adsterra Popunder',
-        code: '<script src="https://pl30221618.effectivecpmnetwork.com/e0/70/b1/e070b115f1b1f73475dd2d5306935f15.js"></script>',
-        type: 'adsterra',
-        adUnitType: 'popunder',
-        position: 'header',
-        size: 'Full Page',
-        adsterraId: '30121118',
-        enabled: true,
-        paused: false,
-        assignedClients: [],
-        createdAt: Date.now(),
-      },
-    ];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultAds));
-    saveAdsToFirestore(defaultAds).catch(() => {});
-    return defaultAds;
-  }
-  return local;
+  return loadAdsLocal();
 }
 
 function saveAds(ads: Ad[]) {
-  saveAdsToFirestore(ads).catch(() => {});
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(ads));
 }
 
 function loadClientEmails(): string[] {
@@ -208,6 +172,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   const [clientEmails, setClientEmails] = useState<string[]>([]);
   const [assignModal, setAssignModal] = useState<Ad | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [newAd, setNewAd] = useState({
     name: '',
     code: '',
@@ -218,7 +184,6 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
     adsterraId: '',
   });
 
-  useEffect(() => { saveAds(ads); }, [ads]);
   useEffect(() => { setClientEmails(loadClientEmails()); }, []);
 
   const addAd = () => {
@@ -238,6 +203,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
       createdAt: Date.now(),
     };
     setAds(prev => [...prev, ad]);
+    setHasUnsavedChanges(true);
     setNewAd({ name: '', code: '', type: 'adsterra', adUnitType: 'banner', position: 'header', size: '', adsterraId: '' });
     setShowAdd(false);
   };
@@ -258,17 +224,20 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
       createdAt: Date.now(),
     };
     setAds(prev => [...prev, ad]);
+    setHasUnsavedChanges(true);
     setShowPresetPicker(false);
     setEditAd(ad.id);
   };
 
   const updateAd = (id: string, updates: Partial<Ad>) => {
     setAds(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+    setHasUnsavedChanges(true);
   };
 
   const deleteAd = (id: string) => {
     if (!confirm(isAr ? 'هل أنت متأكد من حذف هذا الإعلان؟' : 'Are you sure you want to delete this ad?')) return;
     setAds(prev => prev.filter(a => a.id !== id));
+    setHasUnsavedChanges(true);
   };
 
   const toggleClientAssignment = (adId: string, clientEmail: string) => {
@@ -282,6 +251,18 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
           : [...a.assignedClients, clientEmail],
       };
     }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveAdsToFirestore(ads);
+      setHasUnsavedChanges(false);
+    } catch (e) {
+      alert(isAr ? 'حدث خطأ أثناء الحفظ' : 'Error saving ads');
+    }
+    setSaving(false);
   };
 
   const copyCode = (code: string) => {
@@ -316,6 +297,18 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             {isAr ? 'لوحة Adsterra' : 'Adsterra Panel'}
           </a>
           <button
+            onClick={handleSave}
+            disabled={!hasUnsavedChanges || saving}
+            className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl text-sm transition-all shadow-lg ${
+              hasUnsavedChanges
+                ? 'bg-amber-400 hover:bg-amber-500 text-black shadow-amber-400/20 animate-pulse'
+                : 'bg-white/5 text-slate-500 cursor-not-allowed'
+            }`}
+          >
+            <RotateCcw size={14} className={saving ? 'animate-spin' : ''} />
+            {saving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ التغييرات' : 'Save Changes')}
+          </button>
+          <button
             onClick={() => setShowPresetPicker(true)}
             className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-all"
           >
@@ -331,6 +324,16 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
           </button>
         </div>
       </div>
+
+      {/* Unsaved Changes Warning */}
+      {hasUnsavedChanges && (
+        <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
+          <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+          <p className="text-xs text-amber-300 font-bold">
+            {isAr ? 'لديك تغييرات غير محفوظة. اضغط "حفظ التغييرات" لتطبيقها.' : 'You have unsaved changes. Click "Save Changes" to apply them.'}
+          </p>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3">
