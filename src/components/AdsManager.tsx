@@ -183,11 +183,23 @@ const AD_UNIT_TYPES: Record<string, { ar: string; en: string }> = {
 
 export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   const isAr = lang === 'ar';
-  const [ads, setAds] = useState<Ad[]>(loadAds);
+  const [ads, setAds] = useState<Ad[]>([]);
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    saveAdsToFirestore(ads).catch(() => {});
+    loadAdsFromFirestore().then(firestoreAds => {
+      if (firestoreAds.length > 0) {
+        setAds(firestoreAds);
+      } else {
+        const local = loadAds();
+        setAds(local);
+        if (local.length > 0) {
+          saveAdsToFirestore(local).catch(() => {});
+        }
+      }
+    }).catch(() => {
+      setAds(loadAds());
+    });
   }, []);
   const [showPresetPicker, setShowPresetPicker] = useState(false);
   const [editAd, setEditAd] = useState<string | null>(null);
@@ -873,45 +885,14 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
   const [ads, setAds] = useState<Ad[]>([]);
 
   useEffect(() => {
-    const hardcodedAds: Ad[] = [
-      {
-        id: 'sb-1',
-        name: 'Adsterra Social Bar',
-        code: '<script src="https://pl30221617.effectivecpmnetwork.com/1c/a5/8c/1ca58cfd0b20f79d64654344f1912c74.js"></script>',
-        type: 'adsterra',
-        adUnitType: 'social_bar',
-        position: 'between',
-        size: 'Responsive',
-        enabled: true,
-        paused: false,
-        assignedClients: [],
-        createdAt: 0,
-      },
-      {
-        id: 'pu-1',
-        name: 'Adsterra Popunder',
-        code: '<script src="https://pl30221618.effectivecpmnetwork.com/e0/70/b1/e070b115f1b1f73475dd2d5306935f15.js"></script>',
-        type: 'adsterra',
-        adUnitType: 'popunder',
-        position: 'header',
-        size: 'Full Page',
-        enabled: true,
-        paused: false,
-        assignedClients: [],
-        createdAt: 0,
-      },
-    ];
-
     loadAdsFromFirestore().then(firestoreAds => {
       if (firestoreAds.length > 0) {
         setAds(firestoreAds);
       } else {
-        const local = loadAds();
-        setAds(local.length > 0 ? local : hardcodedAds);
+        setAds(loadAds());
       }
     }).catch(() => {
-      const local = loadAds();
-      setAds(local.length > 0 ? local : hardcodedAds);
+      setAds(loadAds());
     });
 
     const interval = setInterval(() => {
