@@ -64,8 +64,8 @@ function loadAdsLocal(): Ad[] {
       position: ad.position || 'header',
       size: ad.size || undefined,
       adsterraId: ad.adsterraId || undefined,
-      enabled: ad.enabled !== false,
-      paused: ad.paused || false,
+      enabled: ad.enabled === true,
+      paused: ad.paused === true,
       assignedClients: Array.isArray(ad.assignedClients) ? ad.assignedClients : [],
       createdAt: ad.createdAt || Date.now(),
     }));
@@ -86,8 +86,8 @@ export async function loadAdsFromFirestore(): Promise<Ad[]> {
         position: ad.position || 'header',
         size: ad.size || undefined,
         adsterraId: ad.adsterraId || undefined,
-        enabled: ad.enabled !== false,
-        paused: ad.paused || false,
+        enabled: ad.enabled === true,
+        paused: ad.paused === true,
         assignedClients: Array.isArray(ad.assignedClients) ? ad.assignedClients : [],
         createdAt: ad.createdAt || Date.now(),
       }));
@@ -96,7 +96,7 @@ export async function loadAdsFromFirestore(): Promise<Ad[]> {
     }
     return [];
   } catch {
-    return loadAdsLocal();
+    return [];
   }
 }
 
@@ -889,18 +889,14 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
 
   useEffect(() => {
     loadAdsFromFirestore().then(firestoreAds => {
-      if (firestoreAds.length > 0) {
-        setAds(firestoreAds);
-      } else {
-        setAds(loadAds());
-      }
+      setAds(firestoreAds);
     }).catch(() => {
-      setAds(loadAds());
+      setAds([]);
     });
 
     const interval = setInterval(() => {
       loadAdsFromFirestore().then(firestoreAds => {
-        if (firestoreAds.length > 0) setAds(firestoreAds);
+        setAds(firestoreAds);
       }).catch(() => {});
     }, 30000);
     return () => clearInterval(interval);
