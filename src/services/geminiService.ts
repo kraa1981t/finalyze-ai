@@ -304,6 +304,24 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     totalAge = len - 1 - firstSwingIdx;
   }
 
+  // 4c. Pre-Pullback Age — candles in trend direction BEFORE the swing point
+  let prePullbackAge = 0;
+  if (direction !== 'sideways' && age > 0) {
+    // age is measured from the last validated swing point
+    // prePullbackAge counts ALL candles BEFORE that swing point moving in the trend direction
+    // (not necessarily consecutive — what matters is the overall directional flow)
+    const swingIdx = len - 1 - age; // index of the swing point
+    if (direction === 'uptrend') {
+      for (let i = swingIdx - 1; i >= 1; i--) {
+        if (closes[i] > closes[i - 1]) prePullbackAge++;
+      }
+    } else if (direction === 'downtrend') {
+      for (let i = swingIdx - 1; i >= 1; i--) {
+        if (closes[i] < closes[i - 1]) prePullbackAge++;
+      }
+    }
+  }
+
   // 5. Volume Surge
   let volSurge = false;
   if (volumes && volumes.length > 5) {
@@ -406,7 +424,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   }
 
   return {
-    direction, age, totalAge, rsi, emaCross, adx, volSurge, atr,
+    direction, age, totalAge, prePullbackAge, rsi, emaCross, adx, volSurge, atr,
     bbUpper, bbMiddle, bbLower, bbWidth, bbPercentB,
     bbPullbackCount, bbTouchLower, bbTouchUpper,
     hasHammer, hasPinbar, hasEngulfing, hasShootingStar,
@@ -652,6 +670,16 @@ function generateLocalAnalysis(
   else if (totalAge < matureLimit) { /* Youth — ONLY zone allowing STRONG */ confidence = Math.round(confidence * 0.85); }
   else if (totalAge > oldLimit) { confidence = Math.round(confidence * 0.75); }
   if (age < minAge) confidence = Math.round(confidence * 0.8);
+
+  // Pre-Pullback Age filter: if trend before pullback is too short (<min) or too long (>max), force NEUTRAL
+  const minPreAge = settings?.minPrePullbackAge ?? 15;
+  const maxPreAge = settings?.maxPrePullbackAge ?? 50;
+  const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
+  if (prePullbackAgeVal > 0 && (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge)) {
+    rawSignal = SignalType.NEUTRAL;
+    confidence = Math.min(confidence, 30);
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c (need ${minPreAge}-${maxPreAge})`, status: 'negative', impact: 'trend before pullback too short or too exhausted — neutral only' });
+  }
 
   const minConf = settings?.minConfidence || 45;
   if (confidence < minConf) rawSignal = SignalType.NEUTRAL;
@@ -1206,6 +1234,16 @@ Return ONLY valid JSON:
       if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
     }
     if (age < minAge) finalConfidence = Math.round(finalConfidence * 0.8);
+
+    // Pre-Pullback Age filter: if trend before pullback is too short or too exhausted, force NEUTRAL
+    const minPreAge = settings?.minPrePullbackAge ?? 15;
+    const maxPreAge = settings?.maxPrePullbackAge ?? 50;
+    const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
+    if (prePullbackAgeVal > 0 && (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge)) {
+      finalSignal = SignalType.NEUTRAL;
+      finalConfidence = Math.min(finalConfidence, 30);
+      detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c (need ${minPreAge}-${maxPreAge})`, status: 'negative', impact: 'trend before pullback too short or too exhausted — neutral only' });
+    }
 
     // ΓöÇΓöÇ STEP 5: Compute confidence from metrics ΓöÇΓöÇ
     const maxPrimary = settings?.maxPrimaryWeight ?? 50;

@@ -13,6 +13,8 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   minInfantAge: 10,
   minMatureAge: 25,
   maxMatureAge: 50,
+  minPrePullbackAge: 15,
+  maxPrePullbackAge: 50,
   primaryBBWeight: 15,
   primarySDWeight: 15,
   primaryAgeWeight: 10,
