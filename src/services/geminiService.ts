@@ -1149,6 +1149,20 @@ Return ONLY valid JSON:
 
     finalConfidence = Math.min(100, finalConfidence + agreementBonus);
 
+    // Strict BB pullback check for STRONG upgrade (mirrors local analysis line 391)
+    let bbPullbackMetStrict = false;
+    if (isUp && metrics?.bbTouchLower && metrics?.bbPullbackCount >= 3 && metrics?.bbPullbackCount <= 6 && (metrics?.hasHammer || metrics?.hasPinbar || metrics?.hasEngulfing || metrics?.hasBullishCandle)) {
+      bbPullbackMetStrict = true;
+    } else if (isDown && metrics?.bbTouchUpper && metrics?.bbPullbackCount >= 3 && metrics?.bbPullbackCount <= 6 && (metrics?.hasShootingStar || metrics?.hasPinbar || metrics?.hasEngulfing || metrics?.hasBearishCandle)) {
+      bbPullbackMetStrict = true;
+    } else if (microMetrics) {
+      if (isUp && microMetrics.bbTouchLower && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasHammer || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBullishCandle)) {
+        bbPullbackMetStrict = true;
+      } else if (isDown && microMetrics.bbTouchUpper && microMetrics.bbPullbackCount >= 3 && microMetrics.bbPullbackCount <= 6 && (microMetrics.hasShootingStar || microMetrics.hasPinbar || microMetrics.hasEngulfing || microMetrics.hasBearishCandle)) {
+        bbPullbackMetStrict = true;
+      }
+    }
+
     if (hasConflict) {
       finalSignal = SignalType.NEUTRAL;
     } else if (primaryMetCount < 3) {
@@ -1157,9 +1171,9 @@ Return ONLY valid JSON:
       const strongThreshold = settings?.strongThreshold ?? 60;
       const buyThreshold = settings?.buyThreshold ?? 40;
       const minStrongSupport = (settings?.minStrongSupport ?? 50) / 100;
-      const CONF_BUFFER = 5; // Confidence buffer to prevent borderline flips
+      const CONF_BUFFER = 5;
       if (direction === 'buy') {
-        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER)) {
+        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER) && bbPullbackMetStrict) {
           finalSignal = SignalType.STRONG_BUY;
         } else if (finalConfidence >= (buyThreshold - CONF_BUFFER)) {
           finalSignal = SignalType.BUY;
@@ -1167,7 +1181,7 @@ Return ONLY valid JSON:
           finalSignal = SignalType.NEUTRAL;
         }
       } else if (direction === 'sell') {
-        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER)) {
+        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER) && bbPullbackMetStrict) {
           finalSignal = SignalType.STRONG_SELL;
         } else if (finalConfidence >= (buyThreshold - CONF_BUFFER)) {
           finalSignal = SignalType.SELL;
