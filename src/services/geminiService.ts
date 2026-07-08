@@ -155,37 +155,72 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     direction = 'downtrend';
   }
 
-  // 4. Age (Relaxed for Crypto)
+  // 4. Age — Structural: find last swing point and count from there
   let age = 0;
-  for (let i = 1; i < len; i++) {
-    const curr = len - i;
-    const isUp = closes[curr] > closes[curr - 1];
-    if (direction === 'uptrend' && isUp) age++;
-    else if (direction === 'downtrend' && !isUp) age++;
-    else break;
+  if (direction === 'uptrend') {
+    // Find last swing low: candle where low is lower than N neighbors on both sides
+    const swingLookback = Math.min(len - 1, 10);
+    for (let i = swingLookback + 2; i < len - 1; i++) {
+      const idx = len - 1 - i;
+      if (idx < 1 || idx >= len - 1) continue;
+      const candleLow = safeLows[idx];
+      let isSwingLow = true;
+      for (let j = 1; j <= swingLookback; j++) {
+        if (idx - j < 0 || idx + j >= len) { isSwingLow = false; break; }
+        if (safeLows[idx - j] < candleLow || safeLows[idx + j] < candleLow) { isSwingLow = false; break; }
+      }
+      if (isSwingLow) { age = len - 1 - idx; break; }
+    }
+    if (age === 0) age = len - 1;
+  } else if (direction === 'downtrend') {
+    // Find last swing high
+    const swingLookback = Math.min(len - 1, 10);
+    for (let i = swingLookback + 2; i < len - 1; i++) {
+      const idx = len - 1 - i;
+      if (idx < 1 || idx >= len - 1) continue;
+      const candleHigh = safeHighs[idx];
+      let isSwingHigh = true;
+      for (let j = 1; j <= swingLookback; j++) {
+        if (idx - j < 0 || idx + j >= len) { isSwingHigh = false; break; }
+        if (safeHighs[idx - j] > candleHigh || safeHighs[idx + j] > candleHigh) { isSwingHigh = false; break; }
+      }
+      if (isSwingHigh) { age = len - 1 - idx; break; }
+    }
+    if (age === 0) age = len - 1;
   }
 
-  // 4b. Total Trend Age ΓÇö structural trend length (last 2+ consecutive opposite candles)
+  // 4b. Total Trend Age — structural: from the furthest swing point in the trend
   let totalAge = 0;
   if (direction !== 'sideways') {
-    let consecutiveAgainst = 0;
-    for (let i = 1; i < len; i++) {
-      const curr = len - i;
-      const prev = curr - 1;
-      const isAgainst = direction === 'uptrend'
-        ? closes[curr] < closes[prev]
-        : closes[curr] > closes[prev];
-      if (isAgainst) {
-        consecutiveAgainst++;
-        if (consecutiveAgainst >= 2) {
-          totalAge = i - consecutiveAgainst;
-          break;
+    // For total age, find the FIRST swing point (furthest back) to measure full trend lifecycle
+    const swingWindow = Math.min(len - 1, 8);
+    let firstSwingIdx = len - 1;
+    if (direction === 'uptrend') {
+      for (let i = swingWindow + 2; i < len - 1; i++) {
+        const idx = len - 1 - i;
+        if (idx < 1) continue;
+        const candleLow = safeLows[idx];
+        let isSwingLow = true;
+        for (let j = 1; j <= swingWindow; j++) {
+          if (idx - j < 0 || idx + j >= len) { isSwingLow = false; break; }
+          if (safeLows[idx - j] < candleLow || safeLows[idx + j] < candleLow) { isSwingLow = false; break; }
         }
-      } else {
-        consecutiveAgainst = 0;
+        if (isSwingLow) { firstSwingIdx = idx; break; }
+      }
+    } else if (direction === 'downtrend') {
+      for (let i = swingWindow + 2; i < len - 1; i++) {
+        const idx = len - 1 - i;
+        if (idx < 1) continue;
+        const candleHigh = safeHighs[idx];
+        let isSwingHigh = true;
+        for (let j = 1; j <= swingWindow; j++) {
+          if (idx - j < 0 || idx + j >= len) { isSwingHigh = false; break; }
+          if (safeHighs[idx - j] > candleHigh || safeHighs[idx + j] > candleHigh) { isSwingHigh = false; break; }
+        }
+        if (isSwingHigh) { firstSwingIdx = idx; break; }
       }
     }
-    if (consecutiveAgainst < 2) totalAge = len;
+    totalAge = len - 1 - firstSwingIdx;
   }
 
   // 5. Volume Surge
