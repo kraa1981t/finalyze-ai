@@ -126,7 +126,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   // 2b. ADX (14) — trend strength
   const adxPeriod = Math.min(14, len - 1);
   let adx = 0;
-  if (len > adxPeriod + 1) {
+  if (len >= adxPeriod + 1) {
     let plusDM = 0, minusDM = 0, trSum = 0;
     for (let i = len - adxPeriod; i < len; i++) {
       const upMove = (highs?.[i] || closes[i]) - (highs?.[i - 1] || closes[i - 1]);
@@ -161,7 +161,8 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     const upperWick = (highs?.[idx] || closes[idx]) - Math.max(safeOpens[idx], closes[idx]);
     const lowerWick = Math.min(safeOpens[idx], closes[idx]) - (lows?.[idx] || closes[idx]);
     const totalRange = (highs?.[idx] || closes[idx]) - (lows?.[idx] || closes[idx]);
-    return totalRange > 0 && (upperWick > body * 2.5 || lowerWick > body * 2.5);
+    // Pinbar: one wick > 2.5x body AND other wick < body
+    return totalRange > 0 && ((upperWick > body * 2.5 && lowerWick < body) || (lowerWick > body * 2.5 && upperWick < body));
   };
   const isShootingStar = (idx: number): boolean => {
     if (idx < 0 || idx >= len) return false;
@@ -175,7 +176,15 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     if (idx < 1 || idx >= len) return false;
     const prevBody = closes[idx - 1] - safeOpens[idx - 1];
     const currBody = closes[idx] - safeOpens[idx];
-    return Math.abs(currBody) > Math.abs(prevBody) * 1.2 && currBody !== 0 && prevBody !== 0;
+    const prevBearish = prevBody < 0;
+    const currBullish = currBody > 0;
+    const prevBullish = prevBody > 0;
+    const currBearish = currBody < 0;
+    // Bullish engulfing: bearish then larger bullish
+    if (prevBearish && currBullish && currBody > Math.abs(prevBody) * 1.2) return true;
+    // Bearish engulfing: bullish then larger bearish
+    if (prevBullish && currBearish && Math.abs(currBody) > prevBody * 1.2) return true;
+    return false;
   };
 
   // 2d. Swing point validation — requires confirmation
@@ -262,7 +271,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     if (age === 0) age = len - 1;
   }
 
-  // 4b. Total Trend Age — structural: from the furthest validated swing point
+  // 4b. Total Trend Age — structural: from the FURTHEST validated swing point
   let totalAge = 0;
   if (direction !== 'sideways') {
     const swingWindow = Math.min(len - 1, 8);
@@ -277,7 +286,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
           if (idx - j < 0 || idx + j >= len) { isSwingLow = false; break; }
           if (safeLows[idx - j] < candleLow || safeLows[idx + j] < candleLow) { isSwingLow = false; break; }
         }
-        if (isSwingLow && validateSwingLow(idx)) { firstSwingIdx = idx; break; }
+        if (isSwingLow && validateSwingLow(idx)) { firstSwingIdx = idx; } // Don't break — find furthest
       }
     } else if (direction === 'downtrend') {
       for (let i = swingWindow + 2; i < len - 1; i++) {
@@ -289,7 +298,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
           if (idx - j < 0 || idx + j >= len) { isSwingHigh = false; break; }
           if (safeHighs[idx - j] > candleHigh || safeHighs[idx + j] > candleHigh) { isSwingHigh = false; break; }
         }
-        if (isSwingHigh && validateSwingHigh(idx)) { firstSwingIdx = idx; break; }
+        if (isSwingHigh && validateSwingHigh(idx)) { firstSwingIdx = idx; } // Don't break — find furthest
       }
     }
     totalAge = len - 1 - firstSwingIdx;
@@ -335,12 +344,13 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     bbPercentB = bbUpper > bbLower ? (currentPrice - bbLower) / (bbUpper - bbLower) : 0.5;
   }
 
-  // 8. Bollinger Band Pullback Detection (3-6 candles opposite to trend)
+  // 8. Bollinger Band Pullback Detection (3-6 candles opposite to trend BEFORE current candle)
   let bbPullbackCount = 0;
   let bbTouchLower = false;
   let bbTouchUpper = false;
   if (len >= 3 && bbLower > 0) {
-    for (let i = len - 1; i >= Math.max(0, len - 7); i--) {
+    // Count pullback candles from len-2 (skip current candle which may be the reversal)
+    for (let i = len - 2; i >= Math.max(0, len - 8); i--) {
       const isBearish = closes[i] < safeOpens[i];
       const isBullish = closes[i] > safeOpens[i];
       if (direction === 'uptrend' && isBearish) bbPullbackCount++;
@@ -639,7 +649,7 @@ function generateLocalAnalysis(
 
   // Age zone caps
   if (totalAge < infantLimit) { confidence = Math.round(confidence * 0.7); rawSignal = rawSignal === SignalType.STRONG_BUY ? SignalType.BUY : rawSignal === SignalType.STRONG_SELL ? SignalType.SELL : rawSignal; }
-  else if (totalAge < matureLimit) { if (rawSignal === SignalType.STRONG_BUY) rawSignal = SignalType.BUY; if (rawSignal === SignalType.STRONG_SELL) rawSignal = SignalType.SELL; confidence = Math.round(confidence * 0.85); }
+  else if (totalAge < matureLimit) { /* Youth — ONLY zone allowing STRONG */ confidence = Math.round(confidence * 0.85); }
   else if (totalAge > oldLimit) { confidence = Math.round(confidence * 0.75); }
   if (age < minAge) confidence = Math.round(confidence * 0.8);
 
@@ -1108,20 +1118,19 @@ Return ONLY valid JSON:
     const nearestZone = supplyDemandZones[0];
     const sdMet = !hasZones || ((nearestZone?.type === 'demand' && isUp) || (nearestZone?.type === 'supply' && isDown));
 
-    // PRIMARY 3 ΓÇö Trend Age: ALL zones pass (never blocks). Youth allows STRONG; others downgrade.
+    // PRIMARY 3 — Trend Age: ALL zones pass (never blocks). Youth allows STRONG; others downgrade.
     const ageMet = true;
 
-    // PRIMARY 4 ΓÇö News: check for high-impact negative events
+    // PRIMARY 4 — News: track for post-computation penalty
     let newsMet = true;
+    let newsPenalty = 1.0;
     if (contextEcon && contextEcon.length > 0) {
       const highImpactEvents = contextEcon.filter((e: any) => e.impact === 'High');
       if (highImpactEvents.length > 0) {
-        // High-impact events reduce confidence
-        finalConfidence = Math.round(finalConfidence * 0.85);
+        newsPenalty = 0.85;
       }
     }
     if (contextNews && contextNews.length > 0) {
-      // Count negative news vs positive
       const negNews = contextNews.filter((n: any) => {
         const title = (n.title || '').toLowerCase();
         return title.includes('crash') || title.includes('ban') || title.includes('fraud') || 
@@ -1133,12 +1142,8 @@ Return ONLY valid JSON:
         return title.includes('rally') || title.includes('bullish') || title.includes('surge') ||
                title.includes('adoption') || title.includes('partnership') || title.includes('launch');
       });
-      // If overwhelmingly negative and signal is BUY → reduce confidence
       if (negNews.length >= 2 && negNews.length > posNews.length) {
-        const currentSignal = String(resultData.signal || '').toLowerCase();
-        if (currentSignal.includes('buy')) {
-          finalConfidence = Math.round(finalConfidence * 0.8);
-        }
+        newsPenalty = Math.min(newsPenalty, 0.8);
       }
     }
 
@@ -1210,6 +1215,11 @@ Return ONLY valid JSON:
     const supportConf = Math.round(supportRatio * maxSupport);
     const computedConfidence = baseConf + primaryConf + supportConf;
     finalConfidence = computedConfidence;
+
+    // Apply news penalty (calculated earlier, applied here after confidence computation)
+    if (newsPenalty < 1.0) {
+      finalConfidence = Math.round(finalConfidence * newsPenalty);
+    }
 
     // Multi-TF Direction: penalize if current direction conflicts with higher timeframe
     const directionConflicts = (isUp && isMacroDown) || (isDown && isMacroUp);
