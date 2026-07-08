@@ -123,6 +123,81 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   const ema21 = calcEMA(closes, 21);
   const emaCross = ema9 > ema21 ? 'bullish' : 'bearish';
 
+  // 2b. ADX (14) — trend strength
+  const adxPeriod = Math.min(14, len - 1);
+  let adx = 0;
+  if (len > adxPeriod + 1) {
+    let plusDM = 0, minusDM = 0, trSum = 0;
+    for (let i = len - adxPeriod; i < len; i++) {
+      const upMove = (highs?.[i] || closes[i]) - (highs?.[i - 1] || closes[i - 1]);
+      const downMove = (lows?.[i - 1] || closes[i - 1]) - (lows?.[i] || closes[i]);
+      const tr = Math.max(
+        (highs?.[i] || closes[i]) - (lows?.[i] || closes[i]),
+        Math.abs((highs?.[i] || closes[i]) - closes[i - 1]),
+        Math.abs((lows?.[i] || closes[i]) - closes[i - 1])
+      );
+      plusDM += upMove > downMove && upMove > 0 ? upMove : 0;
+      minusDM += downMove > upMove && downMove > 0 ? downMove : 0;
+      trSum += tr;
+    }
+    const plusDI = trSum > 0 ? (plusDM / trSum) * 100 : 0;
+    const minusDI = trSum > 0 ? (minusDM / trSum) * 100 : 0;
+    const dx = (plusDI + minusDI) > 0 ? Math.abs(plusDI - minusDI) / (plusDI + minusDI) * 100 : 0;
+    adx = Math.round(dx);
+  }
+
+  // 2c. Reversal candle detection
+  const isHammer = (idx: number): boolean => {
+    if (idx < 0 || idx >= len) return false;
+    const body = Math.abs(closes[idx] - safeOpens[idx]);
+    const lowerWick = Math.min(safeOpens[idx], closes[idx]) - (lows?.[idx] || closes[idx]);
+    const upperWick = (highs?.[idx] || closes[idx]) - Math.max(safeOpens[idx], closes[idx]);
+    const totalRange = (highs?.[idx] || closes[idx]) - (lows?.[idx] || closes[idx]);
+    return totalRange > 0 && lowerWick > body * 2 && upperWick < body * 0.5;
+  };
+  const isPinbar = (idx: number): boolean => {
+    if (idx < 0 || idx >= len) return false;
+    const body = Math.abs(closes[idx] - safeOpens[idx]);
+    const upperWick = (highs?.[idx] || closes[idx]) - Math.max(safeOpens[idx], closes[idx]);
+    const lowerWick = Math.min(safeOpens[idx], closes[idx]) - (lows?.[idx] || closes[idx]);
+    const totalRange = (highs?.[idx] || closes[idx]) - (lows?.[idx] || closes[idx]);
+    return totalRange > 0 && (upperWick > body * 2.5 || lowerWick > body * 2.5);
+  };
+  const isShootingStar = (idx: number): boolean => {
+    if (idx < 0 || idx >= len) return false;
+    const body = Math.abs(closes[idx] - safeOpens[idx]);
+    const upperWick = (highs?.[idx] || closes[idx]) - Math.max(safeOpens[idx], closes[idx]);
+    const lowerWick = Math.min(safeOpens[idx], closes[idx]) - (lows?.[idx] || closes[idx]);
+    const totalRange = (highs?.[idx] || closes[idx]) - (lows?.[idx] || closes[idx]);
+    return totalRange > 0 && upperWick > body * 2 && lowerWick < body * 0.5;
+  };
+  const isEngulfing = (idx: number): boolean => {
+    if (idx < 1 || idx >= len) return false;
+    const prevBody = closes[idx - 1] - safeOpens[idx - 1];
+    const currBody = closes[idx] - safeOpens[idx];
+    return Math.abs(currBody) > Math.abs(prevBody) * 1.2 && currBody !== 0 && prevBody !== 0;
+  };
+
+  // 2d. Swing point validation — requires confirmation
+  const validateSwingLow = (idx: number): boolean => {
+    if (idx < 1 || idx >= len - 1) return false;
+    const hasReversal = isHammer(idx) || isPinbar(idx) || isEngulfing(idx);
+    const hasVolumeConfirm = volumes && volumes.length > idx + 1
+      ? volumes[idx] > volumes.slice(Math.max(0, idx - 5), idx).reduce((a, b) => a + b, 0) / 5 * 1.3
+      : true;
+    const hasEmaConfirm = closes[idx + 1] > ema9 || closes[idx + 2] > ema9;
+    return hasReversal && hasVolumeConfirm && hasEmaConfirm;
+  };
+  const validateSwingHigh = (idx: number): boolean => {
+    if (idx < 1 || idx >= len - 1) return false;
+    const hasReversal = isShootingStar(idx) || isPinbar(idx) || isEngulfing(idx);
+    const hasVolumeConfirm = volumes && volumes.length > idx + 1
+      ? volumes[idx] > volumes.slice(Math.max(0, idx - 5), idx).reduce((a, b) => a + b, 0) / 5 * 1.3
+      : true;
+    const hasEmaConfirm = closes[idx + 1] < ema9 || closes[idx + 2] < ema9;
+    return hasReversal && hasVolumeConfirm && hasEmaConfirm;
+  };
+
   // 3. Trend Direction (STRUCTURAL — reliable method)
   // Primary: Net price displacement (most reliable)
   const windowSize = Math.min(len - 1, 20);
@@ -155,10 +230,9 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     direction = 'downtrend';
   }
 
-  // 4. Age — Structural: find last swing point and count from there
+  // 4. Age — Structural: find last validated swing point
   let age = 0;
   if (direction === 'uptrend') {
-    // Find last swing low: candle where low is lower than N neighbors on both sides
     const swingLookback = Math.min(len - 1, 10);
     for (let i = swingLookback + 2; i < len - 1; i++) {
       const idx = len - 1 - i;
@@ -169,11 +243,10 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
         if (idx - j < 0 || idx + j >= len) { isSwingLow = false; break; }
         if (safeLows[idx - j] < candleLow || safeLows[idx + j] < candleLow) { isSwingLow = false; break; }
       }
-      if (isSwingLow) { age = len - 1 - idx; break; }
+      if (isSwingLow && validateSwingLow(idx)) { age = len - 1 - idx; break; }
     }
     if (age === 0) age = len - 1;
   } else if (direction === 'downtrend') {
-    // Find last swing high
     const swingLookback = Math.min(len - 1, 10);
     for (let i = swingLookback + 2; i < len - 1; i++) {
       const idx = len - 1 - i;
@@ -184,15 +257,14 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
         if (idx - j < 0 || idx + j >= len) { isSwingHigh = false; break; }
         if (safeHighs[idx - j] > candleHigh || safeHighs[idx + j] > candleHigh) { isSwingHigh = false; break; }
       }
-      if (isSwingHigh) { age = len - 1 - idx; break; }
+      if (isSwingHigh && validateSwingHigh(idx)) { age = len - 1 - idx; break; }
     }
     if (age === 0) age = len - 1;
   }
 
-  // 4b. Total Trend Age — structural: from the furthest swing point in the trend
+  // 4b. Total Trend Age — structural: from the furthest validated swing point
   let totalAge = 0;
   if (direction !== 'sideways') {
-    // For total age, find the FIRST swing point (furthest back) to measure full trend lifecycle
     const swingWindow = Math.min(len - 1, 8);
     let firstSwingIdx = len - 1;
     if (direction === 'uptrend') {
@@ -205,7 +277,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
           if (idx - j < 0 || idx + j >= len) { isSwingLow = false; break; }
           if (safeLows[idx - j] < candleLow || safeLows[idx + j] < candleLow) { isSwingLow = false; break; }
         }
-        if (isSwingLow) { firstSwingIdx = idx; break; }
+        if (isSwingLow && validateSwingLow(idx)) { firstSwingIdx = idx; break; }
       }
     } else if (direction === 'downtrend') {
       for (let i = swingWindow + 2; i < len - 1; i++) {
@@ -217,7 +289,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
           if (idx - j < 0 || idx + j >= len) { isSwingHigh = false; break; }
           if (safeHighs[idx - j] > candleHigh || safeHighs[idx + j] > candleHigh) { isSwingHigh = false; break; }
         }
-        if (isSwingHigh) { firstSwingIdx = idx; break; }
+        if (isSwingHigh && validateSwingHigh(idx)) { firstSwingIdx = idx; break; }
       }
     }
     totalAge = len - 1 - firstSwingIdx;
@@ -324,7 +396,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   }
 
   return {
-    direction, age, totalAge, rsi, emaCross, volSurge, atr,
+    direction, age, totalAge, rsi, emaCross, adx, volSurge, atr,
     bbUpper, bbMiddle, bbLower, bbWidth, bbPercentB,
     bbPullbackCount, bbTouchLower, bbTouchUpper,
     hasHammer, hasPinbar, hasEngulfing, hasShootingStar,
