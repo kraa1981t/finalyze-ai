@@ -92,7 +92,7 @@ function calculateSupplyDemandZones(highs: number[], lows: number[], volumes: nu
  * ROBUST TECHNICAL ENGINE (VERSION 2.0)
  * Works with minimal data (10+ candles) and handles gaps gracefully.
  */
-function calculateTechnicalMetrics(closes: number[], highs: number[], lows: number[], volumes?: number[], opens?: number[]) {
+function calculateTechnicalMetrics(closes: number[], highs: number[], lows: number[], volumes?: number[], opens?: number[], timestamps?: number[]) {
   if (!closes || closes.length < 10) return null;
 
   const len = closes.length;
@@ -329,6 +329,35 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     }
   }
 
+  // 4d. Pullback Point — the lowest/highest point that started the current trend
+  let pullbackPoint: { index: number; price: number; date: string | null } | null = null;
+  if (direction !== 'sideways' && totalAge > 0) {
+    const trendStartIdx = len - 1 - totalAge;
+    if (direction === 'uptrend') {
+      // Find the lowest low in the trend range
+      let lowestIdx = trendStartIdx;
+      for (let i = trendStartIdx; i <= len - 1; i++) {
+        if (safeLows[i] < safeLows[lowestIdx]) lowestIdx = i;
+      }
+      pullbackPoint = {
+        index: lowestIdx,
+        price: safeLows[lowestIdx],
+        date: timestamps && timestamps[lowestIdx] ? new Date(timestamps[lowestIdx] * 1000).toISOString().split('T')[0] : null
+      };
+    } else if (direction === 'downtrend') {
+      // Find the highest high in the trend range
+      let highestIdx = trendStartIdx;
+      for (let i = trendStartIdx; i <= len - 1; i++) {
+        if (safeHighs[i] > safeHighs[highestIdx]) highestIdx = i;
+      }
+      pullbackPoint = {
+        index: highestIdx,
+        price: safeHighs[highestIdx],
+        date: timestamps && timestamps[highestIdx] ? new Date(timestamps[highestIdx] * 1000).toISOString().split('T')[0] : null
+      };
+    }
+  }
+
   // 5. Volume Surge
   let volSurge = false;
   if (volumes && volumes.length > 5) {
@@ -431,7 +460,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   }
 
   return {
-    direction, age, totalAge, prePullbackAge, rsi, emaCross, adx, volSurge, atr,
+    direction, age, totalAge, prePullbackAge, pullbackPoint, rsi, emaCross, adx, volSurge, atr,
     bbUpper, bbMiddle, bbLower, bbWidth, bbPercentB,
     bbPullbackCount, bbTouchLower, bbTouchUpper,
     hasHammer, hasPinbar, hasEngulfing, hasShootingStar,
@@ -465,9 +494,10 @@ async function fetchAndPrepareSymbolData(
     const volumes = quotes.volume?.filter((v: any) => v != null);
     const rawOpens1 = quotes.open?.filter((c: any) => c != null) || closes;
     const opens = rawOpens1.length >= closes.length ? rawOpens1 : closes;
+    const timestamps = rawData.chart?.result?.[0]?.timestamp;
     if (closes.length < 10) return { error: `Insufficient data for ${symbol}.` };
 
-    const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes, opens);
+    const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes, opens, timestamps);
     const supplyDemandZones = calculateSupplyDemandZones(highs, lows, volumes || [], closes);
     const zonesText = supplyDemandZones.length > 0
       ? supplyDemandZones.map(z => `${z.type === 'supply' ? 'Supply' : 'Demand'} zone: ${z.bottom.toFixed(2)}ΓÇô${z.top.toFixed(2)} (strength ${z.strength.toFixed(0)}%)`).join('. ')
@@ -572,17 +602,19 @@ function generateLocalAnalysis(
   const minPreAge = settings?.minPrePullbackAge ?? 15;
   const maxPreAge = settings?.maxPrePullbackAge ?? 50;
   const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
+  const pullbackPt = metrics?.pullbackPoint;
+  const pullbackInfo = pullbackPt ? (pullbackPt.date ? ` @ ${pullbackPt.date} (${pullbackPt.price.toFixed(5)})` : ` @ ${pullbackPt.price.toFixed(5)}`) : '';
   let prePullbackAgeMet = false;
   if (prePullbackAgeVal < minPreAge) {
     // Short (صغير) — white — too short for signals
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge})`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only', primary: true });
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge})${pullbackInfo}`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only', primary: true });
   } else if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
     // Young (شاب) — green — STRONG signals allowed
     prePullbackAgeMet = true;
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge})`, status: 'positive', impact: 'trend healthy ΓÇö STRONG signals allowed', primary: true });
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge})${pullbackInfo}`, status: 'positive', impact: 'trend healthy ΓÇö STRONG signals allowed', primary: true });
   } else {
     // Mature (كهل) — red — exhausted, no signals
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge})`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only', primary: true });
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge})${pullbackInfo}`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only', primary: true });
   }
 
   // ΓöÇΓöÇ PRIMARY 4: News ΓöÇΓöÇ
@@ -812,12 +844,13 @@ export async function analyzeMarket(params: {
     const volumes = quotes.volume?.filter((v: any) => v != null);
     const rawOpens2 = quotes.open?.filter((c: any) => c != null) || closes;
     const opens = rawOpens2.length >= closes.length ? rawOpens2 : closes;
+    const timestamps = rawData.chart?.result?.[0]?.timestamp;
 
     if (closes.length < 10) {
       throw new Error(`Insufficient data for ${symbol}.`);
     }
 
-    const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes, opens);
+    const metrics = calculateTechnicalMetrics(closes, highs, lows, volumes, opens, timestamps);
     const supplyDemandZones = calculateSupplyDemandZones(highs, lows, volumes || [], closes);
     const zonesText = supplyDemandZones.length > 0 
       ? supplyDemandZones.map(z => `${z.type === 'supply' ? 'Supply' : 'Demand'} zone: ${z.bottom.toFixed(2)}ΓÇô${z.top.toFixed(2)} (strength ${z.strength.toFixed(0)}%)`).join('. ')
@@ -1262,10 +1295,12 @@ Return ONLY valid JSON:
     if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
       finalSignal = SignalType.NEUTRAL;
       finalConfidence = Math.min(finalConfidence, 30);
+      const pullbackPtAI = metrics?.pullbackPoint;
+      const pullbackInfoAI = pullbackPtAI ? (pullbackPtAI.date ? ` @ ${pullbackPtAI.date} (${pullbackPtAI.price.toFixed(5)})` : ` @ ${pullbackPtAI.price.toFixed(5)}`) : '';
       if (prePullbackAgeVal < minPreAge) {
-        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge})`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only' });
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge})${pullbackInfoAI}`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only' });
       } else {
-        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge})`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only' });
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge})${pullbackInfoAI}`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only' });
       }
     }
 
