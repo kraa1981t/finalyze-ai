@@ -358,6 +358,25 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     }
   }
 
+  // 4e. Last Swing Point — the most recent pullback (swing low for uptrend, swing high for downtrend)
+  let lastSwingPoint: { index: number; price: number; date: string | null } | null = null;
+  if (direction !== 'sideways' && age > 0 && age < len - 1) {
+    const swingIdx = len - 1 - age;
+    if (direction === 'uptrend') {
+      lastSwingPoint = {
+        index: swingIdx,
+        price: safeLows[swingIdx],
+        date: timestamps && timestamps[swingIdx] ? new Date(timestamps[swingIdx] * 1000).toISOString().split('T')[0] : null
+      };
+    } else if (direction === 'downtrend') {
+      lastSwingPoint = {
+        index: swingIdx,
+        price: safeHighs[swingIdx],
+        date: timestamps && timestamps[swingIdx] ? new Date(timestamps[swingIdx] * 1000).toISOString().split('T')[0] : null
+      };
+    }
+  }
+
   // 5. Volume Surge
   let volSurge = false;
   if (volumes && volumes.length > 5) {
@@ -460,7 +479,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   }
 
   return {
-    direction, age, totalAge, prePullbackAge, pullbackPoint, rsi, emaCross, adx, volSurge, atr,
+    direction, age, totalAge, prePullbackAge, pullbackPoint, lastSwingPoint, rsi, emaCross, adx, volSurge, atr,
     bbUpper, bbMiddle, bbLower, bbWidth, bbPercentB,
     bbPullbackCount, bbTouchLower, bbTouchUpper,
     hasHammer, hasPinbar, hasEngulfing, hasShootingStar,
@@ -603,18 +622,20 @@ function generateLocalAnalysis(
   const maxPreAge = settings?.maxPrePullbackAge ?? 50;
   const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
   const pullbackPt = metrics?.pullbackPoint;
-  const pullbackInfo = pullbackPt ? (pullbackPt.date ? ` @ ${pullbackPt.date} (${pullbackPt.price.toFixed(5)})` : ` @ ${pullbackPt.price.toFixed(5)}`) : '';
+  const lastSwing = metrics?.lastSwingPoint;
+  const trendStartInfo = pullbackPt ? (pullbackPt.date ? `${pullbackPt.date} (${pullbackPt.price.toFixed(5)})` : pullbackPt.price.toFixed(5)) : 'N/A';
+  const lastSwingInfo = lastSwing ? (lastSwing.date ? `${lastSwing.date} (${lastSwing.price.toFixed(5)})` : lastSwing.price.toFixed(5)) : 'N/A';
   let prePullbackAgeMet = false;
   if (prePullbackAgeVal < minPreAge) {
     // Short (صغير) — white — too short for signals
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge})${pullbackInfo}`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only', primary: true });
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge}) | بداية: ${trendStartInfo} | آخر سحب: ${lastSwingInfo}`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only', primary: true });
   } else if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
     // Young (شاب) — green — STRONG signals allowed
     prePullbackAgeMet = true;
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge})${pullbackInfo}`, status: 'positive', impact: 'trend healthy ΓÇö STRONG signals allowed', primary: true });
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge}) | بداية: ${trendStartInfo} | آخر سحب: ${lastSwingInfo}`, status: 'positive', impact: 'trend healthy ΓÇö STRONG signals allowed', primary: true });
   } else {
     // Mature (كهل) — red — exhausted, no signals
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge})${pullbackInfo}`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only', primary: true });
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge}) | بداية: ${trendStartInfo} | آخر سحب: ${lastSwingInfo}`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only', primary: true });
   }
 
   // ΓöÇΓöÇ PRIMARY 4: News ΓöÇΓöÇ
@@ -1296,11 +1317,13 @@ Return ONLY valid JSON:
       finalSignal = SignalType.NEUTRAL;
       finalConfidence = Math.min(finalConfidence, 30);
       const pullbackPtAI = metrics?.pullbackPoint;
-      const pullbackInfoAI = pullbackPtAI ? (pullbackPtAI.date ? ` @ ${pullbackPtAI.date} (${pullbackPtAI.price.toFixed(5)})` : ` @ ${pullbackPtAI.price.toFixed(5)}`) : '';
+      const lastSwingAI = metrics?.lastSwingPoint;
+      const trendStartInfoAI = pullbackPtAI ? (pullbackPtAI.date ? `${pullbackPtAI.date} (${pullbackPtAI.price.toFixed(5)})` : pullbackPtAI.price.toFixed(5)) : 'N/A';
+      const lastSwingInfoAI = lastSwingAI ? (lastSwingAI.date ? `${lastSwingAI.date} (${lastSwingAI.price.toFixed(5)})` : lastSwingAI.price.toFixed(5)) : 'N/A';
       if (prePullbackAgeVal < minPreAge) {
-        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge})${pullbackInfoAI}`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only' });
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only' });
       } else {
-        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge})${pullbackInfoAI}`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only' });
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only' });
       }
     }
 
