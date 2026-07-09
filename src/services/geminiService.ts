@@ -574,10 +574,14 @@ function generateLocalAnalysis(
   const minPreAge = settings?.minPrePullbackAge ?? 15;
   const maxPreAge = settings?.maxPrePullbackAge ?? 50;
   const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
+  let prePullbackAgeMet = false;
   if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
+    prePullbackAgeMet = true;
     reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö OK (${minPreAge}-${maxPreAge})`, status: 'positive', impact: 'trend before pullback is healthy', primary: true });
+  } else if (prePullbackAgeVal < minPreAge) {
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö Too Short (need ${minPreAge}-${maxPreAge})`, status: 'negative', impact: 'trend before pullback too short ΓÇö neutral only', primary: true });
   } else {
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö ${prePullbackAgeVal < minPreAge ? 'Too Short' : 'Exhausted'} (need ${minPreAge}-${maxPreAge})`, status: 'negative', impact: 'trend before pullback invalid ΓÇö neutral only', primary: true });
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö Exhausted (need ${minPreAge}-${maxPreAge})`, status: 'neutral', impact: 'trend before pullback exhausted ΓÇö neutral only', primary: true });
   }
 
   // ΓöÇΓöÇ PRIMARY 4: News ΓöÇΓöÇ
@@ -672,11 +676,11 @@ function generateLocalAnalysis(
     rawSignal = SignalType.NEUTRAL;
     confidence = Math.min(confidence, 35);
   } else if (totalScore > 0 && primaryMetCount >= 3) {
-    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet) rawSignal = SignalType.STRONG_BUY;
+    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet && prePullbackAgeMet) rawSignal = SignalType.STRONG_BUY;
     else if (confidence >= (buyThresh - CONF_BUFFER)) rawSignal = SignalType.BUY;
     else rawSignal = SignalType.NEUTRAL;
   } else if (totalScore < 0 && primaryMetCount >= 3) {
-    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet) rawSignal = SignalType.STRONG_SELL;
+    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet && prePullbackAgeMet) rawSignal = SignalType.STRONG_SELL;
     else if (confidence >= (buyThresh - CONF_BUFFER)) rawSignal = SignalType.SELL;
     else rawSignal = SignalType.NEUTRAL;
   } else {
@@ -1333,6 +1337,12 @@ Return ONLY valid JSON:
       }
     }
 
+    // Pre-Pullback Age check for STRONG upgrade
+    const minPreAgeAI = settings?.minPrePullbackAge ?? 15;
+    const maxPreAgeAI = settings?.maxPrePullbackAge ?? 50;
+    const prePullbackAgeValAI = metrics?.prePullbackAge ?? 0;
+    const prePullbackAgeMetAI = prePullbackAgeValAI >= minPreAgeAI && prePullbackAgeValAI <= maxPreAgeAI;
+
     if (hasConflict) {
       finalSignal = SignalType.NEUTRAL;
     } else if (primaryMetCount < 3) {
@@ -1343,7 +1353,7 @@ Return ONLY valid JSON:
       const minStrongSupport = (settings?.minStrongSupport ?? 50) / 100;
       const CONF_BUFFER = 5;
       if (direction === 'buy') {
-        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER) && bbPullbackMetStrict) {
+        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER) && bbPullbackMetStrict && prePullbackAgeMetAI) {
           finalSignal = SignalType.STRONG_BUY;
         } else if (finalConfidence >= (buyThreshold - CONF_BUFFER)) {
           finalSignal = SignalType.BUY;
@@ -1351,7 +1361,7 @@ Return ONLY valid JSON:
           finalSignal = SignalType.NEUTRAL;
         }
       } else if (direction === 'sell') {
-        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER) && bbPullbackMetStrict) {
+        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER) && bbPullbackMetStrict && prePullbackAgeMetAI) {
           finalSignal = SignalType.STRONG_SELL;
         } else if (finalConfidence >= (buyThreshold - CONF_BUFFER)) {
           finalSignal = SignalType.SELL;
