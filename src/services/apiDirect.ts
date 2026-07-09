@@ -3,6 +3,10 @@ const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 const ALTERNATIVE_BASE = 'https://api.alternative.me';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const GROQ_BASE = 'https://api.groq.com/openai/v1';
+const TWELVE_DATA_BASE = 'https://api.twelvedata.com';
+
+// Twelve Data API key (free tier: 800 requests/day)
+const TWELVE_DATA_KEY = localStorage.getItem('twelve_data_key') || '';
 
 const CORS_PROXIES = [
   'https://cors-anywhere.com/',
@@ -298,40 +302,134 @@ async function fetchYahooFinance(symbol: string, timeframe: string): Promise<any
   throw new Error('No Yahoo data found');
 }
 
+// Convert symbol to Twelve Data format
+function symbolToTwelveData(symbol: string): string {
+  const s = symbol.toUpperCase().replace(/ /g, '').replace('=X', '');
+  // Forex pairs: EURUSD, GBPUSD, etc.
+  if (s.length === 6 && !s.includes('USD')) return s;
+  if (s.endsWith('USD')) return s;
+  if (s.startsWith('USD')) return s;
+  return s;
+}
+
+// Convert timeframe to Twelve Data interval
+function twelveDataInterval(timeframe: string): string {
+  const map: Record<string, string> = {
+    '1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min',
+    '1h': '1h', '4h': '4h', '1d': '1day', '1w': '1week', '1M': '1month',
+  };
+  return map[timeframe] || '1day';
+}
+
+// Fetch from Twelve Data API
+async function fetchTwelveData(symbol: string, timeframe: string): Promise<any> {
+  if (!TWELVE_DATA_KEY) throw new Error('No Twelve Data API key');
+  
+  const tdSymbol = symbolToTwelveData(symbol);
+  const interval = twelveDataInterval(timeframe);
+  
+  try {
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 10000);
+    const url = `${TWELVE_DATA_BASE}/time_series?symbol=${tdSymbol}&interval=${interval}&outputsize=200&apikey=${TWELVE_DATA_KEY}`;
+    const resp = await fetch(url, { signal: ac.signal });
+    clearTimeout(timeout);
+    
+    if (!resp.ok) throw new Error(`Twelve Data error: ${resp.status}`);
+    const data = await resp.json();
+    
+    if (data.status === 'error' || !data.values) throw new Error(data.message || 'Twelve Data failed');
+    
+    // Convert to Yahoo format
+    const values = data.values.reverse(); // Twelve Data returns newest first
+    const timestamps = values.map((v: any) => Math.floor(new Date(v.datetime).getTime() / 1000));
+    const closes = values.map((v: any) => parseFloat(v.close));
+    const opens = values.map((v: any) => parseFloat(v.open));
+    const highs = values.map((v: any) => parseFloat(v.high));
+    const lows = values.map((v: any) => parseFloat(v.low));
+    const volumes = values.map((v: any) => parseInt(v.volume) || 0);
+    
+    return {
+      chart: {
+        result: [{
+          meta: { symbol, source: 'twelvedata' },
+          timestamp: timestamps,
+          indicators: {
+            quote: [{ open: opens, high: highs, low: lows, close: closes, volume: volumes }]
+          }
+        }]
+      }
+    };
+  } catch (e: any) {
+    throw new Error(`Twelve Data failed: ${e.message}`);
+  }
+}
+
 export async function fetchMarketDataDirect(symbol: string, timeframe: string): Promise<any> {
   const cacheKey = `${symbol}_${timeframe}`;
   const cached = _dataCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    // 1. Try Binance first (crypto only, no CORS issues)
-    const binancePair = findCryptoPair(symbol);
-    if (binancePair) {
-      try {
+  // Try multiple sources with fallback and timestamp comparison
+  const sources: { name: string; fetch: () => Promise<any> }[] = [];
+
+  // 1. Binance (crypto only)
+  const binancePair = findCryptoPair(symbol);
+  if (binancePair) {
+    sources.push({
+      name: 'Binance',
+      fetch: async () => {
         const interval = TIMEFRAME_MAP[timeframe] || '1d';
         const limit = LIMIT_MAP[timeframe] || 100;
         const ac = new AbortController();
         const timeout = setTimeout(() => ac.abort(), 6000);
         const r = await fetch(`${BINANCE_BASE}/klines?symbol=${binancePair}&interval=${interval}&limit=${limit}`, { signal: ac.signal });
         clearTimeout(timeout);
-        if (r.ok) {
-          const klines = await r.json();
-          if (klines && klines.length >= 10) { const d = toYahooFormat(klines, symbol); _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
-        }
-      } catch {}
-    }
-
-    // 2. Try Yahoo Finance (forex + stocks + crypto fallback)
-    try {
-      const d = await fetchYahooFinance(symbol, timeframe);
-      _dataCache.set(cacheKey, { data: d, ts: Date.now() });
-      return d;
-    } catch {}
-
-    if (attempt < 1) await new Promise(r => setTimeout(r, 1000));
+        if (!r.ok) throw new Error('Binance failed');
+        const klines = await r.json();
+        if (!klines || klines.length < 10) throw new Error('Insufficient Binance data');
+        return toYahooFormat(klines, symbol);
+      }
+    });
   }
 
-  throw new Error('Market data currently unavailable from the source.');
+  // 2. Twelve Data (forex + stocks)
+  if (TWELVE_DATA_KEY) {
+    sources.push({
+      name: 'TwelveData',
+      fetch: () => fetchTwelveData(symbol, timeframe)
+    });
+  }
+
+  // 3. Yahoo Finance (fallback)
+  sources.push({
+    name: 'Yahoo',
+    fetch: () => fetchYahooFinance(symbol, timeframe)
+  });
+
+  // Try each source, collect successful results with timestamps
+  const results: { name: string; data: any; latestTs: number }[] = [];
+
+  for (const source of sources) {
+    try {
+      const data = await source.fetch();
+      const ts = data?.chart?.result?.[0]?.timestamp;
+      if (ts && ts.length > 0) {
+        const latestTs = ts[ts.length - 1];
+        results.push({ name: source.name, data, latestTs });
+      }
+    } catch {}
+  }
+
+  // Return the result with the most recent data
+  if (results.length > 0) {
+    results.sort((a, b) => b.latestTs - a.latestTs);
+    const best = results[0];
+    _dataCache.set(cacheKey, { data: best.data, ts: Date.now() });
+    return best.data;
+  }
+
+  throw new Error('Market data currently unavailable from all sources.');
 }
 
 export async function callAIDirect(prompt: string, apiKey: string): Promise<any> {
