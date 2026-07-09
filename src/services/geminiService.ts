@@ -684,7 +684,7 @@ function generateLocalAnalysis(
   const minPreAge = settings?.minPrePullbackAge ?? 15;
   const maxPreAge = settings?.maxPrePullbackAge ?? 50;
   const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
-  if (prePullbackAgeVal > 0 && (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge)) {
+  if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
     rawSignal = SignalType.NEUTRAL;
     confidence = Math.min(confidence, 30);
     reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c (need ${minPreAge}-${maxPreAge})`, status: 'negative', impact: 'trend before pullback too short or too exhausted — neutral only' });
@@ -1248,7 +1248,7 @@ Return ONLY valid JSON:
     const minPreAge = settings?.minPrePullbackAge ?? 15;
     const maxPreAge = settings?.maxPrePullbackAge ?? 50;
     const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
-    if (prePullbackAgeVal > 0 && (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge)) {
+    if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
       finalSignal = SignalType.NEUTRAL;
       finalConfidence = Math.min(finalConfidence, 30);
       detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c (need ${minPreAge}-${maxPreAge})`, status: 'negative', impact: 'trend before pullback too short or too exhausted — neutral only' });
