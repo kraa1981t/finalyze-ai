@@ -207,6 +207,18 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     return hasReversal && hasVolumeConfirm && hasEmaConfirm;
   };
 
+  // Structural swing detection — for trend age measurement only (relaxed validation)
+  const isStructuralSwingLow = (idx: number): boolean => {
+    if (idx < 1 || idx >= len - 1) return false;
+    const hasEmaConfirm = closes[idx + 1] > ema9 || closes[idx + 2] > ema9;
+    return hasEmaConfirm;
+  };
+  const isStructuralSwingHigh = (idx: number): boolean => {
+    if (idx < 1 || idx >= len - 1) return false;
+    const hasEmaConfirm = closes[idx + 1] < ema9 || closes[idx + 2] < ema9;
+    return hasEmaConfirm;
+  };
+
   // 3. Trend Direction (STRUCTURAL — reliable method)
   // Primary: Net price displacement (most reliable)
   const windowSize = Math.min(len - 1, 20);
@@ -242,7 +254,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   // 4. Age — Structural: find last validated swing point
   let age = 0;
   if (direction === 'uptrend') {
-    const swingLookback = Math.min(len - 1, 10);
+    const swingLookback = Math.min(len - 1, Math.max(10, Math.floor(len * 0.25)));
     for (let i = swingLookback + 2; i < len - 1; i++) {
       const idx = len - 1 - i;
       if (idx < 1 || idx >= len - 1) continue;
@@ -256,7 +268,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     }
     if (age === 0) age = len - 1;
   } else if (direction === 'downtrend') {
-    const swingLookback = Math.min(len - 1, 10);
+    const swingLookback = Math.min(len - 1, Math.max(10, Math.floor(len * 0.25)));
     for (let i = swingLookback + 2; i < len - 1; i++) {
       const idx = len - 1 - i;
       if (idx < 1 || idx >= len - 1) continue;
@@ -274,7 +286,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   // 4b. Total Trend Age — structural: from the FURTHEST validated swing point
   let totalAge = 0;
   if (direction !== 'sideways') {
-    const swingWindow = Math.min(len - 1, 8);
+    const swingWindow = Math.min(len - 1, Math.max(15, Math.floor(len * 0.3)));
     let firstSwingIdx = len - 1;
     if (direction === 'uptrend') {
       for (let i = swingWindow + 2; i < len - 1; i++) {
@@ -286,7 +298,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
           if (idx - j < 0 || idx + j >= len) { isSwingLow = false; break; }
           if (safeLows[idx - j] < candleLow || safeLows[idx + j] < candleLow) { isSwingLow = false; break; }
         }
-        if (isSwingLow && validateSwingLow(idx)) { firstSwingIdx = idx; } // Don't break — find furthest
+        if (isSwingLow && isStructuralSwingLow(idx)) { firstSwingIdx = idx; } // Don't break — find furthest
       }
     } else if (direction === 'downtrend') {
       for (let i = swingWindow + 2; i < len - 1; i++) {
@@ -298,7 +310,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
           if (idx - j < 0 || idx + j >= len) { isSwingHigh = false; break; }
           if (safeHighs[idx - j] > candleHigh || safeHighs[idx + j] > candleHigh) { isSwingHigh = false; break; }
         }
-        if (isSwingHigh && validateSwingHigh(idx)) { firstSwingIdx = idx; } // Don't break — find furthest
+        if (isSwingHigh && isStructuralSwingHigh(idx)) { firstSwingIdx = idx; } // Don't break — find furthest
       }
     }
     totalAge = len - 1 - firstSwingIdx;
