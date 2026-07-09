@@ -573,13 +573,16 @@ function generateLocalAnalysis(
   const maxPreAge = settings?.maxPrePullbackAge ?? 50;
   const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
   let prePullbackAgeMet = false;
-  if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
+  if (prePullbackAgeVal < minPreAge) {
+    // Short (صغير) — white — too short for signals
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge})`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only', primary: true });
+  } else if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
+    // Young (شاب) — green — STRONG signals allowed
     prePullbackAgeMet = true;
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö OK (${minPreAge}-${maxPreAge})`, status: 'positive', impact: 'trend before pullback is healthy', primary: true });
-  } else if (prePullbackAgeVal < minPreAge) {
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö Too Short (need ${minPreAge}-${maxPreAge})`, status: 'negative', impact: 'trend before pullback too short ΓÇö neutral only', primary: true });
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge})`, status: 'positive', impact: 'trend healthy ΓÇö STRONG signals allowed', primary: true });
   } else {
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö Exhausted (need ${minPreAge}-${maxPreAge})`, status: 'neutral', impact: 'trend before pullback exhausted ΓÇö neutral only', primary: true });
+    // Mature (كهل) — red — exhausted, no signals
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge})`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only', primary: true });
   }
 
   // ΓöÇΓöÇ PRIMARY 4: News ΓöÇΓöÇ
