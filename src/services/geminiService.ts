@@ -283,37 +283,34 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     if (age === 0) age = len - 1;
   }
 
-  // 4b. Total Trend Age — structural: from the FURTHEST validated swing point
+  // 4b. Total Trend Age — find the furthest significant pullback (simple displacement method)
   let totalAge = 0;
   if (direction !== 'sideways') {
-    const swingWindow = Math.min(len - 1, Math.max(15, Math.floor(len * 0.3)));
-    let firstSwingIdx = len - 1;
+    // Simple approach: find the furthest point where price pulled back > 1.5% from the trend end
+    const trendEnd = closes[len - 1];
+    const pullbackThreshold = 0.015; // 1.5%
+    let trendStartIdx = 0;
     if (direction === 'uptrend') {
-      for (let i = swingWindow + 2; i < len - 1; i++) {
-        const idx = len - 1 - i;
-        if (idx < 1) continue;
-        const candleLow = safeLows[idx];
-        let isSwingLow = true;
-        for (let j = 1; j <= swingWindow; j++) {
-          if (idx - j < 0 || idx + j >= len) { isSwingLow = false; break; }
-          if (safeLows[idx - j] < candleLow || safeLows[idx + j] < candleLow) { isSwingLow = false; break; }
+      // Find the furthest low that is more than 1.5% below the current price
+      for (let i = len - 2; i >= 0; i--) {
+        const dropPct = (trendEnd - safeLows[i]) / trendEnd;
+        if (dropPct > pullbackThreshold) {
+          trendStartIdx = i + 1;
+          break;
         }
-        if (isSwingLow && isStructuralSwingLow(idx)) { firstSwingIdx = idx; } // Don't break — find furthest
       }
     } else if (direction === 'downtrend') {
-      for (let i = swingWindow + 2; i < len - 1; i++) {
-        const idx = len - 1 - i;
-        if (idx < 1) continue;
-        const candleHigh = safeHighs[idx];
-        let isSwingHigh = true;
-        for (let j = 1; j <= swingWindow; j++) {
-          if (idx - j < 0 || idx + j >= len) { isSwingHigh = false; break; }
-          if (safeHighs[idx - j] > candleHigh || safeHighs[idx + j] > candleHigh) { isSwingHigh = false; break; }
+      // Find the furthest high that is more than 1.5% above the current price
+      for (let i = len - 2; i >= 0; i--) {
+        const risePct = (safeHighs[i] - trendEnd) / trendEnd;
+        if (risePct > pullbackThreshold) {
+          trendStartIdx = i + 1;
+          break;
         }
-        if (isSwingHigh && isStructuralSwingHigh(idx)) { firstSwingIdx = idx; } // Don't break — find furthest
       }
     }
-    totalAge = len - 1 - firstSwingIdx;
+    totalAge = len - 1 - trendStartIdx;
+    if (totalAge < 1) totalAge = len - 1;
   }
 
   // 4c. Pre-Pullback Age — candles in trend direction BEFORE the swing point
