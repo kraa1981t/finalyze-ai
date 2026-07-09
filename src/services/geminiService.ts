@@ -570,6 +570,16 @@ function generateLocalAnalysis(
     reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Old`, status: 'negative', impact: 'trend exhausting', primary: true });
   }
 
+  // ΓöÇΓöÇ PRIMARY 3b: Pre-Pullback Age ΓöÇΓöÇ
+  const minPreAge = settings?.minPrePullbackAge ?? 15;
+  const maxPreAge = settings?.maxPrePullbackAge ?? 50;
+  const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
+  if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö OK (${minPreAge}-${maxPreAge})`, status: 'positive', impact: 'trend before pullback is healthy', primary: true });
+  } else {
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö ${prePullbackAgeVal < minPreAge ? 'Too Short' : 'Exhausted'} (need ${minPreAge}-${maxPreAge})`, status: 'negative', impact: 'trend before pullback invalid ΓÇö neutral only', primary: true });
+  }
+
   // ΓöÇΓöÇ PRIMARY 4: News ΓöÇΓöÇ
   newsMet = true;
   reasons.push({ check: 'News Sentiment', value: 'No active events', status: 'neutral', impact: 'no blocking news', primary: true });
@@ -681,13 +691,9 @@ function generateLocalAnalysis(
   if (age < minAge) confidence = Math.round(confidence * 0.8);
 
   // Pre-Pullback Age filter: if trend before pullback is too short (<min) or too long (>max), force NEUTRAL
-  const minPreAge = settings?.minPrePullbackAge ?? 15;
-  const maxPreAge = settings?.maxPrePullbackAge ?? 50;
-  const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
   if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
     rawSignal = SignalType.NEUTRAL;
     confidence = Math.min(confidence, 30);
-    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c (need ${minPreAge}-${maxPreAge})`, status: 'negative', impact: 'trend before pullback too short or too exhausted — neutral only' });
   }
 
   const minConf = settings?.minConfidence || 45;
