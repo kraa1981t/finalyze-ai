@@ -71,6 +71,7 @@ export interface StrategySettings {
   primaryBBWeight: number;
   primarySDWeight: number;
   primaryAgeWeight: number;
+  primaryPrePullbackAgeWeight: number;
   primaryNewsWeight: number;
   supportRSIWeight: number;
   supportEMAWeight: number;

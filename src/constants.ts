@@ -18,6 +18,7 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   primaryBBWeight: 15,
   primarySDWeight: 15,
   primaryAgeWeight: 10,
+  primaryPrePullbackAgeWeight: 10,
   primaryNewsWeight: 10,
   supportRSIWeight: 5,
   supportEMAWeight: 5,

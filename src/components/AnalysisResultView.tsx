@@ -234,7 +234,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                           className="overflow-hidden"
                         >
                           {(() => {
-                        const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'News', 'Economic Events'];
+                        const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'];
                         const primaryReasons = res.detailedReasons.filter((r: any) => PRIMARY_CHECKS.some(p => r.check?.includes(p)));
                         const supportingReasons = res.detailedReasons.filter((r: any) => !PRIMARY_CHECKS.some(p => r.check?.includes(p)));
 
