@@ -1262,7 +1262,11 @@ Return ONLY valid JSON:
     if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
       finalSignal = SignalType.NEUTRAL;
       finalConfidence = Math.min(finalConfidence, 30);
-      detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c (need ${minPreAge}-${maxPreAge})`, status: 'negative', impact: 'trend before pullback too short or too exhausted — neutral only' });
+      if (prePullbackAgeVal < minPreAge) {
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge})`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only' });
+      } else {
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge})`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only' });
+      }
     }
 
     // ΓöÇΓöÇ STEP 5: Compute confidence from metrics ΓöÇΓöÇ
