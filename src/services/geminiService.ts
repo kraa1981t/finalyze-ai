@@ -313,20 +313,18 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     if (totalAge < 1) totalAge = len - 1;
   }
 
-  // 4c. Pre-Pullback Age — candles in trend direction BEFORE the swing point
+  // 4c. Pre-Pullback Age — candles in trend direction BEFORE the pullback
+  // Uses totalAge (displacement method) to find trend start, then counts directional candles
   let prePullbackAge = 0;
-  if (direction !== 'sideways' && age > 0) {
-    // age is measured from the last validated swing point
-    // prePullbackAge counts ALL candles BEFORE that swing point moving in the trend direction
-    // (not necessarily consecutive — what matters is the overall directional flow)
-    const swingIdx = len - 1 - age; // index of the swing point
+  if (direction !== 'sideways' && totalAge > 0) {
+    const trendStartIdx = len - 1 - totalAge;
     if (direction === 'uptrend') {
-      for (let i = swingIdx - 1; i >= 1; i--) {
-        if (closes[i] > closes[i - 1]) prePullbackAge++;
+      for (let i = trendStartIdx; i < len - 1; i++) {
+        if (closes[i + 1] > closes[i]) prePullbackAge++;
       }
     } else if (direction === 'downtrend') {
-      for (let i = swingIdx - 1; i >= 1; i--) {
-        if (closes[i] < closes[i - 1]) prePullbackAge++;
+      for (let i = trendStartIdx; i < len - 1; i++) {
+        if (closes[i + 1] < closes[i]) prePullbackAge++;
       }
     }
   }
