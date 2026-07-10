@@ -332,11 +332,8 @@ async function fetchTwelveData(symbol: string, timeframe: string): Promise<any> 
   const interval = twelveDataInterval(timeframe);
   
   try {
-    const ac = new AbortController();
-    const timeout = setTimeout(() => ac.abort(), 10000);
     const url = `${TWELVE_DATA_BASE}/time_series?symbol=${tdSymbol}&interval=${interval}&outputsize=200&apikey=${twelveKey}`;
-    const resp = await fetch(url, { signal: ac.signal });
-    clearTimeout(timeout);
+    const resp = await fetchWithProxy(url);
     
     if (!resp.ok) throw new Error(`Twelve Data error: ${resp.status}`);
     const data = await resp.json();
