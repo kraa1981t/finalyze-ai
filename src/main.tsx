@@ -4,7 +4,7 @@ import App from './App.tsx';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
-window.__BUILD = '4';
+window.__BUILD = 'v3.1.0';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
