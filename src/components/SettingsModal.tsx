@@ -328,7 +328,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
           <NumberInput label={isAr ? '① BB Pullback — تراجع بولينجر' : '① BB Pullback — Bollinger Pullback'} value={settings.primaryBBWeight} onChange={(v) => handleChange('primaryBBWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'تراجع 3-6 شموع + لمس BB + شمعة انتكاس' : '3-6 candle pullback + touch BB + reversal candle'} />
           <NumberInput label={isAr ? '② Supply/Demand — مناطق العرض والطلب' : '② Supply/Demand Zones'} value={settings.primarySDWeight} onChange={(v) => handleChange('primarySDWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'منطقة طلب + صعود = شراء / منطقة عرض + هبوط = بيع' : 'Demand+uptrend=buy / Supply+downtrend=sell'} />
           <NumberInput label={isAr ? '③ Trend Age — عمر الاتجاه' : '③ Trend Age'} value={settings.primaryAgeWeight} onChange={(v) => handleChange('primaryAgeWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'ناضج (25-50) = كامل / رضيع أو قديم = تخفيف' : 'Mature (25-50)=full / Infant or Old=reduced'} />
-          <NumberInput label={isAr ? '④ News — أخبار اقتصادية وسياسية' : '④ News Sentiment'} value={settings.primaryNewsWeight} onChange={(v) => handleChange('primaryNewsWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'أخبار سلبية = حظر / لا أخبار = مسموح' : 'Negative news=block / No news=allowed'} />
+          <NumberInput label={isAr ? '④ Pre-Pullback Age — عمر الاتجاه قبل السحب' : '④ Pre-Pullback Age'} value={settings.primaryPrePullbackAgeWeight} onChange={(v) => handleChange('primaryPrePullbackAgeWeight', v)} color="text-[#F59E0B]" desc={isAr ? '15-50 شمعة = مسموح / أقل أو أكثر = محايد' : '15-50 candles=allowed / less or more=neutral'} />
+          <NumberInput label={isAr ? '⑤ News — أخبار اقتصادية وسياسية' : '⑤ News Sentiment'} value={settings.primaryNewsWeight} onChange={(v) => handleChange('primaryNewsWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'أخبار سلبية = حظر / لا أخبار = مسموح' : 'Negative news=block / No news=allowed'} />
         </div>
       </div>
 
@@ -475,6 +476,36 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 </div>
               </div>
               <p className="text-xs text-brand-text/40">{isAr ? 'فوق هذه القيمة ← اتجاه عجوز (خطر انعكاس، تخفيف الثقة). للكريبتو: ×2. افتراضي: 50' : 'Above this → aging trend (reversal risk, confidence cap). For crypto: ×2. Default: 50'}</p>
+            </div>
+
+            {/* Pre-Pullback Age — Min */}
+            <div className="pt-2 border-t border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-semibold text-cyan-400">{isAr ? 'أدنى عمر الاتجاه ماقبل انسحاب' : 'Min Pre-Pullback Age'}</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleChange('minPrePullbackAge', Math.max(5, settings.minPrePullbackAge - 5))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
+                  <span className="w-10 text-center text-lg font-black text-cyan-400 font-mono">{settings.minPrePullbackAge}</span>
+                  <button onClick={() => handleChange('minPrePullbackAge', Math.min(settings.maxPrePullbackAge - 5, settings.minPrePullbackAge + 5))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
+                </div>
+              </div>
+              <p className="text-xs text-brand-text/40">{isAr ? 'أقل من هذا العدد ← الاتجاه قبل الانسحاب قصير جداً (محايد). افتراضي: 15' : 'Below this → trend before pullback too short (neutral). Default: 15'}</p>
+            </div>
+
+            {/* Pre-Pullback Age — Max */}
+            <div className="pt-2 border-t border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-semibold text-cyan-400">{isAr ? 'أقصى عمر الاتجاه ماقبل انسحاب' : 'Max Pre-Pullback Age'}</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleChange('maxPrePullbackAge', Math.max(settings.minPrePullbackAge + 5, settings.maxPrePullbackAge - 5))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
+                  <span className="w-10 text-center text-lg font-black text-cyan-400 font-mono">{settings.maxPrePullbackAge}</span>
+                  <button onClick={() => handleChange('maxPrePullbackAge', Math.min(100, settings.maxPrePullbackAge + 5))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
+                </div>
+              </div>
+              <p className="text-xs text-brand-text/40">{isAr ? 'فوق هذا العدد ← الاتجاه قبل الانسحاب مستنزف (محايد). افتراضي: 50' : 'Above this → trend before pullback exhausted (neutral). Default: 50'}</p>
             </div>
           </div>
         </div>

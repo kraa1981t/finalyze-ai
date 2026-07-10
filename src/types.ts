@@ -66,9 +66,12 @@ export interface StrategySettings {
   minInfantAge: number;
   minMatureAge: number;
   maxMatureAge: number;
+  minPrePullbackAge: number;
+  maxPrePullbackAge: number;
   primaryBBWeight: number;
   primarySDWeight: number;
   primaryAgeWeight: number;
+  primaryPrePullbackAgeWeight: number;
   primaryNewsWeight: number;
   supportRSIWeight: number;
   supportEMAWeight: number;

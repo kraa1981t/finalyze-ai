@@ -288,8 +288,75 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     hasBearishCandle = lastC < lastO;
   }
 
+  // 11. Pre-Pullback Age — candles in trend direction BEFORE the pullback
+  let prePullbackAge = 0;
+  if (totalAge > 0) {
+    const trendStartIdx = len - 1 - totalAge;
+    const trendDir = direction !== 'sideways' ? direction :
+      (len > 1 && closes[len - 1] > closes[trendStartIdx] ? 'uptrend' : 'downtrend');
+    if (trendDir === 'uptrend') {
+      for (let i = trendStartIdx; i < len - 1; i++) {
+        if (closes[i + 1] > closes[i]) prePullbackAge++;
+      }
+    } else if (trendDir === 'downtrend') {
+      for (let i = trendStartIdx; i < len - 1; i++) {
+        if (closes[i + 1] < closes[i]) prePullbackAge++;
+      }
+    }
+  }
+
+  // 12. Pullback Point — the lowest/highest point that started the current trend
+  let pullbackPoint: { index: number; price: number; date: string | null } | null = null;
+  if (totalAge > 0) {
+    const trendStartIdx = len - 1 - totalAge;
+    const trendDir = direction !== 'sideways' ? direction :
+      (len > 1 && closes[len - 1] > closes[trendStartIdx] ? 'uptrend' : 'downtrend');
+    if (trendDir === 'uptrend') {
+      let lowestIdx = trendStartIdx;
+      for (let i = trendStartIdx; i <= len - 1; i++) {
+        if (safeLows[i] < safeLows[lowestIdx]) lowestIdx = i;
+      }
+      pullbackPoint = {
+        index: lowestIdx,
+        price: safeLows[lowestIdx],
+        date: null
+      };
+    } else if (trendDir === 'downtrend') {
+      let highestIdx = trendStartIdx;
+      for (let i = trendStartIdx; i <= len - 1; i++) {
+        if (safeHighs[i] > safeHighs[highestIdx]) highestIdx = i;
+      }
+      pullbackPoint = {
+        index: highestIdx,
+        price: safeHighs[highestIdx],
+        date: null
+      };
+    }
+  }
+
+  // 13. Last Swing Point — the most recent pullback low/high
+  let lastSwingPoint: { index: number; price: number; date: string | null } | null = null;
+  if (age > 0 && age < len - 1) {
+    const swingIdx = len - 1 - age;
+    const swingDir = direction !== 'sideways' ? direction :
+      (len > 1 && closes[len - 1] > closes[swingIdx] ? 'uptrend' : 'downtrend');
+    if (swingDir === 'uptrend') {
+      lastSwingPoint = {
+        index: swingIdx,
+        price: safeLows[swingIdx],
+        date: null
+      };
+    } else if (swingDir === 'downtrend') {
+      lastSwingPoint = {
+        index: swingIdx,
+        price: safeHighs[swingIdx],
+        date: null
+      };
+    }
+  }
+
   return {
-    direction, age, totalAge, rsi, emaCross, volSurge, atr,
+    direction, age, totalAge, prePullbackAge, pullbackPoint, lastSwingPoint, rsi, emaCross, volSurge, atr,
     bbUpper, bbMiddle, bbLower, bbWidth, bbPercentB,
     bbPullbackCount, bbTouchLower, bbTouchUpper,
     hasHammer, hasPinbar, hasEngulfing, hasShootingStar,
@@ -383,6 +450,7 @@ function generateLocalAnalysis(
   let bbPullbackMet = false;
   let supplyDemandMet = false;
   let trendAgeMet = false;
+  let prePullbackAgeMet = false;
   let newsMet = false;
 
   // ΓöÇΓöÇ PRIMARY 1: BB Pullback ΓöÇΓöÇ
@@ -424,6 +492,23 @@ function generateLocalAnalysis(
     reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Youth`, status: 'positive', impact: 'trend developing ΓÇö allowed', primary: true });
   } else {
     reasons.push({ check: 'Trend Age', value: `${totalAge}c ΓÇö Old`, status: 'negative', impact: 'trend exhausting', primary: true });
+  }
+
+  // ΓöÇΓöÇ PRIMARY 3b: Pre-Pullback Age ΓöÇΓöÇ
+  const minPreAge = settings?.minPrePullbackAge ?? 15;
+  const maxPreAge = settings?.maxPrePullbackAge ?? 50;
+  const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
+  const pullbackPt = metrics?.pullbackPoint;
+  const lastSwing = metrics?.lastSwingPoint;
+  const trendStartInfo = pullbackPt ? (pullbackPt.date ? `${pullbackPt.date} (${pullbackPt.price.toFixed(5)})` : pullbackPt.price.toFixed(5)) : 'N/A';
+  const lastSwingInfo = lastSwing ? (lastSwing.date ? `${lastSwing.date} (${lastSwing.price.toFixed(5)})` : lastSwing.price.toFixed(5)) : 'N/A';
+  if (prePullbackAgeVal < minPreAge) {
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge}) | بداية: ${trendStartInfo} | آخر سحب: ${lastSwingInfo}`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only', primary: true });
+  } else if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
+    prePullbackAgeMet = true;
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge}) | بداية: ${trendStartInfo} | آخر سحب: ${lastSwingInfo}`, status: 'positive', impact: 'trend healthy ΓÇö STRONG signals allowed', primary: true });
+  } else {
+    reasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge}) | بداية: ${trendStartInfo} | آخر سحب: ${lastSwingInfo}`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only', primary: true });
   }
 
   // ΓöÇΓöÇ PRIMARY 4: News ΓöÇΓöÇ
@@ -518,11 +603,11 @@ function generateLocalAnalysis(
     rawSignal = SignalType.NEUTRAL;
     confidence = Math.min(confidence, 35);
   } else if (totalScore > 0 && primaryMetCount >= 3) {
-    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet) rawSignal = SignalType.STRONG_BUY;
+    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet && prePullbackAgeMet) rawSignal = SignalType.STRONG_BUY;
     else if (confidence >= (buyThresh - CONF_BUFFER)) rawSignal = SignalType.BUY;
     else rawSignal = SignalType.NEUTRAL;
   } else if (totalScore < 0 && primaryMetCount >= 3) {
-    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet) rawSignal = SignalType.STRONG_SELL;
+    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet && prePullbackAgeMet) rawSignal = SignalType.STRONG_SELL;
     else if (confidence >= (buyThresh - CONF_BUFFER)) rawSignal = SignalType.SELL;
     else rawSignal = SignalType.NEUTRAL;
   } else {
@@ -538,6 +623,21 @@ function generateLocalAnalysis(
 
   const minConf = settings?.minConfidence || 45;
   if (confidence < minConf) rawSignal = SignalType.NEUTRAL;
+
+  // Pre-Pullback Age filter: if trend before pullback is too short or too exhausted, force NEUTRAL
+  if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
+    rawSignal = SignalType.NEUTRAL;
+    confidence = Math.min(confidence, 30);
+  }
+
+  // FINAL SAFETY: Pre-Pullback Age must ALWAYS block BUY/SELL if out of range
+  if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
+    if (rawSignal === SignalType.BUY || rawSignal === SignalType.STRONG_BUY ||
+        rawSignal === SignalType.SELL || rawSignal === SignalType.STRONG_SELL) {
+      rawSignal = SignalType.NEUTRAL;
+      confidence = Math.min(confidence, 30);
+    }
+  }
 
   const dir = metrics?.direction || 'sideways';
   const summary = lang === 'ar'
@@ -1095,6 +1195,26 @@ Return ONLY valid JSON:
     }
     if (age < minAge) finalConfidence = Math.round(finalConfidence * 0.8);
 
+    // Pre-Pullback Age filter: if trend before pullback is too short or too exhausted, force NEUTRAL
+    const minPreAge = settings?.minPrePullbackAge ?? 15;
+    const maxPreAge = settings?.maxPrePullbackAge ?? 50;
+    const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
+    const pullbackPtAI = metrics?.pullbackPoint;
+    const lastSwingAI = metrics?.lastSwingPoint;
+    const trendStartInfoAI = pullbackPtAI ? (pullbackPtAI.date ? `${pullbackPtAI.date} (${pullbackPtAI.price.toFixed(5)})` : pullbackPtAI.price.toFixed(5)) : 'N/A';
+    const lastSwingInfoAI = lastSwingAI ? (lastSwingAI.date ? `${lastSwingAI.date} (${lastSwingAI.price.toFixed(5)})` : lastSwingAI.price.toFixed(5)) : 'N/A';
+    if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
+      finalSignal = SignalType.NEUTRAL;
+      finalConfidence = Math.min(finalConfidence, 30);
+      if (prePullbackAgeVal < minPreAge) {
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only' });
+      } else {
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only' });
+      }
+    } else if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
+      detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'positive', impact: 'trend healthy ΓÇö STRONG signals allowed' });
+    }
+
     // ΓöÇΓöÇ STEP 5: Compute confidence from metrics ΓöÇΓöÇ
     const maxPrimary = settings?.maxPrimaryWeight ?? 50;
     const maxSupport = settings?.maxSupportingWeight ?? 20;
@@ -1103,6 +1223,11 @@ Return ONLY valid JSON:
     const supportConf = Math.round(supportRatio * maxSupport);
     const computedConfidence = baseConf + primaryConf + supportConf;
     finalConfidence = computedConfidence;
+
+    // Pre-Pullback Age cap: re-apply after confidence computation to prevent overwrite
+    if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
+      finalConfidence = Math.min(finalConfidence, 30);
+    }
 
     // Multi-TF Direction: penalize if current direction conflicts with higher timeframe
     const directionConflicts = (isUp && isMacroDown) || (isDown && isMacroUp);
@@ -1157,9 +1282,10 @@ Return ONLY valid JSON:
       const strongThreshold = settings?.strongThreshold ?? 60;
       const buyThreshold = settings?.buyThreshold ?? 40;
       const minStrongSupport = (settings?.minStrongSupport ?? 50) / 100;
-      const CONF_BUFFER = 5; // Confidence buffer to prevent borderline flips
+      const CONF_BUFFER = 5;
+      const prePullbackAgeMetAI = prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge;
       if (direction === 'buy') {
-        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER)) {
+        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER) && prePullbackAgeMetAI) {
           finalSignal = SignalType.STRONG_BUY;
         } else if (finalConfidence >= (buyThreshold - CONF_BUFFER)) {
           finalSignal = SignalType.BUY;
@@ -1167,7 +1293,7 @@ Return ONLY valid JSON:
           finalSignal = SignalType.NEUTRAL;
         }
       } else if (direction === 'sell') {
-        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER)) {
+        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER) && prePullbackAgeMetAI) {
           finalSignal = SignalType.STRONG_SELL;
         } else if (finalConfidence >= (buyThreshold - CONF_BUFFER)) {
           finalSignal = SignalType.SELL;
@@ -1261,6 +1387,16 @@ Return ONLY valid JSON:
       } else {
         finalStopLoss = currentPrice - slDist;
         finalTakeProfit = currentPrice + slDist;
+      }
+    }
+
+    // FINAL SAFETY: Pre-Pullback Age must ALWAYS block BUY/SELL if out of range
+    // This is the LAST check before return — nothing can override it
+    if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
+      if (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
+          finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL) {
+        finalSignal = SignalType.NEUTRAL;
+        finalConfidence = Math.min(finalConfidence, 30);
       }
     }
 

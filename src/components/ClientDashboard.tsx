@@ -325,7 +325,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
 
                       {/* Primary & Supporting Reasons - Split into 2 sections */}
                       {res.detailedReasons && res.detailedReasons.length > 0 && (() => {
-                        const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'News', 'Economic Events'];
+                        const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'];
                         const primaryReasons = res.detailedReasons.filter((r: any) => PRIMARY_CHECKS.some(p => r.check?.includes(p)));
                         const supportingReasons = res.detailedReasons.filter((r: any) => !PRIMARY_CHECKS.some(p => r.check?.includes(p)));
 
