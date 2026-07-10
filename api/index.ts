@@ -344,7 +344,7 @@ app.get("/api/market-data-multi", async (req, res) => {
       };
       const isMetal = !!customMappings[symbol];
       let yahooSymbol = isMetal ? customMappings[symbol] : symbol;
-      const isForex = !isMetal && symbol.length === 6 && !symbol.includes('USD');
+      const isForex = !isMetal && symbol.length === 6 && /^[A-Z]{6}$/.test(symbol);
 
       let attempts: string[] = [];
       if (isMetal) {
