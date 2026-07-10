@@ -297,8 +297,9 @@ app.get("/api/market-data-multi", async (req, res) => {
 
     const results: { source: string; data: any; latestTs: number }[] = [];
 
-    // Source 1: Twelve Data (if key provided)
-    if (twelveKey) {
+    // Source 1: Twelve Data (if key provided) — skip for forex (volume=0 ruins analysis)
+    const isForexForTd = symbol.length === 6 && /^[A-Z]{6}$/.test(symbol);
+    if (twelveKey && !isForexForTd) {
       try {
         const tdSymbol = symbol.replace('=X', '');
         const tdInt = tdInterval[timeframe] || '1day';
