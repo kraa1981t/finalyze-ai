@@ -764,6 +764,15 @@ function generateLocalAnalysis(
   const minConf = settings?.minConfidence || 45;
   if (confidence < minConf) rawSignal = SignalType.NEUTRAL;
 
+  // FINAL SAFETY: Pre-Pullback Age must ALWAYS block BUY/SELL if out of range
+  if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
+    if (rawSignal === SignalType.BUY || rawSignal === SignalType.STRONG_BUY ||
+        rawSignal === SignalType.SELL || rawSignal === SignalType.STRONG_SELL) {
+      rawSignal = SignalType.NEUTRAL;
+      confidence = Math.min(confidence, 30);
+    }
+  }
+
   const dir = metrics?.direction || 'sideways';
   const summary = lang === 'ar'
     ? `\u0645\u0644\u062e\u0635 \u0627\u0644\u062a\u062d\u0644\u064a\u0644: ${symbol} \u2014 ${dir === 'uptrend' ? '\u0627\u062a\u062c\u0627\u0647 \u0635\u0627\u0639\u062f' : dir === 'downtrend' ? '\u0627\u062a\u062c\u0627\u0647 \u0647\u0627\u0628\u0637' : '\u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0627\u0644\u0627\u062a\u062c\u0627\u0647'}. RSI ${metrics?.rsi?.toFixed(1) || 'N/A'}. \u0627\u0644\u062b\u0642\u0629: ${confidence}%.`
@@ -1533,6 +1542,16 @@ Return ONLY valid JSON:
       } else {
         finalStopLoss = currentPrice - slDist;
         finalTakeProfit = currentPrice + slDist;
+      }
+    }
+
+    // FINAL SAFETY: Pre-Pullback Age must ALWAYS block BUY/SELL if out of range
+    // This is the LAST check before return — nothing can override it
+    if (prePullbackAgeValAI < minPreAgeAI || prePullbackAgeValAI > maxPreAgeAI) {
+      if (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
+          finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL) {
+        finalSignal = SignalType.NEUTRAL;
+        finalConfidence = Math.min(finalConfidence, 30);
       }
     }
 
