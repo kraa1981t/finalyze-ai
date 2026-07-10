@@ -5,8 +5,10 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const GROQ_BASE = 'https://api.groq.com/openai/v1';
 const TWELVE_DATA_BASE = 'https://api.twelvedata.com';
 
-// Twelve Data API key (free tier: 800 requests/day)
-const TWELVE_DATA_KEY = localStorage.getItem('twelve_data_key') || '';
+// Twelve Data API key (free tier: 800 requests/day) — read dynamically so saved keys work immediately
+function getTwelveDataKey(): string {
+  try { return localStorage.getItem('twelve_data_key') || ''; } catch { return ''; }
+}
 
 const CORS_PROXIES = [
   'https://cors-anywhere.com/',
@@ -323,7 +325,8 @@ function twelveDataInterval(timeframe: string): string {
 
 // Fetch from Twelve Data API
 async function fetchTwelveData(symbol: string, timeframe: string): Promise<any> {
-  if (!TWELVE_DATA_KEY) throw new Error('No Twelve Data API key');
+  const twelveKey = getTwelveDataKey();
+  if (!twelveKey) throw new Error('No Twelve Data API key');
   
   const tdSymbol = symbolToTwelveData(symbol);
   const interval = twelveDataInterval(timeframe);
@@ -331,7 +334,7 @@ async function fetchTwelveData(symbol: string, timeframe: string): Promise<any> 
   try {
     const ac = new AbortController();
     const timeout = setTimeout(() => ac.abort(), 10000);
-    const url = `${TWELVE_DATA_BASE}/time_series?symbol=${tdSymbol}&interval=${interval}&outputsize=200&apikey=${TWELVE_DATA_KEY}`;
+    const url = `${TWELVE_DATA_BASE}/time_series?symbol=${tdSymbol}&interval=${interval}&outputsize=200&apikey=${twelveKey}`;
     const resp = await fetch(url, { signal: ac.signal });
     clearTimeout(timeout);
     
@@ -394,7 +397,7 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
   }
 
   // 2. Twelve Data (forex + stocks)
-  if (TWELVE_DATA_KEY) {
+  if (getTwelveDataKey()) {
     sources.push({
       name: 'TwelveData',
       fetch: () => fetchTwelveData(symbol, timeframe)
