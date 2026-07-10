@@ -370,10 +370,27 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
   const cached = _dataCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
 
-  // Try multiple sources with fallback and timestamp comparison
-  const sources: { name: string; fetch: () => Promise<any> }[] = [];
+  // 0. Try server-side proxy first (no CORS issues — Twelve Data + Yahoo)
+  try {
+    const tdKey = getTwelveDataKey();
+    const params = new URLSearchParams({ symbol, timeframe });
+    if (tdKey) params.set('twelveKey', tdKey);
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 12000);
+    const resp = await fetch(`/api/market-data-multi?${params.toString()}`, { signal: ac.signal });
+    clearTimeout(timeout);
+    if (resp.ok) {
+      const data = await resp.json();
+      const ts = data?.chart?.result?.[0]?.timestamp;
+      if (ts && ts.length > 0) {
+        _dataCache.set(cacheKey, { data, ts: Date.now() });
+        return data;
+      }
+    }
+  } catch {}
 
-  // 1. Binance (crypto only)
+  // 1. Client-side fallback: Binance (crypto only)
+  const sources: { name: string; fetch: () => Promise<any> }[] = [];
   const binancePair = findCryptoPair(symbol);
   if (binancePair) {
     sources.push({
@@ -393,7 +410,7 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
     });
   }
 
-  // 2. Twelve Data (forex + stocks)
+  // 2. Client-side: Twelve Data (via CORS proxy)
   if (getTwelveDataKey()) {
     sources.push({
       name: 'TwelveData',
@@ -401,15 +418,14 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
     });
   }
 
-  // 3. Yahoo Finance (fallback)
+  // 3. Client-side: Yahoo Finance (via CORS proxy)
   sources.push({
     name: 'Yahoo',
     fetch: () => fetchYahooFinance(symbol, timeframe)
   });
 
-  // Try each source, collect successful results with timestamps
+  // Try each client-side source
   const results: { name: string; data: any; latestTs: number }[] = [];
-
   for (const source of sources) {
     try {
       const data = await source.fetch();
@@ -421,7 +437,6 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
     } catch {}
   }
 
-  // Return the result with the most recent data
   if (results.length > 0) {
     results.sort((a, b) => b.latestTs - a.latestTs);
     const best = results[0];

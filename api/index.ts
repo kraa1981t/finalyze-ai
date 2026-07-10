@@ -270,6 +270,131 @@ app.get("/api/market-data", async (req, res) => {
   }
 });
 
+// API Route: Multi-source Market Data (Twelve Data + Yahoo, server-side, no CORS)
+app.get("/api/market-data-multi", async (req, res) => {
+  try {
+    const symbol = (req.query.symbol as string || '').toUpperCase().replace(/ /g, '');
+    const timeframe = (req.query.timeframe as string) || '1d';
+    if (!symbol) return res.status(400).json({ error: "Symbol is required" });
+
+    const twelveKey = (req.query.twelveKey as string) || '';
+
+    // Helper: Twelve Data interval
+    const tdInterval: Record<string, string> = {
+      '1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min',
+      '1h': '1h', '4h': '4h', '1d': '1day', '1w': '1week', '1M': '1month',
+    };
+
+    // Helper: Yahoo interval/range
+    let yInterval = '1d', yRange = '6mo';
+    if (timeframe === '1m') { yInterval = '1m'; yRange = '1d'; }
+    else if (timeframe === '5m') { yInterval = '5m'; yRange = '5d'; }
+    else if (timeframe === '15m') { yInterval = '15m'; yRange = '5d'; }
+    else if (timeframe === '1h') { yInterval = '60m'; yRange = '1mo'; }
+    else if (timeframe === '4h') { yInterval = '1h'; yRange = '3mo'; }
+    else if (timeframe === '1d') { yInterval = '1d'; yRange = '6mo'; }
+    else if (timeframe === '1w') { yInterval = '1wk'; yRange = '2y'; }
+
+    const results: { source: string; data: any; latestTs: number }[] = [];
+
+    // Source 1: Twelve Data (if key provided)
+    if (twelveKey) {
+      try {
+        const tdSymbol = symbol.replace('=X', '');
+        const tdInt = tdInterval[timeframe] || '1day';
+        const url = `https://api.twelvedata.com/time_series?symbol=${tdSymbol}&interval=${tdInt}&outputsize=200&apikey=${twelveKey}`;
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 10000);
+        const resp = await fetch(url, { signal: ac.signal });
+        clearTimeout(timeout);
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json.values && json.values.length > 0) {
+            const values = json.values.reverse();
+            const timestamps = values.map((v: any) => Math.floor(new Date(v.datetime).getTime() / 1000));
+            const latestTs = timestamps[timestamps.length - 1];
+            const data = {
+              chart: {
+                result: [{
+                  meta: { symbol, source: 'twelvedata' },
+                  timestamp: timestamps,
+                  indicators: {
+                    quote: [{
+                      open: values.map((v: any) => parseFloat(v.open)),
+                      high: values.map((v: any) => parseFloat(v.high)),
+                      low: values.map((v: any) => parseFloat(v.low)),
+                      close: values.map((v: any) => parseFloat(v.close)),
+                      volume: values.map((v: any) => parseInt(v.volume) || 0),
+                    }]
+                  }
+                }]
+              }
+            };
+            results.push({ source: 'TwelveData', data, latestTs });
+          }
+        }
+      } catch {}
+    }
+
+    // Source 2: Yahoo Finance (server-side, no CORS)
+    try {
+      const customMappings: Record<string, string> = {
+        'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F', 'XPDUSD': 'PA=F',
+        'XCUUSD': 'HG=F',
+      };
+      const isMetal = !!customMappings[symbol];
+      let yahooSymbol = isMetal ? customMappings[symbol] : symbol;
+      const isForex = !isMetal && symbol.length === 6 && !symbol.includes('USD');
+
+      let attempts: string[] = [];
+      if (isMetal) {
+        attempts = [yahooSymbol];
+      } else if (isForex) {
+        attempts = [`${yahooSymbol}=X`, `${symbol.slice(0, 3)}-${symbol.slice(3)}`];
+      } else {
+        attempts = [yahooSymbol, `${yahooSymbol}-USD`];
+      }
+
+      for (const attempt of attempts) {
+        try {
+          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(attempt)}?interval=${yInterval}&range=${yRange}`;
+          const ac = new AbortController();
+          const timeout = setTimeout(() => ac.abort(), 8000);
+          const resp = await fetch(url, {
+            signal: ac.signal,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'application/json',
+            }
+          });
+          clearTimeout(timeout);
+          if (!resp.ok) continue;
+          const json = await resp.json();
+          const result = json?.chart?.result?.[0];
+          if (!result?.timestamp || !result?.indicators?.quote?.[0]?.close) continue;
+          const ts = result.timestamp;
+          const q = result.indicators.quote[0];
+          const closes = q.close.filter((c: any) => c != null);
+          if (closes.length < 10) continue;
+          const latestTs = ts[ts.length - 1];
+          results.push({ source: 'Yahoo', data: json, latestTs });
+          break;
+        } catch {}
+      }
+    } catch {}
+
+    // Return the most recent data
+    if (results.length > 0) {
+      results.sort((a, b) => b.latestTs - a.latestTs);
+      return res.json(results[0].data);
+    }
+
+    return res.status(404).json({ error: "No data found from any source" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // API Route: Factory Reset — trigger redeploy from stable-v1
 const STABLE_VERSION_HASH = '62c47deed780f1122533632a688f7760ff0c71f5';
 const STABLE_VERSION_TAG = 'stable-v1';
