@@ -1313,18 +1313,20 @@ Return ONLY valid JSON:
     const minPreAge = settings?.minPrePullbackAge ?? 15;
     const maxPreAge = settings?.maxPrePullbackAge ?? 50;
     const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
+    const pullbackPtAI = metrics?.pullbackPoint;
+    const lastSwingAI = metrics?.lastSwingPoint;
+    const trendStartInfoAI = pullbackPtAI ? (pullbackPtAI.date ? `${pullbackPtAI.date} (${pullbackPtAI.price.toFixed(5)})` : pullbackPtAI.price.toFixed(5)) : 'N/A';
+    const lastSwingInfoAI = lastSwingAI ? (lastSwingAI.date ? `${lastSwingAI.date} (${lastSwingAI.price.toFixed(5)})` : lastSwingAI.price.toFixed(5)) : 'N/A';
     if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
       finalSignal = SignalType.NEUTRAL;
       finalConfidence = Math.min(finalConfidence, 30);
-      const pullbackPtAI = metrics?.pullbackPoint;
-      const lastSwingAI = metrics?.lastSwingPoint;
-      const trendStartInfoAI = pullbackPtAI ? (pullbackPtAI.date ? `${pullbackPtAI.date} (${pullbackPtAI.price.toFixed(5)})` : pullbackPtAI.price.toFixed(5)) : 'N/A';
-      const lastSwingInfoAI = lastSwingAI ? (lastSwingAI.date ? `${lastSwingAI.date} (${lastSwingAI.price.toFixed(5)})` : lastSwingAI.price.toFixed(5)) : 'N/A';
       if (prePullbackAgeVal < minPreAge) {
         detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only' });
       } else {
         detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only' });
       }
+    } else if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
+      detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'positive', impact: 'trend healthy ΓÇö STRONG signals allowed' });
     }
 
     // ΓöÇΓöÇ STEP 5: Compute confidence from metrics ΓöÇΓöÇ
