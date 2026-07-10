@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Settings2, Activity, LayoutTemplate, Layers, ShieldCheck, Mail, MessageSquare, CheckCircle, RotateCcw, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, Settings2, Activity, LayoutTemplate, Layers, ShieldCheck, Mail, MessageSquare, CheckCircle, RotateCcw, AlertTriangle, Loader2, Key } from 'lucide-react';
 import { StrategySettings } from '../types';
 import { DEFAULT_STRATEGY_SETTINGS } from '../constants';
 import { User } from 'firebase/auth';
@@ -41,6 +41,14 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
       return localStorage.getItem('finalyze_dev_phone') || '0663919868';
     }
     return '0663919868';
+  });
+
+  // Twelve Data API key state
+  const [twelveDataKey, setTwelveDataKey] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('twelve_data_key') || '';
+    }
+    return '';
   });
 
   const [isVerifying, setIsVerifying] = useState(false);
@@ -511,7 +519,93 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         </div>
       )}
 
-      {/* Section 5: Developer Dynamic Credentials Security (Only visible to the developer) */}
+      {/* Section 5: Data Source API Key */}
+      <div className="space-y-3 pt-6 border-t border-white/10">
+        <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
+          <Database size={16} /> {isAr ? '🔑 مفتاح مصدر البيانات' : '🔑 Data Source API Key'}
+        </h3>
+        
+        <div className="bg-purple-500/5 border border-purple-500/10 rounded-2xl p-5 space-y-3 text-right">
+          <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+            {isAr ? 'أدخل مفتاح Twelve Data للحصول على بيانات حية. المجاني: 800 طلب/يوم. السجل في twelvedata.com' : 'Enter Twelve Data API key for live data. Free tier: 800 requests/day. Sign up at twelvedata.com'}
+          </p>
+          
+          <div className="flex items-center gap-3">
+            <input
+              type="password"
+              placeholder={isAr ? 'أدخل مفتاح Twelve Data' : 'Enter Twelve Data API key'}
+              defaultValue={typeof localStorage !== 'undefined' ? localStorage.getItem('twelve_data_key') || '' : ''}
+              onBlur={(e) => {
+                if (e.target.value) {
+                  localStorage.setItem('twelve_data_key', e.target.value);
+                } else {
+                  localStorage.removeItem('twelve_data_key');
+                }
+              }}
+              className="flex-1 bg-brand-bg border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-mono text-left focus:outline-none focus:border-purple-500/50"
+            />
+            <button
+              onClick={() => {
+                const val = (document.querySelector('input[type="password"]') as HTMLInputElement)?.value;
+                if (val) {
+                  localStorage.setItem('twelve_data_key', val);
+                  alert(isAr ? 'تم الحفظ!' : 'Saved!');
+                }
+              }}
+              className="px-4 py-2.5 bg-purple-500/20 border border-purple-500/30 text-purple-400 rounded-xl text-xs font-bold hover:bg-purple-500/30 transition-all"
+            >
+              {isAr ? 'حفظ' : 'Save'}
+            </button>
+          </div>
+          
+          <p className="text-xs text-slate-500">
+            {isAr ? '⚠️ بدون مفتاح → البيانات من Yahoo فقط (أقل موثوقية)' : '⚠️ Without key → Yahoo only (less reliable)'}
+          </p>
+        </div>
+      </div>
+
+      {/* Section 6: API Keys */}
+      <div className="space-y-3 pt-4 border-t border-white/10">
+        <h3 className="text-xs font-black text-cyan-400 uppercase tracking-widest flex items-center gap-2">
+          <Key size={16} /> {isAr ? '🔑 مفاتيح API' : '🔑 API Keys'}
+        </h3>
+        <div className="bg-cyan-500/5 border border-cyan-500/10 rounded-2xl p-5 space-y-4">
+          <p className="text-xs text-brand-text/60 leading-relaxed">
+            {isAr ? 'أدخل مفتاح Twelve Data للحصول على بيانات حية موثوقة. المفتاح مجاني ويعطي 800 طلب/يوم.' : 'Enter your Twelve Data API key for reliable live data. Free key provides 800 requests/day.'}
+          </p>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-cyan-400">{isAr ? 'Twelve Data API Key' : 'Twelve Data API Key'}</label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={twelveDataKey}
+                onChange={(e) => setTwelveDataKey(e.target.value)}
+                placeholder={isAr ? 'أدخل المفتاح هنا...' : 'Enter API key here...'}
+                className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-mono text-white placeholder:text-white/30 focus:outline-none focus:border-cyan-500/50 transition-colors"
+              />
+              <button
+                onClick={() => {
+                  localStorage.setItem('twelve_data_key', twelveDataKey);
+                  alert(isAr ? 'تم حفظ المفتاح!' : 'API key saved!');
+                }}
+                className="px-4 py-2.5 bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 rounded-xl text-sm font-bold hover:bg-cyan-500/30 transition-all"
+              >
+                {isAr ? 'حفظ' : 'Save'}
+              </button>
+            </div>
+            {twelveDataKey && (
+              <p className="text-[10px] text-green-400 flex items-center gap-1">
+                <CheckCircle size={10} /> {isAr ? 'مفتاح محفوظ' : 'Key saved'}
+              </p>
+            )}
+          </div>
+          <a href="https://twelvedata.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400/60 hover:text-cyan-400 transition-colors">
+            {isAr ? 'احصل على مفتاح مجاني من Twelve Data ←' : 'Get free key from Twelve Data ←'}
+          </a>
+        </div>
+      </div>
+
+      {/* Section 7: Developer Dynamic Credentials Security (Only visible to the developer) */}
       {user && (user.email === 'taybekraa@gmail.com' || user.email === 'kraakraa109@gmail.com' || user.email === 'bachasalman69@gmail.com') && (
         <div className="space-y-4 pt-6 border-t border-white/10">
           <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
