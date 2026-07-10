@@ -410,8 +410,9 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
     });
   }
 
-  // 2. Client-side: Twelve Data (via CORS proxy)
-  if (getTwelveDataKey()) {
+  // 2. Client-side: Twelve Data (via CORS proxy) — skip for forex (volume=0)
+  const isForex = symbol.length === 6 && /^[A-Z]{6}$/.test(symbol);
+  if (getTwelveDataKey() && !isForex) {
     sources.push({
       name: 'TwelveData',
       fetch: () => fetchTwelveData(symbol, timeframe)
