@@ -316,13 +316,16 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
   // 4c. Pre-Pullback Age — candles in trend direction BEFORE the pullback
   // Uses totalAge (displacement method) to find trend start, then counts directional candles
   let prePullbackAge = 0;
-  if (direction !== 'sideways' && totalAge > 0) {
+  if (totalAge > 0) {
     const trendStartIdx = len - 1 - totalAge;
-    if (direction === 'uptrend') {
+    // Use displacement-based direction (totalAge>0 means pullback exists) even if swing direction=sideways
+    const trendDir = direction !== 'sideways' ? direction :
+      (len > 1 && closes[len - 1] > closes[trendStartIdx] ? 'uptrend' : 'downtrend');
+    if (trendDir === 'uptrend') {
       for (let i = trendStartIdx; i < len - 1; i++) {
         if (closes[i + 1] > closes[i]) prePullbackAge++;
       }
-    } else if (direction === 'downtrend') {
+    } else if (trendDir === 'downtrend') {
       for (let i = trendStartIdx; i < len - 1; i++) {
         if (closes[i + 1] < closes[i]) prePullbackAge++;
       }
@@ -331,9 +334,11 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
 
   // 4d. Pullback Point — the lowest/highest point that started the current trend
   let pullbackPoint: { index: number; price: number; date: string | null } | null = null;
-  if (direction !== 'sideways' && totalAge > 0) {
+  if (totalAge > 0) {
     const trendStartIdx = len - 1 - totalAge;
-    if (direction === 'uptrend') {
+    const trendDir = direction !== 'sideways' ? direction :
+      (len > 1 && closes[len - 1] > closes[trendStartIdx] ? 'uptrend' : 'downtrend');
+    if (trendDir === 'uptrend') {
       // Find the lowest low in the trend range
       let lowestIdx = trendStartIdx;
       for (let i = trendStartIdx; i <= len - 1; i++) {
@@ -344,7 +349,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
         price: safeLows[lowestIdx],
         date: timestamps && timestamps[lowestIdx] ? new Date(timestamps[lowestIdx] * 1000).toISOString().split('T')[0] : null
       };
-    } else if (direction === 'downtrend') {
+    } else if (trendDir === 'downtrend') {
       // Find the highest high in the trend range
       let highestIdx = trendStartIdx;
       for (let i = trendStartIdx; i <= len - 1; i++) {
@@ -360,15 +365,17 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
 
   // 4e. Last Swing Point — the most recent pullback (swing low for uptrend, swing high for downtrend)
   let lastSwingPoint: { index: number; price: number; date: string | null } | null = null;
-  if (direction !== 'sideways' && age > 0 && age < len - 1) {
+  if (age > 0 && age < len - 1) {
     const swingIdx = len - 1 - age;
-    if (direction === 'uptrend') {
+    const swingDir = direction !== 'sideways' ? direction :
+      (len > 1 && closes[len - 1] > closes[swingIdx] ? 'uptrend' : 'downtrend');
+    if (swingDir === 'uptrend') {
       lastSwingPoint = {
         index: swingIdx,
         price: safeLows[swingIdx],
         date: timestamps && timestamps[swingIdx] ? new Date(timestamps[swingIdx] * 1000).toISOString().split('T')[0] : null
       };
-    } else if (direction === 'downtrend') {
+    } else if (swingDir === 'downtrend') {
       lastSwingPoint = {
         index: swingIdx,
         price: safeHighs[swingIdx],
@@ -767,6 +774,7 @@ function generateLocalAnalysis(
     signal: rawSignal, confidence, summary, detailedReasons: reasons,
     microSignal: 'unknown', microTrend: '', technicalScore: Math.round(totalScore * 16.7 + 50),
     sentimentScore: contextFearGreed?.value ?? 50, historicalMatch: '',
+    trendAge: totalAge,
     timestamp: new Date().toISOString(),
     userId: '',
     primaryMetCount,
