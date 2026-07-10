@@ -328,6 +328,18 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
       return d;
     } catch {}
 
+    // 3. Try server-side proxy (bypasses CORS + Brave ad-blocker)
+    try {
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 15000);
+      const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`, { signal: ac.signal });
+      clearTimeout(timeout);
+      if (r.ok) {
+        const d = await r.json();
+        if (d && d.chart) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
+      }
+    } catch {}
+
     if (attempt < 1) await new Promise(r => setTimeout(r, 1000));
   }
 

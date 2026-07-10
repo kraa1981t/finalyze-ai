@@ -173,7 +173,7 @@ app.get("/api/crypto-prices", async (_req, res) => {
   }
 });
 
-// Helper for Market Data Fetching
+// Helper: Yahoo Finance Fetch
 const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
@@ -193,6 +193,79 @@ const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: strin
     const data = await response.json();
     if (data.chart?.result?.[0]) return data;
     return null;
+  } catch (e) {
+    clearTimeout(timeout);
+    return null;
+  }
+};
+
+// Helper: Binance Klines → Yahoo format
+const SERVER_CRYPTO_MAP: Record<string, string> = {
+  'BTCUSD': 'BTCUSDT', 'ETHUSD': 'ETHUSDT', 'SOLUSD': 'SOLUSDT',
+  'XRPUSD': 'XRPUSDT', 'DOGEUSD': 'DOGEUSDT', 'ADAUSD': 'ADAUSDT',
+  'DOTUSD': 'DOTUSDT', 'MATICUSD': 'MATICUSDT', 'LINKUSD': 'LINKUSDT',
+  'UNIUSD': 'UNIUSDT', 'AVAXUSD': 'AVAXUSDT', 'ATOMUSD': 'ATOMUSDT',
+  'LTCUSD': 'LTCUSDT', 'BCHUSD': 'BCHUSDT', 'XLMUSD': 'XLMUSDT',
+  'TRXUSD': 'TRXUSDT', 'FILUSD': 'FILUSDT', 'APTUSD': 'APTUSDT',
+  'ARBUSD': 'ARBUSDT', 'OPUSD': 'OPUSDT', 'INJUSD': 'INJUSDT',
+  'BTCUSDT': 'BTCUSDT', 'ETHUSDT': 'ETHUSDT', 'SOLUSDT': 'SOLUSDT',
+};
+
+function findServerCryptoPair(symbol: string): string | null {
+  const upper = symbol.toUpperCase().replace(/ /g, '');
+  if (SERVER_CRYPTO_MAP[upper]) return SERVER_CRYPTO_MAP[upper];
+  if (upper.endsWith('USD') || upper.endsWith('USDT')) {
+    const base = upper.replace(/USD(T)?$/, '');
+    if (base && base.length <= 10) return `${base}USDT`;
+  }
+  const knownCoins = ['BTC','ETH','SOL','XRP','DOGE','ADA','DOT','MATIC','LINK',
+    'UNI','AVAX','ATOM','LTC','BCH','XLM','TRX','FIL','APT','ARB','OP','INJ'];
+  for (const coin of knownCoins) {
+    if (upper.startsWith(coin)) return `${coin}USDT`;
+  }
+  return null;
+}
+
+const SERVER_INTERVAL_MAP: Record<string, string> = {
+  '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+  '1h': '1h', '4h': '4h', '1d': '1d', '1w': '1w', '1M': '1M',
+};
+const SERVER_LIMIT_MAP: Record<string, number> = {
+  '1m': 100, '5m': 100, '15m': 200, '1h': 200, '4h': 500,
+  '1d': 365, '1w': 200, '1M': 200,
+};
+
+const fetchBinanceData = async (symbol: string, timeframe: string): Promise<any> => {
+  const pair = findServerCryptoPair(symbol);
+  if (!pair) return null;
+  const interval = SERVER_INTERVAL_MAP[timeframe] || '1d';
+  const limit = SERVER_LIMIT_MAP[timeframe] || 100;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const url = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!response.ok) return null;
+    const klines = await response.json();
+    if (!klines || klines.length < 10) return null;
+    return {
+      chart: {
+        result: [{
+          meta: { symbol, regularMarketTime: Math.floor(Date.now() / 1000) },
+          timestamp: klines.map((k: any[]) => Math.floor(k[0] / 1000)),
+          indicators: {
+            quote: [{
+              open: klines.map((k: any[]) => parseFloat(k[1])),
+              high: klines.map((k: any[]) => parseFloat(k[2])),
+              low: klines.map((k: any[]) => parseFloat(k[3])),
+              close: klines.map((k: any[]) => parseFloat(k[4])),
+              volume: klines.map((k: any[]) => parseFloat(k[5])),
+            }]
+          }
+        }]
+      }
+    };
   } catch (e) {
     clearTimeout(timeout);
     return null;
@@ -226,24 +299,26 @@ app.get("/api/market-data", async (req, res) => {
     else if (timeframe === '1d') { interval = '1d'; range = '6mo'; }
     else if (timeframe === '1w') { interval = '1wk'; range = '2y'; }
 
-    // Determine symbol format based on type heuristics
     const hasEquals = yahooSymbol.includes('=');
-    const isForex = !isMetal && yahooSymbol.length >= 6 && (
+    const isForex = !isMetal && !hasEquals && yahooSymbol.length >= 6 && (
       yahooSymbol.endsWith('USD') || yahooSymbol.endsWith('EUR') ||
       yahooSymbol.endsWith('JPY') || yahooSymbol.endsWith('GBP') ||
       yahooSymbol.endsWith('AUD') || yahooSymbol.endsWith('NZD') ||
       yahooSymbol.endsWith('CAD') || yahooSymbol.endsWith('CHF')
     );
-    
-    // For metals: use mapped futures symbol (e.g., GC=F)
-    // For forex: use =X suffix (e.g., EURUSD=X)
-    // For stocks/crypto: use symbol as-is (e.g., AAPL, BTC-USD)
+    const cryptoPair = findServerCryptoPair(rawSymbol);
+    const isCrypto = !!cryptoPair && !isMetal;
+
+    if (isCrypto) {
+      const binanceData = await fetchBinanceData(rawSymbol, timeframe);
+      if (binanceData) return res.json(binanceData);
+    }
+
     let attempts: string[] = [];
     if (isMetal || hasEquals) {
       attempts = [yahooSymbol];
     } else if (isForex) {
       attempts = [`${yahooSymbol}=X`];
-      // Fallback: try with dash format (e.g., EUR-USD, GBP-JPY)
       const base = yahooSymbol.slice(0, 3);
       const quote = yahooSymbol.slice(3);
       if (base.length === 3 && quote.length === 3) {
@@ -251,7 +326,6 @@ app.get("/api/market-data", async (req, res) => {
       }
     } else {
       attempts = [yahooSymbol];
-      // Crypto fallback: append -USD or -BTC
       if (!yahooSymbol.includes('-')) {
         attempts.push(`${yahooSymbol}-USD`);
       }
