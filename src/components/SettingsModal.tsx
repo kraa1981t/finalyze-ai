@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Settings2, Activity, LayoutTemplate, Layers, ShieldCheck, Mail, MessageSquare, CheckCircle, RotateCcw, AlertTriangle, Loader2, Key, Database } from 'lucide-react';
+import { X, Settings2, Activity, LayoutTemplate, Layers, ShieldCheck, Mail, MessageSquare, CheckCircle, RotateCcw, AlertTriangle, Loader2, Key } from 'lucide-react';
 import { StrategySettings } from '../types';
 import { DEFAULT_STRATEGY_SETTINGS } from '../constants';
 import { User } from 'firebase/auth';
@@ -519,52 +519,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         </div>
       )}
 
-      {/* Section 5: Data Source API Key */}
-      <div className="space-y-3 pt-6 border-t border-white/10">
-        <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
-          <Database size={16} /> {isAr ? '🔑 مفتاح مصدر البيانات' : '🔑 Data Source API Key'}
-        </h3>
-        
-        <div className="bg-purple-500/5 border border-purple-500/10 rounded-2xl p-5 space-y-3 text-right">
-          <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-            {isAr ? 'أدخل مفتاح Twelve Data للحصول على بيانات حية. المجاني: 800 طلب/يوم. السجل في twelvedata.com' : 'Enter Twelve Data API key for live data. Free tier: 800 requests/day. Sign up at twelvedata.com'}
-          </p>
-          
-          <div className="flex items-center gap-3">
-            <input
-              type="password"
-              placeholder={isAr ? 'أدخل مفتاح Twelve Data' : 'Enter Twelve Data API key'}
-              defaultValue={typeof localStorage !== 'undefined' ? localStorage.getItem('twelve_data_key') || '' : ''}
-              onBlur={(e) => {
-                if (e.target.value) {
-                  localStorage.setItem('twelve_data_key', e.target.value);
-                } else {
-                  localStorage.removeItem('twelve_data_key');
-                }
-              }}
-              className="flex-1 bg-brand-bg border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-mono text-left focus:outline-none focus:border-purple-500/50"
-            />
-            <button
-              onClick={() => {
-                const val = (document.querySelector('input[type="password"]') as HTMLInputElement)?.value;
-                if (val) {
-                  localStorage.setItem('twelve_data_key', val);
-                  alert(isAr ? 'تم الحفظ!' : 'Saved!');
-                }
-              }}
-              className="px-4 py-2.5 bg-purple-500/20 border border-purple-500/30 text-purple-400 rounded-xl text-xs font-bold hover:bg-purple-500/30 transition-all"
-            >
-              {isAr ? 'حفظ' : 'Save'}
-            </button>
-          </div>
-          
-          <p className="text-xs text-slate-500">
-            {isAr ? '⚠️ بدون مفتاح → البيانات من Yahoo فقط (أقل موثوقية)' : '⚠️ Without key → Yahoo only (less reliable)'}
-          </p>
-        </div>
-      </div>
-
-      {/* Section 6: API Keys */}
+      {/* Section 5: API Keys */}
       <div className="space-y-3 pt-4 border-t border-white/10">
         <h3 className="text-xs font-black text-cyan-400 uppercase tracking-widest flex items-center gap-2">
           <Key size={16} /> {isAr ? '🔑 مفاتيح API' : '🔑 API Keys'}
@@ -574,7 +529,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             {isAr ? 'أدخل مفتاح Twelve Data للحصول على بيانات حية موثوقة. المفتاح مجاني ويعطي 800 طلب/يوم.' : 'Enter your Twelve Data API key for reliable live data. Free key provides 800 requests/day.'}
           </p>
           <div className="space-y-2">
-            <label className="text-xs font-bold text-cyan-400">{isAr ? 'Twelve Data API Key' : 'Twelve Data API Key'}</label>
+            <label className="text-xs font-bold text-cyan-400">{isAr ? 'مفتاح Twelve Data' : 'Twelve Data API Key'}</label>
             <div className="flex gap-2">
               <input
                 type="password"
@@ -605,7 +560,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         </div>
       </div>
 
-      {/* Section 7: Developer Dynamic Credentials Security (Only visible to the developer) */}
+      {/* Section 6: Developer Dynamic Credentials Security (Only visible to the developer) */}
       {user && (user.email === 'taybekraa@gmail.com' || user.email === 'kraakraa109@gmail.com' || user.email === 'bachasalman69@gmail.com') && (
         <div className="space-y-4 pt-6 border-t border-white/10">
           <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
