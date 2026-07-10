@@ -1351,6 +1351,11 @@ Return ONLY valid JSON:
       finalConfidence = Math.round(finalConfidence * newsPenalty);
     }
 
+    // Pre-Pullback Age cap: re-apply after confidence computation to prevent overwrite
+    if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
+      finalConfidence = Math.min(finalConfidence, 30);
+    }
+
     // Multi-TF Direction: penalize if current direction conflicts with higher timeframe
     const directionConflicts = (isUp && isMacroDown) || (isDown && isMacroUp);
     if (directionConflicts) {
