@@ -241,7 +241,7 @@ const fetchBinanceData = async (symbol: string, timeframe: string): Promise<any>
   const interval = SERVER_INTERVAL_MAP[timeframe] || '1d';
   const limit = SERVER_LIMIT_MAP[timeframe] || 100;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), 10000);
   try {
     const url = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;
     const response = await fetch(url, { signal: controller.signal });
@@ -338,6 +338,9 @@ app.get("/api/market-data", async (req, res) => {
     }
 
     if (!finalData) return res.status(404).json({ error: "No data found" });
+
+    const hasQuotes = finalData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
+    if (!hasQuotes) return res.status(404).json({ error: "No data found" });
     res.json(finalData);
   } catch (error: any) {
     res.status(500).json({ error: "Server Error" });

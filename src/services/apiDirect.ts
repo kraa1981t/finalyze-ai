@@ -316,7 +316,8 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
         clearTimeout(timeout);
         if (r.ok) {
           const d = await r.json();
-          if (d && d.chart) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
+          const hasData = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
+          if (d && d.chart && hasData) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
         }
       } catch {}
     }
@@ -353,7 +354,8 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
         clearTimeout(timeout);
         if (r.ok) {
           const d = await r.json();
-          if (d && d.chart) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
+          const hasData = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
+          if (d && d.chart && hasData) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
         }
       } catch {}
     }
