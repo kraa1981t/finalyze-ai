@@ -235,41 +235,51 @@ const SERVER_LIMIT_MAP: Record<string, number> = {
   '1d': 365, '1w': 200, '1M': 200,
 };
 
+const BINANCE_ENDPOINTS = [
+  'https://api.binance.com',
+  'https://api1.binance.com',
+  'https://api3.binance.com',
+  'https://data-api.binance.vision',
+];
+
 const fetchBinanceData = async (symbol: string, timeframe: string): Promise<any> => {
   const pair = findServerCryptoPair(symbol);
   if (!pair) return null;
   const interval = SERVER_INTERVAL_MAP[timeframe] || '1d';
   const limit = SERVER_LIMIT_MAP[timeframe] || 100;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-  try {
-    const url = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-    if (!response.ok) return null;
-    const klines = await response.json();
-    if (!klines || klines.length < 10) return null;
-    return {
-      chart: {
-        result: [{
-          meta: { symbol, regularMarketTime: Math.floor(Date.now() / 1000) },
-          timestamp: klines.map((k: any[]) => Math.floor(k[0] / 1000)),
-          indicators: {
-            quote: [{
-              open: klines.map((k: any[]) => parseFloat(k[1])),
-              high: klines.map((k: any[]) => parseFloat(k[2])),
-              low: klines.map((k: any[]) => parseFloat(k[3])),
-              close: klines.map((k: any[]) => parseFloat(k[4])),
-              volume: klines.map((k: any[]) => parseFloat(k[5])),
-            }]
-          }
-        }]
-      }
-    };
-  } catch (e) {
-    clearTimeout(timeout);
-    return null;
+  
+  for (const base of BINANCE_ENDPOINTS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const url = `${base}/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!response.ok) continue;
+      const klines = await response.json();
+      if (!klines || klines.length < 10) continue;
+      return {
+        chart: {
+          result: [{
+            meta: { symbol, regularMarketTime: Math.floor(Date.now() / 1000) },
+            timestamp: klines.map((k: any[]) => Math.floor(k[0] / 1000)),
+            indicators: {
+              quote: [{
+                open: klines.map((k: any[]) => parseFloat(k[1])),
+                high: klines.map((k: any[]) => parseFloat(k[2])),
+                low: klines.map((k: any[]) => parseFloat(k[3])),
+                close: klines.map((k: any[]) => parseFloat(k[4])),
+                volume: klines.map((k: any[]) => parseFloat(k[5])),
+              }]
+            }
+          }]
+        }
+      };
+    } catch (e) {
+      clearTimeout(timeout);
+    }
   }
+  return null;
 };
 
 // API Route: Market Data
@@ -300,14 +310,14 @@ app.get("/api/market-data", async (req, res) => {
     else if (timeframe === '1w') { interval = '1wk'; range = '2y'; }
 
     const hasEquals = yahooSymbol.includes('=');
-    const isForex = !isMetal && !hasEquals && yahooSymbol.length >= 6 && (
+    const cryptoPair = findServerCryptoPair(rawSymbol);
+    const isCrypto = !!cryptoPair && !isMetal;
+    const isForex = !isMetal && !hasEquals && !isCrypto && yahooSymbol.length >= 6 && (
       yahooSymbol.endsWith('USD') || yahooSymbol.endsWith('EUR') ||
       yahooSymbol.endsWith('JPY') || yahooSymbol.endsWith('GBP') ||
       yahooSymbol.endsWith('AUD') || yahooSymbol.endsWith('NZD') ||
       yahooSymbol.endsWith('CAD') || yahooSymbol.endsWith('CHF')
     );
-    const cryptoPair = findServerCryptoPair(rawSymbol);
-    const isCrypto = !!cryptoPair && !isMetal;
 
     if (isCrypto) {
       const binanceData = await fetchBinanceData(rawSymbol, timeframe);
