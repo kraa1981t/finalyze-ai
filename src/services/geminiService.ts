@@ -894,9 +894,9 @@ Return ONLY valid JSON:
     const infantAgeThreshold = settings?.minInfantAge ?? 10;
     const matureAgeThreshold = settings?.minMatureAge ?? 25;
     const oldAgeThreshold = settings?.maxMatureAge ?? 50;
-    const infantLimit = isCrypto ? infantAgeThreshold * 2 : infantAgeThreshold;
-    const matureLimit = isCrypto ? matureAgeThreshold * 2 : matureAgeThreshold;
-    const oldLimit = isCrypto ? oldAgeThreshold * 2 : oldAgeThreshold;
+    const infantLimit = infantAgeThreshold;
+    const matureLimit = matureAgeThreshold;
+    const oldLimit = oldAgeThreshold;
 
     let aiResponse: any = null;
     for (let attempt = 0; attempt < 2; attempt++) {
