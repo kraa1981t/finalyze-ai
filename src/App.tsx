@@ -1872,7 +1872,7 @@ export default function App() {
                 </button>
               </div>
             )}
-            <AnalysisResultView results={analysisResults.filter(r => r.signal !== 'no_entry' && r.signal !== 'neutral')} lang={lang} settings={settings} />
+            <AnalysisResultView results={analysisResults} lang={lang} settings={settings} />
           </motion.div>
         )}
 
