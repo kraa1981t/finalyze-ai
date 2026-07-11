@@ -1265,8 +1265,10 @@ Return ONLY valid JSON:
     }
 
     // Multi-TF Direction: BLOCK signal if current direction conflicts with higher timeframe
+    let higherTFBlocked = false;
     const directionConflicts = (isUp && isMacroDown) || (isDown && isMacroUp);
     if (directionConflicts) {
+      higherTFBlocked = true;
       finalConfidence = Math.round(finalConfidence * 0.6); // 40% penalty for trading against higher TF
       // Force NEUTRAL when trading against the higher timeframe — this is too risky
       if (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
@@ -1295,7 +1297,10 @@ Return ONLY valid JSON:
     let direction: string;
     let agreementBonus = 0;
     
-    if (metricsDirection && aiDirection) {
+    if (higherTFBlocked) {
+      // Higher TF blocked the signal — direction stays null, force NEUTRAL below
+      direction = null;
+    } else if (metricsDirection && aiDirection) {
       if (metricsDirection === aiDirection) {
         // AGREE: both say same direction → boost confidence
         direction = metricsDirection;
@@ -1314,7 +1319,9 @@ Return ONLY valid JSON:
 
     finalConfidence = Math.min(100, finalConfidence + agreementBonus);
 
-    if (hasConflict) {
+    if (higherTFBlocked) {
+      finalSignal = SignalType.NEUTRAL;
+    } else if (hasConflict) {
       finalSignal = SignalType.NEUTRAL;
     } else if (primaryMetCount < 3) {
       finalSignal = SignalType.NEUTRAL;
