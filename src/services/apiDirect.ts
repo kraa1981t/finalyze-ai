@@ -4,24 +4,8 @@ const ALTERNATIVE_BASE = 'https://api.alternative.me';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const GROQ_BASE = 'https://api.groq.com/openai/v1';
 
-const CORS_PROXIES = [
-  'https://cors-anywhere.com/',
-  'https://api.allorigins.win/raw?url=',
-  'https://whateverorigin.org/get?url=',
-  'https://corsproxy.io/?url=',
-];
-
 async function fetchWithProxy(url: string, opts?: RequestInit): Promise<Response> {
-  for (const proxy of CORS_PROXIES) {
-    try {
-      const ac = new AbortController();
-      const t = setTimeout(() => ac.abort(), 8000);
-      const r = await fetch(`${proxy}${encodeURIComponent(url)}`, { ...opts, signal: ac.signal });
-      clearTimeout(t);
-      if (r.ok) return r;
-    } catch {}
-  }
-  throw new Error('All CORS proxies failed');
+  throw new Error('All CORS proxies dead');
 }
 
 const _dataCache = new Map<string, { data: any; ts: number }>();
@@ -307,58 +291,18 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
   const isCrypto = !!binancePair;
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    // 1. For crypto: try server FIRST (Binance via server bypasses Brave ad-blocker + CORS)
-    if (isCrypto) {
-      try {
-        const ac = new AbortController();
-        const timeout = setTimeout(() => ac.abort(), 12000);
-        const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`, { signal: ac.signal });
-        clearTimeout(timeout);
-        if (r.ok) {
-          const d = await r.json();
-          const hasData = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
-          if (d && d.chart && hasData) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
-        }
-      } catch {}
-    }
-
-    // 2. Try Binance directly (works without ad-blockers)
-    if (binancePair) {
-      try {
-        const interval = TIMEFRAME_MAP[timeframe] || '1d';
-        const limit = LIMIT_MAP[timeframe] || 100;
-        const ac = new AbortController();
-        const timeout = setTimeout(() => ac.abort(), 6000);
-        const r = await fetch(`${BINANCE_BASE}/klines?symbol=${binancePair}&interval=${interval}&limit=${limit}`, { signal: ac.signal });
-        clearTimeout(timeout);
-        if (r.ok) {
-          const klines = await r.json();
-          if (klines && klines.length >= 10) { const d = toYahooFormat(klines, symbol); _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
-        }
-      } catch {}
-    }
-
-    // 3. Try Yahoo Finance (forex + stocks + crypto fallback)
+    // 1. Try server (Binance via server for crypto, Yahoo for forex/stocks/metals)
     try {
-      const d = await fetchYahooFinance(symbol, timeframe);
-      _dataCache.set(cacheKey, { data: d, ts: Date.now() });
-      return d;
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 20000);
+      const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`, { signal: ac.signal });
+      clearTimeout(timeout);
+      if (r.ok) {
+        const d = await r.json();
+        const hasData = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
+        if (d && d.chart && hasData) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
+      }
     } catch {}
-
-    // 4. For non-crypto: try server as last fallback
-    if (!isCrypto) {
-      try {
-        const ac = new AbortController();
-        const timeout = setTimeout(() => ac.abort(), 15000);
-        const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`, { signal: ac.signal });
-        clearTimeout(timeout);
-        if (r.ok) {
-          const d = await r.json();
-          const hasData = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
-          if (d && d.chart && hasData) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
-        }
-      } catch {}
-    }
 
     if (attempt < 1) await new Promise(r => setTimeout(r, 1000));
   }

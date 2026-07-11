@@ -247,39 +247,42 @@ const fetchBinanceData = async (symbol: string, timeframe: string): Promise<any>
   if (!pair) return null;
   const interval = SERVER_INTERVAL_MAP[timeframe] || '1d';
   const limit = SERVER_LIMIT_MAP[timeframe] || 100;
-  
-  for (const base of BINANCE_ENDPOINTS) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    try {
+
+  // Try ALL endpoints in parallel — first valid response wins
+  const ac = new AbortController();
+  const timeout = setTimeout(() => ac.abort(), 10000);
+  const results = await Promise.allSettled(
+    BINANCE_ENDPOINTS.map(async (base) => {
       const url = `${base}/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (!response.ok) continue;
-      const klines = await response.json();
-      if (!klines || klines.length < 10) continue;
-      return {
-        chart: {
-          result: [{
-            meta: { symbol, regularMarketTime: Math.floor(Date.now() / 1000) },
-            timestamp: klines.map((k: any[]) => Math.floor(k[0] / 1000)),
-            indicators: {
-              quote: [{
-                open: klines.map((k: any[]) => parseFloat(k[1])),
-                high: klines.map((k: any[]) => parseFloat(k[2])),
-                low: klines.map((k: any[]) => parseFloat(k[3])),
-                close: klines.map((k: any[]) => parseFloat(k[4])),
-                volume: klines.map((k: any[]) => parseFloat(k[5])),
-              }]
-            }
+      const resp = await fetch(url, { signal: ac.signal });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const klines = await resp.json();
+      if (!klines || klines.length < 10) throw new Error('Too few klines');
+      return klines;
+    })
+  );
+  clearTimeout(timeout);
+
+  const klines = results.find(r => r.status === 'fulfilled')?.value;
+  if (!klines) return null;
+
+  return {
+    chart: {
+      result: [{
+        meta: { symbol, regularMarketTime: Math.floor(Date.now() / 1000) },
+        timestamp: klines.map((k: any[]) => Math.floor(k[0] / 1000)),
+        indicators: {
+          quote: [{
+            open: klines.map((k: any[]) => parseFloat(k[1])),
+            high: klines.map((k: any[]) => parseFloat(k[2])),
+            low: klines.map((k: any[]) => parseFloat(k[3])),
+            close: klines.map((k: any[]) => parseFloat(k[4])),
+            volume: klines.map((k: any[]) => parseFloat(k[5])),
           }]
         }
-      };
-    } catch (e) {
-      clearTimeout(timeout);
+      }]
     }
-  }
-  return null;
+  };
 };
 
 // API Route: Market Data
