@@ -938,20 +938,35 @@ Return ONLY valid JSON:
     }
 
     if (!aiResponse || aiResponse?.error) {
-      console.warn(`[Engine] AI unavailable for ${symbol}, using local analysis:`, aiResponse?.error);
-      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, timeframe, infantLimit, matureLimit, oldLimit, contextFearGreed, macroDirection);
+      console.warn(`[Engine] AI unavailable for ${symbol}, using metrics-based signal:`, aiResponse?.error);
     }
 
-    if (!aiResponse?.choices?.[0]?.message?.content) {
-      console.warn(`[Engine] AI returned no content for ${symbol}, using local analysis`);
-      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, timeframe, infantLimit, matureLimit, oldLimit, contextFearGreed, macroDirection);
+    let resultData: any;
+    if (aiResponse && !aiResponse?.error && aiResponse?.choices?.[0]?.message?.content) {
+      const rawText = aiResponse.choices[0].message.content;
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("AI Synthesis Error: Invalid JSON structure.");
+      resultData = JSON.parse(jsonMatch[0]);
+    } else {
+      // Fallback: synthesize resultData from metrics so it goes through the same STEP 2-6 pipeline
+      const dir = metrics?.direction || 'sideways';
+      const rsi = metrics?.rsi ?? 50;
+      const macd = metrics?.macdHistogram ?? 0;
+      const emaC = metrics?.emaCross || 'none';
+      let synthConf = 50;
+      if (dir === 'uptrend') synthConf += 10;
+      else if (dir === 'downtrend') synthConf -= 10;
+      if (rsi < 30) synthConf += 5;
+      else if (rsi > 70) synthConf -= 5;
+      if (macd > 0) synthConf += 3;
+      else if (macd < 0) synthConf -= 3;
+      if (emaC === 'bullish') synthConf += 5;
+      else if (emaC === 'bearish') synthConf -= 5;
+      synthConf = Math.max(20, Math.min(80, synthConf));
+      const synthSignal = synthConf >= 55 ? (dir === 'uptrend' ? 'buy' : dir === 'downtrend' ? 'sell' : 'neutral') : 'neutral';
+      resultData = { signal: synthSignal, confidence: synthConf, detailedReasons: [] };
+      console.log(`[Engine] ${symbol} synth: ${synthSignal} (${synthConf}%) dir=${dir} rsi=${rsi.toFixed(1)} ema=${emaC}`);
     }
-
-    const rawText = aiResponse.choices[0].message.content;
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("AI Synthesis Error: Invalid JSON structure.");
-    
-    const resultData = JSON.parse(jsonMatch[0]);
 
     // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     // LOCKED (v6): SIGNAL ENGINE RULES ΓÇö DO NOT MODIFY
