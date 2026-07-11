@@ -1126,10 +1126,18 @@ Return ONLY valid JSON:
     }
     // If no BB data at all ΓåÆ pass
 
-    // PRIMARY 2 ΓÇö Supply/Demand: no zones = pass, zones support = pass, zones conflict = BLOCK
+    // PRIMARY 2 ΓÇö Supply/Demand: no zones = pass, zones support = pass, zones conflict = penalty
     const hasZones = supplyDemandZones.length > 0;
     const nearestZone = supplyDemandZones[0];
-    const sdMet = !hasZones || ((nearestZone?.type === 'demand' && isUp) || (nearestZone?.type === 'supply' && isDown));
+    const sdAligned = hasZones && ((nearestZone?.type === 'demand' && isUp) || (nearestZone?.type === 'supply' && isDown));
+    const sdConflict = hasZones && !sdAligned;
+    // Always pass for regular signals; only block for STRONG via allGatesMet
+    const sdMet = !sdConflict;
+    // Confidence penalty when supply/demand conflicts (applies to all signals)
+    if (sdConflict) {
+      finalConfidence = Math.round(finalConfidence * 0.8);
+      detailedReasons.push({ check: 'Supply/Demand', value: `${nearestZone?.type} ${nearestZone?.bottom?.toFixed(2)}-${nearestZone?.top?.toFixed(2)} conflicts with ${metrics?.direction}`, status: 'negative', impact: `supply/demand conflict -20% confidence` });
+    }
 
     // PRIMARY 3 ΓÇö Trend Age: ALL zones pass (never blocks). Youth allows STRONG; others downgrade.
     const ageMet = true;
@@ -1341,10 +1349,10 @@ Return ONLY valid JSON:
       const CONF_BUFFER = 5;
       const prePullbackAgeMet = prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge;
       // ΓöÉ STRONG: all 5 gates (BB + Supply/Demand + Trend Age + Pre-Pullback + News) + supporting ratio + confidence
-      const allGatesMet = bbMet && sdMet && ageMet && prePullbackAgeMet && newsMet;
+      const allGatesMet = bbMet && !sdConflict && ageMet && prePullbackAgeMet && newsMet;
       const qualifiesForStrong = allGatesMet && supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER);
-      // ΓöÉ REGULAR: only Supply/Demand gate + confidence (bypass BB, Pre-Pullback Age, News)
-      const qualifiesForRegular = sdMet && finalConfidence >= (buyThreshold - CONF_BUFFER);
+      // ΓöÉ REGULAR: only confidence threshold (Supply/Demand already applied as penalty above)
+      const qualifiesForRegular = finalConfidence >= (buyThreshold - CONF_BUFFER);
       if (direction === 'buy') {
         if (qualifiesForStrong) {
           finalSignal = SignalType.STRONG_BUY;
