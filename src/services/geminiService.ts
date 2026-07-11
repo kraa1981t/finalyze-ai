@@ -433,7 +433,8 @@ async function fetchAndPrepareSymbolData(
 function generateLocalAnalysis(
   metrics: any, zonesText: string, supplyDemandZones: any[], microMetrics: any, microTF: string,
   settings: StrategySettings, type: MarketType, lang: string, symbol: string, timeframe: string, infantLimit: number, matureLimit: number, oldLimit: number,
-  contextFearGreed?: { value: number; classification: string } | null
+  contextFearGreed?: { value: number; classification: string } | null,
+  macroDirection?: 'uptrend' | 'downtrend' | 'sideways'
 ): AnalysisResult {
   const minAge = settings?.minTrendAge ?? 2;
   const age = metrics?.age || 0;
@@ -624,6 +625,19 @@ function generateLocalAnalysis(
 
   const minConf = settings?.minConfidence || 45;
   if (confidence < minConf) rawSignal = SignalType.NEUTRAL;
+
+  // Higher TF Direction: BLOCK signal if current direction conflicts with higher timeframe
+  const directionConflicts = macroDirection && (
+    (isUp && macroDirection === 'downtrend') || (isDown && macroDirection === 'uptrend')
+  );
+  if (directionConflicts) {
+    confidence = Math.round(confidence * 0.6);
+    if (rawSignal === SignalType.BUY || rawSignal === SignalType.STRONG_BUY ||
+        rawSignal === SignalType.SELL || rawSignal === SignalType.STRONG_SELL) {
+      rawSignal = SignalType.NEUTRAL;
+    }
+    reasons.push({ check: 'Higher TF Direction', value: `Higher: ${macroDirection} vs Current: ${direction}`, status: 'negative', impact: 'BLOCKED: trading against higher timeframe trend', primary: true });
+  }
 
   // Pre-Pullback Age filter: if trend before pullback is too short or too exhausted, force NEUTRAL
   if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
@@ -910,12 +924,12 @@ Return ONLY valid JSON:
 
     if (!aiResponse || aiResponse?.error) {
       console.warn(`[Engine] AI unavailable for ${symbol}, using local analysis:`, aiResponse?.error);
-      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, timeframe, infantLimit, matureLimit, oldLimit, contextFearGreed);
+      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, timeframe, infantLimit, matureLimit, oldLimit, contextFearGreed, macroDirection);
     }
 
     if (!aiResponse?.choices?.[0]?.message?.content) {
       console.warn(`[Engine] AI returned no content for ${symbol}, using local analysis`);
-      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, timeframe, infantLimit, matureLimit, oldLimit, contextFearGreed);
+      return generateLocalAnalysis(metrics, zonesText, supplyDemandZones, microMetrics, microTF, settings, type, lang, symbol, timeframe, infantLimit, matureLimit, oldLimit, contextFearGreed, macroDirection);
     }
 
     const rawText = aiResponse.choices[0].message.content;
@@ -1232,15 +1246,20 @@ Return ONLY valid JSON:
       finalConfidence = Math.min(finalConfidence, 30);
     }
 
-    // Multi-TF Direction: penalize if current direction conflicts with higher timeframe
+    // Multi-TF Direction: BLOCK signal if current direction conflicts with higher timeframe
     const directionConflicts = (isUp && isMacroDown) || (isDown && isMacroUp);
     if (directionConflicts) {
-      finalConfidence = Math.round(finalConfidence * 0.75); // 25% penalty for trading against higher TF
+      finalConfidence = Math.round(finalConfidence * 0.6); // 40% penalty for trading against higher TF
+      // Force NEUTRAL when trading against the higher timeframe — this is too risky
+      if (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
+          finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL) {
+        finalSignal = SignalType.NEUTRAL;
+      }
       detailedReasons.push({ 
         check: `Higher TF Direction (${macro1})`, 
         value: `Higher TF: ${macroDirection} vs Current: ${metrics?.direction}`, 
         status: 'negative', 
-        impact: `WARNING: trading against higher timeframe trend` 
+        impact: `BLOCKED: trading against higher timeframe trend is too risky` 
       });
     } else {
       detailedReasons.push({ 
