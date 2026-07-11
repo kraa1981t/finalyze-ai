@@ -688,8 +688,9 @@ export async function analyzeMarketBatch(
       try {
         if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
         await waitIfRateLimited();
+        const t0 = Date.now();
         const result = await analyzeMarket({ symbol: p.symbol, type: p.type, timeframe: p.timeframe, tradingStyle: p.tradingStyle, settings, lang });
-        console.log(`[Batch] ${p.symbol} ΓåÆ ${result.signal} (${result.confidence}%)`);
+        console.log(`[Batch] ${p.symbol} → ${result.signal} (${result.confidence}%) [${Date.now() - t0}ms]`);
         results.push(result);
         lastError = null;
         break;
@@ -697,6 +698,12 @@ export async function analyzeMarketBatch(
         lastError = e;
         console.warn(`[Batch] Attempt ${attempt + 1} FAILED ${p.symbol}:`, e.message);
       }
+    }
+    if (lastError) {
+      console.error(`[Batch] GIVING UP ${p.symbol} after 2 attempts:`, lastError.message);
+      errors.push({ symbol: p.symbol, error: lastError.message || 'Analysis failed' });
+    }
+  }
     }
     if (lastError) errors.push({ symbol: p.symbol, error: lastError.message || 'Analysis failed' });
   }
@@ -706,6 +713,11 @@ export async function analyzeMarketBatch(
     if (onProgress) onProgress(batch[0].symbol, total, i, errors.length);
     await Promise.all(batch.map((p, j) => analyzeOne(p, i + j)));
     if (i + BATCH_SIZE < total) await new Promise(r => setTimeout(r, 800));
+  }
+
+  console.log(`[Batch] DONE: ${results.length} results, ${errors.length} errors out of ${total} symbols`);
+  if (errors.length > 0) {
+    console.error(`[Batch] Failed symbols:`, errors.map(e => `${e.symbol}: ${e.error}`).join(' | '));
   }
 
   return { results, errors };
@@ -736,21 +748,27 @@ export async function analyzeMarket(params: {
     const macro2 = TF_PROGRESSION[Math.min(currentIndex + 2, TF_PROGRESSION.length - 1)];
     const microTF = currentIndex > 0 ? TF_PROGRESSION[currentIndex - 1] : TF_PROGRESSION[0];
 
-    // Fetch ALL data sources in PARALLEL ΓÇö saves ~10-15s per symbol
+    // Fetch ALL data sources in PARALLEL — saves ~10-15s per symbol
+    console.log(`[Engine] Fetching data for ${symbol} (${timeframe}, micro=${microTF}, macro=${macro1})`);
+    const fetchT0 = Date.now();
     const [rawData, microDataRaw, ctxResult, macroDataRaw] = await Promise.all([
-      fetchMarketDataDirect(symbol, timeframe).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } })),
-      fetchMarketDataDirect(symbol, microTF).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } })),
-      fetchMarketContext(symbol).catch(() => ({ fearGreed: null, news: [], econEvents: [] })),
-      fetchMarketDataDirect(symbol, macro1).catch(() => ({ chart: { result: [{ indicators: { quote: [{}] } }] } })),
+      fetchMarketDataDirect(symbol, timeframe).catch((e) => { console.warn(`[Engine] ${symbol} main fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
+      fetchMarketDataDirect(symbol, microTF).catch((e) => { console.warn(`[Engine] ${symbol} micro fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
+      fetchMarketContext(symbol).catch((e) => { console.warn(`[Engine] ${symbol} ctx fail:`, e.message); return { fearGreed: null, news: [], econEvents: [] }; }),
+      fetchMarketDataDirect(symbol, macro1).catch((e) => { console.warn(`[Engine] ${symbol} macro fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
     ]);
+    console.log(`[Engine] ${symbol} data fetched in ${Date.now() - fetchT0}ms`);
 
     let contextFearGreed = ctxResult.fearGreed;
     let contextNews: { title: string; source: string }[] = ctxResult.news || [];
     let contextEcon: any[] = ctxResult.econEvents || [];
 
     const quotes = rawData.chart?.result?.[0]?.indicators?.quote?.[0];
+    const closeLen = quotes?.close?.filter((c: any) => c != null)?.length || 0;
+    console.log(`[Engine] ${symbol} close data points: ${closeLen}`);
     
     if (!quotes || !quotes.close) {
+      console.error(`[Engine] ${symbol} BLOCKED: no close data — rawData keys: ${JSON.stringify(Object.keys(rawData?.chart?.result?.[0] || {}))}`);
       throw new Error("Market data currently unavailable from the source.");
     }
 

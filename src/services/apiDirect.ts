@@ -301,8 +301,13 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
         const d = await r.json();
         const hasData = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
         if (d && d.chart && hasData) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
+        console.warn(`[FetchData] ${symbol} server returned data but no valid close. hasData=${hasData}, d.chart=${!!d?.chart}`);
+      } else {
+        console.warn(`[FetchData] ${symbol} server responded ${r.status} ${r.statusText}`);
       }
-    } catch {}
+    } catch (e: any) {
+      console.warn(`[FetchData] ${symbol} attempt ${attempt + 1} error:`, e.message);
+    }
 
     if (attempt < 1) await new Promise(r => setTimeout(r, 1000));
   }
