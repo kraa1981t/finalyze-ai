@@ -1207,21 +1207,29 @@ Return ONLY valid JSON:
     let finalSignal = rawSignal as SignalType;
     let finalConfidence = Number(resultData.confidence) || 50;
 
-    // ΓöÇΓöÇ STEP 4: Age zone adjustments ΓöÇΓöÇ — ONLY for STRONG candidates
+    // ΓöÇΓöÇ STEP 4: Age zone adjustments ΓöÇΓöÇ
     const isStrongCandidate = rawSignal === 'strong_buy' || rawSignal === 'strong_sell';
+    const isOld = totalAge > oldLimit;
+
+    // Regular signals: block in OLD zone only (infant, youth, mature allowed)
+    if (!isStrongCandidate && isOld) {
+      finalSignal = SignalType.NEUTRAL;
+      finalConfidence = Math.min(finalConfidence, 25);
+      detailedReasons.push({ check: 'Trend Age Zone', value: `${totalAge}c ΓÇö كهل (أكثر من ${oldLimit})`, status: 'negative', impact: 'trend exhausted ΓÇö no signals allowed' });
+    }
+
+    // STRONG signals: only allowed in MATURE zone (25-70)
     if (isStrongCandidate) {
-      if (totalAge < infantLimit) {
-        finalConfidence = Math.round(finalConfidence * 0.7);
-        if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
-        if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
-      } else if (totalAge < matureLimit) {
-        // Youth ΓÇö ONLY zone allowing STRONG
-      } else if (totalAge <= oldLimit) {
-        // Mature ΓÇö downgrade STRONG to regular
-        if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
-        if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
-      } else {
-        finalConfidence = Math.round(finalConfidence * 0.75);
+      const isMature = totalAge >= matureLimit && totalAge <= oldLimit;
+      if (!isMature) {
+        // Not mature → downgrade STRONG to regular
+        if (totalAge < infantLimit) {
+          finalConfidence = Math.round(finalConfidence * 0.7);
+        } else if (totalAge < matureLimit) {
+          finalConfidence = Math.round(finalConfidence * 0.85);
+        } else {
+          finalConfidence = Math.round(finalConfidence * 0.75);
+        }
         if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
         if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
       }
@@ -1356,9 +1364,9 @@ Return ONLY valid JSON:
       } else {
         finalSignal = SignalType.NEUTRAL;
       }
-      // Youth-only STRONG enforcement
-      const isYouth = totalAge >= infantLimit && totalAge < matureLimit;
-      if (!isYouth && (finalSignal === SignalType.STRONG_BUY || finalSignal === SignalType.STRONG_SELL)) {
+      // Mature-only STRONG enforcement
+      const isMature = totalAge >= matureLimit && totalAge <= oldLimit;
+      if (!isMature && (finalSignal === SignalType.STRONG_BUY || finalSignal === SignalType.STRONG_SELL)) {
         finalSignal = finalSignal === SignalType.STRONG_BUY ? SignalType.BUY : SignalType.SELL;
       }
     }
