@@ -475,7 +475,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                     className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
                 </div>
               </div>
-              <p className="text-xs text-brand-text/40">{isAr ? 'فوق هذه القيمة ← اتجاه عجوز (خطر انعكاس، تخفيف الثقة). للكريبتو: ×2. افتراضي: 50' : 'Above this → aging trend (reversal risk, confidence cap). For crypto: ×2. Default: 50'}</p>
+              <p className="text-xs text-brand-text/40">{isAr ? 'فوق هذه القيمة ← اتجاه عجوز (خطر انعكاس، تخفيف الثقة). افتراضي: 50' : 'Above this → aging trend (reversal risk, confidence cap). Default: 50'}</p>
             </div>
 
             {/* Pre-Pullback Age — Min */}

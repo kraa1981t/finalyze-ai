@@ -495,8 +495,9 @@ function generateLocalAnalysis(
   }
 
   // ΓöÇΓöÇ PRIMARY 3b: Pre-Pullback Age ΓöÇΓöÇ
-  const minPreAge = settings?.minPrePullbackAge ?? 15;
+  const rawMinPreAge = settings?.minPrePullbackAge ?? 15;
   const maxPreAge = settings?.maxPrePullbackAge ?? 50;
+  const minPreAge = Math.min(rawMinPreAge, Math.max(3, Math.floor(totalAge * 0.5)));
   const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
   const pullbackPt = metrics?.pullbackPoint;
   const lastSwing = metrics?.lastSwingPoint;
@@ -1196,8 +1197,10 @@ Return ONLY valid JSON:
     if (age < minAge) finalConfidence = Math.round(finalConfidence * 0.8);
 
     // Pre-Pullback Age filter: if trend before pullback is too short or too exhausted, force NEUTRAL
-    const minPreAge = settings?.minPrePullbackAge ?? 15;
+    // Adaptive minimum: cannot require more than the trend itself provides
+    const rawMinPreAge = settings?.minPrePullbackAge ?? 15;
     const maxPreAge = settings?.maxPrePullbackAge ?? 50;
+    const minPreAge = Math.min(rawMinPreAge, Math.max(3, Math.floor(totalAge * 0.5)));
     const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
     const pullbackPtAI = metrics?.pullbackPoint;
     const lastSwingAI = metrics?.lastSwingPoint;
