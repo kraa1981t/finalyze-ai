@@ -964,7 +964,7 @@ Return ONLY valid JSON:
       else if (emaC === 'bearish') synthConf -= 5;
       synthConf = Math.max(20, Math.min(80, synthConf));
       const synthSignal = synthConf >= 55 ? (dir === 'uptrend' ? 'buy' : dir === 'downtrend' ? 'sell' : 'neutral') : 'neutral';
-      resultData = { signal: synthSignal, confidence: synthConf, detailedReasons: [] };
+      resultData = { signal: synthSignal, confidence: synthConf, detailedReasons: [], summary: `${symbol} ${synthSignal} (${synthConf}%) — metrics-based`, microSignal: 'unknown', microTrend: dir, historicalMatch: 'N/A' };
       console.log(`[Engine] ${symbol} synth: ${synthSignal} (${synthConf}%) dir=${dir} rsi=${rsi.toFixed(1)} ema=${emaC}`);
     }
 
