@@ -704,9 +704,6 @@ export async function analyzeMarketBatch(
       errors.push({ symbol: p.symbol, error: lastError.message || 'Analysis failed' });
     }
   }
-    }
-    if (lastError) errors.push({ symbol: p.symbol, error: lastError.message || 'Analysis failed' });
-  }
 
   for (let i = 0; i < total; i += BATCH_SIZE) {
     const batch = paramsList.slice(i, i + BATCH_SIZE);
