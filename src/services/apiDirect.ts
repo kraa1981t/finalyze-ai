@@ -303,9 +303,25 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
   const cached = _dataCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
 
+  const binancePair = findCryptoPair(symbol);
+  const isCrypto = !!binancePair;
+
   for (let attempt = 0; attempt < 2; attempt++) {
-    // 1. Try Binance first (crypto only, no CORS issues)
-    const binancePair = findCryptoPair(symbol);
+    // 1. For crypto: try server FIRST (Binance via server bypasses Brave ad-blocker + CORS)
+    if (isCrypto) {
+      try {
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 12000);
+        const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`, { signal: ac.signal });
+        clearTimeout(timeout);
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d.chart) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
+        }
+      } catch {}
+    }
+
+    // 2. Try Binance directly (works without ad-blockers)
     if (binancePair) {
       try {
         const interval = TIMEFRAME_MAP[timeframe] || '1d';
@@ -321,24 +337,26 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
       } catch {}
     }
 
-    // 2. Try Yahoo Finance (forex + stocks + crypto fallback)
+    // 3. Try Yahoo Finance (forex + stocks + crypto fallback)
     try {
       const d = await fetchYahooFinance(symbol, timeframe);
       _dataCache.set(cacheKey, { data: d, ts: Date.now() });
       return d;
     } catch {}
 
-    // 3. Try server-side proxy (bypasses CORS + Brave ad-blocker)
-    try {
-      const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), 15000);
-      const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`, { signal: ac.signal });
-      clearTimeout(timeout);
-      if (r.ok) {
-        const d = await r.json();
-        if (d && d.chart) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
-      }
-    } catch {}
+    // 4. For non-crypto: try server as last fallback
+    if (!isCrypto) {
+      try {
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 15000);
+        const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`, { signal: ac.signal });
+        clearTimeout(timeout);
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d.chart) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
+        }
+      } catch {}
+    }
 
     if (attempt < 1) await new Promise(r => setTimeout(r, 1000));
   }
