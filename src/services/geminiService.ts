@@ -1207,26 +1207,28 @@ Return ONLY valid JSON:
     let finalSignal = rawSignal as SignalType;
     let finalConfidence = Number(resultData.confidence) || 50;
 
-    // ΓöÇΓöÇ STEP 4: Age zone adjustments ΓöÇΓöÇ
-    if (totalAge < infantLimit) {
-      finalConfidence = Math.round(finalConfidence * 0.7);
-      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
-      if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
-    } else if (totalAge < matureLimit) {
-      // Youth ΓÇö ONLY zone allowing STRONG
-    } else if (totalAge <= oldLimit) {
-      // Mature ΓÇö downgrade STRONG to regular
-      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
-      if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
-    } else {
-      finalConfidence = Math.round(finalConfidence * 0.75);
-      if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
-      if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
+    // ΓöÇΓöÇ STEP 4: Age zone adjustments ΓöÇΓöÇ — ONLY for STRONG candidates
+    const isStrongCandidate = rawSignal === 'strong_buy' || rawSignal === 'strong_sell';
+    if (isStrongCandidate) {
+      if (totalAge < infantLimit) {
+        finalConfidence = Math.round(finalConfidence * 0.7);
+        if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
+        if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
+      } else if (totalAge < matureLimit) {
+        // Youth ΓÇö ONLY zone allowing STRONG
+      } else if (totalAge <= oldLimit) {
+        // Mature ΓÇö downgrade STRONG to regular
+        if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
+        if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
+      } else {
+        finalConfidence = Math.round(finalConfidence * 0.75);
+        if (finalSignal === SignalType.STRONG_BUY) finalSignal = SignalType.BUY;
+        if (finalSignal === SignalType.STRONG_SELL) finalSignal = SignalType.SELL;
+      }
+      if (age < minAge) finalConfidence = Math.round(finalConfidence * 0.8);
     }
-    if (age < minAge) finalConfidence = Math.round(finalConfidence * 0.8);
 
-    // Pre-Pullback Age filter: if trend before pullback is too short or too exhausted, force NEUTRAL
-    // Adaptive minimum: cannot require more than the trend itself provides
+    // ΓöÇΓöÇ STEP 4b: Pre-Pullback Age ΓöÇΓöÇ — filter blocks STRONG only; regular signals bypass
     const rawMinPreAge = settings?.minPrePullbackAge ?? 15;
     const maxPreAge = settings?.maxPrePullbackAge ?? 50;
     const minPreAge = Math.min(rawMinPreAge, Math.max(3, Math.floor(totalAge * 0.5)));
@@ -1236,15 +1238,17 @@ Return ONLY valid JSON:
     const trendStartInfoAI = pullbackPtAI ? (pullbackPtAI.date ? `${pullbackPtAI.date} (${pullbackPtAI.price.toFixed(5)})` : pullbackPtAI.price.toFixed(5)) : 'N/A';
     const lastSwingInfoAI = lastSwingAI ? (lastSwingAI.date ? `${lastSwingAI.date} (${lastSwingAI.price.toFixed(5)})` : lastSwingAI.price.toFixed(5)) : 'N/A';
     if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
-      finalSignal = SignalType.NEUTRAL;
-      finalConfidence = Math.min(finalConfidence, 30);
+      if (isStrongCandidate) {
+        finalSignal = SignalType.NEUTRAL;
+        finalConfidence = Math.min(finalConfidence, 30);
+      }
       if (prePullbackAgeVal < minPreAge) {
-        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'neutral', impact: 'trend before pullback too short ΓÇö neutral only' });
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: isStrongCandidate ? 'neutral' : 'positive', impact: isStrongCandidate ? 'trend before pullback too short ΓÇö blocks STRONG' : 'trend short but regular signal bypasses' });
       } else {
-        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'negative', impact: 'trend exhausted ΓÇö neutral only' });
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: isStrongCandidate ? 'negative' : 'positive', impact: isStrongCandidate ? 'trend exhausted ΓÇö blocks STRONG' : 'trend exhausted but regular signal bypasses' });
       }
     } else if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
-      detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'positive', impact: 'trend healthy ΓÇö STRONG signals allowed' });
+      detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'positive', impact: 'trend healthy ΓÇö all signals allowed' });
     }
 
     // ΓöÇΓöÇ STEP 5: Compute confidence from metrics ΓöÇΓöÇ
@@ -1320,26 +1324,31 @@ Return ONLY valid JSON:
       finalSignal = SignalType.NEUTRAL;
     } else if (hasConflict) {
       finalSignal = SignalType.NEUTRAL;
-    } else if (primaryMetCount < 3) {
+    } else if (direction === null) {
       finalSignal = SignalType.NEUTRAL;
     } else {
       const strongThreshold = settings?.strongThreshold ?? 60;
       const buyThreshold = settings?.buyThreshold ?? 40;
       const minStrongSupport = (settings?.minStrongSupport ?? 50) / 100;
       const CONF_BUFFER = 5;
-      const prePullbackAgeMetAI = prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge;
+      const prePullbackAgeMet = prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge;
+      // ΓöÉ STRONG: all 5 gates (BB + Supply/Demand + Trend Age + Pre-Pullback + News) + supporting ratio + confidence
+      const allGatesMet = bbMet && sdMet && ageMet && prePullbackAgeMet && newsMet;
+      const qualifiesForStrong = allGatesMet && supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER);
+      // ΓöÉ REGULAR: only Supply/Demand gate + confidence (bypass BB, Pre-Pullback Age, News)
+      const qualifiesForRegular = sdMet && finalConfidence >= (buyThreshold - CONF_BUFFER);
       if (direction === 'buy') {
-        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER) && prePullbackAgeMetAI) {
+        if (qualifiesForStrong) {
           finalSignal = SignalType.STRONG_BUY;
-        } else if (finalConfidence >= (buyThreshold - CONF_BUFFER)) {
+        } else if (qualifiesForRegular) {
           finalSignal = SignalType.BUY;
         } else {
           finalSignal = SignalType.NEUTRAL;
         }
       } else if (direction === 'sell') {
-        if (supportRatio >= minStrongSupport && finalConfidence >= (strongThreshold - CONF_BUFFER) && prePullbackAgeMetAI) {
+        if (qualifiesForStrong) {
           finalSignal = SignalType.STRONG_SELL;
-        } else if (finalConfidence >= (buyThreshold - CONF_BUFFER)) {
+        } else if (qualifiesForRegular) {
           finalSignal = SignalType.SELL;
         } else {
           finalSignal = SignalType.NEUTRAL;
