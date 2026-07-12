@@ -224,10 +224,11 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
         r.userId = user?.uid || 'anonymous';
         results.push(r);
         if (user?.uid) {
+          const clean = Object.fromEntries(Object.entries(r).filter(([_, v]) => v !== undefined && v !== null));
           addDoc(collection(db, "analysisResults"), {
-            ...r,
+            ...clean,
             timestamp: serverTimestamp(),
-          }).catch(() => {});
+          }).catch((e) => console.warn('[Form] Firestore save failed:', e.message));
         }
       }
       for (const e of batchResult.errors) {
