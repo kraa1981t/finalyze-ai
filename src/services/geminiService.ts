@@ -1324,30 +1324,26 @@ Return ONLY valid JSON:
       });
     }
 
-    // ΓöÇΓöÇ STEP 6: Voting system — Metrics vs AI ΓöÇΓöÇ
+    // ΓöÇΓöÇ STEP 6: Direction from METRICS (primary) — AI cannot override trend direction ΓöÇΓöÇ
     const metricsDirection = isUp ? 'buy' : isDown ? 'sell' : null;
-    const aiDirection = finalSignal.includes('buy') ? 'buy' : finalSignal.includes('sell') ? 'sell' : null;
     
     var direction: string;
     var agreementBonus = 0;
     
     if (higherTFBlocked) {
-      // Higher TF blocked the signal — direction stays null, force NEUTRAL below
       direction = null;
-    } else if (metricsDirection && aiDirection) {
-      if (metricsDirection === aiDirection) {
-        // AGREE: both say same direction → boost confidence
-        direction = metricsDirection;
+    } else if (metricsDirection) {
+      // Metrics direction is ALWAYS primary — trend direction + RSI + EMA determine direction
+      direction = metricsDirection;
+      // Check if AI agrees (bonus only — AI cannot flip direction)
+      const aiAgrees = finalSignal.includes(metricsDirection);
+      if (aiAgrees) {
         agreementBonus = 10;
-      } else {
-        // DISAGREE: reduce confidence but don't force NEUTRAL
-        direction = aiDirection;
-        finalConfidence = Math.round(finalConfidence * 0.75);
       }
     } else {
-      // Both neutral or one missing — compute direction from supporting reasons
-      if (buyReasons > sellReasons + 1) direction = 'buy';
-      else if (sellReasons > buyReasons + 1) direction = 'sell';
+      // Sideways — use supporting reasons to determine direction
+      if (buyReasons > sellReasons + 2) direction = 'buy';
+      else if (sellReasons > buyReasons + 2) direction = 'sell';
       else direction = null;
     }
 
@@ -1486,11 +1482,18 @@ Return ONLY valid JSON:
       }
     }
 
+    // ΓöÇΓöÇ Generate STABLE summary from metrics (not AI text) ΓöÇΓöÇ
+    const trendText = metrics?.direction === 'uptrend' ? 'صاعد' : metrics?.direction === 'downtrend' ? 'هابط' : 'عرضي';
+    const zoneText = totalAge < infantAgeThreshold ? 'طفولي' : totalAge < matureAgeThreshold ? 'شاب' : totalAge <= oldAgeThreshold ? 'نضج' : 'كهل';
+    const signalText = finalSignal === SignalType.STRONG_BUY ? 'شراء قوي' : finalSignal === SignalType.BUY ? 'شراء' : finalSignal === SignalType.STRONG_SELL ? 'بيع قوي' : finalSignal === SignalType.SELL ? 'بيع' : 'محايد';
+    const rsiText = metrics?.rsi !== undefined ? `RSI=${metrics.rsi.toFixed(0)}` : '';
+    const summary = `${symbol} ${signalText} ${finalConfidence}% — ${trendText} (${totalAge}c ${zoneText}) ${rsiText}`;
+
     const finalResult: AnalysisResult = {
       symbol, type, timeframe,
       signal: finalSignal,
       confidence: finalConfidence,
-      summary: resultData.summary,
+      summary,
       detailedReasons,
       newsSources: [...new Set(detailedReasons
         .filter((r: any) => r.check === 'News Sentiment' && r.source)
