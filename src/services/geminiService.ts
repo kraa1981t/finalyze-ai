@@ -598,23 +598,33 @@ function generateLocalAnalysis(
 
   // ΓöÇΓöÇ Signal classification ΓöÇΓöÇ
   let rawSignal: SignalType;
+  const CONF_BUFFER = 5;
+  const isOld = totalAge > oldLimit;
+  const isMatureForStrong = totalAge >= matureLimit && totalAge <= oldLimit;
 
+  // Old zone: block ALL signals
+  if (isOld) {
+    rawSignal = SignalType.NEUTRAL;
+    confidence = Math.min(confidence, 25);
+  }
   // Sideways + no strong evidence = NEUTRAL
-  const CONF_BUFFER = 5; // Confidence buffer to prevent borderline flips
-  if (!isUp && !isDown && !hasStrongEvidence) {
+  else if (!isUp && !isDown && !hasStrongEvidence) {
     rawSignal = SignalType.NEUTRAL;
     confidence = Math.min(confidence, 35);
-  } else if (totalScore > 0 && primaryMetCount >= 3) {
-    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet && prePullbackAgeMet) rawSignal = SignalType.STRONG_BUY;
-    else if (confidence >= (buyThresh - CONF_BUFFER)) rawSignal = SignalType.BUY;
-    else rawSignal = SignalType.NEUTRAL;
-  } else if (totalScore < 0 && primaryMetCount >= 3) {
-    if (confidence >= (strongThresh - CONF_BUFFER) && bbPullbackMet && prePullbackAgeMet) rawSignal = SignalType.STRONG_SELL;
-    else if (confidence >= (buyThresh - CONF_BUFFER)) rawSignal = SignalType.SELL;
-    else rawSignal = SignalType.NEUTRAL;
+  }
+  // STRONG signals: only in MATURE zone (25-70), all gates required
+  else if (totalScore > 0 && primaryMetCount >= 3 && isMatureForStrong && bbPullbackMet && prePullbackAgeMet && confidence >= (strongThresh - CONF_BUFFER)) {
+    rawSignal = SignalType.STRONG_BUY;
+  } else if (totalScore < 0 && primaryMetCount >= 3 && isMatureForStrong && bbPullbackMet && prePullbackAgeMet && confidence >= (strongThresh - CONF_BUFFER)) {
+    rawSignal = SignalType.STRONG_SELL;
+  }
+  // Regular BUY/SELL: only needs buyThreshold (bypass BB, Pre-Pullback, News)
+  else if (totalScore > 0 && confidence >= (buyThresh - CONF_BUFFER)) {
+    rawSignal = SignalType.BUY;
+  } else if (totalScore < 0 && confidence >= (buyThresh - CONF_BUFFER)) {
+    rawSignal = SignalType.SELL;
   } else {
     rawSignal = SignalType.NEUTRAL;
-    confidence = Math.min(confidence, buyThresh - 1);
   }
 
   // Age zone caps
@@ -958,30 +968,10 @@ Return ONLY valid JSON:
     }
 
     const aiOk = aiResponse && !aiResponse?.error && aiResponse?.choices?.[0]?.message?.content;
-    let resultData: any;
-    if (aiOk) {
-      const rawText = aiResponse.choices[0].message.content;
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("AI Synthesis Error: Invalid JSON structure.");
-      resultData = JSON.parse(jsonMatch[0]);
-    } else {
-      resultData = synthFromMetrics(metrics, symbol);
-    }
+    const rawText = aiOk ? aiResponse.choices[0].message.content : '';
+    const jsonMatch = aiOk ? rawText.match(/\{[\s\S]*\}/) : null;
+    const resultData = aiOk && jsonMatch ? JSON.parse(jsonMatch[0]) : synthFromMetrics(metrics, symbol);
 
-    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
-    // LOCKED (v6): SIGNAL ENGINE RULES ΓÇö DO NOT MODIFY
-    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
-    // RULE: ALL 4 primary conditions are MANDATORY for ANY signal.
-    // RULE: BB Pullback (lenient): passes if BB exists + aligns with direction. Blocks only on active conflict.
-    // RULE: Strict pullback (touch+3-6c+reversal) is for STRONG upgrade bonus, NOT for gate.
-    // RULE: Primary conditions computed from METRICS, not AI text.
-    // RULE: Supporting ratio <40% ΓåÆ NEUTRAL, 40-59% ΓåÆ regular, ΓëÑ60% ΓåÆ STRONG allowed.
-    // RULE: Youth zone (10-25) is the ONLY zone allowing STRONG signals.
-    // RULE: Supply/Demand ΓÇö no zones detected = pass (not block).
-    // RULE: Conflict = 3+ buy reasons AND 3+ sell reasons ΓåÆ force NEUTRAL.
-    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
-
-    // ΓöÇΓöÇ STEP 1: Build detailedReasons BEFORE any enforcement ΓöÇΓöÇ
     let detailedReasons: any[] = Array.isArray(resultData.detailedReasons) ? [...resultData.detailedReasons] : [];
 
     // Build fallback from metrics if AI didn't provide reasons
