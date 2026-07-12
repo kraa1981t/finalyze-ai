@@ -1281,6 +1281,18 @@ Return ONLY valid JSON:
     const computedConfidence = baseConf + primaryConf + supportConf;
     finalConfidence = computedConfidence;
 
+    // ΓöÇΓöÇ STEP 5b: Age Zone Confidence Penalty ΓöÇΓöÇ
+    // Infant trends have insufficient data — penalize confidence to avoid overconfidence
+    if (totalAge < infantAgeThreshold) {
+      const infantPenalty = Math.round(finalConfidence * 0.30); // -30%
+      finalConfidence = Math.max(finalConfidence - infantPenalty, 25);
+      detailedReasons.push({ check: 'Age Zone Penalty', value: `${totalAge}c — طفل (<${infantAgeThreshold})`, status: 'negative', impact: `trend too young, insufficient data — confidence -30%` });
+    } else if (totalAge < matureAgeThreshold) {
+      const youthPenalty = Math.round(finalConfidence * 0.15); // -15%
+      finalConfidence = Math.max(finalConfidence - youthPenalty, 30);
+      detailedReasons.push({ check: 'Age Zone Penalty', value: `${totalAge}c — شباب (${infantAgeThreshold}-${matureAgeThreshold})`, status: 'neutral', impact: `trend developing, moderate confidence — confidence -15%` });
+    }
+
     // Pre-Pullback Age cap: re-apply after confidence computation to prevent overwrite
     if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
       finalConfidence = Math.min(finalConfidence, 30);
