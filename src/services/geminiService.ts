@@ -807,6 +807,11 @@ export async function analyzeMarket(params: {
     const volumes = quotes.volume?.filter((v: any) => v != null);
     const rawOpens2 = quotes.open?.filter((c: any) => c != null) || closes;
     const opens = rawOpens2.length >= closes.length ? rawOpens2 : closes;
+    
+    // Extract timestamps for date calculations
+    const timestamps: number[] = rawData.chart?.result?.[0]?.timestamp || [];
+    const tsLen = timestamps.length;
+    const candlesWithTS = Math.min(tsLen, closes.length);
 
     if (closes.length < 10) {
       throw new Error(`Insufficient data for ${symbol}.`);
@@ -1036,11 +1041,9 @@ Return ONLY valid JSON:
       totalAge <= oldLimit ? `Mature (${matureLimit}-${oldLimit})` : `Old (>${oldLimit})`;
     const zoneStatus = totalAge >= matureLimit && totalAge <= oldLimit ? 'positive' :
       totalAge < infantLimit ? 'negative' : 'neutral';
-    const trendStartIdx = closes.length - 1 - totalAge;
-    const trendStartPrice = trendStartIdx >= 0 && trendStartIdx < closes.length ? closes[trendStartIdx]?.toFixed(5) : 'N/A';
-    const lastSwingPriceStr = metrics?.lastSwingPoint?.price?.toFixed(5) || 'N/A';
+    
     detailedReasons.push({
-      check: 'Trend Age', value: `${totalAge}c ΓÇö ${ageZoneDesc} | بداية: ${trendStartPrice} | آخر سحب: ${lastSwingPriceStr}`, status: zoneStatus,
+      check: 'Trend Age', value: `${totalAge}c ΓÇö ${ageZoneDesc}`, status: zoneStatus,
       impact: zoneStatus === 'positive' ? 'trend mature ΓÇö full signal allowed' :
         zoneStatus === 'negative' ? 'trend age issue ΓÇö confidence reduced' : 'trend developing'
     });
@@ -1260,20 +1263,26 @@ Return ONLY valid JSON:
     const prePullbackAgeVal = metrics?.prePullbackAge ?? 0;
     const pullbackPtAI = metrics?.pullbackPoint;
     const lastSwingAI = metrics?.lastSwingPoint;
-    const trendStartInfoAI = pullbackPtAI ? (pullbackPtAI.date ? `${pullbackPtAI.date} (${pullbackPtAI.price.toFixed(5)})` : pullbackPtAI.price.toFixed(5)) : 'N/A';
-    const lastSwingInfoAI = lastSwingAI ? (lastSwingAI.date ? `${lastSwingAI.date} (${lastSwingAI.price.toFixed(5)})` : lastSwingAI.price.toFixed(5)) : 'N/A';
+    // Calculate dates from timestamps using indices
+    const toDateFromIdx = (idx: number) => {
+      if (idx >= 0 && idx < timestamps.length) return new Date(timestamps[idx] * 1000).toISOString().split('T')[0];
+      return 'N/A';
+    };
+    const trendStartInfoAI = pullbackPtAI ? `${toDateFromIdx(pullbackPtAI.index)} (${pullbackPtAI.price.toFixed(5)})` : 'N/A';
+    const lastSwingInfoAI = lastSwingAI ? `${toDateFromIdx(lastSwingAI.index)} (${lastSwingAI.price.toFixed(5)})` : 'N/A';
+    const preDatesInfo = `بداية: ${trendStartInfoAI}\nآخر سحب: ${lastSwingInfoAI}`;
     if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
       if (isStrongCandidate) {
         finalSignal = SignalType.NEUTRAL;
         finalConfidence = Math.min(finalConfidence, 30);
       }
       if (prePullbackAgeVal < minPreAge) {
-        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: isStrongCandidate ? 'neutral' : 'positive', impact: isStrongCandidate ? 'trend before pullback too short ΓÇö blocks STRONG' : 'trend short but regular signal bypasses' });
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö صغير (أقل من ${minPreAge})`, dates: preDatesInfo, status: isStrongCandidate ? 'neutral' : 'positive', impact: isStrongCandidate ? 'trend before pullback too short ΓÇö blocks STRONG' : 'trend short but regular signal bypasses' });
       } else {
-        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: isStrongCandidate ? 'negative' : 'positive', impact: isStrongCandidate ? 'trend exhausted ΓÇö blocks STRONG' : 'trend exhausted but regular signal bypasses' });
+        detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö كهل (أكثر من ${maxPreAge})`, dates: preDatesInfo, status: isStrongCandidate ? 'negative' : 'positive', impact: isStrongCandidate ? 'trend exhausted ΓÇö blocks STRONG' : 'trend exhausted but regular signal bypasses' });
       }
     } else if (prePullbackAgeVal >= minPreAge && prePullbackAgeVal <= maxPreAge) {
-      detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge}) | بداية: ${trendStartInfoAI} | آخر سحب: ${lastSwingInfoAI}`, status: 'positive', impact: 'trend healthy ΓÇö all signals allowed' });
+      detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge})`, dates: preDatesInfo, status: 'positive', impact: 'trend healthy ΓÇö all signals allowed' });
     }
 
     // ΓöÇΓöÇ STEP 5: Compute confidence from metrics ΓöÇΓöÇ

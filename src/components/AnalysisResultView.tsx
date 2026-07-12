@@ -250,22 +250,25 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
 
                         const renderReason = (reason: any, i: number) => (
                           <div key={i} className="bg-white/[0.02] rounded-lg p-3 border border-white/5" title={reason.impact || ''}>
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className={`w-3 h-3 rounded-full shrink-0 ${
-                                  reason.status === 'positive' ? 'bg-emerald-400' :
-                                  reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'
-                                }`} />
-                                <span className={`font-bold text-sm truncate ${reason.status === 'positive' ? 'text-emerald-400' : reason.status === 'negative' ? 'text-red-400' : 'text-slate-400'}`}>
-                                  {reason.check}
-                                </span>
-                              </div>
-                              <span className={`font-mono text-sm shrink-0 ${reason.status === 'positive' ? 'text-emerald-400/60' : reason.status === 'negative' ? 'text-red-400/60' : 'text-slate-400/60'}`}>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-3 h-3 rounded-full shrink-0 ${
+                                reason.status === 'positive' ? 'bg-emerald-400' :
+                                reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'
+                              }`} />
+                              <span className={`font-bold text-sm shrink-0 ${reason.status === 'positive' ? 'text-emerald-400' : reason.status === 'negative' ? 'text-red-400' : 'text-slate-400'}`}>
+                                {reason.check}
+                              </span>
+                              <span className={`font-mono text-sm break-all ${reason.status === 'positive' ? 'text-emerald-400/60' : reason.status === 'negative' ? 'text-red-400/60' : 'text-slate-400/60'}`}>
                                 {reason.value}
                               </span>
                             </div>
+                            {reason.dates && (
+                              <div className={`ml-5 mt-1 text-xs font-mono whitespace-pre-line ${reason.status === 'positive' ? 'text-emerald-400/50' : reason.status === 'negative' ? 'text-red-400/50' : 'text-slate-400/50'}`}>
+                                {reason.dates}
+                              </div>
+                            )}
                             {reason.impact && (
-                              <p className={`text-xs mt-1 leading-relaxed ${reason.status === 'positive' ? 'text-emerald-400/40' : reason.status === 'negative' ? 'text-red-400/40' : 'text-slate-400/40'}`}>
+                              <p className={`text-xs mt-1 ml-5 leading-relaxed ${reason.status === 'positive' ? 'text-emerald-400/40' : reason.status === 'negative' ? 'text-red-400/40' : 'text-slate-400/40'}`}>
                                 {reason.impact}
                               </p>
                             )}
