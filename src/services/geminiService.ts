@@ -720,6 +720,26 @@ export async function analyzeMarketBatch(
   return { results, errors };
 }
 
+function synthFromMetrics(metrics: any, symbol: string, direction: string): any {
+  const dir = metrics?.direction || 'sideways';
+  const rsi = metrics?.rsi ?? 50;
+  const macd = metrics?.macdHistogram ?? 0;
+  const emaC = metrics?.emaCross || 'none';
+  let synthConf = 50;
+  if (dir === 'uptrend') synthConf += 10;
+  else if (dir === 'downtrend') synthConf -= 10;
+  if (rsi < 30) synthConf += 5;
+  else if (rsi > 70) synthConf -= 5;
+  if (macd > 0) synthConf += 3;
+  else if (macd < 0) synthConf -= 3;
+  if (emaC === 'bullish') synthConf += 5;
+  else if (emaC === 'bearish') synthConf -= 5;
+  synthConf = Math.max(20, Math.min(80, synthConf));
+  const synthSignal = synthConf >= 55 ? (dir === 'uptrend' ? 'buy' : dir === 'downtrend' ? 'sell' : 'neutral') : 'neutral';
+  console.log(`[Engine] ${symbol} synth: ${synthSignal} (${synthConf}%) dir=${dir} rsi=${rsi.toFixed(1)} ema=${emaC}`);
+  return { signal: synthSignal, confidence: synthConf, detailedReasons: [], summary: `${symbol} ${synthSignal} (${synthConf}%) — metrics-based`, microSignal: 'unknown', microTrend: dir, historicalMatch: 'N/A' };
+}
+
 export async function analyzeMarket(params: {
   symbol: string;
   type: MarketType;
@@ -937,35 +957,15 @@ Return ONLY valid JSON:
       if (attempt < 1) await new Promise(r => setTimeout(r, 2000));
     }
 
-    if (!aiResponse || aiResponse?.error) {
-      console.warn(`[Engine] AI unavailable for ${symbol}, using metrics-based signal:`, aiResponse?.error);
-    }
-
+    const aiOk = aiResponse && !aiResponse?.error && aiResponse?.choices?.[0]?.message?.content;
     let resultData: any;
-    if (aiResponse && !aiResponse?.error && aiResponse?.choices?.[0]?.message?.content) {
+    if (aiOk) {
       const rawText = aiResponse.choices[0].message.content;
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("AI Synthesis Error: Invalid JSON structure.");
       resultData = JSON.parse(jsonMatch[0]);
     } else {
-      // Fallback: synthesize resultData from metrics so it goes through the same STEP 2-6 pipeline
-      const dir = metrics?.direction || 'sideways';
-      const rsi = metrics?.rsi ?? 50;
-      const macd = metrics?.macdHistogram ?? 0;
-      const emaC = metrics?.emaCross || 'none';
-      let synthConf = 50;
-      if (dir === 'uptrend') synthConf += 10;
-      else if (dir === 'downtrend') synthConf -= 10;
-      if (rsi < 30) synthConf += 5;
-      else if (rsi > 70) synthConf -= 5;
-      if (macd > 0) synthConf += 3;
-      else if (macd < 0) synthConf -= 3;
-      if (emaC === 'bullish') synthConf += 5;
-      else if (emaC === 'bearish') synthConf -= 5;
-      synthConf = Math.max(20, Math.min(80, synthConf));
-      const synthSignal = synthConf >= 55 ? (dir === 'uptrend' ? 'buy' : dir === 'downtrend' ? 'sell' : 'neutral') : 'neutral';
-      resultData = { signal: synthSignal, confidence: synthConf, detailedReasons: [], summary: `${symbol} ${synthSignal} (${synthConf}%) — metrics-based`, microSignal: 'unknown', microTrend: dir, historicalMatch: 'N/A' };
-      console.log(`[Engine] ${symbol} synth: ${synthSignal} (${synthConf}%) dir=${dir} rsi=${rsi.toFixed(1)} ema=${emaC}`);
+      resultData = synthFromMetrics(metrics, symbol, direction);
     }
 
     // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
