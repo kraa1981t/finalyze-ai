@@ -786,9 +786,9 @@ export async function analyzeMarket(params: {
     ]);
     console.log(`[Engine] ${symbol} data fetched in ${Date.now() - fetchT0}ms`);
 
-    let contextFearGreed = ctxResult.fearGreed;
-    let contextNews: { title: string; source: string }[] = ctxResult.news || [];
-    let contextEcon: any[] = ctxResult.econEvents || [];
+    var contextFearGreed = ctxResult.fearGreed;
+    var contextNews: { title: string; source: string }[] = ctxResult.news || [];
+    var contextEcon: any[] = ctxResult.econEvents || [];
 
     const quotes = rawData.chart?.result?.[0]?.indicators?.quote?.[0];
     const closeLen = quotes?.close?.filter((c: any) => c != null)?.length || 0;
@@ -819,8 +819,8 @@ export async function analyzeMarket(params: {
       : 'No clear zones detected.';
     
     // Process micro data (already fetched in parallel above)
-    let microCloses: number[] = [];
-    let microMetrics = null;
+    var microCloses: number[] = [];
+    var microMetrics = null;
     try {
       const microQuotes = microDataRaw.chart?.result?.[0]?.indicators?.quote?.[0];
       if (microQuotes && microQuotes.close) {
@@ -838,7 +838,7 @@ export async function analyzeMarket(params: {
     }
 
     // Compute MACRO direction (higher timeframe trend)
-    let macroDirection: 'uptrend' | 'downtrend' | 'sideways' = 'sideways';
+    var macroDirection: 'uptrend' | 'downtrend' | 'sideways' = 'sideways';
     try {
       const macroQuotes = macroDataRaw.chart?.result?.[0]?.indicators?.quote?.[0];
       if (macroQuotes && macroQuotes.close) {
@@ -958,7 +958,7 @@ Return ONLY valid JSON:
     const matureLimit = matureAgeThreshold;
     const oldLimit = oldAgeThreshold;
 
-    let aiResponse: any = null;
+    var aiResponse: any = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       await waitIfRateLimited();
       aiResponse = await callAIDirect(technicalPrompt, keyValue);
@@ -972,7 +972,7 @@ Return ONLY valid JSON:
     const jsonMatch = aiOk ? rawText.match(/\{[\s\S]*\}/) : null;
     const resultData = aiOk && jsonMatch ? JSON.parse(jsonMatch[0]) : synthFromMetrics(metrics, symbol);
 
-    let detailedReasons: any[] = Array.isArray(resultData.detailedReasons) ? [...resultData.detailedReasons] : [];
+    var detailedReasons: any[] = Array.isArray(resultData.detailedReasons) ? [...resultData.detailedReasons] : [];
 
     // Build fallback from metrics if AI didn't provide reasons
     if (detailedReasons.length === 0) {
@@ -1117,7 +1117,7 @@ Return ONLY valid JSON:
     const hasMicroBbData = !!(microMetrics && microMetrics.bbLower > 0);
     // Lenient: BB data exists ΓåÆ pass. Only blocks if BB actively conflicts with direction.
     // e.g. price at upper BB in uptrend with no pullback = conflict ΓåÆ block
-    let bbMet = true;
+    var bbMet = true;
     if (hasMicroBbData) {
       // Micro BB available ΓÇö use it: pass if price aligns OR if no strong conflict
       const microAtUpper = microMetrics.bbPercentB > 0.85;
@@ -1148,7 +1148,7 @@ Return ONLY valid JSON:
     const ageMet = true;
 
     // PRIMARY 4 ΓÇö News: check for high-impact negative events
-    let newsMet = true;
+    var newsMet = true;
     if (contextEcon && contextEcon.length > 0) {
       const highImpactEvents = contextEcon.filter((e: any) => e.impact === 'High');
       if (highImpactEvents.length > 0) {
@@ -1179,7 +1179,7 @@ Return ONLY valid JSON:
     }
 
     const primaryTotal = 4;
-    let primaryMetCount = 0;
+    var primaryMetCount = 0;
     if (bbMet) primaryMetCount++;
     if (sdMet) primaryMetCount++;
     if (ageMet) primaryMetCount++;
@@ -1206,10 +1206,10 @@ Return ONLY valid JSON:
     // ΓöÇΓöÇ STEP 2b: Conflict detection ΓöÇΓöÇ
     const buyReasons = detailedReasons.filter((r: any) => r.status === 'positive').length;
     const sellReasons = detailedReasons.filter((r: any) => r.status === 'negative').length;
-    let hasConflict = buyReasons >= 4 && sellReasons >= 4;
+    var hasConflict = buyReasons >= 4 && sellReasons >= 4;
 
     // ΓöÇΓöÇ STEP 3: Normalize AI signal ΓöÇΓöÇ
-    let rawSignal = String(resultData.signal || 'no_entry').toLowerCase().trim().replace(/\s+/g, '_');
+    var rawSignal = String(resultData.signal || 'no_entry').toLowerCase().trim().replace(/\s+/g, '_');
     if (rawSignal.includes('strong_buy') || rawSignal === 'strongbuy') rawSignal = 'strong_buy';
     else if (rawSignal.includes('strong_sell') || rawSignal === 'strongsell') rawSignal = 'strong_sell';
     else if (rawSignal.includes('buy')) rawSignal = 'buy';
@@ -1217,8 +1217,8 @@ Return ONLY valid JSON:
     else if (rawSignal.includes('neutral')) rawSignal = 'neutral';
     else rawSignal = 'no_entry';
 
-    let finalSignal = rawSignal as SignalType;
-    let finalConfidence = Number(resultData.confidence) || 50;
+    var finalSignal = rawSignal as SignalType;
+    var finalConfidence = Number(resultData.confidence) || 50;
 
     // ΓöÇΓöÇ STEP 4: Age zone adjustments ΓöÇΓöÇ
     const isStrongCandidate = rawSignal === 'strong_buy' || rawSignal === 'strong_sell';
@@ -1287,7 +1287,7 @@ Return ONLY valid JSON:
     }
 
     // Multi-TF Direction: BLOCK signal if current direction conflicts with higher timeframe
-    let higherTFBlocked = false;
+    var higherTFBlocked = false;
     const directionConflicts = (isUp && isMacroDown) || (isDown && isMacroUp);
     if (directionConflicts) {
       higherTFBlocked = true;
@@ -1316,8 +1316,8 @@ Return ONLY valid JSON:
     const metricsDirection = isUp ? 'buy' : isDown ? 'sell' : null;
     const aiDirection = finalSignal.includes('buy') ? 'buy' : finalSignal.includes('sell') ? 'sell' : null;
     
-    let direction: string;
-    let agreementBonus = 0;
+    var direction: string;
+    var agreementBonus = 0;
     
     if (higherTFBlocked) {
       // Higher TF blocked the signal — direction stays null, force NEUTRAL below
@@ -1422,11 +1422,11 @@ Return ONLY valid JSON:
     const currentPrice = closes[closes.length - 1] || 0;
     const atr = metrics?.atr || 0;
 
-    let finalStopLoss = 0;
-    let finalTakeProfit = 0;
+    var finalStopLoss = 0;
+    var finalTakeProfit = 0;
 
     if (currentPrice > 0) {
-      let slDist = 0;
+      var slDist = 0;
       const isForex = type === MarketType.FOREX;
 
       if (atr > 0) {
@@ -1434,8 +1434,8 @@ Return ONLY valid JSON:
         slDist = atr * atrMultiplier;
       }
 
-      let minSL: number;
-      let maxSL: number;
+      var minSL: number;
+      var maxSL: number;
 
       if (isForex) {
         const pipSize = symbol.toUpperCase().includes('JPY') ? 0.01 : 0.0001;
@@ -1506,7 +1506,37 @@ Return ONLY valid JSON:
     return finalResult;
 
   } catch (error: any) {
-    console.error("[Engine Error]:", error);
-    throw new Error(error.message || "Stability logic error.");
+    console.error("[Engine Error] Falling back to synth:", error);
+    const dir = metrics?.direction || 'sideways';
+    const rsi = metrics?.rsi ?? 50;
+    const tAge = metrics?.totalAge || 0;
+    const raw: SignalType = rsi < 30 ? (dir === 'uptrend' ? SignalType.BUY : SignalType.SELL) : rsi > 70 ? (dir === 'downtrend' ? SignalType.SELL : SignalType.BUY) : SignalType.NEUTRAL;
+    const conf = raw === SignalType.NEUTRAL ? 30 : Math.min(75, 50 + (rsi < 30 || rsi > 70 ? 15 : 0) + (dir !== 'sideways' ? 10 : 0));
+    const price = closes[closes.length - 1] || 0;
+    const atr = metrics?.atr || price * 0.02;
+    const finalResult: AnalysisResult = {
+      symbol, type, timeframe,
+      signal: raw,
+      confidence: conf,
+      summary: `[TDZ Fallback] ${symbol} ${dir} RSI=${rsi.toFixed(1)} — engine error: ${error.message}`,
+      detailedReasons: [{ check: 'Engine Fallback', value: `TDZ error: ${error.message}`, status: 'neutral', impact: 'synth fallback used' }],
+      newsSources: [],
+      technicalScore: metrics?.momentumScore || 50,
+      sentimentScore: 50,
+      trendMaturity: tAge < 10 ? 'infancy' as const : (tAge < 25 ? 'youth' as const : (tAge <= 70 ? 'mature' as const : 'aging' as const)),
+      trendAge: tAge,
+      microTF: (settings?.microTimeframe || '1h') as string,
+      microSignal: 'unknown',
+      microTrend: '',
+      historicalMatch: '',
+      timestamp: new Date().toISOString(),
+      userId: '',
+      entryPrice: price,
+      stopLoss: raw.includes('buy') ? price - atr * 2 : price + atr * 2,
+      takeProfit: raw.includes('buy') ? price + atr * 3 : price - atr * 3,
+      primaryMetCount: 0,
+      direction: dir || 'sideways',
+    };
+    return finalResult;
   }
 }
