@@ -1319,9 +1319,10 @@ Return ONLY valid JSON:
     // Candle pattern confirmation at pullback point
     if (pullbackCandleConfirmVal && pullbackPtAI) {
       const pullbackIdx = pullbackPtAI.index;
-      const hasReversalCandle = (pullbackIdx >= 0 && pullbackIdx < len) ? (
-        (direction === 'uptrend' && (metrics?.hasHammer || metrics?.hasPinbar || metrics?.hasEngulfing)) ||
-        (direction === 'downtrend' && (metrics?.hasShootingStar || metrics?.hasPinbar || metrics?.hasEngulfing))
+      const trendDir = metrics?.direction || 'sideways';
+      const hasReversalCandle = (pullbackIdx >= 0 && pullbackIdx < closes.length) ? (
+        (trendDir === 'uptrend' && (metrics?.hasHammer || metrics?.hasPinbar || metrics?.hasEngulfing)) ||
+        (trendDir === 'downtrend' && (metrics?.hasShootingStar || metrics?.hasPinbar || metrics?.hasEngulfing))
       ) : false;
       if (!hasReversalCandle) {
         pullbackConfirmed = false;
@@ -1392,8 +1393,9 @@ Return ONLY valid JSON:
 
     // Multi-TF Direction: BLOCK signal if current direction conflicts with higher timeframe
     var higherTFBlocked = false;
+    const useHigherTF = settings?.useHigherTimeframe !== false; // default: true
     const directionConflicts = (isUp && isMacroDown) || (isDown && isMacroUp);
-    if (directionConflicts) {
+    if (useHigherTF && directionConflicts) {
       higherTFBlocked = true;
       finalConfidence = Math.round(finalConfidence * 0.6); // 40% penalty for trading against higher TF
       // Force NEUTRAL when trading against the higher timeframe — this is too risky
@@ -1407,7 +1409,7 @@ Return ONLY valid JSON:
         status: 'negative', 
         impact: `BLOCKED: trading against higher timeframe trend is too risky` 
       });
-    } else {
+    } else if (useHigherTF) {
       detailedReasons.push({ 
         check: `Higher TF Direction (${macro1})`, 
         value: `Higher TF: ${macroDirection} aligns with Current: ${metrics?.direction}`, 
