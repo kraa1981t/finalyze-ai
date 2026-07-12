@@ -720,7 +720,7 @@ export async function analyzeMarketBatch(
   return { results, errors };
 }
 
-function synthFromMetrics(metrics: any, symbol: string, direction: string): any {
+function synthFromMetrics(metrics: any, symbol: string): any {
   const dir = metrics?.direction || 'sideways';
   const rsi = metrics?.rsi ?? 50;
   const macd = metrics?.macdHistogram ?? 0;
@@ -965,7 +965,7 @@ Return ONLY valid JSON:
       if (!jsonMatch) throw new Error("AI Synthesis Error: Invalid JSON structure.");
       resultData = JSON.parse(jsonMatch[0]);
     } else {
-      resultData = synthFromMetrics(metrics, symbol, direction);
+      resultData = synthFromMetrics(metrics, symbol);
     }
 
     // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
