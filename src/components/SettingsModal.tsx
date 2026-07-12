@@ -507,6 +507,45 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
               </div>
               <p className="text-xs text-brand-text/40">{isAr ? 'فوق هذا العدد ← الاتجاه قبل الانسحاب مستنزف (محايد). افتراضي: 50' : 'Above this → trend before pullback exhausted (neutral). Default: 50'}</p>
             </div>
+
+            {/* Min Pullback Candles */}
+            <div className="pt-2 border-t border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-semibold text-cyan-400">{isAr ? 'أدنى شموع السحبة' : 'Min Pullback Candles'}</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleChange('minPullbackCandles', Math.max(1, (settings.minPullbackCandles || 2) - 1))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
+                  <span className="w-10 text-center text-lg font-black text-cyan-400 font-mono">{settings.minPullbackCandles || 2}</span>
+                  <button onClick={() => handleChange('minPullbackCandles', Math.min(10, (settings.minPullbackCandles || 2) + 1))}
+                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
+                </div>
+              </div>
+              <p className="text-xs text-brand-text/40">{isAr ? 'الحد الأدنى للشموع المعاكسة للاتجاه为了 تأكيد نقطة السحبة. افتراضي: 2' : 'Min opposite candles to confirm pullback point. Default: 2'}</p>
+            </div>
+
+            {/* Pullback Volume Confirm */}
+            <div className="pt-2 border-t border-white/5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-cyan-400">{isAr ? 'تأكيد بالحجم عند السحبة' : 'Pullback Volume Confirm'}</label>
+                <button onClick={() => handleChange('pullbackVolConfirm', !settings.pullbackVolConfirm)}
+                  className={`w-12 h-6 rounded-full transition-all ${settings.pullbackVolConfirm ? 'bg-cyan-500' : 'bg-white/10'}`}>
+                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.pullbackVolConfirm ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+              <p className="text-xs text-brand-text/40 mt-1">{isAr ? 'يتطلب حجم مرتفع عند نقطة السحبة للتأكيد' : 'Require high volume at pullback point for confirmation'}</p>
+            </div>
+
+            {/* Pullback Candle Confirm */}
+            <div className="pt-2 border-t border-white/5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-cyan-400">{isAr ? 'تأكيد بشمعة ارتداد' : 'Pullback Candle Confirm'}</label>
+                <button onClick={() => handleChange('pullbackCandleConfirm', !settings.pullbackCandleConfirm)}
+                  className={`w-12 h-6 rounded-full transition-all ${settings.pullbackCandleConfirm ? 'bg-cyan-500' : 'bg-white/10'}`}>
+                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.pullbackCandleConfirm ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+              <p className="text-xs text-brand-text/40 mt-1">{isAr ? 'يتطلب شمعة ارتداد (Pinbar/Engulfing/Hammer) عند نقطة السحبة' : 'Require reversal candle (Pinbar/Engulfing/Hammer) at pullback point'}</p>
+            </div>
           </div>
         </div>
       )}

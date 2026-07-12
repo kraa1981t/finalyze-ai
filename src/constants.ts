@@ -30,6 +30,9 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   strongThreshold: 70,
   buyThreshold: 50,
   minStrongSupport: 50,
+  minPullbackCandles: 2,
+  pullbackVolConfirm: false,
+  pullbackCandleConfirm: false,
 };
 
 export const DEFAULT_AUTO_SETTINGS = {

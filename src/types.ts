@@ -83,6 +83,9 @@ export interface StrategySettings {
   strongThreshold: number;
   buyThreshold: number;
   minStrongSupport: number;
+  minPullbackCandles: number;
+  pullbackVolConfirm: boolean;
+  pullbackCandleConfirm: boolean;
 }
 
 export interface AutoAnalysisSettings {

@@ -1292,6 +1292,47 @@ Return ONLY valid JSON:
       detailedReasons.push({ check: 'Pre-Pullback Age', value: `${prePullbackAgeVal}c ΓÇö شاب (${minPreAge}-${maxPreAge})`, dates: preDatesInfo, status: 'positive', impact: 'trend healthy ΓÇö all signals allowed' });
     }
 
+    // ΓöÇΓöÇ STEP 4c: Pullback Confirmation ΓöÇΓöÇ — validate pullback point quality
+    var pullbackConfirmed = true;
+    const minPullbackCandlesVal = settings?.minPullbackCandles ?? 2;
+    const pullbackVolConfirmVal = settings?.pullbackVolConfirm ?? false;
+    const pullbackCandleConfirmVal = settings?.pullbackCandleConfirm ?? false;
+    
+    // Calculate opposite candles count (candles against the trend during the pullback)
+    const oppositeCandles = totalAge - prePullbackAgeVal;
+    if (oppositeCandles < minPullbackCandlesVal) {
+      pullbackConfirmed = false;
+      detailedReasons.push({ check: 'Pullback Confirm', value: `${oppositeCandles}c معاكسة (أقل من ${minPullbackCandlesVal})`, status: 'negative', impact: `pullback too weak — only ${oppositeCandles} opposite candles` });
+    }
+    
+    // Volume confirmation at pullback point
+    if (pullbackVolConfirmVal && pullbackPtAI) {
+      const pullbackIdx = pullbackPtAI.index;
+      const avgVol = volumes && volumes.length > 0 ? volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length : 0;
+      const pullbackVol = volumes && pullbackIdx >= 0 && pullbackIdx < volumes.length ? volumes[pullbackIdx] : 0;
+      if (avgVol > 0 && pullbackVol < avgVol * 0.8) {
+        pullbackConfirmed = false;
+        detailedReasons.push({ check: 'Pullback Confirm', value: `حجم منخفض عند السحبة`, status: 'negative', impact: `pullback volume ${Math.round(pullbackVol/avgVol*100)}% of average — weak confirmation` });
+      }
+    }
+    
+    // Candle pattern confirmation at pullback point
+    if (pullbackCandleConfirmVal && pullbackPtAI) {
+      const pullbackIdx = pullbackPtAI.index;
+      const hasReversalCandle = (pullbackIdx >= 0 && pullbackIdx < len) ? (
+        (direction === 'uptrend' && (metrics?.hasHammer || metrics?.hasPinbar || metrics?.hasEngulfing)) ||
+        (direction === 'downtrend' && (metrics?.hasShootingStar || metrics?.hasPinbar || metrics?.hasEngulfing))
+      ) : false;
+      if (!hasReversalCandle) {
+        pullbackConfirmed = false;
+        detailedReasons.push({ check: 'Pullback Confirm', value: `لا توجد شمعة ارتداد`, status: 'negative', impact: `no reversal candle at pullback point — weak confirmation` });
+      }
+    }
+    
+    if (pullbackConfirmed && (oppositeCandles >= minPullbackCandlesVal || oppositeCandles >= 2)) {
+      detailedReasons.push({ check: 'Pullback Confirm', value: `${oppositeCandles}c معاكسة — مؤكدة`, status: 'positive', impact: `pullback confirmed with ${oppositeCandles} opposite candles` });
+    }
+
     // ΓöÇΓöÇ STEP 5: Compute confidence from metrics ΓöÇΓöÇ
     const maxPrimary = settings?.maxPrimaryWeight ?? 50;
     const maxSupport = settings?.maxSupportingWeight ?? 20;
@@ -1337,6 +1378,11 @@ Return ONLY valid JSON:
         finalConfidence = Math.round(finalConfidence * 0.75); // -25%
         detailedReasons.push({ check: 'RSI Extreme', value: `${rsiVal.toFixed(1)} — تشبع بيعي`, status: 'negative', impact: 'oversold danger — confidence -25%' });
       }
+    }
+
+    // ΓöÇΓöÇ STEP 5d: Pullback Quality Penalty ΓöÇΓöÇ — weak pullback = lower confidence
+    if (!pullbackConfirmed) {
+      finalConfidence = Math.round(finalConfidence * 0.80); // -20%
     }
 
     // Pre-Pullback Age cap: re-apply after confidence computation to prevent overwrite
