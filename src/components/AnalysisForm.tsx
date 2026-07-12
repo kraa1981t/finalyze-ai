@@ -224,7 +224,30 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
         r.userId = user?.uid || 'anonymous';
         results.push(r);
         if (user?.uid) {
-          const clean = Object.fromEntries(Object.entries(r).filter(([_, v]) => v !== undefined && v !== null));
+          const clean = JSON.parse(JSON.stringify({
+            symbol: r.symbol,
+            type: r.type,
+            timeframe: r.timeframe,
+            signal: r.signal,
+            confidence: r.confidence,
+            summary: r.summary || '',
+            detailedReasons: r.detailedReasons || [],
+            newsSources: r.newsSources || [],
+            technicalScore: r.technicalScore || 0,
+            sentimentScore: r.sentimentScore || 0,
+            historicalMatch: r.historicalMatch || '',
+            trendMaturity: r.trendMaturity || 'unknown',
+            trendAge: r.trendAge || 0,
+            microTF: r.microTF || '',
+            microSignal: r.microSignal || 'unknown',
+            microTrend: r.microTrend || '',
+            userId: r.userId,
+            entryPrice: r.entryPrice || 0,
+            stopLoss: r.stopLoss || 0,
+            takeProfit: r.takeProfit || 0,
+            primaryMetCount: r.primaryMetCount || 0,
+            direction: r.direction || '',
+          }));
           addDoc(collection(db, "analysisResults"), {
             ...clean,
             timestamp: serverTimestamp(),
