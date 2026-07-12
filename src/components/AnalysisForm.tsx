@@ -224,34 +224,33 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
         r.userId = user?.uid || 'anonymous';
         results.push(r);
         if (user?.uid) {
-          const clean = JSON.parse(JSON.stringify({
-            symbol: r.symbol,
-            type: r.type,
-            timeframe: r.timeframe,
-            signal: r.signal,
-            confidence: r.confidence,
-            summary: r.summary || '',
-            detailedReasons: r.detailedReasons || [],
-            newsSources: r.newsSources || [],
-            technicalScore: r.technicalScore || 0,
-            sentimentScore: r.sentimentScore || 0,
-            historicalMatch: r.historicalMatch || '',
-            trendMaturity: r.trendMaturity || 'unknown',
-            trendAge: r.trendAge || 0,
-            microTF: r.microTF || '',
-            microSignal: r.microSignal || 'unknown',
-            microTrend: r.microTrend || '',
-            userId: r.userId,
-            entryPrice: r.entryPrice || 0,
-            stopLoss: r.stopLoss || 0,
-            takeProfit: r.takeProfit || 0,
-            primaryMetCount: r.primaryMetCount || 0,
-            direction: r.direction || '',
-          }));
-          addDoc(collection(db, "analysisResults"), {
-            ...clean,
-            timestamp: serverTimestamp(),
-          }).catch((e) => console.warn('[Form] Firestore save failed:', e.message));
+          try {
+            await addDoc(collection(db, "analysisResults"), {
+              symbol: String(r.symbol || ''),
+              type: String(r.type || ''),
+              timeframe: String(r.timeframe || ''),
+              signal: String(r.signal || 'neutral'),
+              confidence: Number(r.confidence) || 0,
+              summary: String(r.summary || ''),
+              technicalScore: Number(r.technicalScore) || 0,
+              sentimentScore: Number(r.sentimentScore) || 0,
+              trendAge: Number(r.trendAge) || 0,
+              trendMaturity: String(r.trendMaturity || 'unknown'),
+              microTF: String(r.microTF || ''),
+              microSignal: String(r.microSignal || 'unknown'),
+              microTrend: String(r.microTrend || ''),
+              entryPrice: Number(r.entryPrice) || 0,
+              stopLoss: Number(r.stopLoss) || 0,
+              takeProfit: Number(r.takeProfit) || 0,
+              primaryMetCount: Number(r.primaryMetCount) || 0,
+              direction: String(r.direction || ''),
+              historicalMatch: String(r.historicalMatch || ''),
+              timestamp: serverTimestamp(),
+              userId: r.userId,
+            });
+          } catch (e: any) {
+            console.warn('[Form] Firestore save skipped:', e.message);
+          }
         }
       }
       for (const e of batchResult.errors) {
