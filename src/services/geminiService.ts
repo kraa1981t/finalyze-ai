@@ -1268,9 +1268,16 @@ Return ONLY valid JSON:
       if (idx >= 0 && idx < timestamps.length) return new Date(timestamps[idx] * 1000).toISOString().split('T')[0];
       return 'N/A';
     };
-    const trendStartInfoAI = pullbackPtAI ? `${toDateFromIdx(pullbackPtAI.index)} (${pullbackPtAI.price.toFixed(5)})` : 'N/A';
-    const lastSwingInfoAI = lastSwingAI ? `${toDateFromIdx(lastSwingAI.index)} (${lastSwingAI.price.toFixed(5)})` : 'N/A';
-    const preDatesInfo = `بداية: ${trendStartInfoAI}\nآخر سحب: ${lastSwingInfoAI}`;
+    // 1. بداية الاتجاه الكلي (trend start = closes index)
+    const trendStartDateStr = (() => {
+      const idx = closes.length - 1 - totalAge;
+      return idx >= 0 && idx < timestamps.length ? toDateFromIdx(idx) : 'N/A';
+    })();
+    // 2. بداية تكون آخر نقطة سحب (pullback point formation)
+    const pullbackFormDateStr = pullbackPtAI ? `${toDateFromIdx(pullbackPtAI.index)} (${pullbackPtAI.price.toFixed(5)})` : 'N/A';
+    // 3. آخر نقطة سحب (last swing point)
+    const lastSwingDateStr = lastSwingAI ? `${toDateFromIdx(lastSwingAI.index)} (${lastSwingAI.price.toFixed(5)})` : 'N/A';
+    const preDatesInfo = `بداية الاتجاه: ${trendStartDateStr}\nبداية آخر سحبة: ${pullbackFormDateStr}\nآخر سحبة: ${lastSwingDateStr}`;
     if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
       if (isStrongCandidate) {
         finalSignal = SignalType.NEUTRAL;
@@ -1304,6 +1311,32 @@ Return ONLY valid JSON:
       const youthPenalty = Math.round(finalConfidence * 0.15); // -15%
       finalConfidence = Math.max(finalConfidence - youthPenalty, 30);
       detailedReasons.push({ check: 'Age Zone Penalty', value: `${totalAge}c — شباب (${infantAgeThreshold}-${matureAgeThreshold})`, status: 'neutral', impact: `trend developing, moderate confidence — confidence -15%` });
+    }
+
+    // ΓöÇΓöÇ STEP 5c: RSI Extreme Protection ΓöÇΓöÇ
+    // RSI >80 = overbought danger, RSI <20 = oversold danger
+    var rsiBlocked = false;
+    const rsiVal = metrics?.rsi;
+    if (rsiVal !== undefined) {
+      if (rsiVal > 85) {
+        // EXTREME overbought — BLOCK signal
+        rsiBlocked = true;
+        finalConfidence = Math.min(finalConfidence, 20);
+        detailedReasons.push({ check: 'RSI Extreme', value: `${rsiVal.toFixed(1)} — تشبع شرائي متطرف`, status: 'negative', impact: 'BLOCKED: RSI > 85 —极高风险 انعكاس' });
+      } else if (rsiVal > 80) {
+        // High overbought — heavy penalty
+        finalConfidence = Math.round(finalConfidence * 0.75); // -25%
+        detailedReasons.push({ check: 'RSI Extreme', value: `${rsiVal.toFixed(1)} — تشبع شرائي`, status: 'negative', impact: 'overbought danger — confidence -25%' });
+      } else if (rsiVal < 15) {
+        // EXTREME oversold — BLOCK signal
+        rsiBlocked = true;
+        finalConfidence = Math.min(finalConfidence, 20);
+        detailedReasons.push({ check: 'RSI Extreme', value: `${rsiVal.toFixed(1)} — تشبع بيعي متطرف`, status: 'negative', impact: 'BLOCKED: RSI < 15 —极高风险 انعكاس' });
+      } else if (rsiVal < 20) {
+        // High oversold — heavy penalty
+        finalConfidence = Math.round(finalConfidence * 0.75); // -25%
+        detailedReasons.push({ check: 'RSI Extreme', value: `${rsiVal.toFixed(1)} — تشبع بيعي`, status: 'negative', impact: 'oversold danger — confidence -25%' });
+      }
     }
 
     // Pre-Pullback Age cap: re-apply after confidence computation to prevent overwrite
@@ -1363,6 +1396,8 @@ Return ONLY valid JSON:
     finalConfidence = Math.min(100, finalConfidence + agreementBonus);
 
     if (higherTFBlocked) {
+      finalSignal = SignalType.NEUTRAL;
+    } else if (rsiBlocked) {
       finalSignal = SignalType.NEUTRAL;
     } else if (hasConflict) {
       finalSignal = SignalType.NEUTRAL;
