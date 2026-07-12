@@ -1027,24 +1027,23 @@ Return ONLY valid JSON:
         contextEcon.some((e: any) => e.impact === 'High') ? '-10% confidence penalty' : 'no penalty');
     }
 
-    // ΓöÇΓöÇ STEP 1b: Trend Age Zone fallback reason ΓöÇΓöÇ
-    if (!detailedReasons.some((r: any) => r.check?.includes('Trend Age'))) {
-      const ageZoneDesc = totalAge < infantLimit ? `Infant (<${infantLimit})` :
-        totalAge < matureLimit ? `Youth (${infantLimit}-${matureLimit})` :
-        totalAge <= oldLimit ? `Mature (${matureLimit}-${oldLimit})` : `Old (>${oldLimit})`;
-      const zoneStatus = totalAge >= matureLimit && totalAge <= oldLimit ? 'positive' :
-        totalAge < infantLimit ? 'negative' : 'neutral';
-      // Calculate trend start price and pullback price
-      const trendStartIdx = closes.length - 1 - totalAge;
-      const trendStartPrice = trendStartIdx >= 0 && trendStartIdx < closes.length ? closes[trendStartIdx]?.toFixed(5) : 'N/A';
-      const pullbackPriceStr = metrics?.pullbackPoint?.price?.toFixed(5) || 'N/A';
-      const lastSwingPriceStr = metrics?.lastSwingPoint?.price?.toFixed(5) || 'N/A';
-      detailedReasons.push({
-        check: 'Trend Age', value: `${totalAge}c ΓÇö ${ageZoneDesc} | بداية: ${trendStartPrice} | آخر سحب: ${lastSwingPriceStr}`, status: zoneStatus,
-        impact: zoneStatus === 'positive' ? 'trend mature ΓÇö full signal allowed' :
-          zoneStatus === 'negative' ? 'trend age issue ΓÇö confidence reduced' : 'trend developing'
-      });
-    }
+    // ΓöÇΓöÇ STEP 1b: Trend Age Zone — ALWAYS replace AI version with metrics version ΓöÇΓöÇ
+    // Remove any AI-generated Trend Age reason
+    detailedReasons = detailedReasons.filter((r: any) => !r.check?.includes('Trend Age'));
+    
+    const ageZoneDesc = totalAge < infantLimit ? `Infant (<${infantLimit})` :
+      totalAge < matureLimit ? `Youth (${infantLimit}-${matureLimit})` :
+      totalAge <= oldLimit ? `Mature (${matureLimit}-${oldLimit})` : `Old (>${oldLimit})`;
+    const zoneStatus = totalAge >= matureLimit && totalAge <= oldLimit ? 'positive' :
+      totalAge < infantLimit ? 'negative' : 'neutral';
+    const trendStartIdx = closes.length - 1 - totalAge;
+    const trendStartPrice = trendStartIdx >= 0 && trendStartIdx < closes.length ? closes[trendStartIdx]?.toFixed(5) : 'N/A';
+    const lastSwingPriceStr = metrics?.lastSwingPoint?.price?.toFixed(5) || 'N/A';
+    detailedReasons.push({
+      check: 'Trend Age', value: `${totalAge}c ΓÇö ${ageZoneDesc} | بداية: ${trendStartPrice} | آخر سحب: ${lastSwingPriceStr}`, status: zoneStatus,
+      impact: zoneStatus === 'positive' ? 'trend mature ΓÇö full signal allowed' :
+        zoneStatus === 'negative' ? 'trend age issue ΓÇö confidence reduced' : 'trend developing'
+    });
 
     // ΓöÇΓöÇ STEP 1c: Supply/Demand fallback reason ΓöÇΓöÇ
     if (!detailedReasons.some((r: any) => r.check?.includes('Supply/Demand'))) {
