@@ -340,23 +340,23 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                         const ageBadge = getAgeBadge();
 
                         const renderReason = (reason: any, i: number) => (
-                          <div key={i} className="bg-white/[0.02] rounded-lg p-2.5 border border-white/5" title={reason.impact || ''}>
+                          <div key={i} className="bg-white/[0.02] rounded-lg p-3 border border-white/5" title={reason.impact || ''}>
                             <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <div className={`w-2 h-2 rounded-full shrink-0 ${
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`w-3 h-3 rounded-full shrink-0 ${
                                   reason.status === 'positive' ? 'bg-emerald-400' :
                                   reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'
                                 }`} />
-                                <span className={`font-bold text-xs truncate ${reason.status === 'positive' ? 'text-emerald-400' : reason.status === 'negative' ? 'text-red-400' : 'text-slate-400'}`}>
+                                <span className={`font-bold text-sm truncate ${reason.status === 'positive' ? 'text-emerald-400' : reason.status === 'negative' ? 'text-red-400' : 'text-slate-400'}`}>
                                   {reason.check}
                                 </span>
                               </div>
-                              <span className={`font-mono text-[10px] shrink-0 ${reason.status === 'positive' ? 'text-emerald-400/60' : reason.status === 'negative' ? 'text-red-400/60' : 'text-slate-400/60'}`}>
+                              <span className={`font-mono text-sm shrink-0 ${reason.status === 'positive' ? 'text-emerald-400/60' : reason.status === 'negative' ? 'text-red-400/60' : 'text-slate-400/60'}`}>
                                 {reason.value}
                               </span>
                             </div>
                             {reason.impact && (
-                              <p className={`text-[9px] mt-1 leading-relaxed ${reason.status === 'positive' ? 'text-emerald-400/40' : reason.status === 'negative' ? 'text-red-400/40' : 'text-slate-400/40'}`}>
+                              <p className={`text-xs mt-1 leading-relaxed ${reason.status === 'positive' ? 'text-emerald-400/40' : reason.status === 'negative' ? 'text-red-400/40' : 'text-slate-400/40'}`}>
                                 {reason.impact}
                               </p>
                             )}
@@ -398,22 +398,22 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                                 {primaryReasons.length > 0 && (
                                   <div className="space-y-1">
                                     <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-1.5">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                                        <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-amber-400" />
+                                        <span className="text-sm font-black text-amber-400 uppercase tracking-wider">
                                           {isAr ? '\u0627\u0644\u0634\u0631\u0648\u0637 \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629' : 'PRIMARY CONDITIONS'}
                                         </span>
-                                        <span className="text-[9px] font-bold text-amber-400/50 bg-amber-500/10 px-1.5 py-0.5 rounded-full">
+                                        <span className="text-xs font-bold text-amber-400/50 bg-amber-500/10 px-2 py-0.5 rounded-full">
                                           {primaryReasons.length}
                                         </span>
                                       </div>
                                       {ageBadge && (
-                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${ageBadge.color}`}>
+                                        <span className={`text-xs font-black px-3 py-1 rounded-full border ${ageBadge.color}`}>
                                           {ageBadge.label} ({res.trendAge}c)
                                         </span>
                                       )}
                                     </div>
-                                    <div className="space-y-1">
+                                    <div className="space-y-1.5">
                                       {primaryReasons.map(renderReason)}
                                     </div>
                                   </div>
@@ -421,17 +421,17 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
 
                                 {/* Supporting Conditions */}
                                 {supportingReasons.length > 0 && (
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-1.5">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                                      <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider">
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-blue-400" />
+                                      <span className="text-sm font-black text-blue-400 uppercase tracking-wider">
                                         {isAr ? '\u0627\u0644\u0634\u0631\u0648\u0637 \u0627\u0644\u062f\u0627\u0639\u0645\u0629' : 'SUPPORTING CONDITIONS'}
                                       </span>
-                                      <span className="text-[9px] font-bold text-blue-400/50 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
+                                      <span className="text-xs font-bold text-blue-400/50 bg-blue-500/10 px-2 py-0.5 rounded-full">
                                         {supportingReasons.length}
                                       </span>
                                     </div>
-                                    <div className="space-y-1">
+                                    <div className="space-y-1.5">
                                       {supportingReasons.map(renderReason)}
                                     </div>
                                   </div>

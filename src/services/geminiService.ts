@@ -1034,8 +1034,17 @@ Return ONLY valid JSON:
         totalAge <= oldLimit ? `Mature (${matureLimit}-${oldLimit})` : `Old (>${oldLimit})`;
       const zoneStatus = totalAge >= matureLimit && totalAge <= oldLimit ? 'positive' :
         totalAge < infantLimit ? 'negative' : 'neutral';
+      // Calculate trend start date and pullback date
+      const trendStartDate = closes.length > 0 ? (() => {
+        const msPerCandle = 24 * 60 * 60 * 1000; // default daily
+        const now = Date.now();
+        const startMs = now - (totalAge * msPerCandle);
+        return new Date(startMs).toISOString().split('T')[0];
+      })() : 'N/A';
+      const pullbackDateStr = metrics?.pullbackPoint?.date || metrics?.pullbackPoint?.price?.toFixed(5) || 'N/A';
+      const lastSwingDateStr = metrics?.lastSwingPoint?.date || metrics?.lastSwingPoint?.price?.toFixed(5) || 'N/A';
       detailedReasons.push({
-        check: 'Trend Age', value: `${totalAge}c ΓÇö ${ageZoneDesc}`, status: zoneStatus,
+        check: 'Trend Age', value: `${totalAge}c ΓÇö ${ageZoneDesc} | بداية: ${trendStartDate} | آخر سحب: ${lastSwingDateStr}`, status: zoneStatus,
         impact: zoneStatus === 'positive' ? 'trend mature ΓÇö full signal allowed' :
           zoneStatus === 'negative' ? 'trend age issue ΓÇö confidence reduced' : 'trend developing'
       });
