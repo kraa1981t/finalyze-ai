@@ -91,7 +91,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onClearAll, la
         const cfg = CATEGORY_CONFIG[cat];
         const strong = catSignals.filter(s => s.signal === SignalType.STRONG_BUY || s.signal === SignalType.STRONG_SELL);
         const regular = catSignals.filter(s => s.signal === SignalType.BUY || s.signal === SignalType.SELL);
-        const top4 = regular.sort((a, b) => b.confidence - a.confidence).slice(0, 4);
+        const top3 = regular.sort((a, b) => b.confidence - a.confidence).slice(0, 3);
 
         return (
           <div key={cat} className="space-y-2">
@@ -107,9 +107,9 @@ export default function TopSignals({ signals, onRemove, onSelect, onClearAll, la
               <StrongCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpand={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={onSelect} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} />
             ))}
 
-            {top4.length > 0 && (
+            {top3.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {top4.map((res, idx) => (
+                {top3.map((res, idx) => (
                   <RegularCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpand={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={onSelect} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`r_${res.symbol}_${idx}`} />
                 ))}
               </div>
