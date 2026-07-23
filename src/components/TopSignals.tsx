@@ -178,12 +178,12 @@ function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpa
                 {expandedReasons.has(cardKey) && (
                   <div className="space-y-1.5 pt-1">
                     {res.detailedReasons.map((reason, i) => (
-                      <div key={i} className="bg-white/10 rounded-lg p-2.5 border border-white/10 flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${reason.status === 'positive' ? 'bg-emerald-300' : reason.status === 'negative' ? 'bg-red-300' : 'bg-white/50'}`} />
+                      <div key={i} className="bg-white/[0.06] rounded-lg p-3 border border-white/15 flex items-center justify-between text-sm sm:text-base">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-3 h-3 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/60'}`} />
                           <span className="font-bold text-white">{reason.check}</span>
                         </div>
-                        <span className="text-white/70 font-mono">{reason.value}</span>
+                        <span className="text-white/85 font-mono font-semibold">{reason.value}</span>
                       </div>
                     ))}
                   </div>
@@ -258,12 +258,12 @@ function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExp
                 {expandedReasons.has(cardKey) && (
                   <div className="space-y-1.5 pt-1">
                     {res.detailedReasons.map((reason, i) => (
-                      <div key={i} className="bg-white/10 rounded-lg p-2.5 border border-white/10 flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${reason.status === 'positive' ? 'bg-emerald-300' : reason.status === 'negative' ? 'bg-red-300' : 'bg-white/50'}`} />
+                      <div key={i} className="bg-white/[0.06] rounded-lg p-3 border border-white/15 flex items-center justify-between text-sm sm:text-base">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-3 h-3 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/60'}`} />
                           <span className="font-bold text-white">{reason.check}</span>
                         </div>
-                        <span className="text-white/70 font-mono">{reason.value}</span>
+                        <span className="text-white/85 font-mono font-semibold">{reason.value}</span>
                       </div>
                     ))}
                   </div>

@@ -249,26 +249,26 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                         const ageBadge = getAgeBadge();
 
                         const renderReason = (reason: any, i: number) => (
-                          <div key={i} className="bg-white/[0.02] rounded-lg p-3 border border-white/5" title={reason.impact || ''}>
+                          <div key={i} className="bg-white/[0.04] rounded-lg p-3 border border-white/10" title={reason.impact || ''}>
                             <div className="flex items-center gap-2">
-                              <div className={`w-3 h-3 rounded-full shrink-0 ${
+                              <div className={`w-3.5 h-3.5 rounded-full shrink-0 ${
                                 reason.status === 'positive' ? 'bg-emerald-400' :
                                 reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'
                               }`} />
-                              <span className={`font-bold text-sm shrink-0 ${reason.status === 'positive' ? 'text-emerald-400' : reason.status === 'negative' ? 'text-red-400' : 'text-slate-400'}`}>
+                              <span className={`font-bold text-sm sm:text-base shrink-0 ${reason.status === 'positive' ? 'text-emerald-400' : reason.status === 'negative' ? 'text-red-400' : 'text-slate-400'}`}>
                                 {reason.check}
                               </span>
-                              <span className={`font-mono text-sm break-all ${reason.status === 'positive' ? 'text-emerald-400/60' : reason.status === 'negative' ? 'text-red-400/60' : 'text-slate-400/60'}`}>
+                              <span className={`font-mono text-sm sm:text-base break-all font-semibold ${reason.status === 'positive' ? 'text-emerald-300' : reason.status === 'negative' ? 'text-red-300' : 'text-slate-300'}`}>
                                 {reason.value}
                               </span>
                             </div>
                             {reason.dates && (
-                              <div className={`ml-5 mt-1 text-xs font-mono whitespace-pre-line ${reason.status === 'positive' ? 'text-emerald-400/50' : reason.status === 'negative' ? 'text-red-400/50' : 'text-slate-400/50'}`}>
+                              <div className={`ml-5 mt-1.5 text-sm font-mono whitespace-pre-line ${reason.status === 'positive' ? 'text-emerald-300/70' : reason.status === 'negative' ? 'text-red-300/70' : 'text-slate-300/70'}`}>
                                 {reason.dates}
                               </div>
                             )}
                             {reason.impact && (
-                              <p className={`text-xs mt-1 ml-5 leading-relaxed ${reason.status === 'positive' ? 'text-emerald-400/40' : reason.status === 'negative' ? 'text-red-400/40' : 'text-slate-400/40'}`}>
+                              <p className={`text-sm mt-1.5 ml-5 leading-relaxed ${reason.status === 'positive' ? 'text-emerald-300/60' : reason.status === 'negative' ? 'text-red-300/60' : 'text-slate-300/60'}`}>
                                 {reason.impact}
                               </p>
                             )}
