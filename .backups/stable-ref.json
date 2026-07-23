@@ -1,6 +1,6 @@
 {
-    "autoUpdate":  true,
-    "description":  "1c043f4 fix: 2 critical bugs — len/direction undefined + useHigherTimeframe enforcement",
-    "savedAt":  "2026-07-23 15:00",
-    "stableVersion":  "1c043f406418ff188b72680406d51291090b7747"
+  "stableVersion": "da7b00c85b292adc06d2257f6788ebc58f06d4ca",
+  "description": "27bb31f feat: v3.12.0-stable — unified card design across all pages, moved menu icon to right side",
+  "savedAt": "2026-07-23 15:05",
+  "autoUpdate": true
 }
