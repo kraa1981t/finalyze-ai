@@ -4,6 +4,12 @@ const ALTERNATIVE_BASE = 'https://api.alternative.me';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const GROQ_BASE = 'https://api.groq.com/openai/v1';
 
+const CORS_PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
+  'https://cors-anywhere.herokuapp.com/',
+];
+
 async function fetchWithProxy(url: string, opts?: RequestInit): Promise<Response> {
   throw new Error('All CORS proxies dead');
 }

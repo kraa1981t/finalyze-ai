@@ -496,21 +496,6 @@ export default function Header({
               </button>
             )}
             <div className="flex items-center gap-3">
-              {/* Desktop: sidebar menu toggle */}
-              {!isPWA && (
-                <button
-                  onMouseDown={(e) => { e.stopPropagation(); onToggleSidebar(); }}
-                  className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/10 rounded-xl border border-white/20 shadow-sm hover:bg-white/20 transition-all"
-                  title={lang === 'ar' ? 'القائمة' : 'Menu'}
-                >
-                  <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">
-                    {lang === 'ar' ? 'القائمة' : 'Menu'}
-                  </span>
-                  <div className="p-2 rounded-lg bg-[#F59E0B] border border-black/10 text-black shadow-md">
-                    <Menu size={18} />
-                  </div>
-                </button>
-              )}
               <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center overflow-hidden shadow-2xl shadow-sky-500/40 rotate-3 hover:rotate-0 transition-all pointer-events-none border-2 border-white/50">
                 <img src={customLogo || `${BASE_URL}logo.png`} alt="Joseph Trading" className="w-full h-full object-cover" />
               </div>
@@ -787,6 +772,22 @@ export default function Header({
                   <span className="hidden sm:inline">{t.login}</span>
                 </button>
               </div>
+            )}
+
+            {/* Desktop: sidebar menu toggle - right side */}
+            {!isPWA && (
+              <button
+                onMouseDown={(e) => { e.stopPropagation(); onToggleSidebar(); }}
+                className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/10 rounded-xl border border-white/20 shadow-sm hover:bg-white/20 transition-all ml-2"
+                title={lang === 'ar' ? 'القائمة' : 'Menu'}
+              >
+                <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">
+                  {lang === 'ar' ? 'القائمة' : 'Menu'}
+                </span>
+                <div className="p-2 rounded-lg bg-[#F59E0B] border border-black/10 text-black shadow-md">
+                  <Menu size={18} />
+                </div>
+              </button>
             )}
           </div>
           )}

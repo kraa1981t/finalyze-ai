@@ -1618,13 +1618,13 @@ Return ONLY valid JSON:
 
   } catch (error: any) {
     console.error("[Engine Error] Falling back to synth:", error);
-    const dir = metrics?.direction || 'sideways';
-    const rsi = metrics?.rsi ?? 50;
-    const tAge = metrics?.totalAge || 0;
-    const raw: SignalType = rsi < 30 ? (dir === 'uptrend' ? SignalType.BUY : SignalType.SELL) : rsi > 70 ? (dir === 'downtrend' ? SignalType.SELL : SignalType.BUY) : SignalType.NEUTRAL;
+    const dir = 'sideways';
+    const rsi = 50;
+    const tAge = 0;
+    const raw: SignalType = rsi < 30 ? SignalType.BUY : rsi > 70 ? SignalType.SELL : SignalType.NEUTRAL;
     const conf = raw === SignalType.NEUTRAL ? 30 : Math.min(75, 50 + (rsi < 30 || rsi > 70 ? 15 : 0) + (dir !== 'sideways' ? 10 : 0));
-    const price = closes[closes.length - 1] || 0;
-    const atr = metrics?.atr || price * 0.02;
+    const price = 0;
+    const atr = price * 0.02;
     const finalResult: AnalysisResult = {
       symbol, type, timeframe,
       signal: raw,
@@ -1632,7 +1632,7 @@ Return ONLY valid JSON:
       summary: `[TDZ Fallback] ${symbol} ${dir} RSI=${rsi.toFixed(1)} — engine error: ${error.message}`,
       detailedReasons: [{ check: 'Engine Fallback', value: `TDZ error: ${error.message}`, status: 'neutral', impact: 'synth fallback used' }],
       newsSources: [],
-      technicalScore: metrics?.momentumScore || 50,
+      technicalScore: 50,
       sentimentScore: 50,
       trendMaturity: tAge < 10 ? 'infancy' as const : (tAge < 25 ? 'youth' as const : (tAge <= 70 ? 'mature' as const : 'aging' as const)),
       trendAge: tAge,

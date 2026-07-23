@@ -115,7 +115,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     if (isOpen) {
       setEditAddresses(JSON.parse(JSON.stringify(addresses)));
       setCopiedId(null);
-      setNewAddress({ name: '', address: '' });
+      setNewAddress({ id: '', name: '', address: '' });
       setSelectedCoinId(null);
       setPaymentConfirmed(false);
       setTimerRunning(false);
@@ -233,7 +233,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     if (!newAddress.name || !newAddress.address) return;
     const id = 'custom_' + Date.now();
     setEditAddresses([...editAddresses, { id, name: newAddress.name, address: newAddress.address }]);
-    setNewAddress({ name: '', address: '' });
+    setNewAddress({ id: '', name: '', address: '' });
   };
 
   const calcCryptoAmount = (coinId: string, coinName?: string): string => {

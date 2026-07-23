@@ -15,9 +15,10 @@ interface SettingsModalProps {
   user: User | null;
   asPage?: boolean;
   lang: Language;
+  onDeleteClientResults?: () => Promise<void>;
 }
 
-export default function SettingsModal({ isOpen, onClose, settings, onSettingsChange, user, asPage, lang }: SettingsModalProps) {
+export default function SettingsModal({ isOpen, onClose, settings, onSettingsChange, onSave, user, asPage, lang, onDeleteClientResults }: SettingsModalProps) {
   const isAr = lang === 'ar';
   const handleChange = (key: keyof StrategySettings, value: any) => {
     onSettingsChange({ ...settings, [key]: value });

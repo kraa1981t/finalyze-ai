@@ -33,7 +33,7 @@ export interface AnalysisResult {
   technicalScore: number;
   sentimentScore: number;
   historicalMatch?: string;
-  trendMaturity?: 'infancy' | 'youth' | 'aging' | 'unknown';
+  trendMaturity?: 'infancy' | 'youth' | 'mature' | 'aging' | 'unknown';
   trendAge?: number; // Number of candles
   microTF?: string;
   microSignal?: 'pullback' | 'aligned' | 'unknown';
@@ -86,6 +86,9 @@ export interface StrategySettings {
   minPullbackCandles: number;
   pullbackVolConfirm: boolean;
   pullbackCandleConfirm: boolean;
+  maxPrimaryWeight?: number;
+  maxSupportingWeight?: number;
+  microTimeframe?: string;
 }
 
 export interface AutoAnalysisSettings {

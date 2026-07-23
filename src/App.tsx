@@ -500,6 +500,19 @@ export default function App() {
     return base;
   });
 
+  const [cardColor, setCardColor] = useState<string>(() => {
+    return localStorage.getItem('card_color') || '#F59E0B';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('card_color', cardColor);
+    const r = parseInt(cardColor.slice(1, 3), 16);
+    const g = parseInt(cardColor.slice(3, 5), 16);
+    const b = parseInt(cardColor.slice(5, 7), 16);
+    document.documentElement.style.setProperty('--card-bg', `${r},${g},${b}`);
+    document.documentElement.style.setProperty('--card-bg-active', `${r},${g},${b}`);
+  }, [cardColor]);
+
   useEffect(() => {
     localStorage.setItem('auto_settings', JSON.stringify(autoSettings));
   }, [autoSettings]);

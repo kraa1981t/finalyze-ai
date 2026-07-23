@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AnalysisResult, SignalType, MarketType } from '../types';
-import { motion, AnimatePresence } from 'motion/react';
 import { Info, X, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
@@ -14,18 +13,18 @@ interface TopSignalsProps {
   lang: Language;
 }
 
-const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelAr: string; labelEn: string }> = {
-  [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', labelAr: 'شراء قوي', labelEn: 'Strong Buy' },
-  [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', labelAr: 'بيع قوي', labelEn: 'Strong Sell' },
-  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', labelAr: 'شراء', labelEn: 'Buy' },
-  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', labelAr: 'بيع', labelEn: 'Sell' },
+const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelAr: string; labelEn: string; symbolColor: string }> = {
+  [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', labelAr: 'شراء قوي', labelEn: 'Strong Buy', symbolColor: '#00ff88' },
+  [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', labelAr: 'بيع قوي', labelEn: 'Strong Sell', symbolColor: '#ff4444' },
+  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', labelAr: 'شراء', labelEn: 'Buy', symbolColor: '#66ffaa' },
+  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', labelAr: 'بيع', labelEn: 'Sell', symbolColor: '#ff8888' },
 };
 
 const CATEGORY_CONFIG: Record<string, { emoji: string; labelAr: string; labelEn: string; color: string; borderColor: string }> = {
-  forex: { emoji: '\uD83D\uDCB1', labelAr: '\u0627\u0644\u0641\u0648\u0631\u0643\u0633', labelEn: 'Forex', color: 'text-blue-400', borderColor: 'border-blue-500/30' },
-  crypto: { emoji: '\uD83E\uDDF1', labelAr: '\u0627\u0644\u0643\u0631\u064A\u0628\u062A\u0648', labelEn: 'Crypto', color: 'text-purple-400', borderColor: 'border-purple-500/30' },
-  stocks: { emoji: '\uD83D\uDCC8', labelAr: '\u0627\u0644\u0623\u0633\u0647\u0645', labelEn: 'Stocks', color: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
-  metals: { emoji: '\uD83D\uDC8E', labelAr: '\u0627\u0644\u0645\u0639\u0627\u062F\u0646', labelEn: 'Metals', color: 'text-orange-400', borderColor: 'border-orange-500/30' },
+  forex: { emoji: '\uD83D\uDCB1', labelAr: 'الفوركس', labelEn: 'Forex', color: 'text-blue-400', borderColor: 'border-blue-500/30' },
+  crypto: { emoji: '\uD83E\uDDF1', labelAr: 'الكريبتو', labelEn: 'Crypto', color: 'text-purple-400', borderColor: 'border-purple-500/30' },
+  stocks: { emoji: '\uD83D\uDCC8', labelAr: 'الأسهم', labelEn: 'Stocks', color: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
+  metals: { emoji: '\uD83D\uDC8E', labelAr: 'المعادن', labelEn: 'Metals', color: 'text-orange-400', borderColor: 'border-orange-500/30' },
 };
 
 function getSymbolCategory(symbol: string): string {
@@ -41,7 +40,7 @@ const formatPublishDate = (timestamp: string, lang: string) => {
   try {
     const date = new Date(timestamp);
     const isAr = lang === 'ar';
-    const daysAr = ['\u0627\u0644\u0623\u062D\u062F', '\u0627\u0644\u0625\u062B\u0646\u064A\u0646', '\u0627\u0644\u062B\u0644\u0627\u062B\u0627\u0621', '\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621', '\u0627\u0644\u062E\u0645\u064A\u0633', '\u0627\u0644\u062C\u0645\u0639\u0629', '\u0627\u0644\u0633\u0628\u062A'];
+    const daysAr = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dayName = isAr ? daysAr[date.getDay()] : daysEn[date.getDay()];
     const hours = String(date.getHours()).padStart(2, '0');
@@ -62,7 +61,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onClearAll, la
 
   const grouped: Record<string, AnalysisResult[]> = { forex: [], crypto: [], stocks: [], metals: [] };
   for (const s of signals) {
-    const cat = (s.type as string) || getSymbolCategory(s.symbol);
+    const cat = getSymbolCategory(s.symbol);
     if (grouped[cat]) grouped[cat].push(s);
     else grouped.forex.push(s);
   }
@@ -71,6 +70,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onClearAll, la
 
   return (
     <div className="mb-12 space-y-6">
+      <style>{`.signal-card .text-emerald-400{color:#059669!important}.signal-card .text-red-400{color:#dc2626!important}`}</style>
       <div className={cn("flex items-center justify-between px-4", isAr ? "flex-row" : "flex-row-reverse")}>
         <button 
           onClick={onClearAll}
@@ -129,6 +129,7 @@ function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpa
 }) {
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.STRONG_BUY];
   const isExpanded = expandedCard === cardKey;
+  const cardRef = useRef<HTMLDivElement>(null);
   const isJPY = res.symbol.includes('JPY');
   const decimals = isJPY ? 3 : 5;
   const entry = res.entryPrice || (res.stopLoss && res.takeProfit ? (res.stopLoss + res.takeProfit) / 2 : 1.0);
@@ -137,59 +138,61 @@ function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpa
   const tpPrice = (res.signal.includes('buy')) ? entry + slPips * 2 * pipSize : entry - slPips * 2 * pipSize;
   const slPrice = (res.signal.includes('buy')) ? entry - slPips * pipSize : entry + slPips * pipSize;
 
+  useEffect(() => {
+    if (isExpanded && cardRef.current) {
+      setTimeout(() => {
+        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  }, [isExpanded]);
+
   return (
-    <div className={cn("rounded-xl border transition-all mx-2", isExpanded ? 'border-primary ring-1 ring-primary bg-brand-alt/80' : 'border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50')}>
-      <button onClick={() => { onSelect(res); onExpand(isExpanded ? null : cardKey); }} className="w-full px-3 py-3 flex flex-col items-center gap-2">
-        <div className="flex items-stretch justify-between w-full gap-2 px-1">
-          <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-3 py-3 shrink-0 min-w-[70px] flex items-center justify-center">
-            <span className="text-base font-black font-mono text-emerald-400">{tpPrice.toFixed(decimals)}</span>
-          </div>
-          <span className="text-sm font-black text-yellow-400 italic truncate flex items-center">{res.symbol}</span>
-          <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-3 py-3 shrink-0 min-w-[70px] flex items-center justify-center">
-            <span className="text-base font-black font-mono text-red-400">{slPrice.toFixed(decimals)}</span>
-          </div>
+    <div ref={cardRef} className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden" style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
+      <button onClick={() => { onSelect(res); }} className="w-full px-3 py-1.5 flex flex-col items-center gap-1">
+        <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
+          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tpPrice.toFixed(decimals)}</span>
+          <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
+          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{slPrice.toFixed(decimals)}</span>
         </div>
-        <span className={`text-xs font-black ${meta.color}`}>{isAr ? meta.labelAr : meta.labelEn}</span>
-        <div className="flex items-center gap-3">
-          <span className="text-base font-black text-yellow-400 font-mono">{res.confidence}%</span>
-          <span className="text-[10px] text-yellow-400/50 font-bold">{formatPublishDate(res.timestamp, lang)}</span>
+        <span className="text-sm sm:text-base font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
+          <span className="text-[10px] sm:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, isAr ? 'ar' : 'en')}</span>
         </div>
       </button>
 
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <div className="px-2 pb-1.5 space-y-1.5 border-t border-white/5 pt-1.5">
-              {res.summary && <div className="bg-white/5 rounded p-1.5 border border-white/5 text-[10px] text-yellow-400/70 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
-              {res.detailedReasons && res.detailedReasons.length > 0 && (
-                <div className="space-y-1">
-                  <button onClick={(e) => { e.stopPropagation(); const n = new Set(expandedReasons); n.has(cardKey) ? n.delete(cardKey) : n.add(cardKey); onExpandReasons(n); }} className="w-full flex items-center justify-between text-xs font-bold text-yellow-400/70 hover:text-yellow-400 py-1">
-                    <div className="flex items-center gap-1"><Info size={12} /><span>{isAr ? '\u0627\u0644\u0645\u0648\u0634\u0631\u0627\u062A' : 'Indicators'} ({res.detailedReasons.length})</span></div>
-                    <span className="text-[10px]">{expandedReasons.has(cardKey) ? '\u25BC' : '\u25B6'}</span>
-                  </button>
-                  <AnimatePresence>
-                    {expandedReasons.has(cardKey) && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                        <div className="space-y-1 pt-1">
-                          {res.detailedReasons.map((reason, i) => (
-                            <div key={i} className="bg-white/[0.02] rounded p-1.5 border border-white/5 flex items-center justify-between text-[10px]">
-                              <div className="flex items-center gap-1">
-                                <div className={`w-1.5 h-1.5 rounded-full ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/30'}`} />
-                                <span className="font-bold text-yellow-400/80">{reason.check}</span>
-                              </div>
-                              <span className="text-yellow-400/50 font-mono">{reason.value}</span>
-                            </div>
-                          ))}
+      <button onClick={(e) => { e.stopPropagation(); onExpand(isExpanded ? null : cardKey); }} className="w-full flex items-center justify-center py-1 text-white/40 hover:text-white/70 transition-colors">
+        <span className="text-xs">{isExpanded ? '\u25B2' : '\u25BC'}</span>
+      </button>
+
+      {isExpanded && (
+        <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
+          <div className="px-3 py-2 space-y-2">
+            {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
+            {res.detailedReasons && res.detailedReasons.length > 0 && (
+              <div className="space-y-1.5">
+                <button onClick={(e) => { e.stopPropagation(); const n = new Set(expandedReasons); n.has(cardKey) ? n.delete(cardKey) : n.add(cardKey); onExpandReasons(n); }} className="w-full flex items-center justify-between text-sm font-bold text-white hover:text-white/80 py-1">
+                  <div className="flex items-center gap-1.5"><Info size={14} /><span>{isAr ? 'المشارات' : 'Indicators'} ({res.detailedReasons.length})</span></div>
+                  <span className="text-xs">{expandedReasons.has(cardKey) ? '\u25BC' : '\u25B6'}</span>
+                </button>
+                {expandedReasons.has(cardKey) && (
+                  <div className="space-y-1.5 pt-1">
+                    {res.detailedReasons.map((reason, i) => (
+                      <div key={i} className="bg-white/10 rounded-lg p-2.5 border border-white/10 flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${reason.status === 'positive' ? 'bg-emerald-300' : reason.status === 'negative' ? 'bg-red-300' : 'bg-white/50'}`} />
+                          <span className="font-bold text-white">{reason.check}</span>
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                        <span className="text-white/70 font-mono">{reason.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <button onClick={(e) => { e.stopPropagation(); onRemove(res.symbol); }} className="absolute top-1 left-1 p-1 hover:bg-red-500/20 rounded-md text-white/20 hover:text-red-500 transition-colors">
         <X size={12} />
@@ -206,6 +209,7 @@ function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExp
 }) {
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.BUY];
   const isExpanded = expandedCard === cardKey;
+  const cardRef = useRef<HTMLDivElement>(null);
   const isJPY = res.symbol.includes('JPY');
   const decimals = isJPY ? 3 : 5;
   const entry = res.entryPrice || (res.stopLoss && res.takeProfit ? (res.stopLoss + res.takeProfit) / 2 : 1.0);
@@ -214,59 +218,61 @@ function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExp
   const tpPrice = (res.signal.includes('buy')) ? entry + slPips * 2 * pipSize : entry - slPips * 2 * pipSize;
   const slPrice = (res.signal.includes('buy')) ? entry - slPips * pipSize : entry + slPips * pipSize;
 
+  useEffect(() => {
+    if (isExpanded && cardRef.current) {
+      setTimeout(() => {
+        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  }, [isExpanded]);
+
   return (
-    <div className={cn("rounded-lg border transition-all", isExpanded ? 'border-primary ring-1 ring-primary bg-brand-alt/80' : 'border-white/5 bg-brand-alt/45 hover:border-white/10')}>
-      <button onClick={() => { onSelect(res); onExpand(isExpanded ? null : cardKey); }} className="w-full px-2 py-2 flex flex-col items-center gap-1.5">
-        <div className="flex items-stretch justify-between w-full gap-2 px-1">
-          <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-3 py-3 shrink-0 min-w-[70px] flex items-center justify-center">
-            <span className="text-base font-black font-mono text-emerald-400">{tpPrice.toFixed(decimals)}</span>
-          </div>
-          <span className="text-sm font-black text-yellow-400 italic truncate flex items-center">{res.symbol}</span>
-          <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-3 py-3 shrink-0 min-w-[70px] flex items-center justify-center">
-            <span className="text-base font-black font-mono text-red-400">{slPrice.toFixed(decimals)}</span>
-          </div>
+    <div ref={cardRef} className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden" style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
+      <button onClick={() => { onSelect(res); }} className="w-full px-3 py-1.5 flex flex-col items-center gap-1">
+        <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
+          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tpPrice.toFixed(decimals)}</span>
+          <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
+          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{slPrice.toFixed(decimals)}</span>
         </div>
-        <span className={`text-xs font-black ${meta.color}`}>{isAr ? meta.labelAr : meta.labelEn}</span>
-        <div className="flex items-center gap-3">
-          <span className="text-base font-black text-yellow-400 font-mono">{res.confidence}%</span>
-          <span className="text-[10px] text-yellow-400/50 font-bold">{formatPublishDate(res.timestamp, lang)}</span>
+        <span className="text-sm sm:text-base font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
+          <span className="text-[10px] sm:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, isAr ? 'ar' : 'en')}</span>
         </div>
       </button>
 
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <div className="px-2 pb-1.5 space-y-1.5 border-t border-white/5 pt-1.5">
-              {res.summary && <div className="bg-white/5 rounded p-1.5 border border-white/5 text-[10px] text-yellow-400/70 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
-              {res.detailedReasons && res.detailedReasons.length > 0 && (
-                <div className="space-y-1">
-                  <button onClick={(e) => { e.stopPropagation(); const n = new Set(expandedReasons); n.has(cardKey) ? n.delete(cardKey) : n.add(cardKey); onExpandReasons(n); }} className="w-full flex items-center justify-between text-xs font-bold text-yellow-400/70 hover:text-yellow-400 py-1">
-                    <div className="flex items-center gap-1"><Info size={12} /><span>{isAr ? '\u0627\u0644\u0645\u0648\u0634\u0631\u0627\u062A' : 'Indicators'} ({res.detailedReasons.length})</span></div>
-                    <span className="text-[10px]">{expandedReasons.has(cardKey) ? '\u25BC' : '\u25B6'}</span>
-                  </button>
-                  <AnimatePresence>
-                    {expandedReasons.has(cardKey) && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                        <div className="space-y-1 pt-1">
-                          {res.detailedReasons.map((reason, i) => (
-                            <div key={i} className="bg-white/[0.02] rounded p-1.5 border border-white/5 flex items-center justify-between text-[10px]">
-                              <div className="flex items-center gap-1">
-                                <div className={`w-1.5 h-1.5 rounded-full ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/30'}`} />
-                                <span className="font-bold text-yellow-400/80">{reason.check}</span>
-                              </div>
-                              <span className="text-yellow-400/50 font-mono">{reason.value}</span>
-                            </div>
-                          ))}
+      <button onClick={(e) => { e.stopPropagation(); onExpand(isExpanded ? null : cardKey); }} className="w-full flex items-center justify-center py-1 text-white/40 hover:text-white/70 transition-colors">
+        <span className="text-xs">{isExpanded ? '\u25B2' : '\u25BC'}</span>
+      </button>
+
+      {isExpanded && (
+        <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
+          <div className="px-3 py-2 space-y-2">
+            {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
+            {res.detailedReasons && res.detailedReasons.length > 0 && (
+              <div className="space-y-1.5">
+                <button onClick={(e) => { e.stopPropagation(); const n = new Set(expandedReasons); n.has(cardKey) ? n.delete(cardKey) : n.add(cardKey); onExpandReasons(n); }} className="w-full flex items-center justify-between text-sm font-bold text-white hover:text-white/80 py-1">
+                  <div className="flex items-center gap-1.5"><Info size={14} /><span>{isAr ? 'المشارات' : 'Indicators'} ({res.detailedReasons.length})</span></div>
+                  <span className="text-xs">{expandedReasons.has(cardKey) ? '\u25BC' : '\u25B6'}</span>
+                </button>
+                {expandedReasons.has(cardKey) && (
+                  <div className="space-y-1.5 pt-1">
+                    {res.detailedReasons.map((reason, i) => (
+                      <div key={i} className="bg-white/10 rounded-lg p-2.5 border border-white/10 flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${reason.status === 'positive' ? 'bg-emerald-300' : reason.status === 'negative' ? 'bg-red-300' : 'bg-white/50'}`} />
+                          <span className="font-bold text-white">{reason.check}</span>
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                        <span className="text-white/70 font-mono">{reason.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <button onClick={(e) => { e.stopPropagation(); onRemove(res.symbol); }} className="absolute top-1 left-1 p-1 hover:bg-red-500/20 rounded-md text-white/20 hover:text-red-500 transition-colors">
         <X size={12} />
