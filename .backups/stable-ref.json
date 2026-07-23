@@ -1,6 +1,6 @@
 {
     "autoUpdate":  true,
-    "description":  "c3a69ee ClientDashboard: STRONG signals only",
-    "savedAt":  "2026-06-09 04:06",
-    "stableVersion":  "c3a69ee09f3f41264c6bab8b35c908fd33fca54e"
+    "description":  "1c043f4 fix: 2 critical bugs — len/direction undefined + useHigherTimeframe enforcement",
+    "savedAt":  "2026-07-23 15:00",
+    "stableVersion":  "1c043f406418ff188b72680406d51291090b7747"
 }
