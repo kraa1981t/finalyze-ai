@@ -4,6 +4,7 @@ import { Info, X, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 import { SYMBOL_CATEGORIES } from '../constants';
+import TradingViewWidget from './TradingViewWidget';
 
 interface TopSignalsProps {
   signals: AnalysisResult[];
@@ -166,8 +167,11 @@ function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpa
       </button>
 
       {isExpanded && (
-        <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
+        <div className="border-t border-white/10" style={{ maxHeight: '450px', overflowY: 'auto' }}>
           <div className="px-3 py-2 space-y-2">
+            <div className="h-[200px] rounded-xl overflow-hidden">
+              <TradingViewWidget symbol={res.symbol} />
+            </div>
             {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
             {res.detailedReasons && res.detailedReasons.length > 0 && (
               <div className="space-y-1.5">
@@ -246,8 +250,11 @@ function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExp
       </button>
 
       {isExpanded && (
-        <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
+        <div className="border-t border-white/10" style={{ maxHeight: '450px', overflowY: 'auto' }}>
           <div className="px-3 py-2 space-y-2">
+            <div className="h-[200px] rounded-xl overflow-hidden">
+              <TradingViewWidget symbol={res.symbol} />
+            </div>
             {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
             {res.detailedReasons && res.detailedReasons.length > 0 && (
               <div className="space-y-1.5">

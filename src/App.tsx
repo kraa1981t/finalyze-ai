@@ -826,8 +826,8 @@ export default function App() {
   };
 
   const handleSelectSignal = (result: AnalysisResult) => {
-    setAnalysisResults([result]);
-    setShowForm(false);
+    // Card expansion is handled within TopSignals component
+    // No need to navigate to a different view
   };
 
   const isMarketOpen = (category: string) => {
