@@ -178,12 +178,12 @@ function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpa
                 {expandedReasons.has(cardKey) && (
                   <div className="space-y-1.5 pt-1">
                     {res.detailedReasons.map((reason, i) => (
-                      <div key={i} className="bg-white/[0.06] rounded-lg p-3 border border-white/15 flex items-center justify-between text-sm sm:text-base">
+                      <div key={i} style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)'}} className="rounded-lg p-3 flex items-center justify-between text-sm sm:text-base">
                         <div className="flex items-center gap-2.5">
-                          <div className={`w-3 h-3 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/60'}`} />
-                          <span className="font-bold text-white">{reason.check}</span>
+                          <div className={`w-4 h-4 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/70'}`} />
+                          <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-bold text-base sm:text-lg">{reason.check}</span>
                         </div>
-                        <span className="text-white/85 font-mono font-semibold">{reason.value}</span>
+                        <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-mono text-sm sm:text-base font-bold">{reason.value}</span>
                       </div>
                     ))}
                   </div>
@@ -258,12 +258,12 @@ function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExp
                 {expandedReasons.has(cardKey) && (
                   <div className="space-y-1.5 pt-1">
                     {res.detailedReasons.map((reason, i) => (
-                      <div key={i} className="bg-white/[0.06] rounded-lg p-3 border border-white/15 flex items-center justify-between text-sm sm:text-base">
+                      <div key={i} style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)'}} className="rounded-lg p-3 flex items-center justify-between text-sm sm:text-base">
                         <div className="flex items-center gap-2.5">
-                          <div className={`w-3 h-3 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/60'}`} />
-                          <span className="font-bold text-white">{reason.check}</span>
+                          <div className={`w-4 h-4 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/70'}`} />
+                          <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-bold text-base sm:text-lg">{reason.check}</span>
                         </div>
-                        <span className="text-white/85 font-mono font-semibold">{reason.value}</span>
+                        <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-mono text-sm sm:text-base font-bold">{reason.value}</span>
                       </div>
                     ))}
                   </div>

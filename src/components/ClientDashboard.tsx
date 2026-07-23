@@ -142,7 +142,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
                 <span className={`text-sm font-black ${cfg.color}`}>{isAr ? cfg.labelAr : cfg.labelEn}</span>
                 <span className="text-xs text-white/40 font-bold">({catSignals.length})</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {catSignals.map((res, idx) => (
                   <ClientSignalCard key={`all_${res.symbol}_${idx}`} res={res} isAr={isAr} lang={lang} selectedSymbol={selectedSymbol} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpandCard={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={(sym) => { if (selectedSymbol === sym) { setSelectedSymbol(null); setSymbolExplicitlySelected(false); } else { setSelectedSymbol(sym); setSymbolExplicitlySelected(true); } handleClick(); }} hasActivePlan={hasActivePlan} formatPublishDate={formatPublishDate} cardKey={`all_${res.symbol}_${idx}`} onClick={handleClick} />
                 ))}
@@ -206,14 +206,14 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, expandedCard, expan
   const ageBadge = getAgeBadge();
 
   const renderReason = (reason: any, i: number) => (
-    <div key={i} className="bg-white/[0.04] rounded-lg p-3 border border-white/10" title={reason.impact || ''}>
-      <div className="flex items-center gap-2">
-        <div className={`w-3.5 h-3.5 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-slate-400'}`} />
-        <span className={`font-bold text-sm sm:text-base shrink-0 ${reason.status === 'positive' ? 'text-emerald-400' : reason.status === 'negative' ? 'text-red-400' : 'text-slate-400'}`}>{reason.check}</span>
-        <span className={`font-mono text-sm sm:text-base break-all font-semibold ${reason.status === 'positive' ? 'text-emerald-300' : reason.status === 'negative' ? 'text-red-300' : 'text-slate-300'}`}>{reason.value}</span>
+    <div key={i} style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)'}} className="rounded-lg p-3" title={reason.impact || ''}>
+      <div className="flex items-center gap-2.5">
+        <div className={`w-4 h-4 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/70'}`} />
+        <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-bold text-base sm:text-lg shrink-0">{reason.check}</span>
+        <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-mono text-sm sm:text-base break-all font-bold">{reason.value}</span>
       </div>
-      {reason.dates && <div className={`ml-5 mt-1.5 text-sm font-mono whitespace-pre-line ${reason.status === 'positive' ? 'text-emerald-300/70' : reason.status === 'negative' ? 'text-red-300/70' : 'text-slate-300/70'}`}>{reason.dates}</div>}
-      {reason.impact && <p className={`text-sm mt-1.5 ml-5 leading-relaxed ${reason.status === 'positive' ? 'text-emerald-300/60' : reason.status === 'negative' ? 'text-red-300/60' : 'text-slate-300/60'}`}>{reason.impact}</p>}
+      {reason.dates && <div style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff',opacity:0.8}} className="ml-6 mt-2 text-sm font-mono whitespace-pre-line">{reason.dates}</div>}
+      {reason.impact && <p style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff',opacity:0.7}} className="text-sm mt-2 ml-6 leading-relaxed">{reason.impact}</p>}
     </div>
   );
 
