@@ -1,6 +1,6 @@
 {
-  "stableVersion": "095951327659e979e0395d1b6c245f467a0b8313",
-  "description": "0959513 v3.12.0-stable — full card design + factory reset + menu icon",
-  "savedAt": "2026-07-23 15:22",
+  "stableVersion": "46393e9",
+  "description": "46393e9 feat: reduce regular signals from 4 to 3 per category",
+  "savedAt": "2026-07-23 18:00",
   "autoUpdate": true
 }
