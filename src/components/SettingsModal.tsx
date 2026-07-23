@@ -55,6 +55,9 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
   const [notification, setNotification] = useState<{ type: 'sms' | 'email'; title: string; body: string } | null>(null);
   const [saved, setSaved] = useState(false);
 
+  // Stable version info
+  const [stableVersion, setStableVersion] = useState<{ version: string; date: string; commit: string } | null>(null);
+
   // Factory Reset state
   const [showFactoryReset, setShowFactoryReset] = useState(false);
   const [factoryResetLoading, setFactoryResetLoading] = useState(false);
@@ -174,6 +177,34 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
     }
     setFactoryResetLoading(false);
   };
+
+  // Fetch latest stable version info from GitHub
+  useEffect(() => {
+    const fetchStableVersion = async () => {
+      try {
+        const resp = await fetch(`https://raw.githubusercontent.com/${GITHUB_REPO}/main/.backups/stable-ref.json`);
+        if (resp.ok) {
+          const data = await resp.json();
+          const commitHash = data.description?.split(' ')[0] || '';
+          const savedDate = data.savedAt || '';
+          let formattedDate = savedDate;
+          if (savedDate) {
+            try {
+              const d = new Date(savedDate.replace(' ', 'T'));
+              const monthsAr = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+              formattedDate = `${d.getDate()} ${monthsAr[d.getMonth()]} ${d.getFullYear()}`;
+            } catch {}
+          }
+          setStableVersion({
+            version: commitHash ? `${commitHash} - ${formattedDate}` : 'v3.12.0-stable - 23 يوليو 2026',
+            date: formattedDate,
+            commit: commitHash
+          });
+        }
+      } catch {}
+    };
+    fetchStableVersion();
+  }, []);
 
   // Auto close notification after 8 seconds
   useEffect(() => {
@@ -682,20 +713,20 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
           <RotateCcw size={16} /> {isAr ? '🔴 إعادة تعيين المصنع (Factory Reset)' : '🔴 Factory Reset'}
         </h3>
         <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-black text-white/80 bg-white/10 px-2 py-0.5 rounded-full">{stableVersion?.version || 'v3.12.0-stable - 23 يوليو 2026'}</span>
+          </div>
           <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-            {isAr ? '⚠️ هذا الإجراء يعيد تعيين الموقع بالكامل إلى النسخة المستقرة (stable-v2). سيتم فقدان أي تغييرات لاحقة. يرجى التأكد قبل المتابعة.' : '⚠️ This resets the entire site to the stable version (stable-v2). Any subsequent changes will be lost. Please be certain before proceeding.'}
+            {isAr ? `⚠️ هذا الإجراء يعيد تعيين الموقع بالكامل إلى النسخة المستقرة (${stableVersion?.version || 'v3.12.0-stable - 23 يوليو 2026'}). سيتم فقدان أي تغييرات لاحقة. يرجى التأكد قبل المتابعة.` : `⚠️ This resets the entire site to the stable version (${stableVersion?.version || 'v3.12.0-stable - July 23, 2026'}). Any subsequent changes will be lost. Please be certain before proceeding.`}
           </p>
 
-          {/* Direct link to GitHub Actions */}
-          <a
-            href="https://github.com/kraa1981t/finalyze-ai/actions/workflows/factory-reset.yml"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 text-center"
+          <button
+            onClick={() => setShowFactoryReset(true)}
+            className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-3 rounded-xl transition-all text-xs cursor-pointer shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2"
           >
             <RotateCcw size={16} />
-            {isAr ? 'فتح Factory Reset على GitHub' : 'Open Factory Reset on GitHub'}
-          </a>
+            {isAr ? `استعادة إلى النسخة المستقرة (${stableVersion?.version || 'v3.12.0-stable - 23 يوليو 2026'})` : `Restore to Stable (${stableVersion?.version || 'v3.12.0-stable - July 23, 2026'})`}
+          </button>
         </div>
       </div>
 
@@ -808,8 +839,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             <h3 className="text-lg font-black text-red-400">
               {isAr ? '⚠️ تأكيد إعادة تعيين المصنع' : '⚠️ Confirm Factory Reset'}
             </h3>
-            <p className="text-sm text-slate-300 font-semibold">
-              {isAr ? 'هل أنت متأكد؟ سيتم إعادة تعيين الموقع إلى النسخة المستقرة (stable-v2). هذا الإجراء لا يمكن التراجع عنه.' : 'Are you sure? This will reset the site to the stable version (stable-v2). This action cannot be undone.'}
+            <p className="text-sm text-white/60 leading-relaxed">
+              {isAr ? `هل أنت متأكد؟ سيتم إعادة تعيين الموقع إلى النسخة المستقرة (${stableVersion?.version || 'v3.12.0-stable - 23 يوليو 2026'}). هذا الإجراء لا يمكن التراجع عنه.` : `Are you sure? This will reset the site to the stable version (${stableVersion?.version || 'v3.12.0-stable - July 23, 2026'}). This action cannot be undone.`}
             </p>
             {factoryResetError && (
               <p className="text-xs text-red-400 font-bold bg-red-500/10 rounded-xl p-3">{factoryResetError}</p>
