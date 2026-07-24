@@ -23,6 +23,7 @@ interface HeaderProps {
   isWaiting?: boolean;
   hasApiKey: boolean;
   onToggleSidebar: () => void;
+  isSidebarOpen?: boolean;
   isDeveloper?: boolean;
   lastSyncStatus?: { ok: boolean; count?: number; error?: string; time: number } | null;
   analysisProgress?: { current: string; total: number; index: number; failed?: number } | null;

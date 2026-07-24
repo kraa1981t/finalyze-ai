@@ -1590,14 +1590,7 @@ export default function App() {
         freemiumDisabled={freemiumDisabled}
       />
 
-      {/* Device Preview Overlay */}
-      <DevicePreview
-        isOpen={!!previewDevice}
-        onClose={() => setPreviewDevice(null)}
-        device={previewDevice || 'phone'}
-      />
-
-      {/* Sidebar Panel - pushes content, doesn't overlay - NOT on PWA or DevicePreview iframe */}
+      {/* Sidebar Panel - dropdown below menu icon */}
       <AnimatePresence>
         {isSidebarOpen && !isPWA && window.self === window.top && (
           <SidebarPanel
@@ -1609,6 +1602,13 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Device Preview Overlay */}
+      <DevicePreview
+        isOpen={!!previewDevice}
+        onClose={() => setPreviewDevice(null)}
+        device={previewDevice || 'phone'}
+      />
 
       <AnimatePresence>
         {isScanningFinished && !foundAnyStrong && autoSettings.isEnabled && (
@@ -1625,7 +1625,7 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <main className={`flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-24 relative transition-all duration-300 ${isSidebarOpen ? (lang === 'ar' ? 'mr-56' : 'ml-56') : ''}`}>
+      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-24 relative">
         {/* Dedicated pages (from dashboard) */}
         {activePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>

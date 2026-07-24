@@ -38,12 +38,12 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
   return (
     <motion.div
       ref={panelRef}
-      initial={{ x: isRTL ? 100 : -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: isRTL ? 100 : -100, opacity: 0 }}
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: -20, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className={`fixed top-24 bottom-0 w-56 z-40 bg-[#D1FAE5]/95 backdrop-blur-xl border-l border-black/10 shadow-2xl flex flex-col overflow-hidden ${isRTL ? 'right-0 border-l' : 'left-0 border-r'}`}
-      style={{ direction: isRTL ? 'rtl' : 'ltr' }}
+      className={`fixed top-[72px] w-64 z-[60] bg-[#D1FAE5]/95 backdrop-blur-xl border border-black/10 shadow-2xl flex flex-col overflow-hidden rounded-2xl ${isRTL ? 'left-4' : 'right-4'}`}
+      style={{ direction: isRTL ? 'rtl' : 'ltr', maxHeight: 'calc(100vh - 100px)' }}
     >
       <div className="px-5 py-4 border-b border-black/5">
         <h3 className="text-xs font-black uppercase tracking-widest text-black/50">
@@ -61,12 +61,12 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.1 }}
               onClick={() => onNavigate(item.page)}
-              className="flex items-center gap-4 px-4 py-4 rounded-2xl bg-white/10 border border-black/10 hover:bg-[#F59E0B]/10 hover:border-[#F59E0B]/30 transition-all group shadow-sm hover:shadow-md"
+              className="flex items-center gap-3 px-3 py-3 rounded-2xl bg-white/10 border border-black/10 hover:bg-[#F59E0B]/10 hover:border-[#F59E0B]/30 transition-all group shadow-sm hover:shadow-md"
             >
-              <div className={`p-2.5 rounded-xl bg-gradient-to-br ${item.color} border border-black/10 text-black shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all`}>
+              <div className={`shrink-0 p-2.5 rounded-xl bg-gradient-to-br ${item.color} border border-black/10 text-black shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all`}>
                 <Icon size={20} />
               </div>
-              <span className="text-sm font-black text-black/80 group-hover:text-black transition-colors">
+              <span className="text-sm font-bold text-black/80 group-hover:text-black transition-colors whitespace-nowrap">
                 {item.label}
               </span>
             </motion.button>
