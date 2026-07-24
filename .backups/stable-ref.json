@@ -1,6 +1,6 @@
 {
-  "stableVersion": "34a1f38",
-  "description": "34a1f38 feat: unified signal display - strong + top 3 regular per category, full width cards",
-  "savedAt": "2026-07-24 13:10",
-  "autoUpdate": true
+  "tag": "stable-v3",
+  "sha": "bb26074",
+  "date": "2026-07-24",
+  "message": "v3.14.0 - sidebar dropdown fixed for RTL"
 }
