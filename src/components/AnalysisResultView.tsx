@@ -15,11 +15,11 @@ interface AnalysisResultViewProps {
 }
 
 const SIGNAL_CONFIG: Record<SignalType, { labelKey: keyof typeof translations.en, color: string, bg: string, border: string, icon: any, labelAr: string, labelEn: string, symbolColor: string }> = {
-    [SignalType.STRONG_BUY]: { labelKey: "strong_buy" as any, color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", icon: null, labelAr: "شراء قوي", labelEn: "Strong Buy", symbolColor: '#00ff88' },
-    [SignalType.BUY]: { labelKey: "buy" as any, color: "text-emerald-400/80", bg: "bg-emerald-500/10", border: "border-emerald-500/20", icon: null, labelAr: "شراء", labelEn: "Buy", symbolColor: '#66ffaa' },
+    [SignalType.STRONG_BUY]: { labelKey: "strong_buy" as any, color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", icon: null, labelAr: "إشارة شراء قوي", labelEn: "Strong Buy Signal", symbolColor: '#00ff88' },
+    [SignalType.BUY]: { labelKey: "buy" as any, color: "text-emerald-400/80", bg: "bg-emerald-500/10", border: "border-emerald-500/20", icon: null, labelAr: "إشارة شراء", labelEn: "Buy Signal", symbolColor: '#66ffaa' },
     [SignalType.NEUTRAL]: { labelKey: "neutral" as any, color: "text-slate-400", bg: "bg-slate-500/20", border: "border-slate-500/20", icon: null, labelAr: "محايد", labelEn: "Neutral", symbolColor: '#ffffff' },
-    [SignalType.SELL]: { labelKey: "sell" as any, color: "text-red-400/80", bg: "bg-red-500/10", border: "border-red-500/20", icon: null, labelAr: "بيع", labelEn: "Sell", symbolColor: '#ff8888' },
-    [SignalType.STRONG_SELL]: { labelKey: "strong_sell" as any, color: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40", icon: null, labelAr: "بيع قوي", labelEn: "Strong Sell", symbolColor: '#ff4444' },
+    [SignalType.SELL]: { labelKey: "sell" as any, color: "text-red-400/80", bg: "bg-red-500/10", border: "border-red-500/20", icon: null, labelAr: "إشارة بيع", labelEn: "Sell Signal", symbolColor: '#ff5555' },
+    [SignalType.STRONG_SELL]: { labelKey: "strong_sell" as any, color: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40", icon: null, labelAr: "إشارة بيع قوي", labelEn: "Strong Sell Signal", symbolColor: '#ff4444' },
     [SignalType.NO_ENTRY]: { labelKey: "no_entry" as any, color: "text-slate-500", bg: "bg-slate-500/10", border: "border-slate-500/10", icon: null, labelAr: "لا توجد فرصة", labelEn: "No Entry", symbolColor: '#ffffff' },
 };
 
@@ -72,7 +72,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
   return (
     <div className="space-y-6 pb-20">
       {/* 1. Top Section: Interactive Chart */}
-      <div className="w-full max-w-4xl mx-auto">
+      <div className="w-full">
         <div className="h-[250px] md:h-[300px] bg-brand-bg rounded-2xl overflow-hidden shadow-2xl border border-brand-text/5 relative">
           <TradingViewWidget symbol={selectedResult.symbol} />
           <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
@@ -94,7 +94,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
       </div>
 
       {/* 3. Compact Opportunity Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-w-4xl mx-auto items-start px-2 sm:px-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 items-start px-2 sm:px-0">
         {sortedResults.map((res, idx) => {
           const meta = SIGNAL_CONFIG[res.signal] || SIGNAL_CONFIG[SignalType.NEUTRAL];
           const isSelected = selectedIndex === idx;
@@ -130,7 +130,7 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                   <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
                   <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{sl ? sl.toFixed(decimals) : '—'}</span>
                 </div>
-                <span className="text-sm sm:text-base font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
+                <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
                   <div className="flex items-center gap-0.5">

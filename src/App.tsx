@@ -770,16 +770,10 @@ export default function App() {
       // Separate strong and regular signals
       const strong = resolved.filter(s => s.signal === 'strong_buy' || s.signal === 'strong_sell');
       const regular = resolved.filter(s => s.signal === 'buy' || s.signal === 'sell');
-      // BUG FIX: Give priority to recently-downgraded signals (was strong, now regular)
-      // so they don't get dropped by the top-4 limit
-      const top4Regular = regular.sort((a, b) => {
-        const aPrevStrong = previousMap.has(a.symbol) && (previousMap.get(a.symbol)!.signal === 'strong_buy' || previousMap.get(a.symbol)!.signal === 'strong_sell');
-        const bPrevStrong = previousMap.has(b.symbol) && (previousMap.get(b.symbol)!.signal === 'strong_buy' || previousMap.get(b.symbol)!.signal === 'strong_sell');
-        if (aPrevStrong && !bPrevStrong) return -1;
-        if (!aPrevStrong && bPrevStrong) return 1;
-        return b.confidence - a.confidence;
-      }).slice(0, 4);
-      setTopSignals([...strong, ...top4Regular].slice(0, 15));
+      
+      // Pass all signals - TopSignals component handles category-based display
+      // Each category independently shows its strong signals + top 3 regular
+      setTopSignals([...strong, ...regular]);
 
       if (hasBrandNewSymbol) {
         setNewSignalAlert(lang === 'ar' ? '\u2705 \u0644\u0642\u062f \u0631\u0635\u0629 \u062a\u062f\u0627\u0648\u0644 \u0642\u0648\u064a\u0629 \u062c\u062f\u064a\u062f\u0629!' : '\u2705 New strong trading opportunity detected!');

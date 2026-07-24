@@ -14,10 +14,10 @@ interface ClientDashboardProps {
 }
 
 const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelAr: string; labelEn: string; symbolColor: string }> = {
-  [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', labelAr: 'شراء قوي', labelEn: 'Strong Buy', symbolColor: '#00ff88' },
-  [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', labelAr: 'بيع قوي', labelEn: 'Strong Sell', symbolColor: '#ff4444' },
-  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', labelAr: 'شراء', labelEn: 'Buy', symbolColor: '#66ffaa' },
-  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', labelAr: 'بيع', labelEn: 'Sell', symbolColor: '#ff8888' },
+  [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', labelAr: 'إشارة شراء قوي', labelEn: 'Strong Buy Signal', symbolColor: '#00ff88' },
+  [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', labelAr: 'إشارة بيع قوي', labelEn: 'Strong Sell Signal', symbolColor: '#ff4444' },
+  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', labelAr: 'إشارة شراء', labelEn: 'Buy Signal', symbolColor: '#66ffaa' },
+  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', labelAr: 'إشارة بيع', labelEn: 'Sell Signal', symbolColor: '#ff5555' },
 };
 
 const CATEGORY_CONFIG: Record<string, { emoji: string; labelAr: string; labelEn: string; color: string; borderColor: string }> = {
@@ -135,15 +135,19 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
         {activeCategories.map(cat => {
           const catSignals = grouped[cat];
           const cfg = CATEGORY_CONFIG[cat];
+          const strong = catSignals.filter(s => s.signal === SignalType.STRONG_BUY || s.signal === SignalType.STRONG_SELL);
+          const regular = catSignals.filter(s => s.signal === SignalType.BUY || s.signal === SignalType.SELL);
+          const top3 = regular.sort((a, b) => b.confidence - a.confidence).slice(0, 3);
+          const displaySignals = [...strong, ...top3];
           return (
             <div key={cat} className="space-y-2">
               <div className="flex items-center gap-2 px-2 py-1">
                 <span className="text-base">{cfg.emoji}</span>
                 <span className={`text-sm font-black ${cfg.color}`}>{isAr ? cfg.labelAr : cfg.labelEn}</span>
-                <span className="text-xs text-white/40 font-bold">({catSignals.length})</span>
+                <span className="text-xs text-white/40 font-bold">({displaySignals.length})</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {catSignals.map((res, idx) => (
+                {displaySignals.map((res, idx) => (
                   <ClientSignalCard key={`all_${res.symbol}_${idx}`} res={res} isAr={isAr} lang={lang} selectedSymbol={selectedSymbol} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpandCard={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={(sym) => { if (selectedSymbol === sym) { setSelectedSymbol(null); setSymbolExplicitlySelected(false); } else { setSelectedSymbol(sym); setSymbolExplicitlySelected(true); } handleClick(); }} hasActivePlan={hasActivePlan} formatPublishDate={formatPublishDate} cardKey={`all_${res.symbol}_${idx}`} onClick={handleClick} />
                 ))}
               </div>
@@ -235,7 +239,7 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, expandedCard, expan
           <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
           <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{sl ? sl.toFixed(decimals) : '\u2014'}</span>
         </div>
-        <span className="text-sm sm:text-base font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
+        <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
         <div className="flex items-center gap-2">
           <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
           <div className="flex items-center gap-0.5">
