@@ -1,6 +1,6 @@
 {
-  "stableVersion": "46393e9",
-  "description": "46393e9 feat: reduce regular signals from 4 to 3 per category",
-  "savedAt": "2026-07-23 18:00",
+  "stableVersion": "34a1f38",
+  "description": "34a1f38 feat: unified signal display - strong + top 3 regular per category, full width cards",
+  "savedAt": "2026-07-24 13:10",
   "autoUpdate": true
 }
