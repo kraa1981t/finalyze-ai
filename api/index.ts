@@ -174,29 +174,32 @@ app.get("/api/crypto-prices", async (_req, res) => {
 });
 
 // Helper: Yahoo Finance Fetch
+const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
 const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
-  try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${rangeStr}&interval=${intervalStr}`;
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Origin': 'https://finance.yahoo.com',
-        'Referer': 'https://finance.yahoo.com/'
-      }
-    });
-    clearTimeout(timeout);
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (data.chart?.result?.[0]) return data;
-    return null;
-  } catch (e) {
-    clearTimeout(timeout);
-    return null;
+  const encodedSym = encodeURIComponent(sym);
+  for (const host of YAHOO_HOSTS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const url = `https://${host}/v8/finance/chart/${encodedSym}?range=${rangeStr}&interval=${intervalStr}`;
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+          'Origin': 'https://finance.yahoo.com',
+          'Referer': 'https://finance.yahoo.com/'
+        }
+      });
+      clearTimeout(timeout);
+      if (!response.ok) continue;
+      const data = await response.json();
+      if (data.chart?.result?.[0]) return data;
+    } catch (e) {
+      clearTimeout(timeout);
+    }
   }
+  return null;
 };
 
 // Helper: Binance Klines → Yahoo format
