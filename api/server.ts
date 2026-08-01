@@ -397,12 +397,14 @@ app.get("/api/market-data", async (req, res) => {
     }
 
     let finalData = null;
+    let debugInfo: any = { attempts, isIndexCfd, isMetal, isCrypto, isForex, yahooSymbol };
     for (const attempt of attempts) {
-      finalData = await fetchMarketData(attempt, range, interval);
-      if (finalData) break;
+      const result = await fetchMarketData(attempt, range, interval);
+      if (result) { finalData = result; debugInfo.success = attempt; break; }
+      debugInfo.failed = attempt;
     }
 
-    if (!finalData) return res.status(404).json({ error: "No data found" });
+    if (!finalData) return res.status(404).json({ error: "No data found", debug: debugInfo });
 
     const hasQuotes = finalData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
     if (!hasQuotes) return res.status(404).json({ error: "No data found" });
