@@ -11,7 +11,17 @@ const CORS_PROXIES = [
 ];
 
 async function fetchWithProxy(url: string, opts?: RequestInit): Promise<Response> {
-  throw new Error('All CORS proxies dead');
+  const shuffled = [...CORS_PROXIES].sort(() => Math.random() - 0.5);
+  for (const proxy of shuffled) {
+    try {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 8000);
+      const r = await fetch(`${proxy}${encodeURIComponent(url)}`, { signal: ac.signal, ...opts });
+      clearTimeout(timer);
+      if (r.ok) return r;
+    } catch {}
+  }
+  throw new Error('All CORS proxies failed');
 }
 
 const _dataCache = new Map<string, { data: any; ts: number }>();
@@ -329,6 +339,12 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
 
     if (attempt < 1) await new Promise(r => setTimeout(r, 1000));
   }
+
+  // Fallback: try Yahoo Finance directly via CORS proxy
+  try {
+    const data = await fetchYahooFinance(symbol, timeframe);
+    if (data) { _dataCache.set(cacheKey, { data, ts: Date.now() }); return data; }
+  } catch {}
 
   throw new Error('Market data currently unavailable from the source.');
 }
