@@ -195,12 +195,17 @@ app.get("/api/crypto-prices", async (_req, res) => {
 // Helper: Yahoo Finance Fetch
 const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
 const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
-  const encodedSym = encodeURIComponent(sym);
   for (const host of YAHOO_HOSTS) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
-      const url = `https://${host}/v8/finance/chart/${encodedSym}?range=${rangeStr}&interval=${intervalStr}`;
+      const ETF_ALTS: Record<string, string> = {
+        '^GSPC': 'SPY', '^DJI': 'DIA', '^NDX': 'QQQ',
+        '^FTSE': 'ISF.L', '^GDAXI': 'EWG', '^N225': 'EWJ',
+        '^HSI': 'EWH', '^AXJO': 'EWA',
+      };
+      const yahooSym = ETF_ALTS[sym] || sym;
+      const url = `https://${host}/v8/finance/chart/${encodeURIComponent(yahooSym)}?range=${rangeStr}&interval=${intervalStr}`;
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
@@ -213,7 +218,12 @@ const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: strin
       clearTimeout(timeout);
       if (!response.ok) continue;
       const data = await response.json();
-      if (data.chart?.result?.[0]) return data;
+      if (data.chart?.result?.[0]) {
+        if (yahooSym !== sym && data.chart?.result?.[0]?.meta) {
+          data.chart.result[0].meta.symbol = sym;
+        }
+        return data;
+      }
     } catch (e) {
       clearTimeout(timeout);
     }
