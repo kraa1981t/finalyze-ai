@@ -4,6 +4,7 @@ import { Info, X, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 import { SYMBOL_CATEGORIES } from '../constants';
+import LotSizeCalculator from './LotSizeCalculator';
 
 interface TopSignalsProps {
   signals: AnalysisResult[];
@@ -32,6 +33,9 @@ function getSymbolCategory(symbol: string): string {
   for (const [cat, syms] of Object.entries(SYMBOL_CATEGORIES)) {
     if ((syms as string[]).includes(sym)) return cat;
   }
+  // Index CFDs
+  const indexCfds = ['US500', 'US30', 'US100', 'UK100', 'DE40', 'JP225', 'HK50', 'AU200'];
+  if (indexCfds.includes(sym)) return 'stocks';
   if (sym.endsWith('USD') && !sym.startsWith('USD') && sym.length > 6) return 'crypto';
   return 'forex';
 }
@@ -135,6 +139,8 @@ function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpa
   const entry = res.entryPrice || (res.stopLoss && res.takeProfit ? (res.stopLoss + res.takeProfit) / 2 : 1.0);
   const pipSize = isJPY ? 0.01 : 0.0001;
   const slPips = 40;
+  const sl = res.stopLoss || ((res.signal.includes('buy')) ? entry - slPips * pipSize : entry + slPips * pipSize);
+  const tp = res.takeProfit || ((res.signal.includes('buy')) ? entry + slPips * 2 * pipSize : entry - slPips * 2 * pipSize);
   const tpPrice = (res.signal.includes('buy')) ? entry + slPips * 2 * pipSize : entry - slPips * 2 * pipSize;
   const slPrice = (res.signal.includes('buy')) ? entry - slPips * pipSize : entry + slPips * pipSize;
 
@@ -168,6 +174,9 @@ function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpa
       {isExpanded && (
         <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
           <div className="px-3 py-2 space-y-2">
+            {res.signal !== 'neutral' && res.signal !== 'no_entry' && (
+              <LotSizeCalculator symbol={res.symbol} stopLoss={sl} takeProfit={tp} entryPrice={entry} signal={res.signal as any} lang={isAr ? 'ar' : 'en'} />
+            )}
             {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
             {res.detailedReasons && res.detailedReasons.length > 0 && (
               <div className="space-y-1.5">
@@ -215,6 +224,8 @@ function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExp
   const entry = res.entryPrice || (res.stopLoss && res.takeProfit ? (res.stopLoss + res.takeProfit) / 2 : 1.0);
   const pipSize = isJPY ? 0.01 : 0.0001;
   const slPips = 25;
+  const sl = res.stopLoss || ((res.signal.includes('buy')) ? entry - slPips * pipSize : entry + slPips * pipSize);
+  const tp = res.takeProfit || ((res.signal.includes('buy')) ? entry + slPips * 2 * pipSize : entry - slPips * 2 * pipSize);
   const tpPrice = (res.signal.includes('buy')) ? entry + slPips * 2 * pipSize : entry - slPips * 2 * pipSize;
   const slPrice = (res.signal.includes('buy')) ? entry - slPips * pipSize : entry + slPips * pipSize;
 
@@ -248,6 +259,9 @@ function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExp
       {isExpanded && (
         <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
           <div className="px-3 py-2 space-y-2">
+            {res.signal !== 'neutral' && res.signal !== 'no_entry' && (
+              <LotSizeCalculator symbol={res.symbol} stopLoss={sl} takeProfit={tp} entryPrice={entry} signal={res.signal as any} lang={isAr ? 'ar' : 'en'} />
+            )}
             {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
             {res.detailedReasons && res.detailedReasons.length > 0 && (
               <div className="space-y-1.5">

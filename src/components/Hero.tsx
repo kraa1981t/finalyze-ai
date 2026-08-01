@@ -26,7 +26,7 @@ export default function Hero({ onStartAnalysis, lang }: HeroProps) {
           
           <h1 className="text-5xl md:text-7xl font-display font-bold tracking-tight text-brand-text leading-[1.1]">
             {t.subtitle} <br />
-            <span className="text-primary italic">Finalyze AI</span> 
+            <span className="text-primary italic">Joseph.Trading</span> 
           </h1>
           
           <div className="mt-12 relative max-w-5xl mx-auto group">

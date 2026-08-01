@@ -60,6 +60,16 @@ function symbolToQuery(symbol: string): string {
   if (upper.includes('SOL')) return 'Solana cryptocurrency';
   if (upper.includes('XRP')) return 'XRP cryptocurrency';
   if (upper.includes('DOGE')) return 'Dogecoin cryptocurrency';
+  if (upper.includes('TON')) return 'Toncoin TON cryptocurrency';
+  if (upper.includes('SUI')) return 'Sui blockchain cryptocurrency';
+  if (upper.includes('SEI')) return 'Sei network cryptocurrency';
+  if (upper.includes('NEAR')) return 'NEAR Protocol cryptocurrency';
+  if (upper.includes('APT')) return 'Aptos cryptocurrency';
+  if (upper.includes('ARB')) return 'Arbitrum cryptocurrency';
+  if (upper.includes('OP')) return 'Optimism cryptocurrency';
+  if (upper.includes('WLD')) return 'Worldcoin cryptocurrency';
+  if (upper.includes('JUP')) return 'Jupiter DEX Solana';
+  if (upper.includes('KAS')) return 'Kaspa cryptocurrency';
   if (upper.includes('XAU')) return 'Gold market price';
   if (upper.includes('XAG')) return 'Silver market price';
   if (upper.includes('EUR')) return 'Euro forex market';

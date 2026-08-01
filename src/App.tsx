@@ -4,6 +4,7 @@ import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where, setDoc, query, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { playSuccess, playFail, playCompletion, playStart, initAudio } from './lib/audioEngine';
+import { trackPageView, trackClick } from './lib/tracking';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
 import Header from './components/Header';
 import AnalysisForm from './components/AnalysisForm';
@@ -39,6 +40,7 @@ function hasAnyStoredKey(): boolean {
   } catch { return false; }
 }
 import ClientMonitor from './components/ClientMonitor';
+import SiteStatsPage from './components/SiteStatsPage';
 import AdsManager from './components/AdsManager';
 import { AdSlot } from './components/AdsManager';
 import RadarSettingsPage from './components/RadarSettingsPage';
@@ -87,6 +89,7 @@ export default function App() {
     setIsPWA(standalone);
   }, []);
   const [freemiumDisabled, setFreemiumDisabled] = useState(() => localStorage.getItem('finalyze_freemium_disabled') === 'true');
+  const [clientLoginRequired, setClientLoginRequired] = useState(() => localStorage.getItem('finalyze_client_login_required') === 'true');
   const [needsApiKey, setNeedsApiKeyState] = useState<string | null>(() => {
     try { return localStorage.getItem('finalyze_needs_api_key'); } catch { return null; }
   });
@@ -109,18 +112,19 @@ export default function App() {
     }
     setNeedsApiKeyState(email);
   };
-  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' => {
+  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' => {
     const hash = window.location.hash.slice(1);
-    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads'].includes(hash)) return hash as any;
+    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats'].includes(hash)) return hash as any;
     return 'main';
   };
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads'>(getPageFromHash);
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats'>(getPageFromHash);
   const navStackRef = useRef<string[]>([]);
 
   const navigateTo = (page: any) => {
     if (page !== activePage) {
       navStackRef.current.push(activePage);
       setActivePage(page);
+      if (!isDeveloperSession()) trackPageView(page).catch(() => {});
     }
   };
 
@@ -182,9 +186,14 @@ export default function App() {
     return DEV_EMAILS.includes(email);
   };
 
+  const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats'];
+  const effectivePage = (DEV_ONLY_PAGES.includes(activePage) && !isDeveloperSession()) ? 'main' : activePage;
+
   // CLIENT: Mirror results from developer via Firestore ΓÇö poll collection every 10s, NO orderBy
   useEffect(() => {
-    if (!user || isDeveloperSession()) return;
+    if (isDeveloperSession()) return;
+    // Allow if user is logged in OR if login is not required (guest mode)
+    if (!user && clientLoginRequired) return;
     console.log('[CLIENT] Setting up Firestore polling for shared_results');
 
     const isFirstLoad = !localStorage.getItem('finalyze_client_signals');
@@ -280,7 +289,8 @@ export default function App() {
 
   // CLIENT: Sync freemium state from Firestore
   useEffect(() => {
-    if (!user || isDeveloperSession()) return;
+    if (isDeveloperSession()) return;
+    if (!user && clientLoginRequired) return;
     const syncFreemium = async () => {
       try {
         const snap = await getDoc(doc(db, 'shared_settings', 'freemium'));
@@ -300,9 +310,31 @@ export default function App() {
     return () => clearInterval(interval);
   }, [user]);
 
+  // CLIENT: Sync clientLoginRequired state from Firestore
+  useEffect(() => {
+    const syncClientLogin = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'shared_settings', 'clientLogin'));
+        if (snap.exists()) {
+          const data = snap.data();
+          const required = data.required === true;
+          setClientLoginRequired(required);
+          localStorage.setItem('finalyze_client_login_required', required ? 'true' : 'false');
+          console.log('[SYNC] Client login state synced from Firestore:', required);
+        }
+      } catch (e) {
+        console.warn('[SYNC] Failed to sync client login state:', e);
+      }
+    };
+    syncClientLogin();
+    const interval = setInterval(syncClientLogin, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   // CLIENT: Poll radar status from developer
   useEffect(() => {
-    if (!user || isDeveloperSession()) return;
+    if (isDeveloperSession()) return;
+    if (!user && clientLoginRequired) return;
     let prevRunning = false;
 
     const checkRadarStatus = async () => {
@@ -548,14 +580,17 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads'];
+    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats'];
+    const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats'];
     const onHashChange = () => {
       const hash = window.location.hash.slice(1);
-      setActivePage(VALID_PAGES.includes(hash) ? hash as any : 'main');
+      if (!VALID_PAGES.includes(hash)) { setActivePage('main'); return; }
+      if (DEV_ONLY_PAGES.includes(hash) && !isDeveloperSession()) { setActivePage('main'); return; }
+      setActivePage(hash as any);
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
+  }, [user]);
 
   const [progress, setProgress] = useState<{ current: string, total: number, index: number, failed?: number } | null>(null);
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
@@ -577,6 +612,20 @@ export default function App() {
     else playFail(vol);
   };
 
+  // Strip undefined values recursively (Firestore rejects undefined)
+  const cleanForFirestore = (obj: any): any => {
+    if (obj === undefined || obj === null) return obj;
+    if (Array.isArray(obj)) return obj.map(cleanForFirestore);
+    if (typeof obj === 'object') {
+      const clean: any = {};
+      for (const [k, v] of Object.entries(obj)) {
+        if (v !== undefined) clean[k] = cleanForFirestore(v);
+      }
+      return clean;
+    }
+    return obj;
+  };
+
   // Track the most up-to-date signals instantly to avoid stale closures
   const signalsRef = useRef(topSignals);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -589,11 +638,11 @@ export default function App() {
     if (isDeveloperSession()) {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
       syncTimeoutRef.current = setTimeout(() => {
-        setDoc(doc(db, 'shared_results', 'latest'), {
+        setDoc(doc(db, 'shared_results', 'latest'), cleanForFirestore({
           results: topSignals,
           timestamp: new Date().toISOString(),
           developerEmail: user?.email || '',
-        }).then(() => {
+        })).then(() => {
           console.log('Top signals synced to Firestore successfully, count:', topSignals.length);
           setLastSyncStatus({ ok: true, count: topSignals.length, time: Date.now() });
         }).catch(e => {
@@ -603,6 +652,25 @@ export default function App() {
       }, 300);
     }
   }, [topSignals, user]);
+
+  // DEVELOPER: Force sync on startup — ensures signals are always in Firestore
+  useEffect(() => {
+    if (!isDeveloperSession() || !user) return;
+    const current = signalsRef.current;
+    if (current.length === 0) return;
+    console.log('[DEV] Startup sync — pushing', current.length, 'signals to Firestore');
+    setDoc(doc(db, 'shared_results', 'latest'), cleanForFirestore({
+      results: current,
+      timestamp: new Date().toISOString(),
+      developerEmail: user?.email || '',
+    })).then(() => {
+      console.log('[DEV] Startup sync successful');
+      setLastSyncStatus({ ok: true, count: current.length, time: Date.now() });
+    }).catch(e => {
+      console.warn('[DEV] Startup sync failed:', e);
+      setLastSyncStatus({ ok: false, error: String(e), time: Date.now() });
+    });
+  }, [user]);
 
   // DEVELOPER: Sync radar status to Firestore so clients see banners
   useEffect(() => {
@@ -792,11 +860,11 @@ export default function App() {
     setTopSignals(updated);
     if (isDeveloperSession()) {
       try {
-        await setDoc(doc(db, 'shared_results', 'latest'), {
+        await setDoc(doc(db, 'shared_results', 'latest'), cleanForFirestore({
           results: updated,
           timestamp: new Date().toISOString(),
           developerEmail: user?.email || '',
-        });
+        }));
       } catch (e) { console.warn('[removeSignal] Firestore sync failed:', e); }
     }
   };
@@ -806,12 +874,12 @@ export default function App() {
     if (isDeveloperSession()) {
       try {
         const resetToken = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-        await setDoc(doc(db, 'shared_results', 'latest'), {
+        await setDoc(doc(db, 'shared_results', 'latest'), cleanForFirestore({
           results: [],
           resetToken,
           timestamp: new Date().toISOString(),
           developerEmail: user?.email || '',
-        });
+        }));
         console.log('Clear synced to Firestore, token:', resetToken);
       } catch (e) {
         console.warn('Failed to clear Firestore shared_results:', e);
@@ -879,12 +947,12 @@ export default function App() {
 
       try {
         const resetToken = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-        await setDoc(doc(db, 'shared_results', 'latest'), {
+        await setDoc(doc(db, 'shared_results', 'latest'), cleanForFirestore({
           results: filtered,
           resetToken,
           timestamp: new Date().toISOString(),
           developerEmail: user?.email || '',
-        });
+        }));
         console.log('Automated new trading day purge executed. Remaining:', filtered.length);
       } catch (e) {
         console.warn('[purgeNewDay] Firestore purge failed:', e);
@@ -1012,11 +1080,11 @@ export default function App() {
       const merged = signalsRef.current || [];
       if (merged.length > 0) {
         await Promise.race([
-          setDoc(doc(db, 'shared_results', 'latest'), {
+          setDoc(doc(db, 'shared_results', 'latest'), cleanForFirestore({
             results: merged.slice(-100),
             timestamp: new Date().toISOString(),
             developerEmail: user?.email || '',
-          }),
+          })),
           new Promise<null>((_, rej) => setTimeout(() => rej(new Error('shared_results timeout')), 15000))
         ]);
         setLastSyncStatus({ ok: true, count: merged.length, time: Date.now() });
@@ -1271,12 +1339,13 @@ export default function App() {
     fetchClients();
   }, []);
 
-  // Fetch clients on mount if developer bypass is active
+  // Redirect non-dev users away from dev-only pages
   useEffect(() => {
-    if (!loading && isDeveloperSession()) {
-      fetchClients();
+    if (!loading && !isDeveloperSession() && DEV_ONLY_PAGES.includes(activePage)) {
+      setActivePage('main');
+      window.location.hash = '';
     }
-  }, [loading]);
+  }, [loading, user, activePage]);
 
   // Load custom audios from IndexedDB on startup
   useEffect(() => {
@@ -1504,25 +1573,36 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (e) {
-      console.warn("SignOut firebase warning:", e);
-    }
+    signOut(auth).catch(() => {});
     localStorage.removeItem('finalyze_auth_user');
     localStorage.removeItem('finalyze_auth_timestamp');
     localStorage.removeItem('finalyze_verify_link');
-    persistNeedsApiKey(null);
-    setNeedsApiKeyState(null);
-    setHasApiKey(false);
-    setPaymentPlan(null);
-    setActiveSubscription(null);
-    setAnalysisResults(null);
-    setUser(null);
-    setPendingVerifyLink(null);
+    localStorage.removeItem('finalyze_geo');
+    localStorage.removeItem('finalyze_build_version');
+    localStorage.removeItem('finalyze_client_signals');
+    localStorage.removeItem('finalyze_client_results_date');
+    localStorage.removeItem('finalyze_client_reset_token');
+    localStorage.removeItem('top_signals_persistent');
+    localStorage.removeItem('finalyze_client_alerts');
+    localStorage.removeItem('active_subscription');
+    sessionStorage.clear();
+    window.location.href = '/';
   };
 
   const t = translations[lang];
+
+  // Track initial page view (skip for developer)
+  useEffect(() => {
+    if (!isDeveloperSession()) trackPageView('main').catch(() => {});
+  }, [user]);
+
+  // Auto sign-in anonymously when clientLoginRequired is false
+  useEffect(() => {
+    if (!clientLoginRequired && !user && !loading) {
+      console.log('[AUTH] Client login disabled, entering as guest (no auth needed)');
+      // No auth needed — Firestore rules allow unauthenticated reads
+    }
+  }, [clientLoginRequired, user, loading]);
 
   if (loading) {
     return (
@@ -1552,7 +1632,7 @@ export default function App() {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {!user && !loading && (
+        {!user && !loading && clientLoginRequired && (
           <LoginOverlay 
             onLogin={handleLogin} 
             lang={lang}
@@ -1580,7 +1660,7 @@ export default function App() {
         lastSyncStatus={lastSyncStatus}
         analysisProgress={progress}
         isAnalyzing={isAnalyzing}
-        newSuggestionsCount={activePage === 'suggestions' ? 0 : newSuggestionsCount}
+        newSuggestionsCount={effectivePage === 'suggestions' ? 0 : newSuggestionsCount}
         onNavigateSuggestions={() => navigateTo('suggestions')}
         clientRadarRunning={!isDeveloperSession() && clientRadarRunning}
         showRadarComplete={!isDeveloperSession() && showRadarComplete}
@@ -1627,10 +1707,10 @@ export default function App() {
       
       <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-24 relative">
         {/* Dedicated pages (from dashboard) */}
-        {activePage !== 'main' && !needsApiKey && (
+        {effectivePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <button
-              onClick={() => { if (activePage === 'plans' && paymentPlan) setPaymentPlan(null); goBack(); }}
+              onClick={() => { if (effectivePage === 'plans' && paymentPlan) setPaymentPlan(null); goBack(); }}
               className="sticky top-28 z-30 flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-alt/90 backdrop-blur-xl border border-white/10 text-brand-muted hover:text-brand-text transition-colors mb-6"
             >
               <ArrowLeft size={18} />
@@ -1639,7 +1719,7 @@ export default function App() {
               </span>
             </button>
 
-             {activePage === 'settings' && (
+             {effectivePage === 'settings' && (
                <SettingsModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
@@ -1654,7 +1734,7 @@ export default function App() {
               />
             )}
 
-            {activePage === 'apiKey' && (
+            {effectivePage === 'apiKey' && (
               <ApiKeyModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
@@ -1668,7 +1748,7 @@ export default function App() {
               />
             )}
 
-            {activePage === 'plans' && !paymentPlan && !(freemiumDisabled && !isDeveloperSession()) && (
+            {effectivePage === 'plans' && !paymentPlan && !(freemiumDisabled && !isDeveloperSession()) && (
               <SubscriptionModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
@@ -1678,7 +1758,7 @@ export default function App() {
               />
             )}
 
-            {activePage === 'plans' && paymentPlan && !(freemiumDisabled && !isDeveloperSession()) && (
+            {effectivePage === 'plans' && paymentPlan && !(freemiumDisabled && !isDeveloperSession()) && (
               <PaymentModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
@@ -1705,7 +1785,7 @@ export default function App() {
               />
             )}
 
-            {activePage === 'radar' && (
+            {effectivePage === 'radar' && (
               <RadarSettingsPage
                 key={user?.uid || 'no-session'}
                 autoSettings={autoSettings}
@@ -1718,7 +1798,7 @@ export default function App() {
               />
             )}
 
-            {activePage === 'paymentSettings' && (
+            {effectivePage === 'paymentSettings' && (
               <PaymentModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
@@ -1733,7 +1813,7 @@ export default function App() {
               />
             )}
 
-            {activePage === 'clientMonitor' && isDeveloperSession() && (
+            {effectivePage === 'clientMonitor' && isDeveloperSession() && (
               <ClientMonitor
                 key={user?.uid || 'no-session'}
                 clients={clients}
@@ -1745,14 +1825,20 @@ export default function App() {
                 onRenew={renewClientPlan}
                 freemiumDisabled={freemiumDisabled}
                 onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); setDoc(doc(db, 'shared_settings', 'freemium'), { disabled: v, updatedAt: Date.now() }).catch(console.warn); }}
+                clientLoginRequired={clientLoginRequired}
+                onClientLoginToggle={(v: boolean) => { setClientLoginRequired(v); localStorage.setItem('finalyze_client_login_required', v ? 'true' : 'false'); setDoc(doc(db, 'shared_settings', 'clientLogin'), { required: v, updatedAt: Date.now() }).catch(console.warn); }}
               />
             )}
 
-            {activePage === 'ads' && isDeveloperSession() && (
+            {effectivePage === 'ads' && isDeveloperSession() && (
               <AdsManager lang={lang} onBack={() => goBack()} />
             )}
 
-            {activePage === 'profile' && (
+            {effectivePage === 'siteStats' && isDeveloperSession() && (
+              <SiteStatsPage lang={lang} />
+            )}
+
+            {effectivePage === 'profile' && (
               <ProfilePage
                 user={user}
                 lang={lang}
@@ -1761,7 +1847,7 @@ export default function App() {
               />
             )}
 
-            {activePage === 'about' && (
+            {effectivePage === 'about' && (
               <AboutPage
                 lang={lang}
                 onBack={goBack}
@@ -1769,7 +1855,7 @@ export default function App() {
               />
             )}
 
-            {activePage === 'suggestions' && (
+            {effectivePage === 'suggestions' && (
               <SuggestionsPage
                 lang={lang}
                 onBack={() => navigateTo('about')}
@@ -1782,7 +1868,7 @@ export default function App() {
         )}
 
         {/* FORM - hidden during analysis, hidden when results show, hidden when ApiKey is needed, hidden for clients */}
-        <div style={{ display: isAnalyzing || analysisResults || activePage !== 'main' || !!needsApiKey || !isDeveloperSession() ? 'none' : 'block' }}>
+        <div style={{ display: isAnalyzing || analysisResults || effectivePage !== 'main' || !!needsApiKey || !isDeveloperSession() ? 'none' : 'block' }}>
           {activeSubscription && (() => {
             const daysLeft = Math.ceil((new Date(activeSubscription.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
             return (
@@ -1841,7 +1927,7 @@ export default function App() {
         <AdSlot position="between" lang={lang} />
 
         {/* CLIENT DASHBOARD - shows for non-developers on main page */}
-        {!isDeveloperSession() && !analysisResults && !isAnalyzing && activePage === 'main' && (
+        {!isDeveloperSession() && !analysisResults && !isAnalyzing && effectivePage === 'main' && (
           <div className="max-w-7xl mx-auto px-4">
             <AdSlot position="header" lang={lang} />
             <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} />

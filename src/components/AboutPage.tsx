@@ -96,8 +96,8 @@ export default function AboutPage({ lang, onBack, onGoToSuggestions }: AboutPage
         </h1>
         <p className="text-white/60 text-sm max-w-2xl mx-auto">
           {isAr
-            ? ' Finalyze AI يستخدم الذكاء الاصطناعي والتحليل الفني المتقدم لتحديد أفضل فرص التداول في الأسواق المالية'
-            : 'Finalyze AI uses AI and advanced technical analysis to identify the best trading opportunities in financial markets'}
+            ? 'Joseph.Trading يستخدم الذكاء الاصطناعي والتحليل الفني المتقدم لتحديد أفضل فرص التداول في الأسواق المالية'
+            : 'Joseph.Trading uses AI and advanced technical analysis to identify the best trading opportunities in financial markets'}
         </p>
       </motion.div>
 

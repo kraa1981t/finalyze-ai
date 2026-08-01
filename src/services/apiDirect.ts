@@ -41,6 +41,10 @@ const CRYPTO_MAP: Record<string, string> = {
   'RUNEUSD': 'RUNEUSDT', 'AAVEUSD': 'AAVEUSDT', 'MKRUSD': 'MKRUSDT',
   'SNXUSD': 'SNXUSDT', 'CRVUSD': 'CRVUSDT', 'COMPUSD': 'COMPUSDT',
   'YFIUSD': 'YFIUSDT', 'SUSHIUSD': 'SUSHIUSDT', 'BLURUSD': 'BLURUSDT',
+  'TONUSD': 'TONUSDT', 'SUIUSD': 'SUIUSDT', 'NEARUSD': 'NEARUSDT',
+  'SEIUSD': 'SEIUSDT', 'KASUSD': 'KASUSDT', 'KAVAUSD': 'KAVAUSDT',
+  'WLDUSD': 'WLDUSDT', 'PENDLEUSD': 'PENDLEUSDT', 'JUPUSD': 'JUPUSDT',
+  'STXUSD': 'STXUSDT', 'POLUSD': 'POLUSDT',
   'BTCUSDT': 'BTCUSDT', 'ETHUSDT': 'ETHUSDT',
 };
 
@@ -57,7 +61,8 @@ function findCryptoPair(symbol: string): string | null {
   }
   const knownCoins = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'ADA', 'DOT', 'MATIC', 'LINK',
     'UNI', 'AVAX', 'ATOM', 'LTC', 'BCH', 'XLM', 'TRX', 'FIL', 'APT', 'ARB', 'OP',
-    'INJ', 'RUNE', 'AAVE', 'MKR', 'SNX', 'CRV', 'COMP', 'YFI', 'SUSHI', 'BLUR'];
+    'INJ', 'RUNE', 'AAVE', 'MKR', 'SNX', 'CRV', 'COMP', 'YFI', 'SUSHI', 'BLUR',
+    'TON', 'SUI', 'NEAR', 'SEI', 'KAS', 'KAVA', 'WLD', 'PENDLE', 'JUP', 'STX', 'POL'];
   for (const coin of knownCoins) {
     if (upper.includes(coin)) return `${coin}USDT`;
   }
@@ -172,14 +177,21 @@ export async function fetchCryptoPricesDirect(): Promise<any> {
 function symbolToYahooForex(symbol: string): string | null {
   const upper = symbol.toUpperCase().replace(/ /g, '');
 
-  // Metals mapping (like old server)
+  // Metals mapping
   const metalMap: Record<string, string> = {
     'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F',
-    'XPDUSD': 'PA=F', 'XCUUSD': 'HG=F', 'XALUSD': 'ALI=F',
-    'XZNUSD': 'ZNC=F', 'XNIUSD': 'NIC=F', 'XPBUSD': 'LED=F',
+    'XPDUSD': 'PA=F', 'XCUUSD': 'HG=F',
     'GOLD': 'GC=F', 'SILVER': 'SI=F', 'COPPER': 'HG=F',
   };
   if (metalMap[upper]) return metalMap[upper];
+
+  // Index CFDs
+  const indexCfds: Record<string, string> = {
+    'US500': '^GSPC', 'US30': '^DJI', 'US100': '^NDX',
+    'UK100': '^FTSE', 'DE40': '^GDAXI', 'JP225': '^N225',
+    'HK50': '^HSI', 'AU200': '^AXJO',
+  };
+  if (indexCfds[upper]) return indexCfds[upper];
 
   // Forex pairs: EURUSD → EURUSD=X
   if (/^[A-Z]{6}$/.test(upper)) return `${upper}=X`;

@@ -30,38 +30,51 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Shared results — anyone can write (fixes persistent permission issue), clients must be signed in to read
+    // Shared results — anyone can read/write (clients may be anonymous)
     match /shared_results/{docId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if true;
     }
 
-    // Shared alerts — anyone can write, clients must be signed in to read
+    // Shared alerts — anyone can read/write
     match /shared_alerts/{docId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if true;
     }
 
     // Shared radar status — developer writes running state, clients read to show banner
     match /shared_status/{docId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if true;
     }
 
-    // Shared settings (freemium state) — anyone can write, signed in to read
+    // Shared settings (freemium state, client login toggle) — anyone can read/write
     match /shared_settings/{docId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if true;
     }
 
-    // Site ads config — developer writes, signed-in users read
+    // Site ads config — developer writes, anyone reads
     match /config/{docId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if true;
     }
 
     // Suggestions — anyone can read/write
     match /suggestions/{suggestionId} {
+      allow read, write: if true;
+    }
+
+    // Analytics — anyone can read/write (for anonymous tracking)
+    match /analytics_counters/{docId} {
+      allow read, write: if true;
+    }
+
+    match /analytics_views/{docId} {
+      allow read, write: if true;
+    }
+
+    match /analytics_clicks/{docId} {
       allow read, write: if true;
     }
   }

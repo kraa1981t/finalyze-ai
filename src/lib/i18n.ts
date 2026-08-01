@@ -285,7 +285,7 @@ export const translations: Record<Language, Translations> = {
     clearAllResults: "مسح جميع النتائج"
   },
   es: {
-    title: "Finalyze AI",
+    title: "Joseph.Trading",
     subtitle: "An├ílisis de Mercado Institucional Avanzado",
     startAnalysis: "Iniciar Nuevo An├ílisis",
     analyzing: "Motor de IA Analizando...",
@@ -379,7 +379,7 @@ export const translations: Record<Language, Translations> = {
     clearAllResults: "Borrar Todos los Resultados",
   },
   ru: {
-    title: "Finalyze AI",
+    title: "Joseph.Trading",
     subtitle: "╨ƒ╤Ç╨╛╨┤╨▓╨╕╨╜╤â╤é╤ï╨╣ ╨╕╨╜╤ü╤é╨╕╤é╤â╤å╨╕╨╛╨╜╨░╨╗╤î╨╜╤ï╨╣ ╨░╨╜╨░╨╗╨╕╨╖ ╤Ç╤ï╨╜╨║╨░",
     startAnalysis: "╨¥╨░╤ç╨░╤é╤î ╨╜╨╛╨▓╤ï╨╣ ╨░╨╜╨░╨╗╨╕╨╖",
     analyzing: "╨ÿ╨ÿ-╨┤╨▓╨╕╨╢╨╛╨║ ╨░╨╜╨░╨╗╨╕╨╖╨╕╤Ç╤â╨╡╤é...",
@@ -473,7 +473,7 @@ export const translations: Record<Language, Translations> = {
     clearAllResults: "╨₧╤ç╨╕╤ü╤é╨╕╤é╤î ╨▓╤ü╨╡ ╤Ç╨╡╨╖╤â╨╗╤î╤é╨░╤é╤ï",
   },
   fr: {
-    title: "Finalyze AI",
+    title: "Joseph.Trading",
     subtitle: "Analyse de March├⌐ Institutionnelle Avanc├⌐e",
     startAnalysis: "D├⌐marrer une Nouvelle Analyse",
     analyzing: "Moteur IA en cours d'analyse...",

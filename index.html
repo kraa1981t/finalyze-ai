@@ -15,14 +15,31 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-F3KP7GG4NS"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-F3KP7GG4NS', { send_page_view: false });
+    </script>
     <script>
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(r => r.unregister());
+        });
+        caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))));
       }
     </script>
   </head>
   <body translate="no" class="notranslate">
-    <div id="root" translate="no" class="notranslate"></div>
+    <div id="root" translate="no" class="notranslate">
+      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0a0f1a;color:#10B981;font-family:system-ui;font-size:14px;text-align:center;padding:20px;">
+        <div>
+          <div style="font-size:24px;font-weight:bold;margin-bottom:8px;">Joseph.Trading</div>
+          <div style="color:#94a3b8;">Loading...</div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

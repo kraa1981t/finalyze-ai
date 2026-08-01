@@ -610,7 +610,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                 <p className="text-xs text-purple-300 font-bold mb-1">{isAr ? '💡 كيف تحصل على الأكواد:' : '💡 How to get the codes:'}</p>
                 <ol className="text-[10px] text-purple-400/70 space-y-1 list-decimal list-inside">
                   <li>{isAr ? 'افتح لوحة ناشر Adsterra' : 'Open Adsterra Publisher Panel'}</li>
-                  <li>{isAr ? 'اختر موقعك finalyze-ai-sigma.vercel.app' : 'Select your site finalyze-ai-sigma.vercel.app'}</li>
+                  <li>{isAr ? 'اختر موقعك Joseph.Trading.app' : 'Select your site Joseph.Trading.app'}</li>
                   <li>{isAr ? 'اضغط "GET CODE" بجانب وحدة الإعلان' : 'Click "GET CODE" next to the ad unit'}</li>
                   <li>{isAr ? 'الصق الكود هنا بعد إضافة الإعلان' : 'Paste the code here after adding the ad'}</li>
                 </ol>

@@ -240,7 +240,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
       setNotification({
         type: 'email',
         title: '📧 Google Security Workspace',
-        body: isAr ? `رمز الموافقة الأمنية لتحديث بيانات المطور في Finalyze.AI هو: ${emailCode}` : `Security approval code for updating developer data in Finalyze.AI is: ${emailCode}`
+        body: isAr ? `رمز الموافقة الأمنية لتحديث بيانات المطور في Joseph.Trading هو: ${emailCode}` : `Security approval code for updating developer data in Joseph.Trading is: ${emailCode}`
       });
     }, 1500);
 

@@ -32,6 +32,9 @@ function getSymbolCategory(symbol: string): string {
   for (const [cat, syms] of Object.entries(SYMBOL_CATEGORIES)) {
     if ((syms as string[]).includes(sym)) return cat;
   }
+  // Index CFDs
+  const indexCfds = ['US500', 'US30', 'US100', 'UK100', 'DE40', 'JP225', 'HK50', 'AU200'];
+  if (indexCfds.includes(sym)) return 'stocks';
   if (sym.endsWith('USD') && !sym.startsWith('USD') && sym.length > 6) return 'crypto';
   return 'forex';
 }

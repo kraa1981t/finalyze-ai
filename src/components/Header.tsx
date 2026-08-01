@@ -34,7 +34,7 @@ interface HeaderProps {
   showRadarComplete?: boolean;
   onPreview?: (device: 'phone' | 'tablet') => void;
   isPWA?: boolean;
-  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads') => void;
+  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats') => void;
   freemiumDisabled?: boolean;
 }
 

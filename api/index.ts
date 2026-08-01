@@ -208,6 +208,10 @@ const SERVER_CRYPTO_MAP: Record<string, string> = {
   'LTCUSD': 'LTCUSDT', 'BCHUSD': 'BCHUSDT', 'XLMUSD': 'XLMUSDT',
   'TRXUSD': 'TRXUSDT', 'FILUSD': 'FILUSDT', 'APTUSD': 'APTUSDT',
   'ARBUSD': 'ARBUSDT', 'OPUSD': 'OPUSDT', 'INJUSD': 'INJUSDT',
+  'TONUSD': 'TONUSDT', 'SUIUSD': 'SUIUSDT', 'NEARUSD': 'NEARUSDT',
+  'SEIUSD': 'SEIUSDT', 'KASUSD': 'KASUSDT', 'KAVAUSD': 'KAVAUSDT',
+  'WLDUSD': 'WLDUSDT', 'PENDLEUSD': 'PENDLEUSDT', 'JUPUSD': 'JUPUSDT',
+  'STXUSD': 'STXUSDT', 'POLUSD': 'POLUSDT',
   'BTCUSDT': 'BTCUSDT', 'ETHUSDT': 'ETHUSDT', 'SOLUSDT': 'SOLUSDT',
 };
 
@@ -219,7 +223,8 @@ function findServerCryptoPair(symbol: string): string | null {
     if (base && base.length <= 10) return `${base}USDT`;
   }
   const knownCoins = ['BTC','ETH','SOL','XRP','DOGE','ADA','DOT','MATIC','LINK',
-    'UNI','AVAX','ATOM','LTC','BCH','XLM','TRX','FIL','APT','ARB','OP','INJ'];
+    'UNI','AVAX','ATOM','LTC','BCH','XLM','TRX','FIL','APT','ARB','OP','INJ',
+    'TON','SUI','NEAR','SEI','KAS','KAVA','WLD','PENDLE','JUP','STX','POL'];
   for (const coin of knownCoins) {
     if (upper.startsWith(coin)) return `${coin}USDT`;
   }
@@ -295,10 +300,19 @@ app.get("/api/market-data", async (req, res) => {
     const rawSymbol = symbol.toUpperCase().replace(/ /g, '');
     const customMappings: Record<string, string> = {
       'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F', 'XPDUSD': 'PA=F',
-      'XCUUSD': 'HG=F', 'XALUSD': 'ALI=F', 'XZNUSD': 'ZNC=F', 'XNIUSD': 'NIC=F', 'XPBUSD': 'LED=F',
+      'XCUUSD': 'HG=F',
     };
-    const isMetal = !!customMappings[rawSymbol];
-    let yahooSymbol = isMetal ? customMappings[rawSymbol] : rawSymbol;
+
+    // Index CFDs → Yahoo Finance tickers
+    const indexCfds: Record<string, string> = {
+      'US500': '^GSPC', 'US30': '^DJI', 'US100': '^NDX',
+      'UK100': '^FTSE', 'DE40': '^GDAXI', 'JP225': '^N225',
+      'HK50': '^HSI', 'AU200': '^AXJO',
+    };
+
+    const isIndexCfd = !!indexCfds[rawSymbol];
+    const isMetal = !!customMappings[rawSymbol] && !isIndexCfd;
+    let yahooSymbol = isIndexCfd ? indexCfds[rawSymbol] : isMetal ? customMappings[rawSymbol] : rawSymbol;
 
     let interval = '1d';
     let range = '14d';
@@ -315,12 +329,16 @@ app.get("/api/market-data", async (req, res) => {
     const hasEquals = yahooSymbol.includes('=');
     const cryptoPair = findServerCryptoPair(rawSymbol);
     const isCrypto = !!cryptoPair && !isMetal;
-    const isForex = !isMetal && !hasEquals && !isCrypto && yahooSymbol.length >= 6 && (
-      yahooSymbol.endsWith('USD') || yahooSymbol.endsWith('EUR') ||
-      yahooSymbol.endsWith('JPY') || yahooSymbol.endsWith('GBP') ||
-      yahooSymbol.endsWith('AUD') || yahooSymbol.endsWith('NZD') ||
-      yahooSymbol.endsWith('CAD') || yahooSymbol.endsWith('CHF')
-    );
+
+    // All recognized forex quote currencies
+    const forexQuotes = [
+      'USD', 'EUR', 'JPY', 'GBP', 'AUD', 'NZD', 'CAD', 'CHF',
+      'MXN', 'ZAR', 'TRY', 'SEK', 'NOK', 'DKK', 'SGD', 'HKD',
+      'CNH', 'THB', 'INR', 'PLN', 'CZK', 'HUF', 'ILS', 'KRW', 'TWD',
+    ];
+    const isForex = !isMetal && !isCrypto && !isIndexCfd && yahooSymbol.length === 6 &&
+      forexQuotes.some(q => yahooSymbol.endsWith(q)) &&
+      forexQuotes.some(q => yahooSymbol.startsWith(q));
 
     if (isCrypto) {
       const binanceData = await fetchBinanceData(rawSymbol, timeframe);
@@ -328,7 +346,7 @@ app.get("/api/market-data", async (req, res) => {
     }
 
     let attempts: string[] = [];
-    if (isMetal || hasEquals) {
+    if (isMetal || hasEquals || isIndexCfd) {
       attempts = [yahooSymbol];
     } else if (isForex) {
       attempts = [`${yahooSymbol}=X`];
@@ -368,10 +386,10 @@ const GITHUB_ACTIONS_URL = `https://github.com/${GITHUB_REPO}/actions/new`;
 
 app.post("/api/factory-reset", async (req, res) => {
   const errors: string[] = [];
+  const deployHookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
 
   try {
     // Strategy 1: Vercel Deploy Hook
-    const deployHookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
     if (deployHookUrl) {
       const resp = await fetch(deployHookUrl, { method: 'POST' });
       if (resp.ok || resp.status < 500) {

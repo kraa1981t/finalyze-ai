@@ -56,15 +56,23 @@ export const SYMBOL_CATEGORIES = {
   crypto: [
     'BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD', 'AVAXUSD',
     'DOGEUSD', 'SHIBUSD', 'PEPEUSD', 'WIFUSD', 'BONKUSD',
-    'DOTUSD', 'LINKUSD', 'MATICUSD', 'UNIUSD', 'LTCUSD', 'BCHUSD'
+    'DOTUSD', 'LINKUSD', 'MATICUSD', 'UNIUSD', 'LTCUSD', 'BCHUSD',
+    'TONUSD', 'SUIUSD', 'NEARUSD', 'SEIUSD', 'OPUSD', 'ARBUSD'
   ],
   stocks: [
-    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
-    'XOM', 'CVX', 'SHEL', 'TTE', 'BP',
-    'JPM', 'BAC', 'WFC', 'C', 'GS'
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX',
+    'AMD', 'INTC', 'TSM', 'ASML', 'ARM', 'SMCI',
+    'CRM', 'PLTR', 'COIN', 'NOW',
+    'JPM', 'BAC', 'V', 'MA',
+    'JNJ', 'UNH', 'LLY', 'PFE',
+    'WMT', 'MCD', 'NKE', 'DIS',
+    'XOM', 'CVX', 'COP',
+    'BA', 'CAT', 'GE',
+    'BABA', 'NIO',
+    'SPY', 'QQQ', 'US500', 'US30', 'US100',
   ],
   metals: [
-    'XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD'
+    'XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD',
   ]
 };
 
@@ -127,14 +135,22 @@ export const SYMBOL_GROUPS: Record<string, { label: string, symbols: string[] }[
     { label: 'chfCadPairs', symbols: ['CADJPY', 'CADCHF', 'CHFJPY'] },
   ],
   crypto: [
-    { label: 'topCrypto', symbols: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD', 'AVAXUSD'] },
+    { label: 'topCrypto', symbols: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD', 'AVAXUSD', 'TONUSD'] },
     { label: 'momentumCrypto', symbols: ['DOGEUSD', 'SHIBUSD', 'PEPEUSD', 'WIFUSD', 'BONKUSD'] },
-    { label: 'altCrypto', symbols: ['DOTUSD', 'LINKUSD', 'MATICUSD', 'UNIUSD', 'LTCUSD', 'BCHUSD'] },
+    { label: 'altCrypto', symbols: ['DOTUSD', 'LINKUSD', 'MATICUSD', 'UNIUSD', 'LTCUSD', 'BCHUSD', 'SUIUSD', 'NEARUSD', 'SEIUSD'] },
+    { label: 'layer2', symbols: ['OPUSD', 'ARBUSD', 'MATICUSD', 'IMXUSD'] },
   ],
   stocks: [
-    { label: 'techStocks', symbols: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA'] },
-    { label: 'energyStocks', symbols: ['XOM', 'CVX', 'SHEL', 'TTE', 'BP'] },
-    { label: 'bankStocks', symbols: ['JPM', 'BAC', 'WFC', 'C', 'GS'] },
+    { label: 'techStocks', symbols: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX'] },
+    { label: 'semiconductors', symbols: ['AMD', 'INTC', 'TSM', 'ASML', 'AVGO', 'QCOM', 'ARM', 'SMCI'] },
+    { label: 'softwareCloud', symbols: ['CRM', 'PLTR', 'NOW', 'SNOW', 'COIN', 'DDOG', 'NET'] },
+    { label: 'finance', symbols: ['JPM', 'BAC', 'V', 'MA', 'GS', 'MS', 'BLK'] },
+    { label: 'healthcare', symbols: ['JNJ', 'UNH', 'LLY', 'PFE', 'ABBV', 'MRK'] },
+    { label: 'consumer', symbols: ['WMT', 'MCD', 'NKE', 'DIS', 'COST', 'SBUX'] },
+    { label: 'energy', symbols: ['XOM', 'CVX', 'COP', 'SLB'] },
+    { label: 'chinese', symbols: ['BABA', 'NIO', 'JD', 'PDD'] },
+    { label: 'indices', symbols: ['US500', 'US30', 'US100', 'UK100', 'DE40', 'JP225'] },
+    { label: 'etfs', symbols: ['SPY', 'QQQ', 'DIA', 'GLD', 'SLV'] },
   ],
   metals: [
     { label: 'preciousMetals', symbols: ['XAUUSD', 'XAGUSD', 'XPTUSD'] },
@@ -167,15 +183,15 @@ export const ALL_SYMBOLS_DB: Record<string, string[]> = {
     // Top 10 by Market Cap
     'BTCUSD', 'ETHUSD', 'BNBUSD', 'SOLUSD', 'XRPUSD', 'ADAUSD', 'DOGEUSD', 'TRXUSD', 'AVAXUSD', 'DOTUSD',
     // DeFi
-    'LINKUSD', 'UNIUSD', 'AAVEUSD', 'MKRUSD', 'SNXUSD', 'LDOUSD', 'COMPUSD', 'CRVUSD', 'SUSHIUSD', '1INCHUSD',
+    'LINKUSD', 'UNIUSD', 'AAVEUSD', 'MKRUSD', 'SNXUSD', 'LDOUSD', 'COMPUSD', 'CRVUSD', 'SUSHIUSD', '1INCHUSD', 'PENDLEUSD',
     // Layer 2
-    'MATICUSD', 'OPUSD', 'ARBUSD', 'IMXUSD', 'MANTUSD', 'STRKUSD', 'ZKUSD',
+    'MATICUSD', 'POLUSD', 'OPUSD', 'ARBUSD', 'IMXUSD', 'MANTUSD', 'STRKUSD', 'ZKUSD', 'STXUSD',
     // Layer 1
-    'NEARUSD', 'ICPUSD', 'APTUSD', 'SUIUSD', 'INJUSD', 'SEIUMD', 'ATOMUSD', 'ALGOUSD', 'FTMUSD', 'HBARUSD', 'EOSUSD',
+    'NEARUSD', 'ICPUSD', 'APTUSD', 'SUIUSD', 'INJUSD', 'SEIUSD', 'ATOMUSD', 'ALGOUSD', 'FTMUSD', 'HBARUSD', 'EOSUSD', 'TONUSD', 'KASUSD', 'KAVAUSD',
     // Meme
-    'SHIBUSD', 'PEPEUSD', 'WIFUSD', 'BONKUSD', 'FLOKIUSD', 'MEMEUSD',
+    'SHIBUSD', 'PEPEUSD', 'WIFUSD', 'BONKUSD', 'FLOKIUSD', 'MEMEUSD', 'JUPUSD',
     // Infrastructure & AI
-    'RNDRUSD', 'FILUSD', 'THETAUSD', 'ARUSD', 'FETUSD', 'TAOUSD', 'OCEANUSD',
+    'RNDRUSD', 'FILUSD', 'THETAUSD', 'ARUSD', 'FETUSD', 'TAOUSD', 'OCEANUSD', 'WLDUSD',
     // Others
     'LTCUSD', 'BCHUSD', 'ETCUSD', 'XLMUSD', 'VETUSD', 'XMRUSD', 'ZECUSD', 'DASHUSD',
     'SANDUSD', 'MANAUSD', 'AXSUSD', 'GALAUSD', 'ENJUSD', 'CHZUSD',
@@ -184,21 +200,27 @@ export const ALL_SYMBOLS_DB: Record<string, string[]> = {
     // US Tech Giants (FAANG+)
     'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX',
     // US Semiconductors
-    'AMD', 'INTC', 'QCOM', 'AVGO', 'MU', 'MRVL', 'LRCX', 'KLAC', 'AMAT', 'TSM', 'ASML',
+    'AMD', 'INTC', 'QCOM', 'AVGO', 'MU', 'MRVL', 'LRCX', 'KLAC', 'AMAT', 'TSM', 'ASML', 'ARM', 'SMCI',
     // US Software & Cloud
     'CRM', 'ADBE', 'ORCL', 'NOW', 'SNOW', 'PLTR', 'UBER', 'SQ', 'SHOP', 'COIN', 'DDOG', 'NET', 'ZS',
+    // US AI & Growth
+    'APP', 'MSTR', 'CRWD', 'PANW', 'SOFI', 'DKNG', 'RBLX',
     // US Finance
     'JPM', 'BAC', 'WFC', 'C', 'GS', 'MS', 'BLK', 'SCHW', 'AXP', 'V', 'MA', 'PYPL',
     // US Healthcare
     'JNJ', 'UNH', 'PFE', 'ABBV', 'MRK', 'LLY', 'TMO', 'ABT', 'DHR', 'BMY', 'AMGN', 'GILD', 'MRNA', 'ISRG',
     // US Consumer & Retail
-    'WMT', 'COST', 'HD', 'LOW', 'TGT', 'SBUX', 'MCD', 'NKE', 'DIS', 'PG', 'KO', 'PEP',
+    'WMT', 'COST', 'HD', 'LOW', 'TGT', 'SBUX', 'MCD', 'NKE', 'DIS', 'PG', 'KO', 'PEP', 'LULU',
     // US Energy
     'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO', 'OXY', 'DVN',
     // US Industrial & Defense
     'BA', 'CAT', 'HON', 'GE', 'LMT', 'RTX', 'NOC', 'MMM', 'DE', 'UPS', 'FDX',
     // US Telecom
     'T', 'VZ', 'TMUS', 'CSCO',
+    // US EV
+    'RIVN', 'LCID',
+    // Social Media
+    'SNAP', 'PINS',
     // Chinese Tech
     'BABA', 'JD', 'PDD', 'BIDU', 'NIO', 'LI', 'XPEV',
     // European
@@ -212,6 +234,5 @@ export const ALL_SYMBOLS_DB: Record<string, string[]> = {
   ].sort(),
   metals: [
     'XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'XCUUSD',
-    'XALUSD', 'XNIUSD', 'XZNUSD', 'XPBUSD', 'XSNUSD',
   ].sort()
 };

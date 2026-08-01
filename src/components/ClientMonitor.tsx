@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, ShieldOff, Trash2, RefreshCw, RotateCcw, X, CheckCircle, Clock, Ban, Shield, Crown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Language } from '../lib/i18n';
@@ -24,13 +24,16 @@ interface ClientMonitorProps {
   onRenew: (clientId: string, days: number) => void;
   freemiumDisabled?: boolean;
   onFreemiumToggle?: (v: boolean) => void;
+  clientLoginRequired?: boolean;
+  onClientLoginToggle?: (v: boolean) => void;
 }
 
-export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelete, onDeleteByEmail, onRenew, freemiumDisabled: externalFreemium, onFreemiumToggle }: ClientMonitorProps) {
+export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelete, onDeleteByEmail, onRenew, freemiumDisabled: externalFreemium, onFreemiumToggle, clientLoginRequired: externalClientLogin, onClientLoginToggle }: ClientMonitorProps) {
   const isAr = lang === 'ar';
   const [renewing, setRenewing] = useState<string | null>(null);
   const [renewDays, setRenewDays] = useState(30);
   const [freemiumDisabled, setFreemiumDisabled] = useState(externalFreemium ?? localStorage.getItem('finalyze_freemium_disabled') === 'true');
+  const [clientLoginRequired, setClientLoginRequired] = useState(externalClientLogin ?? localStorage.getItem('finalyze_client_login_required') === 'true');
 
   const daysLeft = (expiry: string | null): number => {
     if (!expiry) return 0;
@@ -101,6 +104,38 @@ export default function ClientMonitor({ clients, lang, onRefresh, onBan, onDelet
           }`}
         >
           {freemiumDisabled ? (isAr ? 'ON: وصول كامل' : 'ON: Full Access') : (isAr ? 'OFF: مقفلة' : 'OFF: Locked')}
+        </button>
+      </div>
+
+      {/* Client Login Required Toggle */}
+      <div className="bg-brand-alt rounded-2xl p-4 border border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {clientLoginRequired ? <Users size={20} className="text-amber-400" /> : <Users size={20} className="text-emerald-400" />}
+          <div>
+            <span className="text-sm font-bold text-white">
+              {isAr ? 'تسجيل دخول العملاء' : 'Client Login Required'}
+            </span>
+            <p className="text-xs text-white/60 mt-0.5">
+              {clientLoginRequired
+                ? (isAr ? 'العملاء يجب عليهم تسجيل الدخول عبر Google' : 'Clients must sign in with Google')
+                : (isAr ? 'العملاء يدخلون مباشرة بدون تسجيل دخول' : 'Clients enter directly without login')}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            const newVal = !clientLoginRequired;
+            setClientLoginRequired(newVal);
+            localStorage.setItem('finalyze_client_login_required', newVal ? 'true' : 'false');
+            onClientLoginToggle?.(newVal);
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            clientLoginRequired
+              ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+              : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+          }`}
+        >
+          {clientLoginRequired ? (isAr ? 'ON: مطلوب تسجيل' : 'ON: Login Required') : (isAr ? 'OFF: بدون تسجيل' : 'OFF: No Login')}
         </button>
       </div>
 
