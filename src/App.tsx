@@ -15,6 +15,7 @@ import DevicePreview from './components/DevicePreview';
 import SettingsModal from './components/SettingsModal';
 import SidebarPanel from './components/SidebarPanel';
 import TopSignals from './components/TopSignals';
+import AdBanner from './components/AdBanner';
 import PortfolioPanel from './components/PortfolioPanel';
 import ClientDashboard from './components/ClientDashboard';
 
@@ -60,7 +61,10 @@ export default function App() {
   });
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [clientSignals, setClientSignals] = useState<AnalysisResult[]>(() => {
-    try { return JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]'); } catch { return []; }
+    try {
+      const saved = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
+      return saved.filter((s: any) => !s.isSideways);
+    } catch { return []; }
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -268,8 +272,8 @@ export default function App() {
           try { playAudio('success'); } catch {}
         }
         
-        setClientSignals(results);
-        localStorage.setItem('finalyze_client_signals', JSON.stringify(results));
+        setClientSignals(results.filter((r: any) => !r.isSideways));
+        localStorage.setItem('finalyze_client_signals', JSON.stringify(results.filter((r: any) => !r.isSideways)));
       } catch (e: any) {
         console.error('[CLIENT] Failed to load shared results:', e?.code || e?.message || e);
       }
@@ -766,6 +770,7 @@ export default function App() {
 
     results.forEach(res => {
       if (res.signal === 'neutral' || res.signal === 'no_entry') return; // neutral hidden
+      if (res.isSideways) return; // sideways signals completely hidden
 
       const existing = updated.find(s => s.symbol === res.symbol);
       const { minHold } = getHoldPeriods(res.timeframe);
@@ -835,9 +840,9 @@ export default function App() {
         }
       }
 
-      // Separate strong and regular signals
-      const strong = resolved.filter(s => s.signal === 'strong_buy' || s.signal === 'strong_sell');
-      const regular = resolved.filter(s => s.signal === 'buy' || s.signal === 'sell');
+      // Separate strong and regular signals (exclude sideways)
+      const strong = resolved.filter(s => (s.signal === 'strong_buy' || s.signal === 'strong_sell') && !s.isSideways);
+      const regular = resolved.filter(s => (s.signal === 'buy' || s.signal === 'sell') && !s.isSideways);
       
       // Pass all signals - TopSignals component handles category-based display
       // Each category independently shows its strong signals + top 3 regular
@@ -1035,8 +1040,8 @@ export default function App() {
             ]);
             if (r && !(r as any).error) {
               const sig = r.signal || '';
-              if (sig && sig !== 'no_entry' && sig !== 'neutral') updateTopSignals([r]);
-              if (sig && sig !== 'no_entry' && sig !== 'neutral') {
+              if (sig && sig !== 'no_entry' && sig !== 'neutral' && !r.isSideways) updateTopSignals([r]);
+              if (sig && sig !== 'no_entry' && sig !== 'neutral' && !r.isSideways) {
                 scanResults.push(r);
                 setClientSignals(prev => {
                   const u = [...prev.filter(x => x.symbol !== r.symbol), r];
@@ -1980,6 +1985,9 @@ export default function App() {
           </button>
         )}
       </main>
+
+      {/* Adsterra Banner 728x90 - Only for clients */}
+      <AdBanner position="footer" isDeveloper={isDeveloperSession()} className="py-4" />
 
       <footer className="py-8 border-t border-white/5 bg-brand-alt/30">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">

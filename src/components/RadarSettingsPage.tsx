@@ -1,10 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Zap, Activity, Layers, Sparkles, Clock, Music, Volume2, Upload, Trash2, CheckCircle, Crown, Star, X, Download, FileAudio } from 'lucide-react';
+import { Zap, Activity, Layers, Sparkles, Clock, Music, Volume2, CheckCircle, Crown, Star, X } from 'lucide-react';
 import { AutoAnalysisSettings } from '../types';
 import { Language } from '../lib/i18n';
-import { saveAudioBlob, deleteAudioBlob } from '../lib/db';
-import { loadCustomAudio, removeCustomAudio, playStart, playSuccess, playFail, playCompletion } from '../lib/audioEngine';
+import { playStart, playSuccess, playFail, playCompletion } from '../lib/audioEngine';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
@@ -19,9 +18,6 @@ interface RadarSettingsPageProps {
 }
 
 export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, onSave, isWaiting, lang, hasActivePlan = true, onUpgrade }: RadarSettingsPageProps) {
-  const successFileRef = useRef<HTMLInputElement>(null);
-  const failFileRef = useRef<HTMLInputElement>(null);
-  const completionFileRef = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState(false);
   const [showUpgradeOverlay, setShowUpgradeOverlay] = useState(false);
 
@@ -29,76 +25,6 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
     onSave?.();
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'success' | 'fail' | 'completion') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const key = type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail';
-        await saveAudioBlob(key, file);
-        await loadCustomAudio(key, file);
-        onAutoSettingsChange({
-          ...autoSettings,
-          [type === 'success' ? 'successSound' : type === 'completion' ? 'completionSound' : 'failSound']: 'custom'
-        });
-      } catch (err) {
-        console.error("Failed to save audio", err);
-      }
-    }
-  };
-
-  const handleDeleteCustomAudio = async (type: 'success' | 'fail' | 'completion') => {
-    try {
-      const key = type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail';
-      await deleteAudioBlob(key);
-      removeCustomAudio(key);
-      onAutoSettingsChange({
-        ...autoSettings,
-        [type === 'success' ? 'successSound' : type === 'completion' ? 'completionSound' : 'failSound']: ''
-      });
-    } catch (err) {
-      console.error("Failed to delete audio", err);
-    }
-  };
-
-  // Save custom audio to desktop file
-  const handleSaveToDesktop = async (type: 'success' | 'fail' | 'completion') => {
-    try {
-      const key = type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail';
-      const { getAudioBlob } = await import('../lib/db');
-      const blob = await getAudioBlob(key);
-      if (!blob) return;
-      
-      const handle = await (window as any).showSaveFilePicker({
-        suggestedName: `${type}_alert_sound.${blob.type === 'audio/mpeg' ? 'mp3' : 'wav'}`,
-        types: [{ description: 'Audio Files', accept: { 'audio/*': ['.mp3', '.wav', '.ogg', '.m4a'] } }]
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-    } catch (err) {
-      if ((err as any).name !== 'AbortError') console.error("Failed to save to desktop", err);
-    }
-  };
-
-  // Load custom audio from desktop file
-  const handleLoadFromDesktop = async (type: 'success' | 'fail' | 'completion') => {
-    try {
-      const [handle] = await (window as any).showOpenFilePicker({
-        types: [{ description: 'Audio Files', accept: { 'audio/*': ['.mp3', '.wav', '.ogg', '.m4a'] } }]
-      });
-      const file = await handle.getFile();
-      const key = type === 'success' ? 'custom_success' : type === 'completion' ? 'custom_completion' : 'custom_fail';
-      await saveAudioBlob(key, file);
-      await loadCustomAudio(key, file);
-      onAutoSettingsChange({
-        ...autoSettings,
-        [type === 'success' ? 'successSound' : type === 'completion' ? 'completionSound' : 'failSound']: 'custom'
-      });
-    } catch (err) {
-      if ((err as any).name !== 'AbortError') console.error("Failed to load from desktop", err);
-    }
   };
 
   const selectedList = autoSettings.category === 'all'
@@ -156,147 +82,55 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
         </button>
       </div>
 
-      {/* Audio Section */}
+      {/* Audio Section — Fixed Default Alerts */}
       <div className="bg-brand-alt rounded-2xl border border-white/10 p-6 space-y-6">
         <div className="flex items-center gap-3 text-brand-muted">
           <Music size={18} className="text-[#F59E0B]" />
           <span className="text-xs font-black uppercase tracking-widest text-brand-text/90">
-            {lang === 'ar' ? 'إعدادات الصوت' : 'Audio Settings'}
+            {lang === 'ar' ? 'التنبيهات الصوتية' : 'Sound Alerts'}
           </span>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-brand-muted">
-              {lang === 'ar' ? 'تنبيه فرصة جديدة' : 'New Signal Alert'}
+        {/* Alert 1: New Opportunity */}
+        <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-brand-bg border border-brand-text/5">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="text-xs font-bold text-brand-text">
+              {lang === 'ar' ? '1. تنبيه فرصة جديدة' : '1. New Opportunity Alert'}
             </span>
-            <div className="flex items-center gap-2">
-              <button onClick={() => playSuccess(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
-                <Volume2 size={14} />
-              </button>
-              <button onClick={() => successFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors" title={lang === 'ar' ? 'رفع من الجهاز' : 'Upload from Device'}>
-                <Upload size={16} />
-              </button>
-              <button onClick={() => handleSaveToDesktop('success')} className="p-2 bg-blue-500/20 rounded-xl text-blue-400 hover:bg-blue-500/30 transition-colors" title={lang === 'ar' ? 'حفظ على سطح المكتب' : 'Save to Desktop'}>
-                <Download size={16} />
-              </button>
-              <button onClick={() => handleLoadFromDesktop('success')} className="p-2 bg-purple-500/20 rounded-xl text-purple-400 hover:bg-purple-500/30 transition-colors" title={lang === 'ar' ? 'تحميل من سطح المكتب' : 'Load from Desktop'}>
-                <FileAudio size={16} />
-              </button>
-            </div>
-            <input type="file" ref={successFileRef} onChange={(e) => handleAudioUpload(e, 'success')} accept="audio/*" className="hidden" />
           </div>
-          <button
-            onClick={() => onAutoSettingsChange({ ...autoSettings, successSound: autoSettings.successSound === 'custom' ? '' : 'custom' })}
-            className={cn(
-              "flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-xs font-black border-2 transition-all text-left",
-              autoSettings.successSound === 'custom'
-                ? 'bg-[#F59E0B]/10 border-[#F59E0B] text-[#F59E0B]'
-                : 'bg-brand-bg border-brand-text/5 text-brand-muted'
-            )}
-          >
-            <div className={cn("w-2 h-2 rounded-full", autoSettings.successSound === 'custom' ? "bg-[#F59E0B]" : "bg-brand-text/20")} />
-            <span className="truncate">
-              {autoSettings.successSound === 'custom'
-                ? (lang === 'ar' ? 'نغمة مخصصة (نشطة)' : 'Custom Sound (Active)')
-                : (lang === 'ar' ? 'نغمة افتراضية' : 'Default Sound')}
-            </span>
-            {autoSettings.successSound === 'custom' && (
-              <button onClick={() => handleDeleteCustomAudio('success')} className="ml-auto p-1 hover:bg-red-500/20 rounded-lg text-red-500">
-                <Trash2 size={14} />
-              </button>
-            )}
+          <button onClick={() => playSuccess(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
+            <Volume2 size={14} />
           </button>
         </div>
 
-        <div className="space-y-3 pt-4 border-t border-brand-text/5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-brand-muted">
-              {lang === 'ar' ? 'تنبيه إتمام التحليل' : 'Analysis Finished Alert'}
+        {/* Alert 2: Session End */}
+        <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-brand-bg border border-brand-text/5">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="text-xs font-bold text-brand-text">
+              {lang === 'ar' ? '2. تنبيه انتهاء الدورة' : '2. Cycle Completion Alert'}
             </span>
-            <div className="flex items-center gap-2">
-              <button onClick={() => playFail(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
-                <Volume2 size={14} />
-              </button>
-              <button onClick={() => failFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors" title={lang === 'ar' ? 'رفع من الجهاز' : 'Upload from Device'}>
-                <Upload size={16} />
-              </button>
-              <button onClick={() => handleSaveToDesktop('fail')} className="p-2 bg-blue-500/20 rounded-xl text-blue-400 hover:bg-blue-500/30 transition-colors" title={lang === 'ar' ? 'حفظ على سطح المكتب' : 'Save to Desktop'}>
-                <Download size={16} />
-              </button>
-              <button onClick={() => handleLoadFromDesktop('fail')} className="p-2 bg-purple-500/20 rounded-xl text-purple-400 hover:bg-purple-500/30 transition-colors" title={lang === 'ar' ? 'تحميل من سطح المكتب' : 'Load from Desktop'}>
-                <FileAudio size={16} />
-              </button>
-            </div>
-            <input type="file" ref={failFileRef} onChange={(e) => handleAudioUpload(e, 'fail')} accept="audio/*" className="hidden" />
           </div>
-          <button
-            onClick={() => onAutoSettingsChange({ ...autoSettings, failSound: autoSettings.failSound === 'custom' ? '' : 'custom' })}
-            className={cn(
-              "flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-xs font-black border-2 transition-all text-left",
-              autoSettings.failSound === 'custom'
-                ? 'bg-[#F59E0B]/10 border-[#F59E0B] text-[#F59E0B]'
-                : 'bg-brand-bg border-brand-text/5 text-brand-muted'
-            )}
-          >
-            <div className={cn("w-2 h-2 rounded-full", autoSettings.failSound === 'custom' ? "bg-[#F59E0B]" : "bg-brand-text/20")} />
-            <span className="truncate">
-              {autoSettings.failSound === 'custom'
-                ? (lang === 'ar' ? 'نغمة مخصصة (نشطة)' : 'Custom Sound (Active)')
-                : (lang === 'ar' ? 'نغمة افتراضية' : 'Default Sound')}
-            </span>
-            {autoSettings.failSound === 'custom' && (
-              <button onClick={() => handleDeleteCustomAudio('fail')} className="ml-auto p-1 hover:bg-red-500/20 rounded-lg text-red-500">
-                <Trash2 size={14} />
-              </button>
-            )}
+          <button onClick={() => playCompletion(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
+            <Volume2 size={14} />
           </button>
         </div>
 
-        <div className="space-y-3 pt-4 border-t border-brand-text/5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-brand-muted">
-              {lang === 'ar' ? 'تنبيه انتهاء الدورة' : 'Cycle Completion Alert'}
+        {/* Alert 3: Analysis Complete */}
+        <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-brand-bg border border-brand-text/5">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-blue-400" />
+            <span className="text-xs font-bold text-brand-text">
+              {lang === 'ar' ? '3. تنبيه إتمام التحليل' : '3. Analysis Complete Alert'}
             </span>
-            <div className="flex items-center gap-2">
-              <button onClick={() => playCompletion(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
-                <Volume2 size={14} />
-              </button>
-              <button onClick={() => completionFileRef.current?.click()} className="p-2 bg-[#F59E0B] rounded-xl text-black hover:bg-[#d97706] transition-colors" title={lang === 'ar' ? 'رفع من الجهاز' : 'Upload from Device'}>
-                <Upload size={16} />
-              </button>
-              <button onClick={() => handleSaveToDesktop('completion')} className="p-2 bg-blue-500/20 rounded-xl text-blue-400 hover:bg-blue-500/30 transition-colors" title={lang === 'ar' ? 'حفظ على سطح المكتب' : 'Save to Desktop'}>
-                <Download size={16} />
-              </button>
-              <button onClick={() => handleLoadFromDesktop('completion')} className="p-2 bg-purple-500/20 rounded-xl text-purple-400 hover:bg-purple-500/30 transition-colors" title={lang === 'ar' ? 'تحميل من سطح المكتب' : 'Load from Desktop'}>
-                <FileAudio size={16} />
-              </button>
-            </div>
-            <input type="file" ref={completionFileRef} onChange={(e) => handleAudioUpload(e, 'completion')} accept="audio/*" className="hidden" />
           </div>
-          <button
-            onClick={() => onAutoSettingsChange({ ...autoSettings, completionSound: autoSettings.completionSound === 'custom' ? '' : 'custom' })}
-            className={cn(
-              "flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-xs font-black border-2 transition-all text-left",
-              autoSettings.completionSound === 'custom'
-                ? 'bg-[#F59E0B]/10 border-[#F59E0B] text-[#F59E0B]'
-                : 'bg-brand-bg border-brand-text/5 text-brand-muted'
-            )}
-          >
-            <div className={cn("w-2 h-2 rounded-full", autoSettings.completionSound === 'custom' ? "bg-[#F59E0B]" : "bg-brand-text/20")} />
-            <span className="truncate">
-              {autoSettings.completionSound === 'custom'
-                ? (lang === 'ar' ? 'نغمة مخصصة (نشطة)' : 'Custom Sound (Active)')
-                : (lang === 'ar' ? 'نغمة افتراضية' : 'Default Sound')}
-            </span>
-            {autoSettings.completionSound === 'custom' && (
-              <button onClick={() => handleDeleteCustomAudio('completion')} className="ml-auto p-1 hover:bg-red-500/20 rounded-lg text-red-500">
-                <Trash2 size={14} />
-              </button>
-            )}
+          <button onClick={() => playFail(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
+            <Volume2 size={14} />
           </button>
         </div>
 
+        {/* Volume */}
         <div className="pt-4 border-t border-brand-text/5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">

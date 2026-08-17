@@ -228,6 +228,72 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     bbPercentB = bbUpper > bbLower ? (currentPrice - bbLower) / (bbUpper - bbLower) : 0.5;
   }
 
+  // 7b. ADX (Average Directional Index) — trend strength vs sideways
+  let adx = 0;
+  let adxDirection: 'uptrend' | 'downtrend' | 'sideways' = 'sideways';
+  if (len >= 28) {
+    const period = 14;
+    const trs: number[] = [];
+    const plusDMs: number[] = [];
+    const minusDMs: number[] = [];
+    for (let i = 1; i < len; i++) {
+      const highDiff = safeHighs[i] - safeHighs[i - 1];
+      const lowDiff = safeLows[i - 1] - safeLows[i];
+      const tr = Math.max(safeHighs[i] - safeLows[i], Math.abs(safeHighs[i] - closes[i - 1]), Math.abs(safeLows[i] - closes[i - 1]));
+      trs.push(tr);
+      plusDMs.push(highDiff > lowDiff && highDiff > 0 ? highDiff : 0);
+      minusDMs.push(lowDiff > highDiff && lowDiff > 0 ? lowDiff : 0);
+    }
+    let atr14 = trs.slice(-period).reduce((a, b) => a + b, 0) / period;
+    let plusDM14 = plusDMs.slice(-period).reduce((a, b) => a + b, 0) / period;
+    let minusDM14 = minusDMs.slice(-period).reduce((a, b) => a + b, 0) / period;
+    const dxs: number[] = [];
+    for (let i = period; i < trs.length; i++) {
+      atr14 = (atr14 * (period - 1) + trs[i]) / period;
+      plusDM14 = (plusDM14 * (period - 1) + plusDMs[i]) / period;
+      minusDM14 = (minusDM14 * (period - 1) + minusDMs[i]) / period;
+      const plusDI = atr14 > 0 ? (plusDM14 / atr14) * 100 : 0;
+      const minusDI = atr14 > 0 ? (minusDM14 / atr14) * 100 : 0;
+      const diSum = plusDI + minusDI;
+      dxs.push(diSum > 0 ? (Math.abs(plusDI - minusDI) / diSum) * 100 : 0);
+    }
+    if (dxs.length >= period) {
+      adx = dxs.slice(-period).reduce((a, b) => a + b, 0) / period;
+      const lastPlusDI = atr14 > 0 ? (plusDM14 / atr14) * 100 : 0;
+      const lastMinusDI = atr14 > 0 ? (minusDM14 / atr14) * 100 : 0;
+      if (adx > 20) {
+        adxDirection = lastPlusDI > lastMinusDI ? 'uptrend' : 'downtrend';
+      }
+    }
+  }
+
+  // 7c. MA Alignment (20/50/200) — confirms trend structure
+  let maAlignment: 'bullish' | 'bearish' | 'mixed' = 'mixed';
+  if (len >= 200) {
+    const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    const sma50 = closes.slice(-50).reduce((a, b) => a + b, 0) / 50;
+    const sma200 = closes.slice(-200).reduce((a, b) => a + b, 0) / 200;
+    if (sma20 > sma50 && sma50 > sma200) maAlignment = 'bullish';
+    else if (sma20 < sma50 && sma50 < sma200) maAlignment = 'bearish';
+  } else if (len >= 50) {
+    const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    const sma50 = closes.slice(-50).reduce((a, b) => a + b, 0) / 50;
+    if (sma20 > sma50 * 1.005) maAlignment = 'bullish';
+    else if (sma20 < sma50 * 0.995) maAlignment = 'bearish';
+  }
+
+  // 7d. COMBINED SIDEWAYS FILTER — ADX + BB Width + MA Alignment
+  const adxSideays = adx < 20;
+  const bbSideays = bbWidth < 0.02;
+  const maMixed = maAlignment === 'mixed';
+  const sidewaysVotes = [adxSideays, bbSideays, maMixed].filter(Boolean).length;
+  const isSideways = sidewaysVotes >= 2;
+  let sidewaysDirection: 'sideways' | 'uptrend' | 'downtrend' = 'sideways';
+  if (!isSideways) {
+    if (maAlignment === 'bullish' || adxDirection === 'uptrend') sidewaysDirection = 'uptrend';
+    else if (maAlignment === 'bearish' || adxDirection === 'downtrend') sidewaysDirection = 'downtrend';
+  }
+
   // 8. Bollinger Band Pullback Detection (3-6 candles opposite to trend)
   let bbPullbackCount = 0;
   let bbTouchLower = false;
@@ -361,6 +427,7 @@ function calculateTechnicalMetrics(closes: number[], highs: number[], lows: numb
     bbPullbackCount, bbTouchLower, bbTouchUpper,
     hasHammer, hasPinbar, hasEngulfing, hasShootingStar,
     hasBullishCandle, hasBearishCandle,
+    adx, adxDirection, maAlignment, isSideways, sidewaysDirection,
     momentumScore: upScore / (upScore + downScore) * 100
   };
 }
@@ -733,17 +800,19 @@ export async function analyzeMarketBatch(
 function synthFromMetrics(metrics: any, symbol: string): any {
   const dir = metrics?.direction || 'sideways';
   const rsi = metrics?.rsi ?? 50;
-  const macd = metrics?.macdHistogram ?? 0;
+  const momentum = metrics?.momentumScore ?? 50;
   const emaC = metrics?.emaCross || 'none';
   let synthConf = 50;
   if (dir === 'uptrend') synthConf += 10;
   else if (dir === 'downtrend') synthConf -= 10;
   if (rsi < 30) synthConf += 5;
   else if (rsi > 70) synthConf -= 5;
-  if (macd > 0) synthConf += 3;
-  else if (macd < 0) synthConf -= 3;
+  if (momentum > 60) synthConf += 3;
+  else if (momentum < 40) synthConf -= 3;
   if (emaC === 'bullish') synthConf += 5;
   else if (emaC === 'bearish') synthConf -= 5;
+  // Sideways penalty
+  if (metrics?.isSideways) synthConf = Math.min(synthConf, 40);
   synthConf = Math.max(20, Math.min(80, synthConf));
   const synthSignal = synthConf >= 55 ? (dir === 'uptrend' ? 'buy' : dir === 'downtrend' ? 'sell' : 'neutral') : 'neutral';
   console.log(`[Engine] ${symbol} synth: ${synthSignal} (${synthConf}%) dir=${dir} rsi=${rsi.toFixed(1)} ema=${emaC}`);
@@ -878,6 +947,8 @@ MARKET DATA: RSI ${metrics?.rsi?.toFixed(1)}, Trend ${metrics?.direction}, EMA C
 BOLLINGER BANDS: Upper ${metrics?.bbUpper?.toFixed(4) || 'N/A'}, Middle ${metrics?.bbMiddle?.toFixed(4) || 'N/A'}, Lower ${metrics?.bbLower?.toFixed(4) || 'N/A'}, %B ${metrics?.bbPercentB ? Math.round(metrics.bbPercentB * 100) : 'N/A'}%, Width ${metrics?.bbWidth ? metrics.bbWidth.toFixed(4) : 'N/A'}.
 BB STRATEGY: Pullback ${metrics?.bbPullbackCount || 0} candles, TouchLower ${metrics?.bbTouchLower || false}, TouchUpper ${metrics?.bbTouchUpper || false}, Hammer ${metrics?.hasHammer || false}, Pinbar ${metrics?.hasPinbar || false}, Engulfing ${metrics?.hasEngulfing || false}, ShootingStar ${metrics?.hasShootingStar || false}.
 
+SIDEWAYS FILTER: ADX ${metrics?.adx?.toFixed(1) || 'N/A'} (direction: ${metrics?.adxDirection || 'N/A'}), MA Alignment ${metrics?.maAlignment || 'N/A'}, IsSideways ${metrics?.isSideways || false}, Direction ${metrics?.sidewaysDirection || 'sideways'}.
+
 MICRO (${microTF}): RSI ${microMetrics?.rsi ? microMetrics.rsi.toFixed(1) : 'N/A'}, Trend ${microMetrics?.direction || 'sideways'}, EMA ${microMetrics?.emaCross || 'unknown'}, BB Upper ${microMetrics?.bbUpper?.toFixed(4) || 'N/A'}, BB Lower ${microMetrics?.bbLower?.toFixed(4) || 'N/A'}, BB %B ${microMetrics?.bbPercentB ? Math.round(microMetrics.bbPercentB * 100) : 'N/A'}%, TouchLower ${microMetrics?.bbTouchLower || false}, TouchUpper ${microMetrics?.bbTouchUpper || false}, Pullback ${microMetrics?.bbPullbackCount || 0}c, Hammer ${microMetrics?.hasHammer || false}, Pinbar ${microMetrics?.hasPinbar || false}, Engulfing ${microMetrics?.hasEngulfing || false}.
 
 CONTEXT: Fear&Greed ${contextFearGreed?.value ?? 'N/A'}/100 (${contextFearGreed?.classification ?? 'Unknown'}). News: ${newsText.substring(0, 300)}. Events: ${eventsText.substring(0, 200)}.
@@ -887,6 +958,8 @@ SETTINGS: NewsGuard ${settings.useNewsGuard ? 'ON' : 'OFF'}, Volume ${settings.u
 SUPPLY & DEMAND ZONES: ${zonesText}
 
 RULES:
+- CRITICAL SIDEWAYS GATE: If "IsSideways" is true, you MUST return signal "no_entry" with confidence 0. This is a HARD GATE — no exceptions. The market is in a sideways/choppy zone and trading is forbidden.
+- If "IsSideways" is false, the market has a clear direction. Use "Direction" (uptrend/downtrend) to confirm your signal direction.
 - 4 PRIMARY CONDITIONS (must ALL be favorable for strong signal):
   1. BB Pullback: trend + 3-6 pullback candles + touch BB + reversal candle ΓåÆ STRONG BUY/SELL
   2. Supply/Demand: demand zone + uptrend = confirms buy; supply zone + downtrend = confirms sell
@@ -1146,8 +1219,9 @@ Return ONLY valid JSON:
     // Always pass for regular signals; only block for STRONG via allGatesMet
     const sdMet = !sdConflict;
     // Confidence penalty when supply/demand conflicts (applies to all signals)
+    var sdPenaltyMult = 1.0;
     if (sdConflict) {
-      finalConfidence = Math.round(finalConfidence * 0.8);
+      sdPenaltyMult = 0.8;
       detailedReasons.push({ check: 'Supply/Demand', value: `${nearestZone?.type} ${nearestZone?.bottom?.toFixed(2)}-${nearestZone?.top?.toFixed(2)} conflicts with ${metrics?.direction}`, status: 'negative', impact: `supply/demand conflict -20% confidence` });
     }
 
@@ -1156,13 +1230,14 @@ Return ONLY valid JSON:
 
     // PRIMARY 4 ΓÇö News: check for high-impact negative events
     var newsMet = true;
+    var econPenaltyMult = 1.0;
     if (contextEcon && contextEcon.length > 0) {
       const highImpactEvents = contextEcon.filter((e: any) => e.impact === 'High');
       if (highImpactEvents.length > 0) {
-        // High-impact events reduce confidence
-        finalConfidence = Math.round(finalConfidence * 0.85);
+        econPenaltyMult = 0.85;
       }
     }
+    var newsPenaltyMult = 1.0;
     if (contextNews && contextNews.length > 0) {
       // Count negative news vs positive
       const negNews = contextNews.filter((n: any) => {
@@ -1180,7 +1255,7 @@ Return ONLY valid JSON:
       if (negNews.length >= 2 && negNews.length > posNews.length) {
         const currentSignal = String(resultData.signal || '').toLowerCase();
         if (currentSignal.includes('buy')) {
-          finalConfidence = Math.round(finalConfidence * 0.8);
+          newsPenaltyMult = 0.8;
         }
       }
     }
@@ -1227,19 +1302,38 @@ Return ONLY valid JSON:
     var finalSignal = rawSignal as SignalType;
     var finalConfidence = Number(resultData.confidence) || 50;
 
+    // ═══ CRITICAL: LOCAL SIDEWAYS ENFORCEMENT ═══
+    // Must be AFTER finalConfidence declaration to avoid var overwrite
+    // Enabled by default — only disabled if useFilterSideways is explicitly false
+    if (settings.useFilterSideways !== false && metrics?.isSideways) {
+      if (finalSignal === 'strong_buy' || finalSignal === 'strong_sell' || finalSignal === 'buy' || finalSignal === 'sell') {
+        finalSignal = 'no_entry' as SignalType;
+        rawSignal = 'no_entry';
+        finalConfidence = 0;
+        detailedReasons.push({
+          check: 'Sideways Filter (LOCAL ENFORCEMENT)',
+          value: `ADX ${metrics?.adx?.toFixed(1) || 'N/A'}, BB Width ${metrics?.bbWidth?.toFixed(4) || 'N/A'}, MA ${metrics?.maAlignment || 'N/A'}`,
+          status: 'negative',
+          impact: 'FORCED NO_ENTRY: market in sideways/choppy zone — all signals blocked'
+        });
+      }
+    }
+
     // ΓöÇΓöÇ STEP 4: Age zone adjustments ΓöÇΓöÇ
     const isStrongCandidate = rawSignal === 'strong_buy' || rawSignal === 'strong_sell';
     const isOld = totalAge > oldLimit;
 
     // Regular signals: block in OLD zone only (infant, youth, mature allowed)
-    if (!isStrongCandidate && isOld) {
+    // Skip if already blocked by sideways enforcement (no_entry)
+    if (!isStrongCandidate && isOld && finalSignal !== 'no_entry') {
       finalSignal = SignalType.NEUTRAL;
       finalConfidence = Math.min(finalConfidence, 25);
       detailedReasons.push({ check: 'Trend Age Zone', value: `${totalAge}c ΓÇö كهل (أكثر من ${oldLimit})`, status: 'negative', impact: 'trend exhausted ΓÇö no signals allowed' });
     }
 
     // STRONG signals: only allowed in MATURE zone (25-70)
-    if (isStrongCandidate) {
+    // Skip if already blocked by sideways enforcement (no_entry)
+    if (isStrongCandidate && finalSignal !== 'no_entry') {
       const isMature = totalAge >= matureLimit && totalAge <= oldLimit;
       if (!isMature) {
         // Not mature → downgrade STRONG to regular
@@ -1279,7 +1373,7 @@ Return ONLY valid JSON:
     const lastSwingDateStr = lastSwingAI ? `${toDateFromIdx(lastSwingAI.index)} (${lastSwingAI.price.toFixed(5)})` : 'N/A';
     const preDatesInfo = `بداية الاتجاه: ${trendStartDateStr}\nبداية آخر سحبة: ${pullbackFormDateStr}\nآخر سحبة: ${lastSwingDateStr}`;
     if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
-      if (isStrongCandidate) {
+      if (isStrongCandidate && finalSignal !== 'no_entry') {
         finalSignal = SignalType.NEUTRAL;
         finalConfidence = Math.min(finalConfidence, 30);
       }
@@ -1342,6 +1436,12 @@ Return ONLY valid JSON:
     const supportConf = Math.round(supportRatio * maxSupport);
     const computedConfidence = baseConf + primaryConf + supportConf;
     finalConfidence = computedConfidence;
+
+    // ΓöÇΓöÇ Apply deferred penalties from primary conditions ΓöÇΓöÇ
+    finalConfidence = Math.round(finalConfidence * sdPenaltyMult * econPenaltyMult * newsPenaltyMult);
+    if (sdPenaltyMult < 1) detailedReasons.push({ check: 'S/D Penalty', value: `-20%`, status: 'negative', impact: 'supply/demand conflict penalty applied' });
+    if (econPenaltyMult < 1) detailedReasons.push({ check: 'Econ Penalty', value: `-15%`, status: 'negative', impact: 'high-impact economic event penalty applied' });
+    if (newsPenaltyMult < 1) detailedReasons.push({ check: 'News Penalty', value: `-20%`, status: 'negative', impact: 'negative news sentiment penalty applied' });
 
     // ΓöÇΓöÇ STEP 5b: Age Zone Confidence Penalty ΓöÇΓöÇ
     // Infant trends have insufficient data — penalize confidence to avoid overconfidence
@@ -1424,7 +1524,10 @@ Return ONLY valid JSON:
     var direction: string;
     var agreementBonus = 0;
     
-    if (higherTFBlocked) {
+    // If sideways enforcement already blocked, skip direction classification entirely
+    if (finalSignal === ('no_entry' as any)) {
+      direction = null;
+    } else if (higherTFBlocked) {
       direction = null;
     } else if (metricsDirection) {
       // Metrics direction is ALWAYS primary — trend direction + RSI + EMA determine direction
@@ -1435,15 +1538,15 @@ Return ONLY valid JSON:
         agreementBonus = 10;
       }
     } else {
-      // Sideways — use supporting reasons to determine direction
-      if (buyReasons > sellReasons + 2) direction = 'buy';
-      else if (sellReasons > buyReasons + 2) direction = 'sell';
-      else direction = null;
+      // Sideways — NO directional signals allowed, force neutral
+      direction = null;
     }
 
     finalConfidence = Math.min(100, finalConfidence + agreementBonus);
 
-    if (higherTFBlocked) {
+    if (finalSignal === ('no_entry' as any)) {
+      // Sideways enforcement already blocked — do NOT override
+    } else if (higherTFBlocked) {
       finalSignal = SignalType.NEUTRAL;
     } else if (rsiBlocked) {
       finalSignal = SignalType.NEUTRAL;
@@ -1609,6 +1712,11 @@ Return ONLY valid JSON:
       takeProfit: finalTakeProfit,
       primaryMetCount,
       direction: direction || 'sideways',
+      isSideways: metrics?.isSideways || false,
+      sidewaysDirection: metrics?.sidewaysDirection || 'sideways',
+      adx: metrics?.adx,
+      adxDirection: metrics?.adxDirection,
+      maAlignment: metrics?.maAlignment,
     };
 
     // Cache the result

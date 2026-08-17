@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Eye, EyeOff, Pause, Play, Monitor, Code, X, Copy, Check, Globe, Users, Tag, ArrowLeft, ExternalLink, Clipboard, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Trash2, Eye, EyeOff, Pause, Play, Monitor, Code, X, Copy, Check, Globe, Users, Tag, ArrowLeft, ExternalLink, Clipboard, RotateCcw, Save, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
 import { db } from '../lib/firebase';
@@ -77,7 +77,7 @@ export async function loadAdsFromFirestore(): Promise<Ad[]> {
     const snap = await getDoc(doc(db, ADS_DOC));
     if (snap.exists()) {
       const data = snap.data();
-      const ads = (data.ads || []).map((ad: any) => ({
+      return (data.ads || []).map((ad: any) => ({
         id: ad.id || generateId(),
         name: ad.name || 'Untitled Ad',
         code: ad.code || '',
@@ -91,8 +91,6 @@ export async function loadAdsFromFirestore(): Promise<Ad[]> {
         assignedClients: Array.isArray(ad.assignedClients) ? ad.assignedClients : [],
         createdAt: ad.createdAt || Date.now(),
       }));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(ads));
-      return ads;
     }
     return [];
   } catch {
@@ -101,12 +99,15 @@ export async function loadAdsFromFirestore(): Promise<Ad[]> {
 }
 
 export async function saveAdsToFirestore(ads: Ad[]): Promise<void> {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ads));
-    await setDoc(doc(db, ADS_DOC), { ads, updatedAt: Date.now() }, { merge: true });
-  } catch {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ads));
-  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(ads));
+  const clean = ads.map(ad => {
+    const obj: Record<string, any> = {};
+    for (const [k, v] of Object.entries(ad)) {
+      if (v !== undefined) obj[k] = v;
+    }
+    return obj;
+  });
+  await setDoc(doc(db, ADS_DOC), { ads: clean, updatedAt: Date.now() }, { merge: true });
 }
 
 function loadAds(): Ad[] {
@@ -154,11 +155,12 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
     loadAdsFromFirestore().then(firestoreAds => {
       if (firestoreAds.length > 0) {
         setAds(firestoreAds);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(firestoreAds));
       } else {
         const local = loadAds();
         setAds(local);
         if (local.length > 0) {
-          saveAdsToFirestore(local).catch(() => {});
+          saveAdsToFirestore(local);
         }
       }
     }).catch(() => {
@@ -174,6 +176,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   const [filterType, setFilterType] = useState<string>('all');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
   const [newAd, setNewAd] = useState({
     name: '',
     code: '',
@@ -259,8 +263,10 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
     try {
       await saveAdsToFirestore(ads);
       setHasUnsavedChanges(false);
-    } catch (e) {
-      alert(isAr ? 'حدث خطأ أثناء الحفظ' : 'Error saving ads');
+      showToast(isAr ? 'تم الحفظ بنجاح' : 'Saved successfully', 'ok');
+    } catch (e: any) {
+      console.error('Save error:', e);
+      showToast(isAr ? `خطأ: ${e.message}` : `Error: ${e.message}`, 'err');
     }
     setSaving(false);
   };
@@ -875,6 +881,24 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                 </div>
               )}
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-6 py-3 rounded-2xl font-bold text-sm shadow-2xl backdrop-blur-xl border ${
+              toast.type === 'ok'
+                ? 'bg-emerald-500/90 text-white border-emerald-400/30'
+                : 'bg-red-500/90 text-white border-red-400/30'
+            }`}
+          >
+            {toast.type === 'ok' ? <Check size={18} /> : <AlertTriangle size={18} />}
+            {toast.msg}
           </motion.div>
         )}
       </AnimatePresence>

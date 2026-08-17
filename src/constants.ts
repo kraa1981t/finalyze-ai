@@ -33,6 +33,7 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   minPullbackCandles: 2,
   pullbackVolConfirm: false,
   pullbackCandleConfirm: false,
+  useFilterSideways: true,
 };
 
 export const DEFAULT_AUTO_SETTINGS = {

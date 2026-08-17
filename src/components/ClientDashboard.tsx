@@ -5,7 +5,7 @@ import TradingViewWidget from './TradingViewWidget';
 import LotSizeCalculator from './LotSizeCalculator';
 import { Language, translations } from '../lib/i18n';
 import { playClick, initAudio } from '../lib/audioEngine';
-import { SYMBOL_CATEGORIES } from '../constants';
+import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
 
 interface ClientDashboardProps {
   results: AnalysisResult[];
@@ -32,9 +32,9 @@ function getSymbolCategory(symbol: string): string {
   for (const [cat, syms] of Object.entries(SYMBOL_CATEGORIES)) {
     if ((syms as string[]).includes(sym)) return cat;
   }
-  // Index CFDs
-  const indexCfds = ['US500', 'US30', 'US100', 'UK100', 'DE40', 'JP225', 'HK50', 'AU200'];
-  if (indexCfds.includes(sym)) return 'stocks';
+  for (const [cat, syms] of Object.entries(ALL_SYMBOLS_DB)) {
+    if ((syms as string[]).includes(sym)) return cat;
+  }
   if (sym.endsWith('USD') && !sym.startsWith('USD') && sym.length > 6) return 'crypto';
   return 'forex';
 }
@@ -81,6 +81,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
   };
   const activeResults = results.filter(r => {
     if (r.signal === 'neutral' || r.signal === 'no_entry') return false;
+    if (r.isSideways) return false;
     const { maxAge } = getHoldPeriods(r.timeframe);
     return (now - new Date(r.timestamp).getTime()) < maxAge;
   });
@@ -245,6 +246,15 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, expandedCard, expan
         <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
         <div className="flex items-center gap-2">
           <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
+          {res.isSideways !== undefined && (
+            <span className={`text-xs font-black px-2 py-0.5 rounded-full border ${
+              res.isSideways ? 'text-white bg-white/20 border-white/30' :
+              res.sidewaysDirection === 'uptrend' ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' :
+              res.sidewaysDirection === 'downtrend' ? 'text-red-300 bg-red-500/20 border-red-500/30' : ''
+            }`}>
+              {res.isSideways ? (isAr ? 'عرضي' : 'Side') : res.sidewaysDirection === 'uptrend' ? (isAr ? 'صاعد' : 'Up') : res.sidewaysDirection === 'downtrend' ? (isAr ? 'هابط' : 'Down') : ''}
+            </span>
+          )}
           <div className="flex items-center gap-0.5">
             <span className="text-[10px] sm:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, lang)}</span>
           </div>

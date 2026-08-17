@@ -3,7 +3,7 @@ import { AnalysisResult, SignalType, MarketType } from '../types';
 import { Info, X, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
-import { SYMBOL_CATEGORIES } from '../constants';
+import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
 import LotSizeCalculator from './LotSizeCalculator';
 
 interface TopSignalsProps {
@@ -33,9 +33,9 @@ function getSymbolCategory(symbol: string): string {
   for (const [cat, syms] of Object.entries(SYMBOL_CATEGORIES)) {
     if ((syms as string[]).includes(sym)) return cat;
   }
-  // Index CFDs
-  const indexCfds = ['US500', 'US30', 'US100', 'UK100', 'DE40', 'JP225', 'HK50', 'AU200'];
-  if (indexCfds.includes(sym)) return 'stocks';
+  for (const [cat, syms] of Object.entries(ALL_SYMBOLS_DB)) {
+    if ((syms as string[]).includes(sym)) return cat;
+  }
   if (sym.endsWith('USD') && !sym.startsWith('USD') && sym.length > 6) return 'crypto';
   return 'forex';
 }
@@ -63,8 +63,11 @@ export default function TopSignals({ signals, onRemove, onSelect, onClearAll, la
 
   if (signals.length === 0) return null;
 
+  // Filter out sideways signals as final safety net
+  const filteredSignals = signals.filter(s => !s.isSideways);
+
   const grouped: Record<string, AnalysisResult[]> = { forex: [], crypto: [], stocks: [], metals: [] };
-  for (const s of signals) {
+  for (const s of filteredSignals) {
     const cat = getSymbolCategory(s.symbol);
     if (grouped[cat]) grouped[cat].push(s);
     else grouped.forex.push(s);
@@ -163,6 +166,15 @@ function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpa
         <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
         <div className="flex items-center gap-2">
           <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
+          {res.isSideways !== undefined && (
+            <span className={`text-xs font-black px-2 py-0.5 rounded-full border ${
+              res.isSideways ? 'text-white bg-white/20 border-white/30' :
+              res.sidewaysDirection === 'uptrend' ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' :
+              res.sidewaysDirection === 'downtrend' ? 'text-red-300 bg-red-500/20 border-red-500/30' : ''
+            }`}>
+              {res.isSideways ? (isAr ? 'عرضي' : 'Side') : res.sidewaysDirection === 'uptrend' ? (isAr ? 'صاعد' : 'Up') : res.sidewaysDirection === 'downtrend' ? (isAr ? 'هابط' : 'Down') : ''}
+            </span>
+          )}
           <span className="text-[10px] sm:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, isAr ? 'ar' : 'en')}</span>
         </div>
       </button>
@@ -248,6 +260,15 @@ function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExp
         <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
         <div className="flex items-center gap-2">
           <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
+          {res.isSideways !== undefined && (
+            <span className={`text-xs font-black px-2 py-0.5 rounded-full border ${
+              res.isSideways ? 'text-white bg-white/20 border-white/30' :
+              res.sidewaysDirection === 'uptrend' ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' :
+              res.sidewaysDirection === 'downtrend' ? 'text-red-300 bg-red-500/20 border-red-500/30' : ''
+            }`}>
+              {res.isSideways ? (isAr ? 'عرضي' : 'Side') : res.sidewaysDirection === 'uptrend' ? (isAr ? 'صاعد' : 'Up') : res.sidewaysDirection === 'downtrend' ? (isAr ? 'هابط' : 'Down') : ''}
+            </span>
+          )}
           <span className="text-[10px] sm:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, isAr ? 'ar' : 'en')}</span>
         </div>
       </button>

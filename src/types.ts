@@ -45,6 +45,11 @@ export interface AnalysisResult {
   primaryMetCount?: number;
   direction?: string;
   entryPrice?: number;
+  isSideways?: boolean;
+  sidewaysDirection?: 'uptrend' | 'downtrend' | 'sideways';
+  adx?: number;
+  adxDirection?: string;
+  maAlignment?: string;
 }
 
 export interface UserPreference {
@@ -89,6 +94,7 @@ export interface StrategySettings {
   maxPrimaryWeight?: number;
   maxSupportingWeight?: number;
   microTimeframe?: string;
+  useFilterSideways?: boolean;
 }
 
 export interface AutoAnalysisSettings {

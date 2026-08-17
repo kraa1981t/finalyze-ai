@@ -14,25 +14,6 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", version: "4.0-Institutional", node: process.version });
 });
 
-// Debug: test Yahoo Finance directly
-app.get("/api/debug-yahoo", async (req, res) => {
-  const sym = (req.query.sym as string) || '^GSPC';
-  const encoded = encodeURIComponent(sym);
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=1d&interval=1d`;
-  try {
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-      }
-    });
-    const text = await resp.text();
-    res.json({ status: resp.status, url, encoded, body: text.substring(0, 500) });
-  } catch (e: any) {
-    res.json({ error: e.message, url, encoded });
-  }
-});
-
 // API Route: Send verification email
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -397,14 +378,12 @@ app.get("/api/market-data", async (req, res) => {
     }
 
     let finalData = null;
-    let debugInfo: any = { attempts, isIndexCfd, isMetal, isCrypto, isForex, yahooSymbol };
     for (const attempt of attempts) {
-      const result = await fetchMarketData(attempt, range, interval);
-      if (result) { finalData = result; debugInfo.success = attempt; break; }
-      debugInfo.failed = attempt;
+      finalData = await fetchMarketData(attempt, range, interval);
+      if (finalData) break;
     }
 
-    if (!finalData) return res.status(404).json({ error: "No data found", debug: debugInfo });
+    if (!finalData) return res.status(404).json({ error: "No data found" });
 
     const hasQuotes = finalData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
     if (!hasQuotes) return res.status(404).json({ error: "No data found" });

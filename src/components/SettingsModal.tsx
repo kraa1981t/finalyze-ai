@@ -392,6 +392,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             { key: 'useNewsGuard', label: isAr ? 'حماية الأخبار' : 'News Guard', desc: isAr ? 'تجنب الأخبار القوية' : 'Avoid major news' },
             { key: 'useHigherTimeframe', label: isAr ? 'الإطار الأعلى' : 'Higher Timeframe', desc: isAr ? 'تأكيد من الإطار الأكبر' : 'Confirm from higher TF' },
             { key: 'useVolumeAnalysis', label: isAr ? 'تحليل الحجم' : 'Volume Analysis', desc: isAr ? 'تحليل تدفق الحجم' : 'Volume flow analysis' },
+            { key: 'useFilterSideways', label: isAr ? 'فلتر الاتجاه العرضي' : 'Sideways Filter', desc: isAr ? 'حظر الإشارات في الأسواق العرضية' : 'Block signals in sideways markets' },
           ].map((item) => (
             <button key={item.key} onClick={() => handleChange(item.key as keyof StrategySettings, !(settings as any)[item.key])}
               className={`flex items-center justify-between p-3.5 rounded-xl border-2 transition-all text-right ${
