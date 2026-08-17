@@ -93,6 +93,10 @@ export interface Translations {
   uploadCustom: string;
   startManualNow: string;
   clearAllResults: string;
+  useCandleMatch: string;
+  candleMatchDailyThreshold: string;
+  candleMatchWeeklyThreshold: string;
+  candleMatchMonthlyThreshold: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -188,7 +192,11 @@ export const translations: Record<Language, Translations> = {
     failSound: "Cycle End Alert",
     uploadCustom: "Upload Custom Audio",
     startManualNow: "Start Manual Analysis Now",
-    clearAllResults: "Clear All Results"
+    clearAllResults: "Clear All Results",
+    useCandleMatch: "Candle Body Match Filter (Daily/Weekly/Monthly)",
+    candleMatchDailyThreshold: "Daily Candle Body Threshold (points)",
+    candleMatchWeeklyThreshold: "Weekly Candle Body Threshold (points)",
+    candleMatchMonthlyThreshold: "Monthly Candle Body Threshold (points)",
   },
   ar: {
     title: "Joseph.Trading",
@@ -282,7 +290,11 @@ export const translations: Record<Language, Translations> = {
     failSound: "تنبيه نهاية الدورة",
     uploadCustom: "رفع صوت مخصص",
     startManualNow: "بدء التحليل اليدوي الآن",
-    clearAllResults: "مسح جميع النتائج"
+    clearAllResults: "مسح جميع النتائج",
+    useCandleMatch: "فلتر تطابق جذوع الشموع (يومي/أسبوعي/شهري)",
+    candleMatchDailyThreshold: "عتبة جذع الشمعة اليومية (نقاط)",
+    candleMatchWeeklyThreshold: "عتبة جذع الشمعة الأسبوعية (نقاط)",
+    candleMatchMonthlyThreshold: "عتبة جذع الشمعة الشهرية (نقاط)",
   },
   es: {
     title: "Joseph.Trading",
@@ -377,6 +389,10 @@ export const translations: Record<Language, Translations> = {
     uploadCustom: "Subir Audio Personalizado",
     startManualNow: "Iniciar An├ílisis Manual Ahora",
     clearAllResults: "Borrar Todos los Resultados",
+    useCandleMatch: "Filtro de Coincidencia de Cuerpo de Vela (Diaria/Semanal/Mensual)",
+    candleMatchDailyThreshold: "Umbral del Cuerpo de Vela Diaria (puntos)",
+    candleMatchWeeklyThreshold: "Umbral del Cuerpo de Vela Semanal (puntos)",
+    candleMatchMonthlyThreshold: "Umbral del Cuerpo de Vela Mensual (puntos)",
   },
   ru: {
     title: "Joseph.Trading",
@@ -471,6 +487,10 @@ export const translations: Record<Language, Translations> = {
     uploadCustom: "╨ù╨░╨│╤Ç╤â╨╖╨╕╤é╤î ╤ü╨▓╨╛╨╣ ╨╖╨▓╤â╨║",
     startManualNow: "╨ù╨░╨┐╤â╤ü╤é╨╕╤é╤î ╤Ç╤â╤ç╨╜╨╛╨╣ ╨░╨╜╨░╨╗╨╕╨╖",
     clearAllResults: "╨₧╤ç╨╕╤ü╤é╨╕╤é╤î ╨▓╤ü╨╡ ╤Ç╨╡╨╖╤â╨╗╤î╤é╨░╤é╤ï",
+    useCandleMatch: "╨¤╨╗╤é╨╡╤Ç ╤ü╨┐╨╛╨▓╨╡╨╗╨╡╨╜╨╕╤Å ╨┐╨┐╨╗╨░ ╤ü╨▓╨╡╤ç╨╕ (╨┤╨╜╨╡╨▓╨╜╨░╤Å/╨╜╨╡╨┤╨╡╨╗╤î╨╜╨░╤Å/╨╝╨╡╤ü╤Å╤ç╨╜╨░╤Å)",
+    candleMatchDailyThreshold: "╨ƒ╨╛╤Ç╨╛╨│ ╨┐╨┐╨╗╨░ ╤ü╨▓╨╡╤ç╨╕ (╨┤╨╜╨╡╨▓╨╜╨░╤Å) (╨┐╤â╨╜╨║╤é╤ï)",
+    candleMatchWeeklyThreshold: "╨ƒ╨╛╤Ç╨╛╨│ ╨┐╨┐╨╗╨░ ╤ü╨▓╨╡╤ç╨╕ (╨╜╨╡╨┤╨╡╨╗╤î╨╜╨░╤Å) (╨┐╤â╨╜╨║╤é╤ï)",
+    candleMatchMonthlyThreshold: "╨ƒ╨╛╤Ç╨╛╨│ ╨┐╨┐╨╗╨░ ╤ü╨▓╨╡╤ç╨╕ (╨╝╨╡╤ü╤Å╤ç╨╜╨░╤Å) (╨┐╤â╨╜╨║╤é╤ï)",
   },
   fr: {
     title: "Joseph.Trading",
@@ -565,5 +585,9 @@ export const translations: Record<Language, Translations> = {
     uploadCustom: "T├⌐l├⌐charger un Audio Personnalis├⌐",
     startManualNow: "Lancer l'Analyse Manuelle Maintenant",
     clearAllResults: "Effacer Tous les R├⌐sultats",
+    useCandleMatch: "Filtre de Coincidence du Corps de Bougie (Quotidien/Hebdomadaire/Mensuel)",
+    candleMatchDailyThreshold: "Seuil du Corps de Bougie Quotidienne (points)",
+    candleMatchWeeklyThreshold: "Seuil du Corps de Bougie Hebdomadaire (points)",
+    candleMatchMonthlyThreshold: "Seuil du Corps de Bougie Mensuelle (points)",
   },
 };

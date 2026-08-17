@@ -95,6 +95,10 @@ export interface StrategySettings {
   maxSupportingWeight?: number;
   microTimeframe?: string;
   useFilterSideways?: boolean;
+  useCandleMatch?: boolean;
+  candleMatchDailyThreshold?: number;
+  candleMatchWeeklyThreshold?: number;
+  candleMatchMonthlyThreshold?: number;
 }
 
 export interface AutoAnalysisSettings {

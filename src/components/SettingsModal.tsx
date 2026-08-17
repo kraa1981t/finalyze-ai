@@ -393,6 +393,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             { key: 'useHigherTimeframe', label: isAr ? 'الإطار الأعلى' : 'Higher Timeframe', desc: isAr ? 'تأكيد من الإطار الأكبر' : 'Confirm from higher TF' },
             { key: 'useVolumeAnalysis', label: isAr ? 'تحليل الحجم' : 'Volume Analysis', desc: isAr ? 'تحليل تدفق الحجم' : 'Volume flow analysis' },
             { key: 'useFilterSideways', label: isAr ? 'فلتر الاتجاه العرضي' : 'Sideways Filter', desc: isAr ? 'حظر الإشارات في الأسواق العرضية' : 'Block signals in sideways markets' },
+            { key: 'useCandleMatch', label: isAr ? 'تطابق جذوع الشموع' : 'Candle Body Match', desc: isAr ? 'تطابق حجم جذوع الشموع (يومي/أسبوعي/شهري)' : 'Match daily/weekly/monthly candle bodies' },
           ].map((item) => (
             <button key={item.key} onClick={() => handleChange(item.key as keyof StrategySettings, !(settings as any)[item.key])}
               className={`flex items-center justify-between p-3.5 rounded-xl border-2 transition-all text-right ${
@@ -415,6 +416,21 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
           ))}
         </div>
       </div>
+
+      {/* Section 4b: Candle Match Thresholds */}
+      {settings.useCandleMatch && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
+            <span className="text-[#F59E0B]">◆</span> {isAr ? 'عتبات تطابق جذوع الشموع' : 'Candle Body Match Thresholds'}
+          </h3>
+          <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+            <div className="text-[10px] text-brand-text/40 mb-3">{isAr ? 'حجم جذع الشمعة المطلوب للتطابق (0 = تعطيل الشمعة)' : 'Required candle body size for match (0 = disable candle)'}</div>
+            <NumberInput label={isAr ? 'شمعة يومية (نقاط)' : 'Daily Candle (points)'} value={settings.candleMatchDailyThreshold ?? 200} onChange={(v) => handleChange('candleMatchDailyThreshold', v)} color="text-[#F59E0B]" desc={isAr ? 'الحد الأدنى لحجم جذع الشمعة اليومية' : 'Min daily candle body size'} />
+            <NumberInput label={isAr ? 'شمعة أسبوعية (نقاط)' : 'Weekly Candle (points)'} value={settings.candleMatchWeeklyThreshold ?? 200} onChange={(v) => handleChange('candleMatchWeeklyThreshold', v)} color="text-[#F59E0B]" desc={isAr ? 'الحد الأدنى لحجم جذع الشمعة الأسبوعية' : 'Min weekly candle body size'} />
+            <NumberInput label={isAr ? 'شمعة شهرية (نقاط)' : 'Monthly Candle (points)'} value={settings.candleMatchMonthlyThreshold ?? 200} onChange={(v) => handleChange('candleMatchMonthlyThreshold', v)} color="text-[#F59E0B]" desc={isAr ? 'الحد الأدنى لحجم جذع الشمعة الشهرية' : 'Min monthly candle body size'} />
+          </div>
+        </div>
+      )}
 
       {/* Section 5: Developer Trend Age Zones */}
       {user && (user.email === 'taybekraa@gmail.com' || user.email === 'kraakraa109@gmail.com' || user.email === 'bachasalman69@gmail.com') && (

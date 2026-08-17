@@ -853,6 +853,18 @@ export async function analyzeMarket(params: {
       fetchMarketContext(symbol).catch((e) => { console.warn(`[Engine] ${symbol} ctx fail:`, e.message); return { fearGreed: null, news: [], econEvents: [] }; }),
       fetchMarketDataDirect(symbol, macro1).catch((e) => { console.warn(`[Engine] ${symbol} macro fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
     ]);
+
+    // Fetch daily/weekly/monthly data for Candle Match Filter (only if enabled)
+    let candleMatchData: { daily: any; weekly: any; monthly: any } | null = null;
+    if (settings?.useCandleMatch) {
+      const [dailyRaw, weeklyRaw, monthlyRaw] = await Promise.all([
+        fetchMarketDataDirect(symbol, '1d').catch((e) => { console.warn(`[Engine] ${symbol} daily fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
+        fetchMarketDataDirect(symbol, '1w').catch((e) => { console.warn(`[Engine] ${symbol} weekly fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
+        fetchMarketDataDirect(symbol, '1M').catch((e) => { console.warn(`[Engine] ${symbol} monthly fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
+      ]);
+      candleMatchData = { daily: dailyRaw, weekly: weeklyRaw, monthly: monthlyRaw };
+    }
+
     console.log(`[Engine] ${symbol} data fetched in ${Date.now() - fetchT0}ms`);
 
     var contextFearGreed = ctxResult.fearGreed;
@@ -1514,11 +1526,86 @@ Return ONLY valid JSON:
         check: `Higher TF Direction (${macro1})`, 
         value: `Higher TF: ${macroDirection} aligns with Current: ${metrics?.direction}`, 
         status: 'positive', 
-        impact: `higher timeframe confirms current trend direction` 
+        impact: `higher timeframe confirms current direction` 
       });
     }
 
-    // ΓöÇΓöÇ STEP 6: Direction from METRICS (primary) — AI cannot override trend direction ΓöÇΓöÇ
+    // ═══ STEP 5e: Candle Body Match Filter (Daily/Weekly/Monthly) ═══
+    var candleMatchBlocked = false;
+    if (settings?.useCandleMatch && candleMatchData) {
+      const calcBody = (raw: any): { body: number; direction: 'bullish' | 'bearish' | 'unknown' } | null => {
+        const q = raw?.chart?.result?.[0]?.indicators?.quote?.[0];
+        if (!q?.close || !q?.open) return null;
+        const closes = q.close.filter((c: any) => c != null);
+        const opens = q.open.filter((o: any) => o != null);
+        if (closes.length < 1 || opens.length < 1) return null;
+        const lastClose = closes[closes.length - 1];
+        const lastOpen = opens[opens.length - 1];
+        const body = Math.abs(lastClose - lastOpen);
+        const dir = lastClose > lastOpen ? 'bullish' : lastClose < lastOpen ? 'bearish' : 'unknown';
+        return { body, direction: dir };
+      };
+
+      const dailyBody = calcBody(candleMatchData.daily);
+      const weeklyBody = calcBody(candleMatchData.weekly);
+      const monthlyBody = calcBody(candleMatchData.monthly);
+
+      // Collect active candles (threshold > 0 means enabled)
+      const activeCandles: { label: string; data: { body: number; direction: string } | null; threshold: number }[] = [];
+      if (dailyBody && (settings.candleMatchDailyThreshold ?? 200) > 0) {
+        activeCandles.push({ label: '1d', data: dailyBody, threshold: settings.candleMatchDailyThreshold ?? 200 });
+      }
+      if (weeklyBody && (settings.candleMatchWeeklyThreshold ?? 200) > 0) {
+        activeCandles.push({ label: '1w', data: weeklyBody, threshold: settings.candleMatchWeeklyThreshold ?? 200 });
+      }
+      if (monthlyBody && (settings.candleMatchMonthlyThreshold ?? 200) > 0) {
+        activeCandles.push({ label: '1M', data: monthlyBody, threshold: settings.candleMatchMonthlyThreshold ?? 200 });
+      }
+
+      if (activeCandles.length >= 2) {
+        // Check 1: All active candles must be same direction
+        const firstDir = activeCandles[0].data!.direction;
+        const allSameDir = activeCandles.every(c => c.data!.direction === firstDir);
+
+        // Check 2: All active candle bodies must meet their thresholds
+        const allAboveThreshold = activeCandles.every(c => c.data!.body >= c.threshold);
+
+        // Check 3: All active candle bodies must be within range of each other (within 50% of smallest)
+        const bodies = activeCandles.map(c => c.data!.body);
+        const minBody = Math.min(...bodies);
+        const maxBody = Math.max(...bodies);
+        const allInRange = minBody > 0 ? (maxBody - minBody) / minBody <= 0.5 : true;
+
+        const candleMatch = allSameDir && allAboveThreshold && allInRange;
+
+        if (!candleMatch) {
+          candleMatchBlocked = true;
+          if (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
+              finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL) {
+            finalSignal = SignalType.NEUTRAL;
+          }
+          const candleInfo = activeCandles.map(c => `${c.label}: ${c.data!.body.toFixed(0)} (${c.data!.direction === 'bullish' ? '↑' : c.data!.direction === 'bearish' ? '↓' : '?'} ${c.data!.direction === firstDir ? '✓' : '✗'})`).join(', ');
+          detailedReasons.push({
+            check: 'Candle Match Filter',
+            value: candleInfo,
+            status: 'negative',
+            impact: !allSameDir ? 'BLOCKED: candle directions do not match across timeframes' :
+                    !allAboveThreshold ? 'BLOCKED: candle body size below threshold' :
+                    'BLOCKED: candle body sizes too different across timeframes'
+          });
+        } else {
+          const candleInfo = activeCandles.map(c => `${c.label}: ${c.data!.body.toFixed(0)} (${c.data!.direction === 'bullish' ? '↑' : '↓'})`).join(', ');
+          detailedReasons.push({
+            check: 'Candle Match Filter',
+            value: candleInfo,
+            status: 'positive',
+            impact: `candle bodies match across timeframes (${firstDir})`
+          });
+        }
+      }
+    }
+
+    // ═══ STEP 6: Direction from METRICS (primary) — AI cannot override trend direction ═══
     const metricsDirection = isUp ? 'buy' : isDown ? 'sell' : null;
     
     var direction: string;
@@ -1547,6 +1634,8 @@ Return ONLY valid JSON:
     if (finalSignal === ('no_entry' as any)) {
       // Sideways enforcement already blocked — do NOT override
     } else if (higherTFBlocked) {
+      finalSignal = SignalType.NEUTRAL;
+    } else if (candleMatchBlocked) {
       finalSignal = SignalType.NEUTRAL;
     } else if (rsiBlocked) {
       finalSignal = SignalType.NEUTRAL;
@@ -1674,6 +1763,15 @@ Return ONLY valid JSON:
     // FINAL SAFETY: Pre-Pullback Age must ALWAYS block BUY/SELL if out of range
     // This is the LAST check before return — nothing can override it
     if (prePullbackAgeVal < minPreAge || prePullbackAgeVal > maxPreAge) {
+      if (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
+          finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL) {
+        finalSignal = SignalType.NEUTRAL;
+        finalConfidence = Math.min(finalConfidence, 30);
+      }
+    }
+
+    // FINAL SAFETY: Candle Match Filter must ALWAYS block BUY/SELL if candles don't match
+    if (candleMatchBlocked) {
       if (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
           finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL) {
         finalSignal = SignalType.NEUTRAL;
