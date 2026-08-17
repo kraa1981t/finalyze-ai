@@ -1,6 +1,6 @@
-{
-  "tag": "stable-v3",
-  "sha": "bb26074",
-  "date": "2026-07-24",
-  "message": "v3.14.0 - sidebar dropdown fixed for RTL"
+﻿{
+    "autoUpdate":  true,
+    "description":  "eede351 chore: save working state before stable backup",
+    "savedAt":  "2026-08-18 00:13",
+    "stableVersion":  "eede351"
 }
