@@ -101,7 +101,7 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="min-h-screen bg-[#0a0f1a] pb-8"
+      className="fixed inset-0 z-50 overflow-y-auto bg-[#0a0f1a]"
     >
       {/* Header */}
       <div className="sticky top-0 z-40 bg-[#0a0f1a]/95 backdrop-blur-xl border-b border-white/5">
