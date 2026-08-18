@@ -1684,6 +1684,7 @@ export default function App() {
             onNavigate={(page) => { navigateTo(page); setIsSidebarOpen(false); }}
             isDeveloper={isDeveloperSession()}
             freemiumDisabled={freemiumDisabled}
+            onPreview={isDeveloperSession() ? (device) => setPreviewDevice(device) : undefined}
           />
         )}
       </AnimatePresence>

@@ -707,28 +707,6 @@ export default function Header({
               </div>
             )}
 
-            {isDeveloper && onPreview && (
-              <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/10 rounded-xl border border-white/20 shadow-sm">
-                <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">{lang === 'ar' ? '\u0645\u0639\u0627\u064a\u0646\u0629' : 'Preview'}</span>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => onPreview('phone')}
-                    className="p-1.5 rounded-lg bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
-                    title={lang === 'ar' ? '\u0645\u0639\u0627\u064a\u0646\u0629 \u0647\u0627\u062a\u0641' : 'Phone preview'}
-                  >
-                    <Smartphone size={15} />
-                  </button>
-                  <button
-                    onClick={() => onPreview('tablet')}
-                    className="p-1.5 rounded-lg bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
-                    title={lang === 'ar' ? '\u0645\u0639\u0627\u064a\u0646\u0629 \u0644\u0648\u062d\u0629' : 'Tablet preview'}
-                  >
-                    <Tablet size={15} />
-                  </button>
-                </div>
-              </div>
-            )}
-
             {user ? (
               <div className="flex flex-col items-center gap-0.5 pl-2 border-l border-black/10 relative" ref={profileMenuRef}>
                 <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">Profile</span>
@@ -795,7 +773,7 @@ export default function Header({
 
           {/* PWA: hamburger only */}
           {isPWA && (
-            <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-1.5 mb-2">
               <button
                 onClick={() => setShowMobileMenu(true)}
                 className="p-2.5 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"

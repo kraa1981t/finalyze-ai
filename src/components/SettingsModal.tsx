@@ -308,31 +308,44 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
     </div>
   );
 
-  const NumberInput = ({ label, value, onChange, min = 0, max = 100, step = 1, color = 'text-primary', desc }: {
-    label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; color?: string; desc?: string;
-  }) => (
-    <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-bold text-brand-text">{label}</div>
-        {desc && <div className="text-[10px] text-brand-text/40 mt-0.5">{desc}</div>}
-      </div>
-      <div className="flex items-center gap-1.5 shrink-0">
-        <button onClick={() => onChange(Math.max(min, value - step))}
-          className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-brand-muted hover:bg-white/10 hover:text-brand-text transition-all flex items-center justify-center text-sm font-bold leading-none">−</button>
-        <div className="relative">
-          <input type="number" min={min} max={max} step={step} value={value}
-            translate="no"
-            dir="ltr"
-            lang="en"
-            onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v))); }}
-            className={`w-16 text-center text-sm font-black font-mono notranslate ${color} bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} />
+  const NumberInput = ({ label, value, onChange, min = 0, max = 9999, step = 1, color = 'text-primary', desc, suffix = '%' }: {
+    label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; color?: string; desc?: string; suffix?: string;
+  }) => {
+    const [draft, setDraft] = React.useState(String(value));
+    const [focused, setFocused] = React.useState(false);
+
+    React.useEffect(() => {
+      if (!focused) setDraft(String(value));
+    }, [value, focused]);
+
+    const commit = () => {
+      let v = parseFloat(draft);
+      if (isNaN(v)) v = value;
+      v = Math.min(max, Math.max(min, v));
+      onChange(v);
+      setDraft(String(v));
+      setFocused(false);
+    };
+
+    return (
+      <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-bold text-brand-text">{label}</div>
+          {desc && <div className="text-[10px] text-brand-text/40 mt-0.5">{desc}</div>}
         </div>
-        <button onClick={() => onChange(Math.min(max, value + step))}
-          className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-brand-muted hover:bg-white/10 hover:text-brand-text transition-all flex items-center justify-center text-sm font-bold leading-none">+</button>
-        <span className="text-[10px] text-brand-text/30 font-mono w-2">%</span>
+        <div className="flex items-center gap-1 shrink-0">
+          <input type="text" inputMode="decimal" translate="no" dir="ltr" lang="en"
+            value={focused ? draft : draft}
+            onFocus={() => { setFocused(true); setDraft(String(value)); }}
+            onBlur={commit}
+            onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(String(value)); setFocused(false); } }}
+            onChange={(e) => setDraft(e.target.value.replace(/[^0-9.\-]/g, ''))}
+            className={`w-20 text-center text-sm font-black font-mono notranslate ${color} bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none`} />
+          {suffix && <span className="text-[10px] text-brand-text/30 font-mono">{suffix}</span>}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const modalBody = (
     <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar" dir="rtl">
@@ -423,11 +436,50 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
           <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
             <span className="text-[#F59E0B]">◆</span> {isAr ? 'عتبات تطابق جذوع الشموع' : 'Candle Body Match Thresholds'}
           </h3>
-          <div className="bg-white/5 border border-white/5 rounded-xl p-4">
-            <div className="text-[10px] text-brand-text/40 mb-3">{isAr ? 'حجم جذع الشمعة المطلوب للتطابق (0 = تعطيل الشمعة)' : 'Required candle body size for match (0 = disable candle)'}</div>
-            <NumberInput label={isAr ? 'شمعة يومية (نقاط)' : 'Daily Candle (points)'} value={settings.candleMatchDailyThreshold ?? 200} onChange={(v) => handleChange('candleMatchDailyThreshold', v)} color="text-[#F59E0B]" desc={isAr ? 'الحد الأدنى لحجم جذع الشمعة اليومية' : 'Min daily candle body size'} />
-            <NumberInput label={isAr ? 'شمعة أسبوعية (نقاط)' : 'Weekly Candle (points)'} value={settings.candleMatchWeeklyThreshold ?? 200} onChange={(v) => handleChange('candleMatchWeeklyThreshold', v)} color="text-[#F59E0B]" desc={isAr ? 'الحد الأدنى لحجم جذع الشمعة الأسبوعية' : 'Min weekly candle body size'} />
-            <NumberInput label={isAr ? 'شمعة شهرية (نقاط)' : 'Monthly Candle (points)'} value={settings.candleMatchMonthlyThreshold ?? 200} onChange={(v) => handleChange('candleMatchMonthlyThreshold', v)} color="text-[#F59E0B]" desc={isAr ? 'الحد الأدنى لحجم جذع الشمعة الشهرية' : 'Min monthly candle body size'} />
+          <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-4">
+            <div className="text-[10px] text-brand-text/40">{isAr ? 'فعّل كل شمعة على حدة وحدد الحد الأدنى للحجم (0 = تعطيل)' : 'Enable each candle separately and set min body size (0 = disable)'}</div>
+
+            {/* Daily Candle */}
+            <div className="flex items-center justify-between py-2 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleChange('candleMatchDailyEnabled', !settings.candleMatchDailyEnabled)}
+                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${settings.candleMatchDailyEnabled !== false ? 'bg-[#F59E0B]' : 'bg-white/20'}`}>
+                  <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${settings.candleMatchDailyEnabled !== false ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+                <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة يومية' : 'Daily (1d)'}</span>
+              </div>
+              <div className="w-24">
+                <NumberInput label="" value={settings.candleMatchDailyThreshold ?? 200} onChange={(v) => handleChange('candleMatchDailyThreshold', v)} color="text-[#F59E0B]" suffix="" min={0} max={9999} />
+              </div>
+            </div>
+
+            {/* Weekly Candle */}
+            <div className="flex items-center justify-between py-2 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleChange('candleMatchWeeklyEnabled', !settings.candleMatchWeeklyEnabled)}
+                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${settings.candleMatchWeeklyEnabled !== false ? 'bg-[#F59E0B]' : 'bg-white/20'}`}>
+                  <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${settings.candleMatchWeeklyEnabled !== false ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+                <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة أسبوعية' : 'Weekly (1w)'}</span>
+              </div>
+              <div className="w-24">
+                <NumberInput label="" value={settings.candleMatchWeeklyThreshold ?? 200} onChange={(v) => handleChange('candleMatchWeeklyThreshold', v)} color="text-[#F59E0B]" suffix="" min={0} max={9999} />
+              </div>
+            </div>
+
+            {/* Monthly Candle */}
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleChange('candleMatchMonthlyEnabled', !settings.candleMatchMonthlyEnabled)}
+                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${settings.candleMatchMonthlyEnabled !== false ? 'bg-[#F59E0B]' : 'bg-white/20'}`}>
+                  <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${settings.candleMatchMonthlyEnabled !== false ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+                <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة شهرية' : 'Monthly (1M)'}</span>
+              </div>
+              <div className="w-24">
+                <NumberInput label="" value={settings.candleMatchMonthlyThreshold ?? 200} onChange={(v) => handleChange('candleMatchMonthlyThreshold', v)} color="text-[#F59E0B]" suffix="" min={0} max={9999} />
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -468,109 +520,25 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             </div>
 
             {/* Min Consecutive Momentum (Age) */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-semibold text-brand-text">{isAr ? 'حد أدنى لاندفاع الاتجاه (Age)' : 'Min Consecutive Momentum (Age)'}</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleChange('minTrendAge', Math.max(1, settings.minTrendAge - 1))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
-                  <span className="w-8 text-center text-lg font-black text-amber-400 font-mono">{settings.minTrendAge}</span>
-                  <button onClick={() => handleChange('minTrendAge', Math.min(10, settings.minTrendAge + 1))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
-                </div>
-              </div>
-              <p className="text-xs text-brand-text/40">{isAr ? 'عدد الشموع المتتالية المطلوب قبل السماح بدخول الصفقة. افتراضي: 2' : 'Required consecutive candles before allowing entry. Default: 2'}</p>
-            </div>
+            <NumberInput label={isAr ? 'حد أدنى لاندفاع الاتجاه (Age)' : 'Min Consecutive Momentum (Age)'} value={settings.minTrendAge} onChange={(v) => handleChange('minTrendAge', v)} color="text-amber-400" desc={isAr ? 'عدد الشموع المتتالية المطلوب قبل السماح بدخول الصفقة. افتراضي: 2' : 'Required consecutive candles before allowing entry. Default: 2'} suffix="" min={1} max={10} />
 
             {/* Infant Age Threshold */}
-            <div className="pt-2 border-t border-white/5">
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-semibold text-red-400">{isAr ? 'بداية مرحلة الطفل (Infant)' : 'Infant Zone Start'}</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleChange('minInfantAge', Math.max(3, settings.minInfantAge - 1))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
-                  <span className="w-10 text-center text-lg font-black text-red-400 font-mono">{settings.minInfantAge}</span>
-                  <button onClick={() => handleChange('minInfantAge', Math.min(settings.minMatureAge - 1, settings.minInfantAge + 1))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
-                </div>
-              </div>
-              <p className="text-xs text-brand-text/40">{isAr ? 'أقل من هذه القيمة ← اتجاه رضيع (تخفيف الثقة). افتراضي: 10' : 'Below this → infant trend (confidence cap). Default: 10'}</p>
-            </div>
+            <NumberInput label={isAr ? 'بداية مرحلة الطفل (Infant)' : 'Infant Zone Start'} value={settings.minInfantAge} onChange={(v) => handleChange('minInfantAge', v)} color="text-red-400" desc={isAr ? 'أقل من هذه القيمة ← اتجاه رضيع (تخفيف الثقة). افتراضي: 10' : 'Below this → infant trend (confidence cap). Default: 10'} suffix="" min={3} max={99} />
 
             {/* Mature Age Start */}
-            <div className="pt-2 border-t border-white/5">
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-semibold text-emerald-400">{isAr ? 'بداية مرحلة النضج (Mature)' : 'Mature Zone Start'}</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleChange('minMatureAge', Math.max(settings.minInfantAge + 1, settings.minMatureAge - 1))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
-                  <span className="w-10 text-center text-lg font-black text-emerald-400 font-mono">{settings.minMatureAge}</span>
-                  <button onClick={() => handleChange('minMatureAge', Math.min(settings.maxMatureAge - 1, settings.minMatureAge + 1))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
-                </div>
-              </div>
-              <p className="text-xs text-brand-text/40">{isAr ? 'من هذه القيمة يبدأ الاتجاه الناضج (يُسمح بالإشارات القوية). افتراضي: 25' : 'From this value the trend is mature (strong signals allowed). Default: 25'}</p>
-            </div>
+            <NumberInput label={isAr ? 'بداية مرحلة النضج (Mature)' : 'Mature Zone Start'} value={settings.minMatureAge} onChange={(v) => handleChange('minMatureAge', v)} color="text-emerald-400" desc={isAr ? 'من هذه القيمة يبدأ الاتجاه الناضج (يُسمح بالإشارات القوية). افتراضي: 25' : 'From this value the trend is mature (strong signals allowed). Default: 25'} suffix="" min={5} max={99} />
 
             {/* Old Age Threshold */}
-            <div className="pt-2 border-t border-white/5">
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-semibold text-red-400">{isAr ? 'بداية مرحلة الشيخوخة (Aging)' : 'Aging Zone Start'}</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleChange('maxMatureAge', Math.max(settings.minMatureAge + 1, settings.maxMatureAge - 5))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
-                  <span className="w-10 text-center text-lg font-black text-red-400 font-mono">{settings.maxMatureAge}</span>
-                  <button onClick={() => handleChange('maxMatureAge', Math.min(100, settings.maxMatureAge + 5))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
-                </div>
-              </div>
-              <p className="text-xs text-brand-text/40">{isAr ? 'فوق هذه القيمة ← اتجاه عجوز (خطر انعكاس، تخفيف الثقة). افتراضي: 50' : 'Above this → aging trend (reversal risk, confidence cap). Default: 50'}</p>
-            </div>
+            <NumberInput label={isAr ? 'بداية مرحلة الشيخوخة (Aging)' : 'Aging Zone Start'} value={settings.maxMatureAge} onChange={(v) => handleChange('maxMatureAge', v)} color="text-red-400" desc={isAr ? 'فوق هذه القيمة ← اتجاه عجوز (خطر انعكاس، تخفيف الثقة). افتراضي: 50' : 'Above this → aging trend (reversal risk, confidence cap). Default: 50'} suffix="" min={10} max={200} />
 
             {/* Pre-Pullback Age — Min */}
-            <div className="pt-2 border-t border-white/5">
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-semibold text-cyan-400">{isAr ? 'أدنى عمر الاتجاه ماقبل انسحاب' : 'Min Pre-Pullback Age'}</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleChange('minPrePullbackAge', Math.max(5, settings.minPrePullbackAge - 5))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
-                  <span className="w-10 text-center text-lg font-black text-cyan-400 font-mono">{settings.minPrePullbackAge}</span>
-                  <button onClick={() => handleChange('minPrePullbackAge', Math.min(settings.maxPrePullbackAge - 5, settings.minPrePullbackAge + 5))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
-                </div>
-              </div>
-              <p className="text-xs text-brand-text/40">{isAr ? 'أقل من هذا العدد ← الاتجاه قبل الانسحاب قصير جداً (محايد). افتراضي: 15' : 'Below this → trend before pullback too short (neutral). Default: 15'}</p>
-            </div>
+            <NumberInput label={isAr ? 'أدنى عمر الاتجاه ماقبل انسحاب' : 'Min Pre-Pullback Age'} value={settings.minPrePullbackAge} onChange={(v) => handleChange('minPrePullbackAge', v)} color="text-cyan-400" desc={isAr ? 'أقل من هذا العدد ← الاتجاه قبل الانسحاب قصير جداً (محايد). افتراضي: 15' : 'Below this → trend before pullback too short (neutral). Default: 15'} suffix="" min={1} max={200} />
 
             {/* Pre-Pullback Age — Max */}
-            <div className="pt-2 border-t border-white/5">
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-semibold text-cyan-400">{isAr ? 'أقصى عمر الاتجاه ماقبل انسحاب' : 'Max Pre-Pullback Age'}</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleChange('maxPrePullbackAge', Math.max(settings.minPrePullbackAge + 5, settings.maxPrePullbackAge - 5))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
-                  <span className="w-10 text-center text-lg font-black text-cyan-400 font-mono">{settings.maxPrePullbackAge}</span>
-                  <button onClick={() => handleChange('maxPrePullbackAge', Math.min(100, settings.maxPrePullbackAge + 5))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
-                </div>
-              </div>
-              <p className="text-xs text-brand-text/40">{isAr ? 'فوق هذا العدد ← الاتجاه قبل الانسحاب مستنزف (محايد). افتراضي: 50' : 'Above this → trend before pullback exhausted (neutral). Default: 50'}</p>
-            </div>
+            <NumberInput label={isAr ? 'أقصى عمر الاتجاه ماقبل انسحاب' : 'Max Pre-Pullback Age'} value={settings.maxPrePullbackAge} onChange={(v) => handleChange('maxPrePullbackAge', v)} color="text-cyan-400" desc={isAr ? 'فوق هذا العدد ← الاتجاه قبل الانسحاب مستنزف (محايد). افتراضي: 50' : 'Above this → trend before pullback exhausted (neutral). Default: 50'} suffix="" min={1} max={200} />
 
             {/* Min Pullback Candles */}
-            <div className="pt-2 border-t border-white/5">
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-semibold text-cyan-400">{isAr ? 'أدنى شموع السحبة' : 'Min Pullback Candles'}</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleChange('minPullbackCandles', Math.max(1, (settings.minPullbackCandles || 2) - 1))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">−</button>
-                  <span className="w-10 text-center text-lg font-black text-cyan-400 font-mono">{settings.minPullbackCandles || 2}</span>
-                  <button onClick={() => handleChange('minPullbackCandles', Math.min(10, (settings.minPullbackCandles || 2) + 1))}
-                    className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all flex items-center justify-center text-lg font-black leading-none">+</button>
-                </div>
-              </div>
-              <p className="text-xs text-brand-text/40">{isAr ? 'الحد الأدنى للشموع المعاكسة للاتجاه为了 تأكيد نقطة السحبة. افتراضي: 2' : 'Min opposite candles to confirm pullback point. Default: 2'}</p>
-            </div>
+            <NumberInput label={isAr ? 'أدنى شموع السحبة' : 'Min Pullback Candles'} value={settings.minPullbackCandles || 2} onChange={(v) => handleChange('minPullbackCandles', v)} color="text-cyan-400" desc={isAr ? 'الحد الأدنى للشموع المعاكسة للاتجاه为了 تأكيد نقطة السحبة. افتراضي: 2' : 'Min opposite candles to confirm pullback point. Default: 2'} suffix="" min={1} max={10} />
 
             {/* Pullback Volume Confirm */}
             <div className="pt-2 border-t border-white/5">

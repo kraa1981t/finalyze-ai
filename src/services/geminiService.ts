@@ -1533,6 +1533,11 @@ Return ONLY valid JSON:
     // ═══ STEP 5e: Candle Body Match Filter (Daily/Weekly/Monthly) ═══
     var candleMatchBlocked = false;
     if (settings?.useCandleMatch && candleMatchData) {
+      // Convert raw body to "points" based on market type
+      // FOREX: multiply by 10000 (convert 0.00188 → 18.8 points)
+      // CRYPTO/STOCKS: keep as-is (already in meaningful units)
+      const bodyMultiplier = isCrypto ? 1 : 10000;
+
       const calcBody = (raw: any): { body: number; direction: 'bullish' | 'bearish' | 'unknown' } | null => {
         const q = raw?.chart?.result?.[0]?.indicators?.quote?.[0];
         if (!q?.close || !q?.open) return null;
@@ -1541,7 +1546,7 @@ Return ONLY valid JSON:
         if (closes.length < 1 || opens.length < 1) return null;
         const lastClose = closes[closes.length - 1];
         const lastOpen = opens[opens.length - 1];
-        const body = Math.abs(lastClose - lastOpen);
+        const body = Math.abs(lastClose - lastOpen) * bodyMultiplier;
         const dir = lastClose > lastOpen ? 'bullish' : lastClose < lastOpen ? 'bearish' : 'unknown';
         return { body, direction: dir };
       };
@@ -1550,15 +1555,15 @@ Return ONLY valid JSON:
       const weeklyBody = calcBody(candleMatchData.weekly);
       const monthlyBody = calcBody(candleMatchData.monthly);
 
-      // Collect active candles (threshold > 0 means enabled)
+      // Collect active candles (enabled + threshold > 0)
       const activeCandles: { label: string; data: { body: number; direction: string } | null; threshold: number }[] = [];
-      if (dailyBody && (settings.candleMatchDailyThreshold ?? 200) > 0) {
+      if (dailyBody && settings.candleMatchDailyEnabled !== false && (settings.candleMatchDailyThreshold ?? 200) > 0) {
         activeCandles.push({ label: '1d', data: dailyBody, threshold: settings.candleMatchDailyThreshold ?? 200 });
       }
-      if (weeklyBody && (settings.candleMatchWeeklyThreshold ?? 200) > 0) {
+      if (weeklyBody && settings.candleMatchWeeklyEnabled !== false && (settings.candleMatchWeeklyThreshold ?? 200) > 0) {
         activeCandles.push({ label: '1w', data: weeklyBody, threshold: settings.candleMatchWeeklyThreshold ?? 200 });
       }
-      if (monthlyBody && (settings.candleMatchMonthlyThreshold ?? 200) > 0) {
+      if (monthlyBody && settings.candleMatchMonthlyEnabled !== false && (settings.candleMatchMonthlyThreshold ?? 200) > 0) {
         activeCandles.push({ label: '1M', data: monthlyBody, threshold: settings.candleMatchMonthlyThreshold ?? 200 });
       }
 
@@ -1570,13 +1575,7 @@ Return ONLY valid JSON:
         // Check 2: All active candle bodies must meet their thresholds
         const allAboveThreshold = activeCandles.every(c => c.data!.body >= c.threshold);
 
-        // Check 3: All active candle bodies must be within range of each other (within 50% of smallest)
-        const bodies = activeCandles.map(c => c.data!.body);
-        const minBody = Math.min(...bodies);
-        const maxBody = Math.max(...bodies);
-        const allInRange = minBody > 0 ? (maxBody - minBody) / minBody <= 0.5 : true;
-
-        const candleMatch = allSameDir && allAboveThreshold && allInRange;
+        const candleMatch = allSameDir && allAboveThreshold;
 
         if (!candleMatch) {
           candleMatchBlocked = true;
@@ -1590,8 +1589,7 @@ Return ONLY valid JSON:
             value: candleInfo,
             status: 'negative',
             impact: !allSameDir ? 'BLOCKED: candle directions do not match across timeframes' :
-                    !allAboveThreshold ? 'BLOCKED: candle body size below threshold' :
-                    'BLOCKED: candle body sizes too different across timeframes'
+                    'BLOCKED: candle body size below threshold'
           });
         } else {
           const candleInfo = activeCandles.map(c => `${c.label}: ${c.data!.body.toFixed(0)} (${c.data!.direction === 'bullish' ? '↑' : '↓'})`).join(', ');

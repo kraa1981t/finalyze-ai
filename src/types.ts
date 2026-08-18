@@ -96,6 +96,9 @@ export interface StrategySettings {
   microTimeframe?: string;
   useFilterSideways?: boolean;
   useCandleMatch?: boolean;
+  candleMatchDailyEnabled?: boolean;
+  candleMatchWeeklyEnabled?: boolean;
+  candleMatchMonthlyEnabled?: boolean;
   candleMatchDailyThreshold?: number;
   candleMatchWeeklyThreshold?: number;
   candleMatchMonthlyThreshold?: number;

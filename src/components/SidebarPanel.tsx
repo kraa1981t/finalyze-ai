@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Key, DollarSign, Wallet, Users, Zap, User, Crown, Info, Lightbulb, Monitor, BarChart3 } from 'lucide-react';
+import { Settings, Key, DollarSign, Wallet, Users, Zap, User, Crown, Info, Lightbulb, Monitor, BarChart3, Smartphone, Tablet } from 'lucide-react';
 import { Language } from '../lib/i18n';
 
 interface SidebarPanelProps {
@@ -9,9 +9,10 @@ interface SidebarPanelProps {
   onNavigate: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats') => void;
   isDeveloper?: boolean;
   freemiumDisabled?: boolean;
+  onPreview?: (device: 'phone' | 'tablet') => void;
 }
 
-export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, freemiumDisabled }: SidebarPanelProps) {
+export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, freemiumDisabled, onPreview }: SidebarPanelProps) {
   const isRTL = lang === 'ar';
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -74,6 +75,30 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
           );
         })}
       </div>
+
+      {isDeveloper && onPreview && (
+        <div className="px-4 py-3 border-t border-black/5">
+          <div className="text-[9px] font-black uppercase text-black/40 tracking-[0.2em] mb-2 px-1">
+            {lang === 'ar' ? 'معاينة' : 'Preview'}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { onPreview('phone'); onClose(); }}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
+            >
+              <Smartphone size={16} />
+              <span className="text-xs font-black">{lang === 'ar' ? 'هاتف' : 'Phone'}</span>
+            </button>
+            <button
+              onClick={() => { onPreview('tablet'); onClose(); }}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
+            >
+              <Tablet size={16} />
+              <span className="text-xs font-black">{lang === 'ar' ? 'لوحي' : 'Tablet'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="px-5 py-3 border-t border-black/5">
         <p className="text-[9px] text-black/30 font-black uppercase tracking-widest text-center">
