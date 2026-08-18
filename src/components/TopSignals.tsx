@@ -180,6 +180,13 @@ function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpa
         </div>
       </button>
 
+      {res.detailedReasons && res.detailedReasons.length > 0 && (
+        <button onClick={(e) => { e.stopPropagation(); onDetail(res); }} className="w-full flex items-center justify-center gap-2 py-2 text-[#F59E0B] hover:text-[#d97706] transition-colors border-t border-white/5">
+          <span className="text-xs font-black uppercase tracking-wider">{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+          <span className="text-[10px] bg-[#F59E0B]/20 px-1.5 py-0.5 rounded-full font-bold">{res.detailedReasons.length}</span>
+        </button>
+      )}
+
       <button onClick={(e) => { e.stopPropagation(); onExpand(isExpanded ? null : cardKey); }} className="w-full flex items-center justify-center py-1 text-white/40 hover:text-white/70 transition-colors">
         <span className="text-xs">{isExpanded ? '\u25B2' : '\u25BC'}</span>
       </button>
