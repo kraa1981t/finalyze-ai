@@ -18,6 +18,7 @@ import TopSignals from './components/TopSignals';
 import AdBanner from './components/AdBanner';
 import PortfolioPanel from './components/PortfolioPanel';
 import ClientDashboard from './components/ClientDashboard';
+import AnalysisDetailPage from './components/AnalysisDetailPage';
 
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType, TradingStyle } from './types';
 import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS, FREE_SYMBOLS } from './constants';
@@ -60,6 +61,7 @@ export default function App() {
     return (!!k1 && k1en) || hasAnyStoredKey();
   });
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
+  const [detailResult, setDetailResult] = useState<AnalysisResult | null>(null);
   const [clientSignals, setClientSignals] = useState<AnalysisResult[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
@@ -1619,6 +1621,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-brand-bg relative">
+      {/* Analysis Detail Page Overlay */}
+      {detailResult && (
+        <AnalysisDetailPage
+          result={detailResult}
+          onBack={() => setDetailResult(null)}
+          lang={lang}
+        />
+      )}
+
       <AnimatePresence>
         {newSignalAlert && (
           <motion.div
@@ -1894,7 +1905,7 @@ export default function App() {
           })()}
           <TopSignals 
             signals={topSignals} onRemove={removeSignal} 
-            onSelect={handleSelectSignal} onClearAll={handleClearAll}
+            onSelect={handleSelectSignal} onDetail={setDetailResult} onClearAll={handleClearAll}
             lang={lang} 
           />
 
@@ -1936,7 +1947,7 @@ export default function App() {
         {!isDeveloperSession() && !analysisResults && !isAnalyzing && effectivePage === 'main' && (
           <div className="max-w-7xl mx-auto px-4">
             <AdSlot position="header" lang={lang} />
-            <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} />
+            <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} onDetail={setDetailResult} />
           </div>
         )}
 
@@ -1971,7 +1982,7 @@ export default function App() {
                 </button>
               </div>
             )}
-            <AnalysisResultView results={analysisResults} lang={lang} settings={settings} />
+            <AnalysisResultView results={analysisResults} lang={lang} settings={settings} onDetail={setDetailResult} />
           </motion.div>
         )}
 

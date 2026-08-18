@@ -10,6 +10,7 @@ interface TopSignalsProps {
   signals: AnalysisResult[];
   onRemove: (symbol: string) => void;
   onSelect: (result: AnalysisResult) => void;
+  onDetail: (result: AnalysisResult) => void;
   onClearAll: () => void;
   lang: Language;
 }
@@ -55,7 +56,7 @@ const formatPublishDate = (timestamp: string, lang: string) => {
   }
 };
 
-export default function TopSignals({ signals, onRemove, onSelect, onClearAll, lang }: TopSignalsProps) {
+export default function TopSignals({ signals, onRemove, onSelect, onDetail, onClearAll, lang }: TopSignalsProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
@@ -111,13 +112,13 @@ export default function TopSignals({ signals, onRemove, onSelect, onClearAll, la
             </div>
 
             {strong.map((res, idx) => (
-              <StrongCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpand={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={onSelect} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} />
+              <StrongCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpand={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={onSelect} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} />
             ))}
 
             {top3.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {top3.map((res, idx) => (
-                  <RegularCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpand={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={onSelect} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`r_${res.symbol}_${idx}`} />
+                  <RegularCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpand={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={onSelect} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`r_${res.symbol}_${idx}`} />
                 ))}
               </div>
             )}
@@ -128,10 +129,10 @@ export default function TopSignals({ signals, onRemove, onSelect, onClearAll, la
   );
 }
 
-function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpandReasons, onSelect, onRemove, formatPublishDate, cardKey }: {
+function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpandReasons, onSelect, onDetail, onRemove, formatPublishDate, cardKey }: {
   res: AnalysisResult; isAr: boolean; expandedCard: string | null; expandedReasons: Set<string>;
   onExpand: (v: string | null) => void; onExpandReasons: (v: Set<string>) => void;
-  onSelect: (r: AnalysisResult) => void; onRemove: (s: string) => void;
+  onSelect: (r: AnalysisResult) => void; onDetail: (r: AnalysisResult) => void; onRemove: (s: string) => void;
   formatPublishDate: (ts: string, lang: string) => string; cardKey: string;
 }) {
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.STRONG_BUY];
@@ -222,10 +223,10 @@ function StrongCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpa
   );
 }
 
-function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpandReasons, onSelect, onRemove, formatPublishDate, cardKey }: {
+function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExpandReasons, onSelect, onDetail, onRemove, formatPublishDate, cardKey }: {
   res: AnalysisResult; isAr: boolean; expandedCard: string | null; expandedReasons: Set<string>;
   onExpand: (v: string | null) => void; onExpandReasons: (v: Set<string>) => void;
-  onSelect: (r: AnalysisResult) => void; onRemove: (s: string) => void;
+  onSelect: (r: AnalysisResult) => void; onDetail: (r: AnalysisResult) => void; onRemove: (s: string) => void;
   formatPublishDate: (ts: string, lang: string) => string; cardKey: string;
 }) {
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.BUY];
@@ -272,6 +273,13 @@ function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExp
           <span className="text-[10px] sm:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, isAr ? 'ar' : 'en')}</span>
         </div>
       </button>
+
+      {res.detailedReasons && res.detailedReasons.length > 0 && (
+        <button onClick={(e) => { e.stopPropagation(); onDetail(res); }} className="w-full flex items-center justify-center gap-2 py-2 text-[#F59E0B] hover:text-[#d97706] transition-colors border-t border-white/5">
+          <span className="text-xs font-black uppercase tracking-wider">{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+          <span className="text-[10px] bg-[#F59E0B]/20 px-1.5 py-0.5 rounded-full font-bold">{res.detailedReasons.length}</span>
+        </button>
+      )}
 
       <button onClick={(e) => { e.stopPropagation(); onExpand(isExpanded ? null : cardKey); }} className="w-full flex items-center justify-center py-1 text-white/40 hover:text-white/70 transition-colors">
         <span className="text-xs">{isExpanded ? '\u25B2' : '\u25BC'}</span>

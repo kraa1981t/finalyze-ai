@@ -12,6 +12,7 @@ interface AnalysisResultViewProps {
   results: AnalysisResult[];
   lang: Language;
   settings?: StrategySettings;
+  onDetail?: (result: AnalysisResult) => void;
 }
 
 const SIGNAL_CONFIG: Record<SignalType, { labelKey: keyof typeof translations.en, color: string, bg: string, border: string, icon: any, labelAr: string, labelEn: string, symbolColor: string }> = {
@@ -23,7 +24,7 @@ const SIGNAL_CONFIG: Record<SignalType, { labelKey: keyof typeof translations.en
     [SignalType.NO_ENTRY]: { labelKey: "no_entry" as any, color: "text-slate-500", bg: "bg-slate-500/10", border: "border-slate-500/10", icon: null, labelAr: "لا توجد فرصة", labelEn: "No Entry", symbolColor: '#ffffff' },
 };
 
-export default function AnalysisResultView({ results, lang, settings }: AnalysisResultViewProps) {
+export default function AnalysisResultView({ results, lang, settings, onDetail }: AnalysisResultViewProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -184,6 +185,17 @@ export default function AnalysisResultView({ results, lang, settings }: Analysis
                           <span>{isAr ? 'الشروط التقييمية' : 'Conditions'} ({res.detailedReasons.length})</span>
                         </div>
                         <span className="text-xs">{expandedReasons.has(`${res.symbol}_${idx}`) ? '\u25B2' : '\u25BC'}</span>
+                      </button>
+                    )}
+
+                    {/* Analysis Reasons Button */}
+                    {res.detailedReasons && res.detailedReasons.length > 0 && onDetail && (
+                      <button
+                        onClick={() => onDetail(res)}
+                        className="w-full flex items-center justify-center gap-2 py-2 text-[#F59E0B] hover:text-[#d97706] transition-colors border-t border-white/5"
+                      >
+                        <span className="text-xs font-black uppercase tracking-wider">{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+                        <span className="text-[10px] bg-[#F59E0B]/20 px-1.5 py-0.5 rounded-full font-bold">{res.detailedReasons.length}</span>
                       </button>
                     )}
 

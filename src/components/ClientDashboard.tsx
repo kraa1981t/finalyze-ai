@@ -11,6 +11,7 @@ interface ClientDashboardProps {
   results: AnalysisResult[];
   lang: Language;
   hasActivePlan?: boolean;
+  onDetail?: (result: AnalysisResult) => void;
 }
 
 const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelAr: string; labelEn: string; symbolColor: string }> = {
@@ -54,7 +55,7 @@ const formatPublishDate = (timestamp: string, lang: string) => {
   }
 };
 
-export default function ClientDashboard({ results, lang, hasActivePlan = false }: ClientDashboardProps) {
+export default function ClientDashboard({ results, lang, hasActivePlan = false, onDetail }: ClientDashboardProps) {
   const isAr = lang === 'ar';
   const t = translations[lang];
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -152,7 +153,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {displaySignals.map((res, idx) => (
-                  <ClientSignalCard key={`all_${res.symbol}_${idx}`} res={res} isAr={isAr} lang={lang} selectedSymbol={selectedSymbol} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpandCard={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={(sym) => { if (selectedSymbol === sym) { setSelectedSymbol(null); setSymbolExplicitlySelected(false); } else { setSelectedSymbol(sym); setSymbolExplicitlySelected(true); } handleClick(); }} hasActivePlan={hasActivePlan} formatPublishDate={formatPublishDate} cardKey={`all_${res.symbol}_${idx}`} onClick={handleClick} />
+                  <ClientSignalCard key={`all_${res.symbol}_${idx}`} res={res} isAr={isAr} lang={lang} selectedSymbol={selectedSymbol} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpandCard={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={(sym) => { if (selectedSymbol === sym) { setSelectedSymbol(null); setSymbolExplicitlySelected(false); } else { setSelectedSymbol(sym); setSymbolExplicitlySelected(true); } handleClick(); }} onDetail={onDetail} hasActivePlan={hasActivePlan} formatPublishDate={formatPublishDate} cardKey={`all_${res.symbol}_${idx}`} onClick={handleClick} />
                 ))}
               </div>
             </div>
@@ -181,11 +182,11 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false }
   );
 }
 
-function ClientSignalCard({ res, isAr, lang, selectedSymbol, expandedCard, expandedReasons, onExpandCard, onExpandReasons, onSelect, hasActivePlan, formatPublishDate, cardKey, onClick }: {
+function ClientSignalCard({ res, isAr, lang, selectedSymbol, expandedCard, expandedReasons, onExpandCard, onExpandReasons, onSelect, onDetail, hasActivePlan, formatPublishDate, cardKey, onClick }: {
   res: AnalysisResult; isAr: boolean; lang: Language; selectedSymbol: string | null;
   expandedCard: string | null; expandedReasons: Set<string>;
   onExpandCard: (v: string | null) => void; onExpandReasons: (v: Set<string>) => void;
-  onSelect: (sym: string) => void; hasActivePlan: boolean;
+  onSelect: (sym: string) => void; onDetail?: (r: AnalysisResult) => void; hasActivePlan: boolean;
   formatPublishDate: (ts: string, lang: string) => string; cardKey: string;
   onClick?: () => void;
 }) {
@@ -264,6 +265,13 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, expandedCard, expan
       <button onClick={(e) => { e.stopPropagation(); onExpandCard(isExpanded ? null : cardKey); }} className="w-full flex items-center justify-center py-1 text-white/40 hover:text-white/70 transition-colors">
         <span className="text-xs">{isExpanded ? '\u25B2' : '\u25BC'}</span>
       </button>
+
+      {res.detailedReasons && res.detailedReasons.length > 0 && (
+        <button onClick={(e) => { e.stopPropagation(); onDetail?.(res); }} className="w-full flex items-center justify-center gap-2 py-2 text-[#F59E0B] hover:text-[#d97706] transition-colors border-t border-white/5">
+          <span className="text-xs font-black uppercase tracking-wider">{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+          <span className="text-[10px] bg-[#F59E0B]/20 px-1.5 py-0.5 rounded-full font-bold">{res.detailedReasons.length}</span>
+        </button>
+      )}
 
       {isExpanded && (
         <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
