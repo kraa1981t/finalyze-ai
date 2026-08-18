@@ -281,47 +281,26 @@ function RegularCard({ res, isAr, expandedCard, expandedReasons, onExpand, onExp
         </div>
       </button>
 
-      {res.detailedReasons && res.detailedReasons.length > 0 && (
-        <button onClick={(e) => { e.stopPropagation(); onDetail(res); }} className="w-full flex items-center justify-center gap-2 py-2 text-[#F59E0B] hover:text-[#d97706] transition-colors border-t border-white/5">
-          <span className="text-xs font-black uppercase tracking-wider">{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
-          <span className="text-[10px] bg-[#F59E0B]/20 px-1.5 py-0.5 rounded-full font-bold">{res.detailedReasons.length}</span>
-        </button>
-      )}
-
+      {/* Expand/Collapse for LotSize + Summary only */}
       <button onClick={(e) => { e.stopPropagation(); onExpand(isExpanded ? null : cardKey); }} className="w-full flex items-center justify-center py-1 text-white/40 hover:text-white/70 transition-colors">
         <span className="text-xs">{isExpanded ? '\u25B2' : '\u25BC'}</span>
       </button>
 
       {isExpanded && (
-        <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
-          <div className="px-3 py-2 space-y-2">
-            {res.signal !== 'neutral' && res.signal !== 'no_entry' && (
-              <LotSizeCalculator symbol={res.symbol} stopLoss={sl} takeProfit={tp} entryPrice={entry} signal={res.signal as any} lang={isAr ? 'ar' : 'en'} />
-            )}
-            {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
-            {res.detailedReasons && res.detailedReasons.length > 0 && (
-              <div className="space-y-1.5">
-                <button onClick={(e) => { e.stopPropagation(); const n = new Set(expandedReasons); n.has(cardKey) ? n.delete(cardKey) : n.add(cardKey); onExpandReasons(n); }} className="w-full flex items-center justify-between text-sm font-bold text-white hover:text-white/80 py-1">
-                  <div className="flex items-center gap-1.5"><Info size={14} /><span>{isAr ? 'المشارات' : 'Indicators'} ({res.detailedReasons.length})</span></div>
-                  <span className="text-xs">{expandedReasons.has(cardKey) ? '\u25BC' : '\u25B6'}</span>
-                </button>
-                {expandedReasons.has(cardKey) && (
-                  <div className="space-y-1.5 pt-1">
-                    {res.detailedReasons.map((reason, i) => (
-                      <div key={i} style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)'}} className="rounded-lg p-3 flex items-center justify-between text-sm sm:text-base">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-4 h-4 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/70'}`} />
-                          <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-bold text-base sm:text-lg">{reason.check}</span>
-                        </div>
-                        <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-mono text-sm sm:text-base font-bold">{reason.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        <div className="border-t border-white/10 px-3 py-2 space-y-2">
+          {res.signal !== 'neutral' && res.signal !== 'no_entry' && (
+            <LotSizeCalculator symbol={res.symbol} stopLoss={sl} takeProfit={tp} entryPrice={entry} signal={res.signal as any} lang={isAr ? 'ar' : 'en'} />
+          )}
+          {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
         </div>
+      )}
+
+      {/* Bright yellow Analysis Reasons button - attached to card bottom */}
+      {res.detailedReasons && res.detailedReasons.length > 0 && (
+        <button onClick={(e) => { e.stopPropagation(); onDetail(res); }} className="w-full py-2.5 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+          <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+          <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[10px]">{res.detailedReasons.length}</span>
+        </button>
       )}
 
       <button onClick={(e) => { e.stopPropagation(); onRemove(res.symbol); }} className="absolute top-1 left-1 p-1 hover:bg-red-500/20 rounded-md text-white/20 hover:text-red-500 transition-colors">

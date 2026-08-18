@@ -168,96 +168,15 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
                       </div>
                     )}
 
-                    {/* Expand/Collapse Conditions Button */}
-                    {res.detailedReasons && res.detailedReasons.length > 0 && (
-                      <button
-                        onClick={() => {
-                          handleClick();
-                          const newSet = new Set(expandedReasons);
-                          const key = `${res.symbol}_${idx}`;
-                          if (newSet.has(key)) newSet.delete(key); else newSet.add(key);
-                          setExpandedReasons(newSet);
-                        }}
-                        className="w-full flex items-center justify-between text-sm font-bold text-white hover:text-white/80 transition-colors py-1"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <Info size={14} />
-                          <span>{isAr ? 'الشروط التقييمية' : 'Conditions'} ({res.detailedReasons.length})</span>
-                        </div>
-                        <span className="text-xs">{expandedReasons.has(`${res.symbol}_${idx}`) ? '\u25B2' : '\u25BC'}</span>
-                      </button>
-                    )}
-
-                    {/* Analysis Reasons Button */}
+                    {/* Bright yellow Analysis Reasons button */}
                     {res.detailedReasons && res.detailedReasons.length > 0 && onDetail && (
                       <button
                         onClick={() => onDetail(res)}
-                        className="w-full flex items-center justify-center gap-2 py-2 text-[#F59E0B] hover:text-[#d97706] transition-colors border-t border-white/5"
+                        className="w-full py-2.5 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 rounded-lg"
                       >
-                        <span className="text-xs font-black uppercase tracking-wider">{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
-                        <span className="text-[10px] bg-[#F59E0B]/20 px-1.5 py-0.5 rounded-full font-bold">{res.detailedReasons.length}</span>
+                        <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+                        <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[10px]">{res.detailedReasons.length}</span>
                       </button>
-                    )}
-
-                    {/* Primary & Supporting Reasons */}
-                    {expandedReasons.has(`${res.symbol}_${idx}`) && res.detailedReasons && res.detailedReasons.length > 0 && (
-                      <div className="space-y-2">
-                        {(() => {
-                          const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'];
-                          const primaryReasons = res.detailedReasons.filter((r: any) => PRIMARY_CHECKS.some(p => r.check?.includes(p)));
-                          const supportingReasons = res.detailedReasons.filter((r: any) => !PRIMARY_CHECKS.some(p => r.check?.includes(p)));
-
-                          const getAgeBadge = () => {
-                            if (res.trendAge === undefined) return null;
-                            const age = res.trendAge;
-                            if (age < 10) return { label: isAr ? 'طفل' : 'Infant', color: 'text-red-400 bg-red-500/15 border-red-500/30' };
-                            if (age < 25) return { label: isAr ? 'شاب' : 'Youth', color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30' };
-                            if (age <= 75) return { label: isAr ? 'ناضج' : 'Mature', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' };
-                            return { label: isAr ? 'شيخ' : 'Old', color: 'text-orange-400 bg-orange-500/15 border-orange-500/30' };
-                          };
-                          const ageBadge = getAgeBadge();
-
-                          const renderReason = (reason: any, i: number) => (
-                            <div key={i} style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)'}} className="rounded-lg p-3" title={reason.impact || ''}>
-                              <div className="flex items-center gap-2.5">
-                                <div className={`w-4 h-4 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/70'}`} />
-                                <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-bold text-base sm:text-lg shrink-0">{reason.check}</span>
-                                <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-mono text-sm sm:text-base break-all font-bold">{reason.value}</span>
-                              </div>
-                              {reason.dates && <div style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff',opacity:0.8}} className="ml-6 mt-2 text-sm font-mono whitespace-pre-line">{reason.dates}</div>}
-                              {reason.impact && <p style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff',opacity:0.7}} className="text-sm mt-2 ml-6 leading-relaxed">{reason.impact}</p>}
-                            </div>
-                          );
-
-                          return (
-                            <>
-                              {primaryReasons.length > 0 && (
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-2 h-2 rounded-full bg-amber-400" />
-                                      <span className="text-sm font-black text-amber-400 uppercase tracking-wider">{isAr ? 'الشروط الأساسية' : 'PRIMARY CONDITIONS'}</span>
-                                      <span className="text-xs font-bold text-amber-400/50 bg-amber-500/10 px-2 py-0.5 rounded-full">{primaryReasons.length}</span>
-                                    </div>
-                                    {ageBadge && <span className={`text-xs font-black px-3 py-1 rounded-full border ${ageBadge.color}`}>{ageBadge.label} ({res.trendAge}c)</span>}
-                                  </div>
-                                  <div className="space-y-1.5">{primaryReasons.map(renderReason)}</div>
-                                </div>
-                              )}
-                              {supportingReasons.length > 0 && (
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-blue-400" />
-                                    <span className="text-sm font-black text-blue-400 uppercase tracking-wider">{isAr ? 'الشروط الداعمة' : 'SUPPORTING CONDITIONS'}</span>
-                                    <span className="text-xs font-bold text-blue-400/50 bg-blue-500/10 px-2 py-0.5 rounded-full">{supportingReasons.length}</span>
-                                  </div>
-                                  <div className="space-y-1.5">{supportingReasons.map(renderReason)}</div>
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
                     )}
                   </div>
                 </div>
