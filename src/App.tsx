@@ -1905,7 +1905,7 @@ export default function App() {
           })()}
           <TopSignals 
             signals={topSignals} onRemove={removeSignal} 
-            onSelect={handleSelectSignal} onDetail={setDetailResult} onClearAll={handleClearAll}
+            onSelect={handleSelectSignal} onClearAll={handleClearAll}
             lang={lang} 
           />
 
