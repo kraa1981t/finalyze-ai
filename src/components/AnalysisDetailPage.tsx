@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, ShieldX, CheckCircle, XCircle, AlertTriangle, BarChart3, Target, Zap } from 'lucide-react';
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, ShieldX, CheckCircle, XCircle, AlertTriangle, BarChart3, Target, Zap, CandlestickChart } from 'lucide-react';
 import { AnalysisResult, SignalType } from '../types';
 import { Language } from '../lib/i18n';
+import LotSizeCalculator from './LotSizeCalculator';
 
 interface AnalysisDetailPageProps {
   result: AnalysisResult;
@@ -10,7 +11,7 @@ interface AnalysisDetailPageProps {
   lang: Language;
 }
 
-const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events', 'Candle Match'];
+const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'];
 const BLOCK_CHECKS = ['Candle Match', 'Sideways Filter', 'Confidence Penalty', 'Trend Penalty', 'Penalty'];
 
 function getSignalColor(signal: SignalType) {
@@ -64,12 +65,16 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
     !BLOCK_CHECKS.some(p => r.check?.includes(p))
   );
 
+  const candleMatchReason = allReasons.find(r => r.check?.includes('Candle Match'));
+  const isJPY = result.symbol.includes('JPY');
+  const decimals = isJPY ? 3 : 5;
+
   useEffect(() => {
     if (chartRef.current && result.symbol) {
       chartRef.current.innerHTML = '';
       const widget = document.createElement('div');
       widget.className = 'tradingview-widget-container';
-      widget.style.height = '400px';
+      widget.style.height = '350px';
       widget.style.borderRadius = '16px';
       widget.style.overflow = 'hidden';
       widget.innerHTML = `
@@ -121,14 +126,14 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 space-y-6 mt-4">
+      <div className="max-w-5xl mx-auto px-4 space-y-5 mt-4 pb-20">
 
-        {/* Chart */}
+        {/* 1. Chart */}
         <div className="rounded-2xl overflow-hidden border border-white/5 bg-[#111827]">
-          <div ref={chartRef} className="w-full" style={{ height: '400px' }} />
+          <div ref={chartRef} className="w-full" style={{ height: '350px' }} />
         </div>
 
-        {/* Signal Summary */}
+        {/* 2. Signal Scores */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white/5 rounded-xl p-4 border border-white/5 text-center">
             <BarChart3 size={20} className="text-blue-400 mx-auto mb-1" />
@@ -147,58 +152,31 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
           </div>
         </div>
 
-        {/* Summary */}
-        {result.summary && (
-          <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-2">{isAr ? 'ملخص' : 'Summary'}</div>
-            <p className="text-sm text-white/70 leading-relaxed">{result.summary}</p>
+        {/* 3. Lot Size Calculator */}
+        {result.signal !== 'neutral' && result.signal !== 'no_entry' && (
+          <div className="rounded-2xl border border-white/5 bg-[#111827] overflow-hidden">
+            <LotSizeCalculator
+              symbol={result.symbol}
+              stopLoss={result.stopLoss || 0}
+              takeProfit={result.takeProfit || 0}
+              entryPrice={result.entryPrice}
+              signal={result.signal as any}
+              lang={lang}
+            />
           </div>
         )}
 
-        {/* Primary Conditions */}
-        {primaryReasons.length > 0 && (
-          <Section
-            title={isAr ? 'الشروط الأساسية' : 'PRIMARY CONDITIONS'}
-            icon={<ShieldCheck size={18} className="text-[#F59E0B]" />}
-            color="amber"
-            reasons={primaryReasons}
-            lang={lang}
-          />
-        )}
-
-        {/* Supporting Conditions */}
-        {supportingReasons.length > 0 && (
-          <Section
-            title={isAr ? 'الشروط الداعمة' : 'SUPPORTING CONDITIONS'}
-            icon={<ShieldAlert size={18} className="text-blue-400" />}
-            color="blue"
-            reasons={supportingReasons}
-            lang={lang}
-          />
-        )}
-
-        {/* Block Filters */}
-        {blockReasons.length > 0 && (
-          <Section
-            title={isAr ? 'فلاتر المنع' : 'BLOCK FILTERS'}
-            icon={<ShieldX size={18} className="text-red-400" />}
-            color="red"
-            reasons={blockReasons}
-            lang={lang}
-          />
-        )}
-
-        {/* Trend Info */}
+        {/* 4. Trend Info - Age + Direction */}
         <div className="grid grid-cols-2 gap-3">
           {result.trendMaturity && (
             <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-              <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">{isAr ? 'مرحلة الاتجاه' : 'Trend Maturity'}</div>
+              <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">{isAr ? 'عمر الاتجاه' : 'Trend Age'}</div>
               <div className="text-sm font-black text-white capitalize">{result.trendMaturity} {result.trendAge ? `(${result.trendAge}c)` : ''}</div>
             </div>
           )}
           {result.microSignal && (
             <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-              <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">{isAr ? 'إشارة مصغرة' : 'Micro Signal'}</div>
+              <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">{isAr ? 'عمر ما بعد السحب' : 'Pre-Pullback Age'}</div>
               <div className="text-sm font-black text-white capitalize">{result.microSignal} {result.microTF ? `(${result.microTF})` : ''}</div>
             </div>
           )}
@@ -220,6 +198,97 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
             </div>
           )}
         </div>
+
+        {/* 5. Candle Match Results */}
+        {candleMatchReason && (
+          <div className={`rounded-2xl p-4 border ${candleMatchReason.status === 'positive' ? 'border-emerald-500/30 bg-emerald-500/5' : candleMatchReason.status === 'negative' ? 'border-red-500/30 bg-red-500/5' : 'border-yellow-500/30 bg-yellow-500/5'}`}>
+            <div className="flex items-center gap-2 mb-3">
+              <CandlestickChart size={18} className={candleMatchReason.status === 'positive' ? 'text-emerald-400' : candleMatchReason.status === 'negative' ? 'text-red-400' : 'text-yellow-400'} />
+              <span className="text-sm font-black text-white uppercase tracking-wider">{isAr ? 'تطابق الشموع' : 'Candle Match'}</span>
+              {candleMatchReason.status === 'positive' ? (
+                <span className="ml-auto px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-500/10 text-emerald-400">{isAr ? 'متطابقة' : 'MATCHED'}</span>
+              ) : (
+                <span className="ml-auto px-2 py-0.5 rounded-md text-[10px] font-black bg-red-500/10 text-red-400">{isAr ? 'غير متطابقة' : 'NOT MATCHED'}</span>
+              )}
+            </div>
+            {/* Parse candle info */}
+            {(() => {
+              const parts = candleMatchReason.value.split(',').map((p: string) => p.trim());
+              return (
+                <div className="space-y-2">
+                  {parts.map((part: string, i: number) => {
+                    const match = part.match(/^(\S+):\s*([\d.]+)\s*\((.)\s*(.)?\)/);
+                    if (!match) return <div key={i} className="text-xs text-white/60 font-mono">{part}</div>;
+                    const [, tf, body, dirChar, checkChar] = match;
+                    const isBullish = dirChar === '↑';
+                    const isMatch = checkChar === '✓';
+                    return (
+                      <div key={i} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-white/60 uppercase">{tf}</span>
+                          <span className={`text-sm font-black ${isBullish ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {isBullish ? '▲' : '▼'} {isBullish ? (isAr ? 'صاعد' : 'Bullish') : (isAr ? 'هابط' : 'Bearish')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-black font-mono text-white">{body}</span>
+                          <span className="text-[10px] text-white/30">{isAr ? 'نقطة' : 'pts'}</span>
+                          {checkChar && (
+                            <span className={`text-xs font-black ${isMatch ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {isMatch ? '✓' : '✗'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+            <p className="text-xs text-white/40 mt-2 leading-relaxed">{candleMatchReason.impact}</p>
+          </div>
+        )}
+
+        {/* 6. Block Filters */}
+        {blockReasons.length > 0 && (
+          <Section
+            title={isAr ? 'فلاتر المنع' : 'BLOCK FILTERS'}
+            icon={<ShieldX size={18} className="text-red-400" />}
+            color="red"
+            reasons={blockReasons}
+            lang={lang}
+          />
+        )}
+
+        {/* 7. Primary Conditions */}
+        {primaryReasons.length > 0 && (
+          <Section
+            title={isAr ? 'الشروط الأساسية' : 'PRIMARY CONDITIONS'}
+            icon={<ShieldCheck size={18} className="text-[#F59E0B]" />}
+            color="amber"
+            reasons={primaryReasons}
+            lang={lang}
+          />
+        )}
+
+        {/* 8. Supporting Conditions */}
+        {supportingReasons.length > 0 && (
+          <Section
+            title={isAr ? 'الشروط الداعمة' : 'SUPPORTING CONDITIONS'}
+            icon={<ShieldAlert size={18} className="text-blue-400" />}
+            color="blue"
+            reasons={supportingReasons}
+            lang={lang}
+          />
+        )}
+
+        {/* Summary */}
+        {result.summary && (
+          <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-2">{isAr ? 'ملخص' : 'Summary'}</div>
+            <p className="text-sm text-white/70 leading-relaxed">{result.summary}</p>
+          </div>
+        )}
       </div>
     </motion.div>
   );
