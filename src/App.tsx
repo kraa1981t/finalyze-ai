@@ -1986,14 +1986,14 @@ export default function App() {
           </motion.div>
         )}
 
-        {/* Floating back button ΓÇö always visible when scrolling */}
-        {analysisResults && !isAnalyzing && (
+        {/* Floating back button - always visible on all pages */}
+        {effectivePage !== 'main' && (
           <button
-            onClick={() => { setAnalysisResults(null); setAnalysisError(null); goBack(); }}
-            className="fixed bottom-8 left-8 z-50 flex items-center gap-3 bg-brand-bg/90 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-4 shadow-2xl hover:bg-brand-alt transition-all group"
+            onClick={() => { if (effectivePage === 'detail') { setDetailResult(null); } else if (analysisResults) { setAnalysisResults(null); setAnalysisError(null); } goBack(); }}
+            className="fixed bottom-6 left-6 z-[90] flex items-center gap-3 bg-[#F59E0B] hover:bg-[#d97706] transition-all rounded-2xl px-5 py-4 shadow-2xl shadow-[#F59E0B]/30 active:scale-95 group"
           >
-            <ArrowLeft size={22} className="text-white group-hover:-translate-x-1 transition-transform" />
-            <span className="text-sm font-bold text-white">{lang === 'ar' ? '\u0639\u0648\u062f\u0629 \u0644\u0644\u062e\u0644\u0641' : 'Go back'}</span>
+            <ArrowLeft size={22} className="text-black group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm font-black text-black">{lang === 'ar' ? '\u0639\u0648\u062f\u0629 \u0644\u0644\u062e\u0644\u0641' : 'Go back'}</span>
           </button>
         )}
       </main>

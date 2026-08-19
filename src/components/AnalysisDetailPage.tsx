@@ -106,8 +106,8 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
       {/* Header */}
       <div className="sticky top-0 z-40 bg-[#0a0f1a]/95 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={onBack} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
-            <ArrowLeft size={20} className="text-white" />
+          <button onClick={onBack} className="p-2 rounded-xl bg-[#F59E0B] hover:bg-[#d97706] transition-all">
+            <ArrowLeft size={20} className="text-black" />
           </button>
           <div className="flex-1">
             <div className="flex items-center gap-2">
