@@ -11,9 +11,6 @@ interface AnalysisDetailPageProps {
   lang: Language;
 }
 
-const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'];
-const BLOCK_CHECKS = ['Candle Match', 'Sideways Filter', 'Confidence Penalty', 'Trend Penalty', 'Penalty'];
-
 function getSignalColor(signal: SignalType) {
   switch (signal) {
     case SignalType.STRONG_BUY: return { bg: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-500', glow: 'shadow-emerald-500/30' };
@@ -38,9 +35,9 @@ function getSignalLabel(signal: SignalType, lang: Language) {
 
 function getStatusIcon(status: string) {
   switch (status) {
-    case 'positive': return <CheckCircle size={18} className="text-emerald-400" />;
-    case 'negative': return <XCircle size={18} className="text-red-400" />;
-    default: return <AlertTriangle size={18} className="text-yellow-400" />;
+    case 'positive': return <CheckCircle size={20} className="text-emerald-400" />;
+    case 'negative': return <XCircle size={20} className="text-red-400" />;
+    default: return <AlertTriangle size={20} className="text-yellow-400" />;
   }
 }
 
@@ -52,22 +49,30 @@ function getStatusStyle(status: string) {
   }
 }
 
+function parseCandleInfo(value: string) {
+  const parts = value.split(',').map((p: string) => p.trim());
+  return parts.map((part: string) => {
+    const match = part.match(/^(\S+):\s*([\d.]+)\s*\((.)\s*(.)?\)/);
+    if (!match) return null;
+    const [, tf, body, dirChar, checkChar] = match;
+    return { tf, body, dirChar, checkChar, isBullish: dirChar === '↑', isMatch: checkChar === '✓' };
+  }).filter(Boolean);
+}
+
 export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDetailPageProps) {
   const isAr = lang === 'ar';
   const chartRef = useRef<HTMLDivElement>(null);
   const colors = getSignalColor(result.signal);
   const allReasons = result.detailedReasons || [];
 
-  const primaryReasons = allReasons.filter(r => PRIMARY_CHECKS.some(p => r.check?.includes(p)));
-  const blockReasons = allReasons.filter(r => BLOCK_CHECKS.some(p => r.check?.includes(p)));
+  const primaryReasons = allReasons.filter(r => ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'].some(p => r.check?.includes(p)));
+  const blockReasons = allReasons.filter(r => ['Sideways Filter', 'Confidence Penalty', 'Trend Penalty', 'Penalty'].some(p => r.check?.includes(p)));
+  const candleMatchReason = allReasons.find(r => r.check?.includes('Candle Match'));
   const supportingReasons = allReasons.filter(r =>
-    !PRIMARY_CHECKS.some(p => r.check?.includes(p)) &&
-    !BLOCK_CHECKS.some(p => r.check?.includes(p))
+    !['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events', 'Candle Match', 'Sideways Filter', 'Confidence Penalty', 'Trend Penalty', 'Penalty'].some(p => r.check?.includes(p))
   );
 
-  const candleMatchReason = allReasons.find(r => r.check?.includes('Candle Match'));
-  const isJPY = result.symbol.includes('JPY');
-  const decimals = isJPY ? 3 : 5;
+  const fmt = (v: number) => Number(v).toFixed(0);
 
   useEffect(() => {
     if (chartRef.current && result.symbol) {
@@ -120,30 +125,30 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
               <span className={`px-3 py-1 rounded-lg text-xs font-black text-white ${colors.bg} shadow-lg ${colors.glow}`}>
                 {getSignalLabel(result.signal, lang)}
               </span>
-              <span className={`text-2xl font-black ${colors.text}`}>{result.confidence}%</span>
+              <span className={`text-2xl font-black ${colors.text}`}>{fmt(result.confidence)}%</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 space-y-5 mt-4 pb-20">
+      <div className="max-w-5xl mx-auto px-4 space-y-6 mt-4 pb-20">
 
-        {/* 1. Signal Scores - top of page, large */}
+        {/* 1. Signal Scores - large */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
             <BarChart3 size={28} className="text-blue-400 mx-auto mb-2" />
-            <div className="text-xs text-white/40 uppercase tracking-wider mb-1">{isAr ? 'تقني' : 'Technical'}</div>
-            <div className="text-4xl font-black text-blue-400">{result.technicalScore}%</div>
+            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'تقني' : 'Technical'}</div>
+            <div className="text-5xl font-black text-blue-400">{fmt(result.technicalScore)}%</div>
           </div>
           <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
             <Zap size={28} className="text-purple-400 mx-auto mb-2" />
-            <div className="text-xs text-white/40 uppercase tracking-wider mb-1">{isAr ? 'مشاعر' : 'Sentiment'}</div>
-            <div className="text-4xl font-black text-purple-400">{result.sentimentScore}%</div>
+            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'مشاعر' : 'Sentiment'}</div>
+            <div className="text-5xl font-black text-purple-400">{fmt(result.sentimentScore)}%</div>
           </div>
           <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
             <Target size={28} className="text-emerald-400 mx-auto mb-2" />
-            <div className="text-xs text-white/40 uppercase tracking-wider mb-1">{isAr ? 'ثقة' : 'Confidence'}</div>
-            <div className={`text-4xl font-black ${colors.text}`}>{result.confidence}%</div>
+            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'ثقة' : 'Confidence'}</div>
+            <div className={`text-5xl font-black ${colors.text}`}>{fmt(result.confidence)}%</div>
           </div>
         </div>
 
@@ -166,105 +171,104 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
           <div ref={chartRef} className="w-full" style={{ height: '350px' }} />
         </div>
 
-        {/* 3. Trend Info - Age + Direction */}
+        {/* 4. Trend Info */}
         <div className="grid grid-cols-2 gap-3">
           {result.trendMaturity && (
-            <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-              <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">{isAr ? 'عمر الاتجاه' : 'Trend Age'}</div>
-              <div className="text-sm font-black text-white capitalize">{result.trendMaturity} {result.trendAge ? `(${result.trendAge}c)` : ''}</div>
+            <div className="bg-white/5 rounded-xl p-5 border border-white/5">
+              <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'عمر الاتجاه' : 'Trend Age'}</div>
+              <div className="text-lg font-black text-white capitalize">{result.trendMaturity} {result.trendAge ? `(${result.trendAge}c)` : ''}</div>
             </div>
           )}
           {result.microSignal && (
-            <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-              <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">{isAr ? 'عمر ما بعد السحب' : 'Pre-Pullback Age'}</div>
-              <div className="text-sm font-black text-white capitalize">{result.microSignal} {result.microTF ? `(${result.microTF})` : ''}</div>
+            <div className="bg-white/5 rounded-xl p-5 border border-white/5">
+              <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'عمر ما بعد السحب' : 'Pre-Pullback Age'}</div>
+              <div className="text-lg font-black text-white capitalize">{result.microSignal} {result.microTF ? `(${result.microTF})` : ''}</div>
             </div>
           )}
           {result.adx !== undefined && (
-            <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-              <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">ADX</div>
-              <div className="text-sm font-black text-white">{result.adx?.toFixed(1)} {result.adxDirection || ''}</div>
+            <div className="bg-white/5 rounded-xl p-5 border border-white/5">
+              <div className="text-sm text-white/40 uppercase tracking-wider mb-1">ADX</div>
+              <div className="text-lg font-black text-white">{result.adx?.toFixed(1)} {result.adxDirection || ''}</div>
             </div>
           )}
           {result.direction && (
-            <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-              <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">{isAr ? 'الاتجاه' : 'Direction'}</div>
+            <div className="bg-white/5 rounded-xl p-5 border border-white/5">
+              <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'الاتجاه' : 'Direction'}</div>
               <div className="flex items-center gap-2">
-                {result.direction === 'buy' ? <TrendingUp size={16} className="text-emerald-400" /> :
-                 result.direction === 'sell' ? <TrendingDown size={16} className="text-red-400" /> :
-                 <Minus size={16} className="text-gray-400" />}
-                <span className="text-sm font-black text-white uppercase">{result.direction}</span>
+                {result.direction === 'buy' ? <TrendingUp size={20} className="text-emerald-400" /> :
+                 result.direction === 'sell' ? <TrendingDown size={20} className="text-red-400" /> :
+                 <Minus size={20} className="text-gray-400" />}
+                <span className="text-lg font-black text-white uppercase">{result.direction}</span>
               </div>
             </div>
           )}
         </div>
 
-        {/* 5. Candle Match Results */}
+        {/* 5. Candle Match - detailed per candle */}
         {candleMatchReason && (
-          <div className={`rounded-2xl p-4 border ${candleMatchReason.status === 'positive' ? 'border-emerald-500/30 bg-emerald-500/5' : candleMatchReason.status === 'negative' ? 'border-red-500/30 bg-red-500/5' : 'border-yellow-500/30 bg-yellow-500/5'}`}>
-            <div className="flex items-center gap-2 mb-3">
-              <CandlestickChart size={18} className={candleMatchReason.status === 'positive' ? 'text-emerald-400' : candleMatchReason.status === 'negative' ? 'text-red-400' : 'text-yellow-400'} />
-              <span className="text-sm font-black text-white uppercase tracking-wider">{isAr ? 'تطابق الشموع' : 'Candle Match'}</span>
+          <div className={`rounded-2xl p-5 border ${candleMatchReason.status === 'positive' ? 'border-emerald-500/30 bg-emerald-500/5' : candleMatchReason.status === 'negative' ? 'border-red-500/30 bg-red-500/5' : 'border-yellow-500/30 bg-yellow-500/5'}`}>
+            <div className="flex items-center gap-2 mb-4">
+              <CandlestickChart size={22} className={candleMatchReason.status === 'positive' ? 'text-emerald-400' : candleMatchReason.status === 'negative' ? 'text-red-400' : 'text-yellow-400'} />
+              <span className="text-lg font-black text-white uppercase tracking-wider">{isAr ? 'تطابق الشموع' : 'CANDLE MATCH'}</span>
               {candleMatchReason.status === 'positive' ? (
-                <span className="ml-auto px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-500/10 text-emerald-400">{isAr ? 'متطابقة' : 'MATCHED'}</span>
+                <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-emerald-500/10 text-emerald-400">{isAr ? 'متطابقة' : 'MATCHED'}</span>
               ) : (
-                <span className="ml-auto px-2 py-0.5 rounded-md text-[10px] font-black bg-red-500/10 text-red-400">{isAr ? 'غير متطابقة' : 'NOT MATCHED'}</span>
+                <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-red-500/10 text-red-400">{isAr ? 'غير متطابقة' : 'NOT MATCHED'}</span>
               )}
             </div>
-            {/* Parse candle info */}
-            {(() => {
-              const parts = candleMatchReason.value.split(',').map((p: string) => p.trim());
-              return (
-                <div className="space-y-2">
-                  {parts.map((part: string, i: number) => {
-                    const match = part.match(/^(\S+):\s*([\d.]+)\s*\((.)\s*(.)?\)/);
-                    if (!match) return <div key={i} className="text-xs text-white/60 font-mono">{part}</div>;
-                    const [, tf, body, dirChar, checkChar] = match;
-                    const isBullish = dirChar === '↑';
-                    const isMatch = checkChar === '✓';
-                    return (
-                      <div key={i} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-white/60 uppercase">{tf}</span>
-                          <span className={`text-sm font-black ${isBullish ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {isBullish ? '▲' : '▼'} {isBullish ? (isAr ? 'صاعد' : 'Bullish') : (isAr ? 'هابط' : 'Bearish')}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-black font-mono text-white">{body}</span>
-                          <span className="text-[10px] text-white/30">{isAr ? 'نقطة' : 'pts'}</span>
-                          {checkChar && (
-                            <span className={`text-xs font-black ${isMatch ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {isMatch ? '✓' : '✗'}
-                            </span>
-                          )}
-                        </div>
+            {/* Each candle separately */}
+            <div className="space-y-3">
+              {parseCandleInfo(candleMatchReason.value).map((c, i) => c && (
+                <div key={i} className={`rounded-xl p-4 border ${c.isMatch ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {/* Timeframe */}
+                      <span className="text-lg font-black text-white/60 uppercase bg-white/10 px-3 py-1 rounded-lg">{c.tf}</span>
+                      {/* Direction icon + label */}
+                      <div className={`flex items-center gap-2 ${c.isBullish ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {c.isBullish ? <TrendingUp size={22} /> : <TrendingDown size={22} />}
+                        <span className="text-lg font-black">
+                          {c.isBullish ? (isAr ? 'صاعد ▲' : 'Bullish ▲') : (isAr ? 'هابط ▼' : 'Bearish ▼')}
+                        </span>
                       </div>
-                    );
-                  })}
+                      {/* Buy/Sell label */}
+                      <span className={`text-sm font-bold px-2 py-0.5 rounded ${c.isBullish ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
+                        {c.isBullish ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {/* Body size */}
+                      <span className="text-2xl font-black font-mono text-white">{c.body}</span>
+                      <span className="text-sm text-white/40">{isAr ? 'نقطة' : 'pts'}</span>
+                      {/* Match status */}
+                      {c.checkChar && (
+                        <span className={`text-2xl font-black ${c.isMatch ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {c.isMatch ? '✓' : '✗'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              );
-            })()}
-            <p className="text-xs text-white/40 mt-2 leading-relaxed">{candleMatchReason.impact}</p>
+              ))}
+            </div>
+            <p className="text-sm text-white/40 mt-3 leading-relaxed">{candleMatchReason.impact}</p>
           </div>
         )}
 
         {/* 6. Block Filters */}
-        {blockReasons.length > 0 && (
-          <Section
-            title={isAr ? 'فلاتر المنع' : 'BLOCK FILTERS'}
-            icon={<ShieldX size={18} className="text-red-400" />}
-            color="red"
-            reasons={blockReasons}
-            lang={lang}
-          />
-        )}
+        <Section
+          title={isAr ? 'فلاتر المنع' : 'BLOCK FILTERS'}
+          icon={<ShieldX size={20} className="text-red-400" />}
+          color="red"
+          reasons={blockReasons}
+          lang={lang}
+        />
 
         {/* 7. Primary Conditions */}
         {primaryReasons.length > 0 && (
           <Section
             title={isAr ? 'الشروط الأساسية' : 'PRIMARY CONDITIONS'}
-            icon={<ShieldCheck size={18} className="text-[#F59E0B]" />}
+            icon={<ShieldCheck size={20} className="text-[#F59E0B]" />}
             color="amber"
             reasons={primaryReasons}
             lang={lang}
@@ -275,7 +279,7 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
         {supportingReasons.length > 0 && (
           <Section
             title={isAr ? 'الشروط الداعمة' : 'SUPPORTING CONDITIONS'}
-            icon={<ShieldAlert size={18} className="text-blue-400" />}
+            icon={<ShieldAlert size={20} className="text-blue-400" />}
             color="blue"
             reasons={supportingReasons}
             lang={lang}
@@ -284,9 +288,9 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
 
         {/* Summary */}
         {result.summary && (
-          <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-2">{isAr ? 'ملخص' : 'Summary'}</div>
-            <p className="text-sm text-white/70 leading-relaxed">{result.summary}</p>
+          <div className="bg-white/5 rounded-xl p-5 border border-white/5">
+            <div className="text-sm text-white/40 uppercase tracking-wider mb-2">{isAr ? 'ملخص' : 'Summary'}</div>
+            <p className="text-base text-white/70 leading-relaxed">{result.summary}</p>
           </div>
         )}
       </div>
@@ -301,6 +305,7 @@ function Section({ title, icon, color, reasons, lang }: {
   reasons: { check: string; value: string; status: string; impact: string }[];
   lang: Language;
 }) {
+  const isAr = lang === 'ar';
   const colorMap = {
     amber: { header: 'border-[#F59E0B]/30', badge: 'bg-[#F59E0B]/10 text-[#F59E0B]' },
     blue: { header: 'border-blue-500/30', badge: 'bg-blue-500/10 text-blue-400' },
@@ -308,33 +313,46 @@ function Section({ title, icon, color, reasons, lang }: {
   };
   const c = colorMap[color];
 
+  if (reasons.length === 0) {
+    return (
+      <div className="space-y-3">
+        <div className={`flex items-center gap-2 pb-2 border-b ${c.header}`}>
+          {icon}
+          <span className="text-lg font-black text-white uppercase tracking-wider">{title}</span>
+          <span className={`ml-auto px-2 py-0.5 rounded-md text-sm font-black ${c.badge}`}>0</span>
+        </div>
+        <div className="text-sm text-white/30 italic py-2">{isAr ? 'لا توجد نتائج' : 'No results'}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <div className={`flex items-center gap-2 pb-2 border-b ${c.header}`}>
         {icon}
-        <span className="text-sm font-black text-white uppercase tracking-wider">{title}</span>
-        <span className={`ml-auto px-2 py-0.5 rounded-md text-[10px] font-black ${c.badge}`}>
+        <span className="text-lg font-black text-white uppercase tracking-wider">{title}</span>
+        <span className={`ml-auto px-2 py-0.5 rounded-md text-sm font-black ${c.badge}`}>
           {reasons.length}
         </span>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {reasons.map((r, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.05 }}
-            className={`rounded-xl p-4 border ${getStatusStyle(r.status)}`}
+            className={`rounded-xl p-5 border ${getStatusStyle(r.status)}`}
           >
             <div className="flex items-start gap-3">
               <div className="mt-0.5">{getStatusIcon(r.status)}</div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-black text-white">{r.check}</span>
-                  <span className="text-xs text-white/30 font-mono">|</span>
-                  <span className="text-xs text-white/50 font-mono">{r.value}</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg font-black text-white">{r.check}</span>
+                  <span className="text-sm text-white/30 font-mono">|</span>
+                  <span className="text-base text-white/60 font-mono">{r.value}</span>
                 </div>
-                <p className="text-xs text-white/40 leading-relaxed">{r.impact}</p>
+                <p className="text-sm text-white/50 leading-relaxed">{r.impact}</p>
               </div>
             </div>
           </motion.div>
