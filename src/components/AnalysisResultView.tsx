@@ -3,7 +3,6 @@ import { AnalysisResult, SignalType, StrategySettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Zap, ShieldAlert, MessageSquare, BarChart2, ChevronDown, Info } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
-import LotSizeCalculator from './LotSizeCalculator';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 import { playClick, initAudio } from '../lib/audioEngine';
@@ -28,8 +27,6 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
   const t = translations[lang];
   const isAr = lang === 'ar';
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [expandedCard, setExpandedCard] = useState<string | null>(null);
-  const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set());
   const audioInitRef = useRef(false);
 
   const handleClick = useCallback(() => {
@@ -98,13 +95,8 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 items-start px-2 sm:px-0">
         {sortedResults.map((res, idx) => {
           const meta = SIGNAL_CONFIG[res.signal] || SIGNAL_CONFIG[SignalType.NEUTRAL];
-          const isSelected = selectedIndex === idx;
-          const isExpanded = expandedCard === `${res.symbol}_${idx}`;
-          const isBuy = res.signal.includes('buy');
-          const isStrong = res.signal === 'strong_buy' || res.signal === 'strong_sell';
           const isJPY = res.symbol.includes('JPY');
           const decimals = isJPY ? 3 : 5;
-          const entry = res.entryPrice || 0;
           const tp = res.takeProfit || 0;
           const sl = res.stopLoss || 0;
 
@@ -117,13 +109,9 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
               style={{ alignSelf: 'start', backgroundColor: 'rgba(var(--card-bg),0.88)' }}
               className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden"
             >
-              {/* Compact Header - Always Visible */}
+              {/* Card content - same as TopSignals */}
               <button
-                onClick={() => {
-                  setSelectedIndex(idx);
-                  setExpandedCard(isExpanded ? null : `${res.symbol}_${idx}`);
-                  handleClick();
-                }}
+                onClick={() => { setSelectedIndex(idx); handleClick(); }}
                 className="w-full px-3 py-1.5 flex flex-col items-center gap-1"
               >
                 <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
@@ -140,34 +128,15 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
                 </div>
               </button>
 
-              {/* Expand/Collapse Arrow */}
-              <button onClick={(e) => { e.stopPropagation(); setExpandedCard(isExpanded ? null : `${res.symbol}_${idx}`); }} className="w-full flex items-center justify-center py-1 text-white/40 hover:text-white/70 transition-colors">
-                <span className="text-xs">{isExpanded ? '\u25B2' : '\u25BC'}</span>
-              </button>
-
-              {/* Expanded Content */}
-              {isExpanded && (
-                <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                  <div className="px-3 py-2 space-y-2">
-                    {/* Summary */}
-                    {res.summary && (
-                      <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed">
-                        <p className="font-bold">{res.summary}</p>
-                      </div>
-                    )}
-
-                    {/* Bright yellow Analysis Reasons button */}
-                    {res.detailedReasons && res.detailedReasons.length > 0 && onDetail && (
-                      <button
-                        onClick={() => onDetail(res)}
-                        className="w-full py-2.5 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 rounded-lg"
-                      >
-                        <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
-                        <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[10px]">{res.detailedReasons.length}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
+              {/* Yellow Analysis Reasons button */}
+              {res.detailedReasons && res.detailedReasons.length > 0 && onDetail && (
+                <button
+                  onClick={() => onDetail(res)}
+                  className="w-full py-2 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-2"
+                >
+                  <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+                  <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[9px]">{res.detailedReasons.length}</span>
+                </button>
               )}
             </motion.div>
           );
