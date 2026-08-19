@@ -1583,7 +1583,7 @@ Return ONLY valid JSON:
               finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL) {
             finalSignal = SignalType.NEUTRAL;
           }
-          const candleInfo = activeCandles.map(c => `${c.label}: ${c.data!.body.toFixed(0)} (${c.data!.direction === 'bullish' ? '↑' : c.data!.direction === 'bearish' ? '↓' : '?'} ${c.data!.direction === firstDir ? '✓' : '✗'})`).join(', ');
+          const candleInfo = activeCandles.map(c => `${c.label}: ${c.data!.body.toFixed(1)} (${c.data!.direction === 'bullish' ? '↑' : c.data!.direction === 'bearish' ? '↓' : '?'} ${c.data!.direction === firstDir ? '✓' : '✗'})`).join(', ');
           detailedReasons.push({
             check: 'Candle Match Filter',
             value: candleInfo,
@@ -1592,7 +1592,7 @@ Return ONLY valid JSON:
                     'BLOCKED: candle body size below threshold'
           });
         } else {
-          const candleInfo = activeCandles.map(c => `${c.label}: ${c.data!.body.toFixed(0)} (${c.data!.direction === 'bullish' ? '↑' : '↓'})`).join(', ');
+          const candleInfo = activeCandles.map(c => `${c.label}: ${c.data!.body.toFixed(1)} (${c.data!.direction === 'bullish' ? '↑' : '↓'})`).join(', ');
           detailedReasons.push({
             check: 'Candle Match Filter',
             value: candleInfo,
