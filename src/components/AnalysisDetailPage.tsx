@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, ShieldX, CheckCircle, XCircle, AlertTriangle, BarChart3, Target, Zap, CandlestickChart } from 'lucide-react';
 import { AnalysisResult, SignalType } from '../types';
 import { Language } from '../lib/i18n';
+import LotSizeCalculator from './LotSizeCalculator';
 
 interface AnalysisDetailPageProps {
   result: AnalysisResult;
@@ -132,7 +133,21 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
           <div ref={chartRef} className="w-full" style={{ height: '350px' }} />
         </div>
 
-        {/* 2. Signal Scores */}
+        {/* 2. Lot Size Calculator */}
+        {result.signal !== 'neutral' && result.signal !== 'no_entry' && (
+          <div className="rounded-2xl border border-white/5 bg-[#111827] overflow-hidden">
+            <LotSizeCalculator
+              symbol={result.symbol}
+              stopLoss={result.stopLoss || 0}
+              takeProfit={result.takeProfit || 0}
+              entryPrice={result.entryPrice}
+              signal={result.signal as any}
+              lang={lang}
+            />
+          </div>
+        )}
+
+        {/* 3. Signal Scores */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white/5 rounded-xl p-4 border border-white/5 text-center">
             <BarChart3 size={20} className="text-blue-400 mx-auto mb-1" />
