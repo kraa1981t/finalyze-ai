@@ -449,7 +449,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة يومية' : 'Daily (1d)'}</span>
               </div>
               <div className="w-24">
-                <NumberInput label="" value={settings.candleMatchDailyThreshold ?? 200} onChange={(v) => handleChange('candleMatchDailyThreshold', v)} color="text-[#F59E0B]" suffix="" min={0} max={9999} />
+                <NumberInput label="" value={settings.candleMatchDailyThreshold ?? 200} onChange={(v) => handleChange('candleMatchDailyThreshold', v)} color="text-[#F59E0B]" suffix={isAr ? 'بيبس' : 'pips'} min={0} max={9999} />
               </div>
             </div>
 
@@ -463,7 +463,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة أسبوعية' : 'Weekly (1w)'}</span>
               </div>
               <div className="w-24">
-                <NumberInput label="" value={settings.candleMatchWeeklyThreshold ?? 200} onChange={(v) => handleChange('candleMatchWeeklyThreshold', v)} color="text-[#F59E0B]" suffix="" min={0} max={9999} />
+                <NumberInput label="" value={settings.candleMatchWeeklyThreshold ?? 200} onChange={(v) => handleChange('candleMatchWeeklyThreshold', v)} color="text-[#F59E0B]" suffix={isAr ? 'بيبس' : 'pips'} min={0} max={9999} />
               </div>
             </div>
 
@@ -477,7 +477,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة شهرية' : 'Monthly (1M)'}</span>
               </div>
               <div className="w-24">
-                <NumberInput label="" value={settings.candleMatchMonthlyThreshold ?? 200} onChange={(v) => handleChange('candleMatchMonthlyThreshold', v)} color="text-[#F59E0B]" suffix="" min={0} max={9999} />
+                <NumberInput label="" value={settings.candleMatchMonthlyThreshold ?? 200} onChange={(v) => handleChange('candleMatchMonthlyThreshold', v)} color="text-[#F59E0B]" suffix={isAr ? 'بيبس' : 'pips'} min={0} max={9999} />
               </div>
             </div>
           </div>
