@@ -449,7 +449,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة يومية' : 'Daily (1d)'}</span>
               </div>
               <div className="flex items-center gap-1">
-                <input type="number" inputMode="decimal" lang="en"
+                <input type="number" inputMode="decimal" lang="en" step="0.1" min="0"
                   value={settings.candleMatchDailyThreshold ?? 10}
                   onChange={(e) => handleChange('candleMatchDailyThreshold', parseFloat(e.target.value) || 0)}
                   className="w-16 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
@@ -467,7 +467,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة أسبوعية' : 'Weekly (1w)'}</span>
               </div>
               <div className="flex items-center gap-1">
-                <input type="number" inputMode="decimal" lang="en"
+                <input type="number" inputMode="decimal" lang="en" step="0.1" min="0"
                   value={settings.candleMatchWeeklyThreshold ?? 20}
                   onChange={(e) => handleChange('candleMatchWeeklyThreshold', parseFloat(e.target.value) || 0)}
                   className="w-16 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
@@ -485,7 +485,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة شهرية' : 'Monthly (1M)'}</span>
               </div>
               <div className="flex items-center gap-1">
-                <input type="number" inputMode="decimal" lang="en"
+                <input type="number" inputMode="decimal" lang="en" step="0.1" min="0"
                   value={settings.candleMatchMonthlyThreshold ?? 30}
                   onChange={(e) => handleChange('candleMatchMonthlyThreshold', parseFloat(e.target.value) || 0)}
                   className="w-16 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
