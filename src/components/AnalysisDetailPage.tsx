@@ -65,11 +65,13 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
   const colors = getSignalColor(result.signal);
   const allReasons = result.detailedReasons || [];
 
-  const primaryReasons = allReasons.filter(r => ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'].some(p => r.check?.includes(p)));
-  const blockReasons = allReasons.filter(r => ['Sideways Filter', 'Confidence Penalty', 'Trend Penalty', 'Penalty'].some(p => r.check?.includes(p)));
+  const blockKeywords = ['Sideways Filter', 'Penalty', 'RSI Extreme', 'Age Zone', 'Trend Age Zone', 'Pullback Confirm', 'Block', 'BLOCKED', 'Higher TF Direction'];
+  const primaryReasons = allReasons.filter(r => ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'].some(p => r.check?.includes(p)) && !blockKeywords.some(p => r.check?.includes(p)));
+  const blockReasons = allReasons.filter(r => blockKeywords.some(p => r.check?.includes(p)));
   const candleMatchReason = allReasons.find(r => r.check?.includes('Candle Match'));
   const supportingReasons = allReasons.filter(r =>
-    !['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events', 'Candle Match', 'Sideways Filter', 'Confidence Penalty', 'Trend Penalty', 'Penalty'].some(p => r.check?.includes(p))
+    !['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events', 'Candle Match'].some(p => r.check?.includes(p)) &&
+    !blockKeywords.some(p => r.check?.includes(p))
   );
 
   const fmt = (v: number) => Number(v).toFixed(0);
