@@ -1,15 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { AnalysisResult, SignalType, MarketType } from '../types';
+import React, { useRef, useEffect } from 'react';
+import { AnalysisResult, SignalType } from '../types';
 import { X, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
-import LotSizeCalculator from './LotSizeCalculator';
 
 interface TopSignalsProps {
   signals: AnalysisResult[];
   onRemove: (symbol: string) => void;
   onSelect: (result: AnalysisResult) => void;
+  onDetail: (result: AnalysisResult) => void;
   onClearAll: () => void;
   lang: Language;
 }
@@ -55,14 +55,12 @@ const formatPublishDate = (timestamp: string, lang: string) => {
   }
 };
 
-export default function TopSignals({ signals, onRemove, onSelect, onClearAll, lang }: TopSignalsProps) {
+export default function TopSignals({ signals, onRemove, onSelect, onDetail, onClearAll, lang }: TopSignalsProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
-  const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
   if (signals.length === 0) return null;
 
-  // Filter out sideways signals as final safety net
   const filteredSignals = signals.filter(s => !s.isSideways);
 
   const grouped: Record<string, AnalysisResult[]> = { forex: [], crypto: [], stocks: [], metals: [] };
@@ -110,13 +108,13 @@ export default function TopSignals({ signals, onRemove, onSelect, onClearAll, la
             </div>
 
             {strong.map((res, idx) => (
-              <StrongCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} expandedCard={expandedCard} onExpand={setExpandedCard} onSelect={onSelect} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} />
+              <SignalCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={onSelect} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} />
             ))}
 
             {top3.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {top3.map((res, idx) => (
-                  <RegularCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} expandedCard={expandedCard} onExpand={setExpandedCard} onSelect={onSelect} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`r_${res.symbol}_${idx}`} />
+                  <SignalCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={onSelect} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`r_${res.symbol}_${idx}`} />
                 ))}
               </div>
             )}
@@ -127,113 +125,26 @@ export default function TopSignals({ signals, onRemove, onSelect, onClearAll, la
   );
 }
 
-function StrongCard({ res, isAr, expandedCard, onExpand, onSelect, onRemove, formatPublishDate, cardKey }: {
-  res: AnalysisResult; isAr: boolean; expandedCard: string | null;
-  onExpand: (v: string | null) => void;
-  onSelect: (r: AnalysisResult) => void; onRemove: (s: string) => void;
-  formatPublishDate: (ts: string, lang: string) => string; cardKey: string;
-}) {
-  const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.STRONG_BUY];
-  const isExpanded = expandedCard === cardKey;
-  const cardRef = useRef<HTMLDivElement>(null);
-  const isJPY = res.symbol.includes('JPY');
-  const decimals = isJPY ? 3 : 5;
-  const entry = res.entryPrice || (res.stopLoss && res.takeProfit ? (res.stopLoss + res.takeProfit) / 2 : 1.0);
-  const pipSize = isJPY ? 0.01 : 0.0001;
-  const slPips = 40;
-  const sl = res.stopLoss || ((res.signal.includes('buy')) ? entry - slPips * pipSize : entry + slPips * pipSize);
-  const tp = res.takeProfit || ((res.signal.includes('buy')) ? entry + slPips * 2 * pipSize : entry - slPips * 2 * pipSize);
-  const tpPrice = (res.signal.includes('buy')) ? entry + slPips * 2 * pipSize : entry - slPips * 2 * pipSize;
-  const slPrice = (res.signal.includes('buy')) ? entry - slPips * pipSize : entry + slPips * pipSize;
-
-  useEffect(() => {
-    if (isExpanded && cardRef.current) {
-      setTimeout(() => {
-        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 50);
-    }
-  }, [isExpanded]);
-
-  return (
-    <div ref={cardRef} className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden" style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
-      <button onClick={() => { onSelect(res); }} className="w-full px-3 py-1.5 flex flex-col items-center gap-1">
-        <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
-          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tpPrice.toFixed(decimals)}</span>
-          <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
-          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{slPrice.toFixed(decimals)}</span>
-        </div>
-        <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
-        <div className="flex items-center gap-2">
-          <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
-          {res.isSideways !== undefined && (
-            <span className={`text-xs font-black px-2 py-0.5 rounded-full border ${
-              res.isSideways ? 'text-white bg-white/20 border-white/30' :
-              res.sidewaysDirection === 'uptrend' ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' :
-              res.sidewaysDirection === 'downtrend' ? 'text-red-300 bg-red-500/20 border-red-500/30' : ''
-            }`}>
-              {res.isSideways ? (isAr ? 'عرضي' : 'Side') : res.sidewaysDirection === 'uptrend' ? (isAr ? 'صاعد' : 'Up') : res.sidewaysDirection === 'downtrend' ? (isAr ? 'هابط' : 'Down') : ''}
-            </span>
-          )}
-          <span className="text-[10px] sm:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, isAr ? 'ar' : 'en')}</span>
-        </div>
-      </button>
-
-      <button onClick={(e) => { e.stopPropagation(); onExpand(isExpanded ? null : cardKey); }} className="w-full flex items-center justify-center py-1 text-white/40 hover:text-white/70 transition-colors">
-        <span className="text-xs">{isExpanded ? '\u25B2' : '\u25BC'}</span>
-      </button>
-
-      {isExpanded && (
-        <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
-          <div className="px-3 py-2 space-y-2">
-            {res.signal !== 'neutral' && res.signal !== 'no_entry' && (
-              <LotSizeCalculator symbol={res.symbol} stopLoss={sl} takeProfit={tp} entryPrice={entry} signal={res.signal as any} lang={isAr ? 'ar' : 'en'} />
-            )}
-            {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
-          </div>
-        </div>
-      )}
-
-      <button onClick={(e) => { e.stopPropagation(); onRemove(res.symbol); }} className="absolute top-1 left-1 p-1 hover:bg-red-500/20 rounded-md text-white/20 hover:text-red-500 transition-colors">
-        <X size={12} />
-      </button>
-    </div>
-  );
-}
-
-function RegularCard({ res, isAr, expandedCard, onExpand, onSelect, onRemove, formatPublishDate, cardKey }: {
-  res: AnalysisResult; isAr: boolean; expandedCard: string | null;
-  onExpand: (v: string | null) => void;
-  onSelect: (r: AnalysisResult) => void; onRemove: (s: string) => void;
+function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate, cardKey }: {
+  res: AnalysisResult; isAr: boolean;
+  onSelect: (r: AnalysisResult) => void; onDetail: (r: AnalysisResult) => void; onRemove: (s: string) => void;
   formatPublishDate: (ts: string, lang: string) => string; cardKey: string;
 }) {
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.BUY];
-  const isExpanded = expandedCard === cardKey;
-  const cardRef = useRef<HTMLDivElement>(null);
   const isJPY = res.symbol.includes('JPY');
   const decimals = isJPY ? 3 : 5;
-  const entry = res.entryPrice || (res.stopLoss && res.takeProfit ? (res.stopLoss + res.takeProfit) / 2 : 1.0);
-  const pipSize = isJPY ? 0.01 : 0.0001;
-  const slPips = 25;
-  const sl = res.stopLoss || ((res.signal.includes('buy')) ? entry - slPips * pipSize : entry + slPips * pipSize);
-  const tp = res.takeProfit || ((res.signal.includes('buy')) ? entry + slPips * 2 * pipSize : entry - slPips * 2 * pipSize);
-  const tpPrice = (res.signal.includes('buy')) ? entry + slPips * 2 * pipSize : entry - slPips * 2 * pipSize;
-  const slPrice = (res.signal.includes('buy')) ? entry - slPips * pipSize : entry + slPips * pipSize;
-
-  useEffect(() => {
-    if (isExpanded && cardRef.current) {
-      setTimeout(() => {
-        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 50);
-    }
-  }, [isExpanded]);
+  const isStrong = res.signal === SignalType.STRONG_BUY || res.signal === SignalType.STRONG_SELL;
+  const tpPrice = res.takeProfit || 0;
+  const slPrice = res.stopLoss || 0;
 
   return (
-    <div ref={cardRef} className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden" style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
+    <div className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden relative" style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
+      {/* Main card content */}
       <button onClick={() => { onSelect(res); }} className="w-full px-3 py-1.5 flex flex-col items-center gap-1">
         <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
-          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tpPrice.toFixed(decimals)}</span>
+          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tpPrice ? tpPrice.toFixed(decimals) : '—'}</span>
           <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
-          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{slPrice.toFixed(decimals)}</span>
+          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{slPrice ? slPrice.toFixed(decimals) : '—'}</span>
         </div>
         <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
         <div className="flex items-center gap-2">
@@ -251,20 +162,15 @@ function RegularCard({ res, isAr, expandedCard, onExpand, onSelect, onRemove, fo
         </div>
       </button>
 
-      {/* Expand/Collapse for LotSize + Summary only */}
-      <button onClick={(e) => { e.stopPropagation(); onExpand(isExpanded ? null : cardKey); }} className="w-full flex items-center justify-center py-1 text-white/40 hover:text-white/70 transition-colors">
-        <span className="text-xs">{isExpanded ? '\u25B2' : '\u25BC'}</span>
-      </button>
-
-      {isExpanded && (
-        <div className="border-t border-white/10 px-3 py-2 space-y-2">
-          {res.signal !== 'neutral' && res.signal !== 'no_entry' && (
-            <LotSizeCalculator symbol={res.symbol} stopLoss={sl} takeProfit={tp} entryPrice={entry} signal={res.signal as any} lang={isAr ? 'ar' : 'en'} />
-          )}
-          {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
-        </div>
+      {/* Yellow Analysis Reasons button - directly under percentage */}
+      {res.detailedReasons && res.detailedReasons.length > 0 && (
+        <button onClick={(e) => { e.stopPropagation(); onDetail(res); }} className="w-full py-2 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-2">
+          <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+          <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[9px]">{res.detailedReasons.length}</span>
+        </button>
       )}
 
+      {/* Remove button */}
       <button onClick={(e) => { e.stopPropagation(); onRemove(res.symbol); }} className="absolute top-1 left-1 p-1 hover:bg-red-500/20 rounded-md text-white/20 hover:text-red-500 transition-colors">
         <X size={12} />
       </button>
