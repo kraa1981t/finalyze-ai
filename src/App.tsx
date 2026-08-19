@@ -1987,9 +1987,9 @@ export default function App() {
         )}
 
         {/* Floating back button - always visible on all pages */}
-        {effectivePage !== 'main' && (
+        {(effectivePage !== 'main' || detailResult) && (
           <button
-            onClick={() => { if (effectivePage === 'detail') { setDetailResult(null); } else if (analysisResults) { setAnalysisResults(null); setAnalysisError(null); } goBack(); }}
+            onClick={() => { if (detailResult) { setDetailResult(null); } else if (analysisResults) { setAnalysisResults(null); setAnalysisError(null); } goBack(); }}
             className="fixed bottom-6 left-6 z-[90] flex items-center gap-3 bg-[#F59E0B] hover:bg-[#d97706] transition-all rounded-2xl px-5 py-4 shadow-2xl shadow-[#F59E0B]/30 active:scale-95 group"
           >
             <ArrowLeft size={22} className="text-black group-hover:-translate-x-1 transition-transform" />
