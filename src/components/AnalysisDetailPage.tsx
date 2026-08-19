@@ -204,64 +204,65 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
           )}
         </div>
 
-        {/* 5. Candle Match - detailed per candle */}
-        {candleMatchReason && (
-          <div className={`rounded-2xl p-5 border ${candleMatchReason.status === 'positive' ? 'border-emerald-500/30 bg-emerald-500/5' : candleMatchReason.status === 'negative' ? 'border-red-500/30 bg-red-500/5' : 'border-yellow-500/30 bg-yellow-500/5'}`}>
-            <div className="flex items-center gap-2 mb-4">
-              <CandlestickChart size={22} className={candleMatchReason.status === 'positive' ? 'text-emerald-400' : candleMatchReason.status === 'negative' ? 'text-red-400' : 'text-yellow-400'} />
-              <span className="text-lg font-black text-white uppercase tracking-wider">{isAr ? 'تطابق الشموع' : 'CANDLE MATCH'}</span>
-              {candleMatchReason.status === 'positive' ? (
+        {/* 5. Candle Match - always show */}
+        <div className="rounded-2xl p-5 border border-white/10 bg-white/5">
+          <div className="flex items-center gap-2 mb-4">
+            <CandlestickChart size={22} className="text-[#F59E0B]" />
+            <span className="text-lg font-black text-white uppercase tracking-wider">{isAr ? 'تطابق الشموع' : 'CANDLE MATCH'}</span>
+            {candleMatchReason ? (
+              candleMatchReason.status === 'positive' ? (
                 <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-emerald-500/10 text-emerald-400">{isAr ? 'متطابقة' : 'MATCHED'}</span>
               ) : (
                 <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-red-500/10 text-red-400">{isAr ? 'غير متطابقة' : 'NOT MATCHED'}</span>
-              )}
-            </div>
-            {/* Each candle separately */}
-            <div className="space-y-3">
-              {parseCandleInfo(candleMatchReason.value).map((c, i) => c && (
-                <div key={i} className={`rounded-xl p-4 border ${c.isMatch ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {/* Timeframe */}
-                      <span className="text-lg font-black text-white/60 uppercase bg-white/10 px-3 py-1 rounded-lg">{c.tf}</span>
-                      {/* Direction icon + label */}
-                      <div className={`flex items-center gap-2 ${c.isBullish ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {c.isBullish ? <TrendingUp size={22} /> : <TrendingDown size={22} />}
-                        <span className="text-lg font-black">
-                          {c.isBullish ? (isAr ? 'صاعد ▲' : 'Bullish ▲') : (isAr ? 'هابط ▼' : 'Bearish ▼')}
+              )
+            ) : (
+              <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-white/10 text-white/40">{isAr ? 'غير مفعّل' : 'DISABLED'}</span>
+            )}
+          </div>
+          {candleMatchReason ? (
+            <>
+              <div className="space-y-3">
+                {parseCandleInfo(candleMatchReason.value).map((c, i) => c && (
+                  <div key={i} className={`rounded-xl p-4 border ${c.isMatch ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-black text-white/60 uppercase bg-white/10 px-3 py-1 rounded-lg">{c.tf}</span>
+                        <div className={`flex items-center gap-2 ${c.isBullish ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {c.isBullish ? <TrendingUp size={22} /> : <TrendingDown size={22} />}
+                          <span className="text-lg font-black">
+                            {c.isBullish ? (isAr ? 'صاعد ▲' : 'Bullish ▲') : (isAr ? 'هابط ▼' : 'Bearish ▼')}
+                          </span>
+                        </div>
+                        <span className={`text-sm font-bold px-2 py-0.5 rounded ${c.isBullish ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
+                          {c.isBullish ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
                         </span>
                       </div>
-                      {/* Buy/Sell label */}
-                      <span className={`text-sm font-bold px-2 py-0.5 rounded ${c.isBullish ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
-                        {c.isBullish ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {/* Body size */}
-                      <span className="text-2xl font-black font-mono text-white">{c.body}</span>
-                      <span className="text-sm text-white/40">{isAr ? 'نقطة' : 'pts'}</span>
-                      {/* Match status */}
-                      {c.checkChar && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl font-black font-mono text-white">{c.body}</span>
+                        <span className="text-sm text-white/40">{isAr ? 'نقطة' : 'pts'}</span>
                         <span className={`text-2xl font-black ${c.isMatch ? 'text-emerald-400' : 'text-red-400'}`}>
                           {c.isMatch ? '✓' : '✗'}
                         </span>
-                      )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-            <p className="text-sm text-white/40 mt-3 leading-relaxed">{candleMatchReason.impact}</p>
-          </div>
-        )}
+                ))}
+              </div>
+              <p className="text-sm text-white/40 mt-3 leading-relaxed">{candleMatchReason.impact}</p>
+            </>
+          ) : (
+            <div className="text-sm text-white/30 italic py-2">{isAr ? 'لم يتم تفعيل فلتر تطابق الشموع أو لا توجد بيانات كافية' : 'Candle match filter not enabled or insufficient data'}</div>
+          )}
+        </div>
 
-        {/* 6. Block Filters */}
+        {/* 6. Block Filters - always show */}
         <Section
           title={isAr ? 'فلاتر المنع' : 'BLOCK FILTERS'}
           icon={<ShieldX size={20} className="text-red-400" />}
           color="red"
           reasons={blockReasons}
           lang={lang}
+          alwaysShow={true}
         />
 
         {/* 7. Primary Conditions */}
@@ -298,12 +299,13 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
   );
 }
 
-function Section({ title, icon, color, reasons, lang }: {
+function Section({ title, icon, color, reasons, lang, alwaysShow }: {
   title: string;
   icon: React.ReactNode;
   color: 'amber' | 'blue' | 'red';
   reasons: { check: string; value: string; status: string; impact: string }[];
   lang: Language;
+  alwaysShow?: boolean;
 }) {
   const isAr = lang === 'ar';
   const colorMap = {
@@ -313,18 +315,7 @@ function Section({ title, icon, color, reasons, lang }: {
   };
   const c = colorMap[color];
 
-  if (reasons.length === 0) {
-    return (
-      <div className="space-y-3">
-        <div className={`flex items-center gap-2 pb-2 border-b ${c.header}`}>
-          {icon}
-          <span className="text-lg font-black text-white uppercase tracking-wider">{title}</span>
-          <span className={`ml-auto px-2 py-0.5 rounded-md text-sm font-black ${c.badge}`}>0</span>
-        </div>
-        <div className="text-sm text-white/30 italic py-2">{isAr ? 'لا توجد نتائج' : 'No results'}</div>
-      </div>
-    );
-  }
+  if (reasons.length === 0 && !alwaysShow) return null;
 
   return (
     <div className="space-y-3">
@@ -336,7 +327,7 @@ function Section({ title, icon, color, reasons, lang }: {
         </span>
       </div>
       <div className="space-y-3">
-        {reasons.map((r, i) => (
+        {reasons.length > 0 ? reasons.map((r, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, x: -10 }}
@@ -356,7 +347,9 @@ function Section({ title, icon, color, reasons, lang }: {
               </div>
             </div>
           </motion.div>
-        ))}
+        )) : (
+          <div className="text-sm text-white/30 italic py-2">{isAr ? 'لا توجد فلاتر منع مُفعّلة' : 'No block filters triggered'}</div>
+        )}
       </div>
     </div>
   );
