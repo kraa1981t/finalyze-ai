@@ -149,18 +149,6 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
               {isExpanded && (
                 <div className="border-t border-white/10" style={{ maxHeight: '350px', overflowY: 'auto' }}>
                   <div className="px-3 py-2 space-y-2">
-                    {/* Lot Size Calculator - hidden for neutral */}
-                    {res.signal !== 'neutral' && res.signal !== 'no_entry' && (
-                      <LotSizeCalculator
-                        symbol={res.symbol}
-                        stopLoss={sl}
-                        takeProfit={tp}
-                        entryPrice={entry}
-                        signal={res.signal as any}
-                        lang={lang}
-                      />
-                    )}
-
                     {/* Summary */}
                     {res.summary && (
                       <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed">

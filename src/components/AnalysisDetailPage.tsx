@@ -128,9 +128,23 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
 
       <div className="max-w-5xl mx-auto px-4 space-y-5 mt-4 pb-20">
 
-        {/* 1. Chart */}
-        <div className="rounded-2xl overflow-hidden border border-white/5 bg-[#111827]">
-          <div ref={chartRef} className="w-full" style={{ height: '350px' }} />
+        {/* 1. Signal Scores - top of page, large */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
+            <BarChart3 size={28} className="text-blue-400 mx-auto mb-2" />
+            <div className="text-xs text-white/40 uppercase tracking-wider mb-1">{isAr ? 'تقني' : 'Technical'}</div>
+            <div className="text-4xl font-black text-blue-400">{result.technicalScore}%</div>
+          </div>
+          <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
+            <Zap size={28} className="text-purple-400 mx-auto mb-2" />
+            <div className="text-xs text-white/40 uppercase tracking-wider mb-1">{isAr ? 'مشاعر' : 'Sentiment'}</div>
+            <div className="text-4xl font-black text-purple-400">{result.sentimentScore}%</div>
+          </div>
+          <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
+            <Target size={28} className="text-emerald-400 mx-auto mb-2" />
+            <div className="text-xs text-white/40 uppercase tracking-wider mb-1">{isAr ? 'ثقة' : 'Confidence'}</div>
+            <div className={`text-4xl font-black ${colors.text}`}>{result.confidence}%</div>
+          </div>
         </div>
 
         {/* 2. Lot Size Calculator */}
@@ -147,23 +161,9 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
           </div>
         )}
 
-        {/* 3. Signal Scores */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white/5 rounded-xl p-4 border border-white/5 text-center">
-            <BarChart3 size={20} className="text-blue-400 mx-auto mb-1" />
-            <div className="text-[10px] text-white/40 uppercase tracking-wider">{isAr ? 'تقني' : 'Technical'}</div>
-            <div className="text-xl font-black text-blue-400">{result.technicalScore}%</div>
-          </div>
-          <div className="bg-white/5 rounded-xl p-4 border border-white/5 text-center">
-            <Zap size={20} className="text-purple-400 mx-auto mb-1" />
-            <div className="text-[10px] text-white/40 uppercase tracking-wider">{isAr ? 'مشاعر' : 'Sentiment'}</div>
-            <div className="text-xl font-black text-purple-400">{result.sentimentScore}%</div>
-          </div>
-          <div className="bg-white/5 rounded-xl p-4 border border-white/5 text-center">
-            <Target size={20} className="text-emerald-400 mx-auto mb-1" />
-            <div className="text-[10px] text-white/40 uppercase tracking-wider">{isAr ? 'ثقة' : 'Confidence'}</div>
-            <div className={`text-xl font-black ${colors.text}`}>{result.confidence}%</div>
-          </div>
+        {/* 3. Chart */}
+        <div className="rounded-2xl overflow-hidden border border-white/5 bg-[#111827]">
+          <div ref={chartRef} className="w-full" style={{ height: '350px' }} />
         </div>
 
         {/* 3. Trend Info - Age + Direction */}
