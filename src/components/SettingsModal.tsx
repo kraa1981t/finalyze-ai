@@ -341,7 +341,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(String(value)); setFocused(false); } }}
             onChange={(e) => setDraft(e.target.value.replace(/[^0-9.\-]/g, ''))}
             className={`w-20 text-center text-sm font-black font-mono notranslate ${color} bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none`} />
-          {suffix && <span className="text-[10px] text-brand-text/30 font-mono">{suffix}</span>}
+          {suffix && <span className="text-[11px] text-[#F59E0B] font-bold ml-1">{suffix}</span>}
         </div>
       </div>
     );
