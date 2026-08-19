@@ -453,7 +453,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                   value={settings.candleMatchDailyThreshold ?? 10}
                   onChange={(e) => handleChange('candleMatchDailyThreshold', parseFloat(e.target.value) || 0)}
                   className="w-14 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
-                <span className="text-sm text-[#F59E0B] font-black whitespace-nowrap">بيبس</span>
+                <span className="text-[13px] font-black text-white whitespace-nowrap">بيبس</span>
               </div>
             </div>
 
@@ -471,7 +471,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                   value={settings.candleMatchWeeklyThreshold ?? 20}
                   onChange={(e) => handleChange('candleMatchWeeklyThreshold', parseFloat(e.target.value) || 0)}
                   className="w-14 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
-                <span className="text-sm text-[#F59E0B] font-black whitespace-nowrap">بيبس</span>
+                <span className="text-[13px] font-black text-white whitespace-nowrap">بيبس</span>
               </div>
             </div>
 
@@ -489,7 +489,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                   value={settings.candleMatchMonthlyThreshold ?? 30}
                   onChange={(e) => handleChange('candleMatchMonthlyThreshold', parseFloat(e.target.value) || 0)}
                   className="w-14 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
-                <span className="text-sm text-[#F59E0B] font-black whitespace-nowrap">بيبس</span>
+                <span className="text-[13px] font-black text-white whitespace-nowrap">بيبس</span>
               </div>
             </div>
           </div>
