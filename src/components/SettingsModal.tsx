@@ -447,13 +447,13 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                   <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${settings.candleMatchDailyEnabled !== false ? 'translate-x-4' : 'translate-x-0'}`} />
                 </button>
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة يومية' : 'Daily (1d)'}</span>
-                <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? '(بيبس)' : '(pips)'}</span>
               </div>
-              <div>
+              <div className="flex items-center gap-1">
                 <input type="number" inputMode="decimal" lang="en"
                   value={settings.candleMatchDailyThreshold ?? 10}
                   onChange={(e) => handleChange('candleMatchDailyThreshold', parseFloat(e.target.value) || 0)}
                   className="w-16 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
+                <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? 'بيبس' : 'pips'}</span>
               </div>
             </div>
 
@@ -465,13 +465,13 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                   <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${settings.candleMatchWeeklyEnabled !== false ? 'translate-x-4' : 'translate-x-0'}`} />
                 </button>
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة أسبوعية' : 'Weekly (1w)'}</span>
-                <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? '(بيبس)' : '(pips)'}</span>
               </div>
-              <div>
+              <div className="flex items-center gap-1">
                 <input type="number" inputMode="decimal" lang="en"
                   value={settings.candleMatchWeeklyThreshold ?? 20}
                   onChange={(e) => handleChange('candleMatchWeeklyThreshold', parseFloat(e.target.value) || 0)}
                   className="w-16 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
+                <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? 'بيبس' : 'pips'}</span>
               </div>
             </div>
 
@@ -483,13 +483,13 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                   <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${settings.candleMatchMonthlyEnabled !== false ? 'translate-x-4' : 'translate-x-0'}`} />
                 </button>
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة شهرية' : 'Monthly (1M)'}</span>
-                <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? '(بيبس)' : '(pips)'}</span>
               </div>
-              <div>
+              <div className="flex items-center gap-1">
                 <input type="number" inputMode="decimal" lang="en"
                   value={settings.candleMatchMonthlyThreshold ?? 30}
                   onChange={(e) => handleChange('candleMatchMonthlyThreshold', parseFloat(e.target.value) || 0)}
                   className="w-16 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
+                <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? 'بيبس' : 'pips'}</span>
               </div>
             </div>
           </div>
