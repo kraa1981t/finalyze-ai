@@ -238,7 +238,7 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-2xl font-black font-mono text-white">{c.body}</span>
-                        <span className="text-sm text-white/40">{isAr ? 'نقطة' : 'pts'}</span>
+                        <span className="text-sm text-white/40">{isAr ? 'بيبس' : 'pips'}</span>
                         <span className={`text-2xl font-black ${c.isMatch ? 'text-emerald-400' : 'text-red-400'}`}>
                           {c.isMatch ? '✓' : '✗'}
                         </span>
