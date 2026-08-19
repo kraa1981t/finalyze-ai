@@ -333,7 +333,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
           <div className="text-xs font-bold text-brand-text">{label}</div>
           {desc && <div className="text-[10px] text-brand-text/40 mt-0.5">{desc}</div>}
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <input type="text" inputMode="decimal" translate="no" dir="ltr" lang="en"
             value={focused ? draft : draft}
             onFocus={() => { setFocused(true); setDraft(String(value)); }}
@@ -341,7 +341,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(String(value)); setFocused(false); } }}
             onChange={(e) => setDraft(e.target.value.replace(/[^0-9.\-]/g, ''))}
             className={`w-20 text-center text-sm font-black font-mono notranslate ${color} bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none`} />
-          {suffix && <span className="text-[11px] text-[#F59E0B] font-bold ml-1">{suffix}</span>}
+          {suffix && <span className="text-xs text-[#F59E0B] font-bold whitespace-nowrap">{suffix}</span>}
         </div>
       </div>
     );
@@ -448,7 +448,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 </button>
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة يومية' : 'Daily (1d)'}</span>
               </div>
-              <div className="w-24">
+              <div className="w-32">
                 <NumberInput label="" value={settings.candleMatchDailyThreshold ?? 200} onChange={(v) => handleChange('candleMatchDailyThreshold', v)} color="text-[#F59E0B]" suffix={isAr ? 'بيبس' : 'pips'} min={0} max={9999} />
               </div>
             </div>
@@ -462,7 +462,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 </button>
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة أسبوعية' : 'Weekly (1w)'}</span>
               </div>
-              <div className="w-24">
+              <div className="w-32">
                 <NumberInput label="" value={settings.candleMatchWeeklyThreshold ?? 200} onChange={(v) => handleChange('candleMatchWeeklyThreshold', v)} color="text-[#F59E0B]" suffix={isAr ? 'بيبس' : 'pips'} min={0} max={9999} />
               </div>
             </div>
@@ -476,7 +476,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 </button>
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة شهرية' : 'Monthly (1M)'}</span>
               </div>
-              <div className="w-24">
+              <div className="w-32">
                 <NumberInput label="" value={settings.candleMatchMonthlyThreshold ?? 200} onChange={(v) => handleChange('candleMatchMonthlyThreshold', v)} color="text-[#F59E0B]" suffix={isAr ? 'بيبس' : 'pips'} min={0} max={9999} />
               </div>
             </div>
