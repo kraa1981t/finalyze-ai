@@ -303,6 +303,70 @@ const fetchBinanceData = async (symbol: string, timeframe: string): Promise<any>
   };
 };
 
+// Helper: Twelve Data OHLC → Yahoo format
+const TWELVE_DATA_API_KEY = process.env.TWELVE_DATA_API_KEY || '';
+const TWELVE_DATA_INTERVALS: Record<string, string> = {
+  '1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min',
+  '1h': '1h', '4h': '4h', '1d': '1day', '1w': '1week', '1M': '1month',
+};
+const TWELVE_DATA_OUTPUTSIZE: Record<string, number> = {
+  '1m': 100, '5m': 100, '15m': 100, '30m': 100,
+  '1h': 200, '4h': 200, '1d': 200, '1w': 100, '1M': 60,
+};
+
+function twelveDataSymbol(symbol: string): string | null {
+  const s = symbol.toUpperCase().replace(/[^A-Z]/g, '');
+  if (s.length !== 6) return null;
+  const base = s.slice(0, 3);
+  const quote = s.slice(3);
+  return `${base}/${quote}`;
+}
+
+const fetchTwelveDataOHLC = async (symbol: string, timeframe: string): Promise<any> => {
+  if (!TWELVE_DATA_API_KEY) return null;
+  const tdSymbol = twelveDataSymbol(symbol);
+  if (!tdSymbol) return null;
+  const interval = TWELVE_DATA_INTERVALS[timeframe] || '1day';
+  const outputsize = TWELVE_DATA_OUTPUTSIZE[timeframe] || 200;
+
+  try {
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 12000);
+    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(tdSymbol)}&interval=${interval}&outputsize=${outputsize}&apikey=${TWELVE_DATA_API_KEY}`;
+    const resp = await fetch(url, { signal: ac.signal });
+    clearTimeout(timeout);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (data.status === 'error' || !data.values || data.values.length === 0) return null;
+
+    const values = [...data.values].reverse();
+    return {
+      chart: {
+        result: [{
+          meta: {
+            symbol,
+            dataGranularity: interval,
+            regularMarketTime: Math.floor(Date.now() / 1000),
+            regularMarketPrice: parseFloat(values[values.length - 1]?.close || '0'),
+          },
+          timestamp: values.map((v: any) => Math.floor(new Date(v.datetime).getTime() / 1000)),
+          indicators: {
+            quote: [{
+              open: values.map((v: any) => parseFloat(v.open)),
+              high: values.map((v: any) => parseFloat(v.high)),
+              low: values.map((v: any) => parseFloat(v.low)),
+              close: values.map((v: any) => parseFloat(v.close)),
+              volume: values.map((v: any) => parseInt(v.volume || '0', 10)),
+            }]
+          }
+        }]
+      }
+    };
+  } catch {
+    return null;
+  }
+};
+
 // API Route: Market Data
 app.get("/api/market-data", async (req, res) => {
   try {
@@ -357,6 +421,16 @@ app.get("/api/market-data", async (req, res) => {
     if (isCrypto) {
       const binanceData = await fetchBinanceData(rawSymbol, timeframe);
       if (binanceData) return res.json(binanceData);
+    }
+
+    // Try Twelve Data first for forex (accurate current candle OHLC)
+    if (isForex) {
+      const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
+      if (twelveData) {
+        console.log(`[TwelveData] ${rawSymbol} ${timeframe} OK`);
+        return res.json(twelveData);
+      }
+      console.log(`[TwelveData] ${rawSymbol} ${timeframe} failed, falling back to Yahoo`);
     }
 
     let attempts: string[] = [];
