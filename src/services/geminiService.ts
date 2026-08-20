@@ -1545,9 +1545,9 @@ Return ONLY valid JSON:
         if (!q?.close || !q?.open) return null;
         const closes = q.close.filter((c: any) => c != null);
         const opens = q.open.filter((o: any) => o != null);
-        if (closes.length < 2 || opens.length < 2) return null;
-        const lastClose = closes[closes.length - 2];
-        const lastOpen = opens[opens.length - 2];
+        if (closes.length < 1 || opens.length < 1) return null;
+        const lastClose = closes[closes.length - 1];
+        const lastOpen = opens[opens.length - 1];
         const body = Math.abs(lastClose - lastOpen) * bodyMultiplier;
         const dir = lastClose > lastOpen ? 'bullish' : lastClose < lastOpen ? 'bearish' : 'unknown';
         return { body, direction: dir };
