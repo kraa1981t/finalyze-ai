@@ -551,63 +551,56 @@ export default function Header({
                   onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled });
                 }}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl border-2 shadow-lg transition-all min-w-[180px]",
+                  "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 shadow-lg transition-all min-w-[180px]",
                   analysisProgress
-                    ? 'bg-blue-500/20 border-blue-500/50 shadow-blue-500/20'
+                    ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/40 animate-pulse'
                     : lastSyncStatus?.ok
-                      ? 'bg-emerald-500/20 border-emerald-500/50 shadow-emerald-500/20'
+                      ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/40'
                       : lastSyncStatus
-                        ? 'bg-red-500/20 border-red-500/50 shadow-red-500/20'
+                        ? 'bg-red-700 border-red-800 text-white shadow-red-500/40'
                         : autoSettings.isEnabled
                           ? (isWaiting
-                            ? 'bg-yellow-500/20 border-yellow-500/50 shadow-yellow-500/20'
-                            : 'bg-emerald-500/20 border-emerald-500/50 shadow-emerald-500/20')
-                          : 'bg-[#F59E0B]/20 border-[#F59E0B]/50 shadow-[#F59E0B]/20'
+                            ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/40'
+                            : 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/40')
+                          : 'bg-red-700 border-red-800 text-white shadow-red-500/30'
                 )}
               >
-                <div className="relative">
+                <div className="relative flex-shrink-0">
                   {analysisProgress ? (
-                    <div className="w-4 h-4 rounded-full bg-blue-500 animate-pulse" />
+                    <div className="w-5 h-5 rounded-full bg-white animate-bounce shadow-[0_0_16px_rgba(255,255,255,0.8)]" />
                   ) : lastSyncStatus ? (
-                    <span className="text-base">{lastSyncStatus.ok ? '✓' : '✗'}</span>
+                    <span className="text-lg font-black">{lastSyncStatus.ok ? '✓' : '✗'}</span>
                   ) : (
-                    <Zap size={16} fill={autoSettings.isEnabled ? "currentColor" : "none"} className={
-                      autoSettings.isEnabled
-                        ? (isWaiting ? 'text-yellow-500' : 'text-emerald-500')
-                        : 'text-[#F59E0B]'
-                    } />
+                    <Zap size={20} fill={autoSettings.isEnabled ? "currentColor" : "none"} className="text-white" />
                   )}
-                  {autoSettings.isEnabled && !isWaiting && !analysisProgress && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-white rounded-full animate-ping shadow-[0_0_12px_white]" />
+                  {(analysisProgress || (autoSettings.isEnabled && !isWaiting)) && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-ping shadow-[0_0_16px_white]" />
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
                   {analysisProgress ? (
                     <>
-                      <span className="text-[11px] font-black text-blue-500 uppercase tracking-wider whitespace-nowrap">
+                      <span className="text-[14px] font-black text-white uppercase tracking-wider whitespace-nowrap">
                         {analysisProgress.index + 1}/{analysisProgress.total}
                       </span>
-                      <span className="text-[11px] font-black text-black truncate max-w-[90px]">
+                      <span className="text-[14px] font-black text-yellow-300 truncate max-w-[120px]">
                         {analysisProgress.current}
                       </span>
                     </>
                   ) : lastSyncStatus ? (
                     <>
-                      <span className={cn(
-                        "text-[11px] font-black uppercase tracking-wider whitespace-nowrap",
-                        lastSyncStatus.ok ? 'text-emerald-500' : 'text-red-500'
-                      )}>
+                      <span className="text-[13px] font-black uppercase tracking-wider text-white whitespace-nowrap">
                         {lastSyncStatus.ok ? 'SYNCED' : 'FAILED'}
                       </span>
                       {lastSyncStatus.count !== undefined && (
-                        <span className="text-[11px] font-black text-black whitespace-nowrap">
+                        <span className="text-[13px] font-black text-yellow-300 whitespace-nowrap">
                           {lastSyncStatus.count} {lang === 'ar' ? 'إشارة' : 'signals'}
                         </span>
                       )}
                     </>
                   ) : (
-                    <span className="text-[11px] font-black uppercase tracking-wider text-black whitespace-nowrap">
-                      {autoSettings.isEnabled ? (isWaiting ? (lang === 'ar' ? 'انتظار' : 'Waiting') : (lang === 'ar' ? ' فحص' : 'Scanning')) : 'OFF'}
+                    <span className="text-[13px] font-black uppercase tracking-wider text-white whitespace-nowrap">
+                      {autoSettings.isEnabled ? (isWaiting ? (lang === 'ar' ? '⏳ انتظار' : '⏳ Waiting') : (lang === 'ar' ? '🔍 فحص' : '🔍 Scanning')) : '🔴 OFF'}
                     </span>
                   )}
                 </div>
