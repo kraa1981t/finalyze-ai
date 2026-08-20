@@ -448,10 +448,11 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 </button>
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة يومية' : 'Daily (1d)'}</span>
               </div>
-              <div className="flex items-center gap-1" dir="ltr">
-                <input type="number" inputMode="decimal" lang="en" step="0.1" min="0"
+              <div className="flex items-center gap-1" dir="ltr" lang="en">
+                <input type="text" inputMode="decimal" lang="en" autoComplete="off"
                   value={settings.candleMatchDailyThreshold ?? 10}
-                  onChange={(e) => handleChange('candleMatchDailyThreshold', parseFloat(e.target.value) || 0)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); if (v === '' || v === '.') { handleChange('candleMatchDailyThreshold', 0); } else { const n = parseFloat(v); if (!isNaN(n)) handleChange('candleMatchDailyThreshold', n); } }}
+                  style={{ fontVariantNumeric: 'lining-nums tabular-nums', WebkitTextSecurity: 'none' }}
                   className="w-20 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
                 <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? 'بيبس' : 'pips'}</span>
               </div>
@@ -466,10 +467,11 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 </button>
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة أسبوعية' : 'Weekly (1w)'}</span>
               </div>
-              <div className="flex items-center gap-1" dir="ltr">
-                <input type="number" inputMode="decimal" lang="en" step="0.1" min="0"
+              <div className="flex items-center gap-1" dir="ltr" lang="en">
+                <input type="text" inputMode="decimal" lang="en" autoComplete="off"
                   value={settings.candleMatchWeeklyThreshold ?? 20}
-                  onChange={(e) => handleChange('candleMatchWeeklyThreshold', parseFloat(e.target.value) || 0)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); if (v === '' || v === '.') { handleChange('candleMatchWeeklyThreshold', 0); } else { const n = parseFloat(v); if (!isNaN(n)) handleChange('candleMatchWeeklyThreshold', n); } }}
+                  style={{ fontVariantNumeric: 'lining-nums tabular-nums', WebkitTextSecurity: 'none' }}
                   className="w-20 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
                 <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? 'بيبس' : 'pips'}</span>
               </div>
@@ -484,10 +486,11 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                 </button>
                 <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة شهرية' : 'Monthly (1M)'}</span>
               </div>
-              <div className="flex items-center gap-1" dir="ltr">
-                <input type="number" inputMode="decimal" lang="en" step="0.1" min="0"
+              <div className="flex items-center gap-1" dir="ltr" lang="en">
+                <input type="text" inputMode="decimal" lang="en" autoComplete="off"
                   value={settings.candleMatchMonthlyThreshold ?? 30}
-                  onChange={(e) => handleChange('candleMatchMonthlyThreshold', parseFloat(e.target.value) || 0)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); if (v === '' || v === '.') { handleChange('candleMatchMonthlyThreshold', 0); } else { const n = parseFloat(v); if (!isNaN(n)) handleChange('candleMatchMonthlyThreshold', n); } }}
+                  style={{ fontVariantNumeric: 'lining-nums tabular-nums', WebkitTextSecurity: 'none' }}
                   className="w-20 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
                 <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? 'بيبس' : 'pips'}</span>
               </div>
