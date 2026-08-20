@@ -1533,19 +1533,21 @@ Return ONLY valid JSON:
     // ═══ STEP 5e: Candle Body Match Filter (Daily/Weekly/Monthly) ═══
     var candleMatchBlocked = false;
     if (settings?.useCandleMatch && candleMatchData) {
-      // Convert raw body to "points" based on market type
-      // FOREX: multiply by 10000 (convert 0.00188 → 18.8 points)
-      // CRYPTO/STOCKS: keep as-is (already in meaningful units)
-      const bodyMultiplier = isCrypto ? 1 : 10000;
+      // FOREX 4-digit pairs: multiply by 10000 (0.00188 → 18.8 pips)
+      // FOREX 2-digit pairs (JPY): multiply by 100 (0.188 → 18.8 pips)
+      // METALS (XAUUSD etc): multiply by 100 (0.188 → 18.8 points)
+      // STOCKS/INDICES: multiply by 100 (price ~5000, move 10 = 1000 points → 10 points)
+      // CRYPTO: keep as-is (BTC at 60000, body already meaningful)
+      const bodyMultiplier = isCrypto ? 1 : (type === MarketType.FOREX ? 10000 : 100);
 
       const calcBody = (raw: any): { body: number; direction: 'bullish' | 'bearish' | 'unknown' } | null => {
         const q = raw?.chart?.result?.[0]?.indicators?.quote?.[0];
         if (!q?.close || !q?.open) return null;
         const closes = q.close.filter((c: any) => c != null);
         const opens = q.open.filter((o: any) => o != null);
-        if (closes.length < 1 || opens.length < 1) return null;
-        const lastClose = closes[closes.length - 1];
-        const lastOpen = opens[opens.length - 1];
+        if (closes.length < 2 || opens.length < 2) return null;
+        const lastClose = closes[closes.length - 2];
+        const lastOpen = opens[opens.length - 2];
         const body = Math.abs(lastClose - lastOpen) * bodyMultiplier;
         const dir = lastClose > lastOpen ? 'bullish' : lastClose < lastOpen ? 'bearish' : 'unknown';
         return { body, direction: dir };

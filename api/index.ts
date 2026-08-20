@@ -338,6 +338,7 @@ app.get("/api/market-data", async (req, res) => {
     else if (timeframe === '4h') { interval = '1h'; range = '3mo'; } 
     else if (timeframe === '1d') { interval = '1d'; range = '6mo'; }
     else if (timeframe === '1w') { interval = '1wk'; range = '2y'; }
+    else if (timeframe === '1M') { interval = '1mo'; range = '5y'; }
 
     const hasEquals = yahooSymbol.includes('=');
     const cryptoPair = findServerCryptoPair(rawSymbol);
