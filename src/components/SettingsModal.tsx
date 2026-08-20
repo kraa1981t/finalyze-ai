@@ -437,7 +437,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             <span className="text-[#F59E0B]">◆</span> {isAr ? 'عتبات تطابق جذوع الشموع' : 'Candle Body Match Thresholds'}
           </h3>
           <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-4">
-            <div className="text-[10px] text-brand-text/40">{isAr ? 'فعّل كل شمعة على حدة وحدد الحد الأدنى للحجم (0 = تعطيل)' : 'Enable each candle separately and set min body size (0 = disable)'}</div>
+            <div className="text-[10px] text-brand-text/40">{isAr ? 'فعّل كل شمعة على حدة وحدد الحد الأدنى للحجم بالبيبس (0 = تعطيل). يدعم الأرقام العشرية مثل 1.5' : 'Enable each candle separately and set min body size in pips (0 = disable). Supports decimals like 1.5'}</div>
 
             {/* Daily Candle */}
             <div className="flex items-center justify-between py-2 border-b border-white/5">
