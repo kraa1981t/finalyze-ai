@@ -512,30 +512,30 @@ export default function Header({
                 <ArrowLeft size={24} />
               </button>
             )}
-            <div className="w-36 h-36 bg-black rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl border-2 border-white/30">
+            <div className="w-[108px] h-[108px] bg-black rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl border-2 border-white/30">
               <img src={customLogo || `${BASE_URL}logo.png`} alt="JT" className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col">
-              <span className="text-5xl font-display font-black tracking-tight text-white drop-shadow-2xl leading-none">
+              <span className="text-4xl font-display font-black tracking-tight text-white drop-shadow-2xl leading-none">
                 Joseph.<span className="text-sky-300 italic">Trading</span>
               </span>
-              <span className="text-[32px] font-black uppercase tracking-[0.3em] text-white/80 leading-none mt-1">Institutional Engine</span>
+              <span className="text-[24px] font-black uppercase tracking-[0.3em] text-white/80 leading-none mt-1">Institutional Engine</span>
             </div>
           </div>
 
           {/* Right: Compact icons row */}
           {!isPWA && (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {/* Suggestions - developer only */}
             {isDeveloper && (
               <button
                 onClick={onNavigateSuggestions}
-                className="flex items-center gap-2 px-4 py-3 bg-white/15 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/25 transition-all relative"
+                className="flex items-center gap-1.5 px-3 py-2 bg-white/15 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/25 transition-all relative"
               >
-                <div className="relative p-2 rounded-lg bg-[#F59E0B] text-black">
-                  <Bell size={24} />
+                <div className="relative p-1.5 rounded-lg bg-[#F59E0B] text-black">
+                  <Bell size={18} />
                   {newSuggestionsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-0.5">
                       {newSuggestionsCount}
                     </span>
                   )}
@@ -548,9 +548,9 @@ export default function Header({
               href="https://www.facebook.com/messages/e2ee/t/7630276620403742/"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-2 rounded-lg bg-[#0084FF] text-white hover:bg-[#006ADB] transition-all shadow-md"
+              className="p-1.5 rounded-lg bg-[#0084FF] text-white hover:bg-[#006ADB] transition-all shadow-md"
             >
-              <MessageCircle size={24} />
+              <MessageCircle size={18} />
             </a>
 
             {/* Auto Analysis + Sync Status */}
@@ -561,7 +561,7 @@ export default function Header({
                   onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled });
                 }}
                 className={cn(
-                  "flex items-center gap-2 px-5 py-3 rounded-xl border-2 shadow-lg transition-all backdrop-blur-sm",
+                  "flex items-center gap-2 px-4 py-2.5 rounded-xl border shadow-md transition-all backdrop-blur-sm",
                   analysisProgress
                     ? 'bg-emerald-600 border-emerald-700 text-white animate-pulse'
                     : lastSyncStatus?.ok
@@ -575,14 +575,14 @@ export default function Header({
               >
                 <div className="relative flex-shrink-0">
                   {analysisProgress ? (
-                    <div className="w-6 h-6 rounded-full bg-white animate-bounce" />
+                    <div className="w-5 h-5 rounded-full bg-white animate-bounce" />
                   ) : lastSyncStatus ? (
-                    <span className="text-xl font-black">{lastSyncStatus.ok ? '✓' : '✗'}</span>
+                    <span className="text-lg font-black">{lastSyncStatus.ok ? '✓' : '✗'}</span>
                   ) : (
-                    <Zap size={24} fill={autoSettings.isEnabled ? "currentColor" : "none"} className="text-white" />
+                    <Zap size={18} fill={autoSettings.isEnabled ? "currentColor" : "none"} className="text-white" />
                   )}
                 </div>
-                <span className="text-[16px] font-black uppercase tracking-wider whitespace-nowrap">
+                <span className="text-[14px] font-black uppercase tracking-wider whitespace-nowrap">
                   {analysisProgress
                     ? `${analysisProgress.index + 1}/${analysisProgress.total}`
                     : lastSyncStatus
@@ -591,20 +591,20 @@ export default function Header({
                   }
                 </span>
                 {lastSyncStatus?.count !== undefined && (
-                  <span className="text-[14px] font-black text-yellow-300">{lastSyncStatus.count}</span>
+                  <span className="text-[12px] font-black text-yellow-300">{lastSyncStatus.count}</span>
                 )}
               </button>
             ) : (
               <div className={cn(
-                "flex items-center gap-2 px-5 py-3 rounded-xl border-2 shadow-lg backdrop-blur-sm",
+                "flex items-center gap-2 px-4 py-2.5 rounded-xl border shadow-md backdrop-blur-sm",
                 clientRadarRunning
                   ? 'bg-red-600 border-red-700 text-white animate-pulse'
                   : showRadarComplete
                     ? 'bg-emerald-600 border-emerald-700 text-white'
                     : 'bg-emerald-500/30 border-emerald-500/50 text-white'
               )}>
-                <Zap size={24} className="text-white" fill="currentColor" />
-                <span className="text-[16px] font-black uppercase tracking-wider">
+                <Zap size={18} className="text-white" fill="currentColor" />
+                <span className="text-[14px] font-black uppercase tracking-wider">
                   {clientRadarRunning ? 'SCANNING' : showRadarComplete ? 'DONE' : 'ACTIVE'}
                 </span>
               </div>
@@ -613,16 +613,16 @@ export default function Header({
             {/* Theme */}
             <button 
               onClick={toggleTheme}
-              className="p-2 rounded-lg bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
+              className="p-1.5 rounded-lg bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
             >
-              {isDark ? <Sun size={24} /> : <Moon size={24} />}
+              {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
             {/* Language */}
             <div className="relative group">
-              <button className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md">
-                <Globe size={24} />
-                <span className="text-[14px] font-black uppercase">{lang}</span>
+              <button className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md">
+                <Globe size={18} />
+                <span className="text-[12px] font-black uppercase">{lang}</span>
               </button>
               <div className="absolute right-0 top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
                 {LANGUAGES.map((l) => (
@@ -645,14 +645,14 @@ export default function Header({
               <div className="relative" ref={profileMenuRef}>
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="w-14 h-14 rounded-full bg-[#F59E0B] border-2 border-white/30 flex items-center justify-center overflow-hidden shadow-lg hover:scale-105 transition-all"
+                  className="w-[84px] h-[84px] rounded-full bg-[#F59E0B] border-2 border-white/30 flex items-center justify-center overflow-hidden shadow-lg hover:scale-105 transition-all"
                 >
                   {customAvatar ? (
                     <img src={customAvatar} alt="profile" className="w-full h-full object-cover" />
                   ) : user.photoURL ? (
                     <img src={user.photoURL} alt="profile" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-lg font-black text-black">{user.email?.charAt(0).toUpperCase()}</span>
+                    <span className="text-xl font-black text-black">{user.email?.charAt(0).toUpperCase()}</span>
                   )}
                 </button>
                 {showProfileMenu && (
@@ -674,9 +674,9 @@ export default function Header({
             ) : (
               <button 
                 onClick={onLogin}
-                className="flex items-center gap-1.5 bg-[#F59E0B] text-black px-4 py-2 rounded-lg font-black text-sm uppercase shadow-md hover:bg-[#d97706] active:scale-95 transition-all"
+                className="flex items-center gap-1.5 bg-[#F59E0B] text-black px-3 py-2 rounded-lg font-black text-xs uppercase shadow-md hover:bg-[#d97706] active:scale-95 transition-all"
               >
-                <LogIn size={20} />
+                <LogIn size={18} />
               </button>
             )}
 
@@ -684,10 +684,10 @@ export default function Header({
             {!isPWA && (
               <button
                 onMouseDown={(e) => { e.stopPropagation(); onToggleSidebar(); }}
-                className="p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
+                className="p-2.5 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
                 title={lang === 'ar' ? 'القائمة' : 'Menu'}
               >
-                <Menu size={28} />
+                <Menu size={22} />
               </button>
             )}
           </div>
