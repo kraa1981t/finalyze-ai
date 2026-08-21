@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, ShieldX, CheckCircle, XCircle, AlertTriangle, BarChart3, Target, Zap, CandlestickChart } from 'lucide-react';
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, ShieldX, CheckCircle, XCircle, AlertTriangle, BarChart3, Target, Zap, CandlestickChart, Clipboard, Check } from 'lucide-react';
 import { AnalysisResult, SignalType } from '../types';
 import { Language } from '../lib/i18n';
 import LotSizeCalculator from './LotSizeCalculator';
@@ -60,6 +60,7 @@ function parseCandleInfo(value: string) {
 }
 
 export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDetailPageProps) {
+  const [copied, setCopied] = useState(false);
   const isAr = lang === 'ar';
   const chartRef = useRef<HTMLDivElement>(null);
   const colors = getSignalColor(result.signal);
@@ -72,6 +73,42 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
   const supportingReasons = remainingReasons.filter(r => !['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'].some(p => r.check?.includes(p)));
 
   const fmt = (v: number) => Number(v).toFixed(0);
+
+  const generateAnalysisText = () => {
+    const lines: string[] = [];
+    lines.push(`📊 ${isAr ? 'تحليل' : 'ANALYSIS'}: ${result.symbol} - ${getSignalLabel(result.signal, lang)}`);
+    lines.push(`${isAr ? 'الثقة' : 'CONFIDENCE'}: ${fmt(result.confidence)}%`);
+    lines.push(`${isAr ? 'التقني' : 'TECHNICAL'}: ${fmt(result.technicalScore)}% | ${isAr ? 'المشاعر' : 'SENTIMENT'}: ${fmt(result.sentimentScore)}%`);
+    lines.push('');
+    if (primaryReasons.length > 0) {
+      lines.push(`✅ ${isAr ? 'الشروط الأساسية' : 'PRIMARY CONDITIONS'}:`);
+      primaryReasons.forEach(r => lines.push(`  • ${r.check}: ${r.value} (${r.impact})`));
+      lines.push('');
+    }
+    if (blockReasons.length > 0) {
+      lines.push(`🚫 ${isAr ? 'فلاتر المنع' : 'BLOCK FILTERS'}:`);
+      blockReasons.forEach(r => lines.push(`  • ${r.check}: ${r.value} (${r.impact})`));
+      lines.push('');
+    }
+    if (supportingReasons.length > 0) {
+      lines.push(`📋 ${isAr ? 'الشروط الداعمة' : 'SUPPORTING'}:`);
+      supportingReasons.forEach(r => lines.push(`  • ${r.check}: ${r.value}`));
+      lines.push('');
+    }
+    if (result.summary) {
+      lines.push(`📝 ${isAr ? 'الملخص' : 'SUMMARY'}: ${result.summary}`);
+    }
+    lines.push('');
+    lines.push(`⏰ ${new Date().toLocaleString()}`);
+    lines.push(`🔗 Joseph.Trading`);
+    return lines.join('\n');
+  };
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(generateAnalysisText());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     if (chartRef.current && result.symbol) {
@@ -130,6 +167,13 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
               <span className={`text-2xl font-black ${colors.text}`}>{fmt(result.confidence)}%</span>
             </div>
           </div>
+          <button
+            onClick={handleCopy}
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"
+            title={isAr ? 'نسخ التحليل' : 'Copy Analysis'}
+          >
+            {copied ? <Check size={18} className="text-emerald-400" /> : <Clipboard size={18} className="text-white/70" />}
+          </button>
         </div>
       </div>
 
