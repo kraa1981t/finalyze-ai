@@ -485,13 +485,13 @@ export default function Header({
         </div>
       )}
 
-      <header className="fixed top-0 left-0 right-0 z-50 h-[350px] overflow-hidden shadow-2xl shadow-emerald-500/20">
+      <header className="fixed top-0 left-0 right-0 z-50 h-[300px] overflow-hidden shadow-2xl shadow-emerald-500/20">
         {/* Trading Banner Background */}
         <div className="absolute inset-0">
           <img 
             src="/trading-banner.png" 
             alt="Joseph.Trading" 
-            className="w-full h-full object-cover object-center"
+            className="w-full h-full object-cover object-[center_30%]"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
               (e.target as HTMLImageElement).parentElement!.classList.add('bg-gradient-to-r', 'from-emerald-600', 'via-emerald-500', 'to-emerald-600');
