@@ -519,7 +519,7 @@ export default function Header({
               <span className="text-4xl font-display font-black tracking-tight text-white drop-shadow-2xl leading-none">
                 Joseph.<span className="text-sky-300 italic">Trading</span>
               </span>
-              <span className="text-[24px] font-black uppercase tracking-[0.3em] text-white/80 leading-none mt-1">Institutional Engine</span>
+              <span className="text-[24px] font-black uppercase tracking-[0.3em] text-white/80 leading-none mt-1">For financial market analysis</span>
             </div>
           </div>
 
