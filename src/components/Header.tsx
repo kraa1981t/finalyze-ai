@@ -504,14 +504,6 @@ export default function Header({
         <div className="relative max-w-7xl mx-auto px-4 h-full flex items-start justify-between pt-4">
           {/* Left: Logo */}
           <div className="flex items-center gap-4">
-            {showBack && (
-              <button 
-                onClick={onBack}
-                className="p-2 -ml-1 text-white/90 hover:text-white transition-colors flex items-center justify-center"
-              >
-                <ArrowLeft size={24} />
-              </button>
-            )}
             <div className="w-[108px] h-[108px] bg-black rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl border-2 border-white/30">
               <img src={customLogo || `${BASE_URL}logo.png`} alt="JT" className="w-full h-full object-cover" />
             </div>
