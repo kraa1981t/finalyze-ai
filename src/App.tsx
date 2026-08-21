@@ -1722,7 +1722,7 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-[320px] relative">
+      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-[340px] relative">
         {/* Dedicated pages (from dashboard) */}
         {effectivePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
