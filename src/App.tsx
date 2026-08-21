@@ -1687,17 +1687,15 @@ export default function App() {
       />
 
       {/* Branded Trading Banner - visible to all users */}
-      <div className="fixed top-20 left-0 right-0 z-40 bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/20 overflow-hidden">
-        <div className="w-full flex justify-center items-center py-1">
-          <img 
-            src="/trading-banner.png" 
-            alt="Joseph.Trading Institutional Engine" 
-            className="h-10 w-auto object-contain"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        </div>
+      <div className="fixed top-20 left-0 right-0 z-40 h-[50px] bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/20 overflow-hidden flex items-center">
+        <img 
+          src="/trading-banner.png" 
+          alt="Joseph.Trading Institutional Engine" 
+          className="w-full h-full object-cover object-center"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
       </div>
 
       {/* Sidebar Panel - dropdown below menu icon */}
