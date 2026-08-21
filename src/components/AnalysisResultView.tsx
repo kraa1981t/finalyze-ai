@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { AnalysisResult, SignalType, StrategySettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Zap, ShieldAlert, MessageSquare, BarChart2, ChevronDown, Info } from 'lucide-react';
+import { Zap, ShieldAlert, MessageSquare, BarChart2, ChevronDown, Info, ArrowLeft } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
@@ -74,6 +74,12 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
         <div className="h-[250px] md:h-[300px] bg-brand-bg rounded-2xl overflow-hidden shadow-2xl border border-brand-text/5 relative">
           <TradingViewWidget symbol={selectedResult.symbol} />
           <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+             <button 
+               onClick={() => setSelectedIndex(0)}
+               className="p-2 rounded-xl bg-[#F59E0B] hover:bg-[#d97706] transition-all shadow-lg"
+             >
+               <ArrowLeft size={18} className="text-black" />
+             </button>
              <div className="px-3 py-1.5 bg-brand-bg/80 backdrop-blur-2xl rounded-full border border-brand-text/20 text-brand-text text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-2 shadow-2xl">
                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,1)]" />
                <span className="text-brand-text">LIVE: {selectedResult.symbol}</span>
