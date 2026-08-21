@@ -133,7 +133,7 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 space-y-6 mt-4 pb-20">
+      <div className="max-w-5xl mx-auto px-4 space-y-3 mt-4 pb-20">
 
         {/* 1. Signal Scores - large */}
         <div className="grid grid-cols-3 gap-4">
