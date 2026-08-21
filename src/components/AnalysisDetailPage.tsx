@@ -286,6 +286,42 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
           />
         )}
 
+        {/* 9. Upcoming Strong News */}
+        {result.detailedReasons && result.detailedReasons.some(r => r.check === 'Economic Events' || r.check === 'Econ Penalty') && (
+          <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-xl p-5 border border-red-500/20">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle size={20} className="text-red-400" />
+              <span className="text-sm font-black uppercase tracking-wider text-red-400">
+                {isAr ? 'أخبار قوية قادمة' : 'UPCOMING STRONG NEWS'}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {result.detailedReasons
+                .filter(r => r.check === 'Economic Events' || r.check === 'Econ Penalty' || r.check === 'News Sentiment')
+                .map((r, i) => (
+                  <div key={i} className="flex items-start gap-3 bg-black/20 rounded-lg p-3 border border-white/5">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <div className={`w-3 h-3 rounded-full ${r.status === 'negative' ? 'bg-red-500 animate-pulse' : r.status === 'positive' ? 'bg-emerald-500' : 'bg-yellow-500'}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-white/90">{r.value}</div>
+                      <div className="text-xs text-white/50 mt-0.5">{r.impact}</div>
+                    </div>
+                    <div className={`flex-shrink-0 px-2 py-1 rounded text-[10px] font-black uppercase ${
+                      r.status === 'negative' ? 'bg-red-500/20 text-red-400' : 
+                      r.status === 'positive' ? 'bg-emerald-500/20 text-emerald-400' : 
+                      'bg-yellow-500/20 text-yellow-400'
+                    }`}>
+                      {r.status === 'negative' ? (isAr ? 'تجنب' : 'AVOID') : 
+                       r.status === 'positive' ? (isAr ? 'آمن' : 'SAFE') : 
+                       (isAr ? 'حذر' : 'CAUTION')}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
         {/* Summary */}
         {result.summary && (
           <div className="bg-white/5 rounded-xl p-5 border border-white/5">

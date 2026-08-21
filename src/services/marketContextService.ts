@@ -17,6 +17,8 @@ interface EconEvent {
   impact: string;
   forecast: string;
   previous: string;
+  advice?: 'avoid_entry' | 'caution' | 'safe';
+  hoursUntil?: number;
 }
 
 export interface MarketContext {

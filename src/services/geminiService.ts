@@ -1112,9 +1112,20 @@ Return ONLY valid JSON:
       } else {
         addReason('News Sentiment', 'No active events', 'neutral', 'no blocking news ΓÇö signal allowed');
       }
-      addReason('Economic Events', contextEcon.length > 0 ? `${contextEcon.length} events this week` : 'no major events',
-        contextEcon.some((e: any) => e.impact === 'High') ? 'negative' : 'neutral',
-        contextEcon.some((e: any) => e.impact === 'High') ? '-10% confidence penalty' : 'no penalty');
+      if (contextEcon.length > 0) {
+        const highEvents = contextEcon.filter((e: any) => e.impact === 'High');
+        const imminentEvents = highEvents.filter((e: any) => e.hoursUntil > 0 && e.hoursUntil <= 24);
+        const eventNames = highEvents.map((e: any) => `${e.country} ${e.title}`).join(', ');
+        
+        if (imminentEvents.length > 0) {
+          const imminentNames = imminentEvents.map((e: any) => `${e.country} ${e.title} (${e.hoursUntil}h)`).join(', ');
+          addReason('Economic Events', `⚠️ ${imminentNames}`, 'negative', `-15% confidence - ${imminentEvents.length} high-impact event(s) within 24h`);
+        } else {
+          addReason('Economic Events', `${eventNames}`, 'neutral', `${highEvents.length} high-impact event(s) scheduled`);
+        }
+      } else {
+        addReason('Economic Events', 'No high-impact events', 'neutral', 'no upcoming major economic events');
+      }
     }
 
     // ΓöÇΓöÇ STEP 1b: Trend Age Zone — ALWAYS replace AI version with metrics version ΓöÇΓöÇ
@@ -1245,8 +1256,15 @@ Return ONLY valid JSON:
     var econPenaltyMult = 1.0;
     if (contextEcon && contextEcon.length > 0) {
       const highImpactEvents = contextEcon.filter((e: any) => e.impact === 'High');
-      if (highImpactEvents.length > 0) {
+      const imminentEvents = highImpactEvents.filter((e: any) => e.hoursUntil > 0 && e.hoursUntil <= 24);
+      if (imminentEvents.length > 0) {
         econPenaltyMult = 0.85;
+        const eventList = imminentEvents.map((e: any) => `${e.country} ${e.title} in ${e.hoursUntil}h`).join('; ');
+        detailedReasons.push({ check: 'Econ Penalty', value: `-15%`, status: 'negative', impact: `Imminent high-impact: ${eventList}` });
+      } else if (highImpactEvents.length > 0) {
+        econPenaltyMult = 0.9;
+        const eventList = highImpactEvents.map((e: any) => `${e.country} ${e.title}`).join('; ');
+        detailedReasons.push({ check: 'Econ Penalty', value: `-10%`, status: 'caution', impact: `Upcoming high-impact: ${eventList}` });
       }
     }
     var newsPenaltyMult = 1.0;
@@ -1449,10 +1467,9 @@ Return ONLY valid JSON:
     const computedConfidence = baseConf + primaryConf + supportConf;
     finalConfidence = computedConfidence;
 
-    // ΓöÇΓöÇ Apply deferred penalties from primary conditions ΓöÇΓöÇ
+    // Apply deferred penalties from primary conditions
     finalConfidence = Math.round(finalConfidence * sdPenaltyMult * econPenaltyMult * newsPenaltyMult);
     if (sdPenaltyMult < 1) detailedReasons.push({ check: 'S/D Penalty', value: `-20%`, status: 'negative', impact: 'supply/demand conflict penalty applied' });
-    if (econPenaltyMult < 1) detailedReasons.push({ check: 'Econ Penalty', value: `-15%`, status: 'negative', impact: 'high-impact economic event penalty applied' });
     if (newsPenaltyMult < 1) detailedReasons.push({ check: 'News Penalty', value: `-20%`, status: 'negative', impact: 'negative news sentiment penalty applied' });
 
     // ΓöÇΓöÇ STEP 5b: Age Zone Confidence Penalty ΓöÇΓöÇ

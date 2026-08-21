@@ -134,10 +134,27 @@ export async function fetchEconCalendarDirect(): Promise<any[]> {
       clearTimeout(timeout2);
     }
     const data = await r.json();
-    return (data || []).filter((e: any) => e.impact === 'High' || e.impact === 'Medium').slice(0, 10).map((e: any) => ({
-      title: e.title, country: e.country, date: e.date,
-      impact: e.impact, forecast: e.forecast || '-', previous: e.previous || '-',
-    }));
+    return (data || [])
+      .filter((e: any) => e.impact === 'High')
+      .slice(0, 8)
+      .map((e: any) => {
+        const eventDate = new Date(e.date);
+        const now = new Date();
+        const hoursUntil = (eventDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        let advice: 'avoid_entry' | 'caution' | 'safe' = 'safe';
+        if (hoursUntil > 0 && hoursUntil <= 1) advice = 'avoid_entry';
+        else if (hoursUntil > 0 && hoursUntil <= 24) advice = 'caution';
+        return {
+          title: e.title,
+          country: e.country,
+          date: e.date,
+          impact: e.impact,
+          forecast: e.forecast || '-',
+          previous: e.previous || '-',
+          advice,
+          hoursUntil: Math.round(hoursUntil),
+        };
+      });
   } catch {
     return [];
   }
