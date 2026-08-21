@@ -501,41 +501,41 @@ export default function Header({
         </div>
         
         {/* Content Overlay - left logo + right icons */}
-        <div className="relative max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
+        <div className="relative max-w-7xl mx-auto px-4 h-full flex items-start justify-between pt-4">
           {/* Left: Logo */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             {showBack && (
               <button 
                 onClick={onBack}
-                className="p-1 -ml-1 text-white/90 hover:text-white transition-colors flex items-center justify-center"
+                className="p-2 -ml-1 text-white/90 hover:text-white transition-colors flex items-center justify-center"
               >
-                <ArrowLeft size={18} />
+                <ArrowLeft size={24} />
               </button>
             )}
-            <div className="w-9 h-9 bg-black rounded-xl flex items-center justify-center overflow-hidden shadow-lg border border-white/30">
+            <div className="w-36 h-36 bg-black rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl border-2 border-white/30">
               <img src={customLogo || `${BASE_URL}logo.png`} alt="JT" className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-display font-black tracking-tight text-white drop-shadow-lg leading-none">
+              <span className="text-5xl font-display font-black tracking-tight text-white drop-shadow-2xl leading-none">
                 Joseph.<span className="text-sky-300 italic">Trading</span>
               </span>
-              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-white/70 leading-none">Institutional Engine</span>
+              <span className="text-[32px] font-black uppercase tracking-[0.3em] text-white/80 leading-none mt-1">Institutional Engine</span>
             </div>
           </div>
 
           {/* Right: Compact icons row */}
           {!isPWA && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-4">
             {/* Suggestions - developer only */}
             {isDeveloper && (
               <button
                 onClick={onNavigateSuggestions}
-                className="flex items-center gap-1 px-2 py-1 bg-white/15 backdrop-blur-sm rounded-lg border border-white/20 hover:bg-white/25 transition-all relative"
+                className="flex items-center gap-2 px-4 py-3 bg-white/15 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/25 transition-all relative"
               >
-                <div className="relative p-1 rounded-md bg-[#F59E0B] text-black">
-                  <Bell size={12} />
+                <div className="relative p-2 rounded-lg bg-[#F59E0B] text-black">
+                  <Bell size={24} />
                   {newSuggestionsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-0.5">
+                    <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
                       {newSuggestionsCount}
                     </span>
                   )}
@@ -548,9 +548,9 @@ export default function Header({
               href="https://www.facebook.com/messages/e2ee/t/7630276620403742/"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1 rounded-md bg-[#0084FF] text-white hover:bg-[#006ADB] transition-all shadow-md"
+              className="p-2 rounded-lg bg-[#0084FF] text-white hover:bg-[#006ADB] transition-all shadow-md"
             >
-              <MessageCircle size={12} />
+              <MessageCircle size={24} />
             </a>
 
             {/* Auto Analysis + Sync Status */}
@@ -561,7 +561,7 @@ export default function Header({
                   onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled });
                 }}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border shadow-md transition-all backdrop-blur-sm",
+                  "flex items-center gap-2 px-5 py-3 rounded-xl border-2 shadow-lg transition-all backdrop-blur-sm",
                   analysisProgress
                     ? 'bg-emerald-600 border-emerald-700 text-white animate-pulse'
                     : lastSyncStatus?.ok
@@ -575,14 +575,14 @@ export default function Header({
               >
                 <div className="relative flex-shrink-0">
                   {analysisProgress ? (
-                    <div className="w-4 h-4 rounded-full bg-white animate-bounce" />
+                    <div className="w-6 h-6 rounded-full bg-white animate-bounce" />
                   ) : lastSyncStatus ? (
-                    <span className="text-sm font-black">{lastSyncStatus.ok ? '✓' : '✗'}</span>
+                    <span className="text-xl font-black">{lastSyncStatus.ok ? '✓' : '✗'}</span>
                   ) : (
-                    <Zap size={14} fill={autoSettings.isEnabled ? "currentColor" : "none"} className="text-white" />
+                    <Zap size={24} fill={autoSettings.isEnabled ? "currentColor" : "none"} className="text-white" />
                   )}
                 </div>
-                <span className="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">
+                <span className="text-[16px] font-black uppercase tracking-wider whitespace-nowrap">
                   {analysisProgress
                     ? `${analysisProgress.index + 1}/${analysisProgress.total}`
                     : lastSyncStatus
@@ -591,20 +591,20 @@ export default function Header({
                   }
                 </span>
                 {lastSyncStatus?.count !== undefined && (
-                  <span className="text-[10px] font-black text-yellow-300">{lastSyncStatus.count}</span>
+                  <span className="text-[14px] font-black text-yellow-300">{lastSyncStatus.count}</span>
                 )}
               </button>
             ) : (
               <div className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border shadow-md backdrop-blur-sm",
+                "flex items-center gap-2 px-5 py-3 rounded-xl border-2 shadow-lg backdrop-blur-sm",
                 clientRadarRunning
                   ? 'bg-red-600 border-red-700 text-white animate-pulse'
                   : showRadarComplete
                     ? 'bg-emerald-600 border-emerald-700 text-white'
                     : 'bg-emerald-500/30 border-emerald-500/50 text-white'
               )}>
-                <Zap size={14} className="text-white" fill="currentColor" />
-                <span className="text-[11px] font-black uppercase tracking-wider">
+                <Zap size={24} className="text-white" fill="currentColor" />
+                <span className="text-[16px] font-black uppercase tracking-wider">
                   {clientRadarRunning ? 'SCANNING' : showRadarComplete ? 'DONE' : 'ACTIVE'}
                 </span>
               </div>
@@ -613,24 +613,24 @@ export default function Header({
             {/* Theme */}
             <button 
               onClick={toggleTheme}
-              className="p-1 rounded-md bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
+              className="p-2 rounded-lg bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
             >
-              {isDark ? <Sun size={12} /> : <Moon size={12} />}
+              {isDark ? <Sun size={24} /> : <Moon size={24} />}
             </button>
 
             {/* Language */}
             <div className="relative group">
-              <button className="flex items-center gap-0.5 px-2 py-1 rounded-md bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md">
-                <Globe size={12} />
-                <span className="text-[9px] font-black uppercase">{lang}</span>
+              <button className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md">
+                <Globe size={24} />
+                <span className="text-[14px] font-black uppercase">{lang}</span>
               </button>
-              <div className="absolute right-0 top-full mt-2 w-36 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
                 {LANGUAGES.map((l) => (
                   <button
                     key={l.code}
                     onClick={() => onLangChange(l.code)}
                     className={cn(
-                      "w-full px-3 py-2 text-left text-xs font-bold transition-colors hover:bg-primary/10",
+                      "w-full px-4 py-3 text-left text-sm font-bold transition-colors hover:bg-primary/10",
                       lang === l.code ? "text-primary bg-primary/5" : "text-brand-text/60"
                     )}
                   >
@@ -645,28 +645,28 @@ export default function Header({
               <div className="relative" ref={profileMenuRef}>
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="w-7 h-7 rounded-full bg-[#F59E0B] border border-white/30 flex items-center justify-center overflow-hidden shadow-md hover:scale-105 transition-all"
+                  className="w-14 h-14 rounded-full bg-[#F59E0B] border-2 border-white/30 flex items-center justify-center overflow-hidden shadow-lg hover:scale-105 transition-all"
                 >
                   {customAvatar ? (
                     <img src={customAvatar} alt="profile" className="w-full h-full object-cover" />
                   ) : user.photoURL ? (
                     <img src={user.photoURL} alt="profile" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-[10px] font-black text-black">{user.email?.charAt(0).toUpperCase()}</span>
+                    <span className="text-lg font-black text-black">{user.email?.charAt(0).toUpperCase()}</span>
                   )}
                 </button>
                 {showProfileMenu && (
-                  <div className={`absolute top-full mt-2 w-48 bg-[#F59E0B] rounded-xl shadow-2xl border-2 border-black/20 overflow-hidden z-[60] ${lang === 'ar' ? 'left-0' : 'right-0'}`}>
-                    <div className="px-3 py-2 border-b-2 border-black/10">
-                      <p className="text-xs font-black text-black truncate">{user.displayName || user.email?.split('@')[0]}</p>
-                      <p className="text-[10px] font-bold text-black/70 truncate">{user.email}</p>
+                  <div className={`absolute top-full mt-2 w-56 bg-[#F59E0B] rounded-xl shadow-2xl border-2 border-black/20 overflow-hidden z-[60] ${lang === 'ar' ? 'left-0' : 'right-0'}`}>
+                    <div className="px-4 py-3 border-b-2 border-black/10">
+                      <p className="text-sm font-black text-black truncate">{user.displayName || user.email?.split('@')[0]}</p>
+                      <p className="text-xs font-bold text-black/70 truncate">{user.email}</p>
                     </div>
                     <button 
                       onClick={() => { setShowProfileMenu(false); setShowLogoutConfirm(true); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-500/20 transition-colors"
+                      className="w-full flex items-center gap-2 px-4 py-3 text-red-600 hover:bg-red-500/20 transition-colors"
                     >
-                      <LogOut size={14} className="text-red-600" />
-                      <span className="text-[11px] font-black text-red-600">{lang === 'ar' ? 'خروج' : 'Logout'}</span>
+                      <LogOut size={20} className="text-red-600" />
+                      <span className="text-sm font-black text-red-600">{lang === 'ar' ? 'خروج' : 'Logout'}</span>
                     </button>
                   </div>
                 )}
@@ -674,9 +674,9 @@ export default function Header({
             ) : (
               <button 
                 onClick={onLogin}
-                className="flex items-center gap-1 bg-[#F59E0B] text-black px-2 py-1 rounded-md font-black text-[9px] uppercase shadow-md hover:bg-[#d97706] active:scale-95 transition-all"
+                className="flex items-center gap-1.5 bg-[#F59E0B] text-black px-4 py-2 rounded-lg font-black text-sm uppercase shadow-md hover:bg-[#d97706] active:scale-95 transition-all"
               >
-                <LogIn size={12} />
+                <LogIn size={20} />
               </button>
             )}
 
@@ -684,10 +684,10 @@ export default function Header({
             {!isPWA && (
               <button
                 onMouseDown={(e) => { e.stopPropagation(); onToggleSidebar(); }}
-                className="p-1.5 rounded-md bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
+                className="p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
                 title={lang === 'ar' ? 'القائمة' : 'Menu'}
               >
-                <Menu size={14} />
+                <Menu size={28} />
               </button>
             )}
           </div>
