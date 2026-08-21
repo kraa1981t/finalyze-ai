@@ -491,7 +491,7 @@ export default function Header({
           <img 
             src="/trading-banner.png" 
             alt="Joseph.Trading" 
-            className="w-full h-full object-cover object-[center_30%]"
+            className="w-full h-full object-cover object-[center_15%]"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
               (e.target as HTMLImageElement).parentElement!.classList.add('bg-gradient-to-r', 'from-emerald-600', 'via-emerald-500', 'to-emerald-600');
