@@ -485,13 +485,29 @@ export default function Header({
         </div>
       )}
 
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#D1FAE5]/95 backdrop-blur-xl border-b border-black/10 shadow-2xl shadow-emerald-500/10 h-20">
-        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between pt-2">
-          <div className="flex items-center gap-4 mb-2">
+      <header className="fixed top-0 left-0 right-0 z-50 h-[120px] overflow-hidden shadow-2xl shadow-emerald-500/20">
+        {/* Trading Banner Background */}
+        <div className="absolute inset-0">
+          <img 
+            src="/trading-banner.png" 
+            alt="Joseph.Trading" 
+            className="w-full h-full object-cover object-top"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+              (e.target as HTMLImageElement).parentElement!.classList.add('bg-[#D1FAE5]');
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
+        </div>
+        
+        {/* Content Overlay */}
+        <div className="relative max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
+          {/* Left: Logo */}
+          <div className="flex items-center gap-3">
             {showBack && (
               <button 
                 onClick={onBack}
-                className="p-2 -ml-1 text-black/70 hover:text-black transition-colors flex items-center justify-center"
+                className="p-2 -ml-1 text-white/90 hover:text-white transition-colors flex items-center justify-center"
               >
                 <ArrowLeft size={20} />
               </button>
@@ -501,24 +517,24 @@ export default function Header({
                 <img src={customLogo || `${BASE_URL}logo.png`} alt="Joseph Trading" className="w-full h-full object-cover" />
               </div>
               <div className="flex flex-col">
-                <span className="text-2xl font-display font-black tracking-tighter text-black drop-shadow-sm leading-none">
-                  Joseph.<span className="text-sky-800 italic">Trading</span>
+                <span className="text-2xl font-display font-black tracking-tighter text-white drop-shadow-lg leading-none">
+                  Joseph.<span className="text-sky-200 italic">Trading</span>
                 </span>
-                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-black/60 ml-1 mt-0.5">Institutional Engine</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/80 ml-1 mt-0.5 drop-shadow-md">Institutional Engine</span>
               </div>
             </div>
           </div>
 
-          {/* Desktop: full icons bar (no changes) */}
+          {/* Right: Icons distributed across header */}
           {!isPWA && (
-          <div className="flex items-center gap-2 mb-2">
-            {/* Suggestions Notifications - developer only */}
+          <div className="flex items-center gap-2">
+            {/* Suggestions - developer only */}
             {isDeveloper && (
               <button
                 onClick={onNavigateSuggestions}
-                className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/10 rounded-xl border border-white/20 shadow-sm hover:bg-white/20 transition-all relative"
+                className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-sm hover:bg-white/30 transition-all relative"
               >
-                <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">{lang === 'ar' ? 'مقترحات' : 'Suggestions'}</span>
+                <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">{lang === 'ar' ? 'مقترحات' : 'Suggestions'}</span>
                 <div className="relative p-1.5 rounded-lg bg-[#F59E0B] border border-black/10 text-black shadow-md">
                   <Bell size={15} />
                   {newSuggestionsCount > 0 && (
@@ -530,9 +546,9 @@ export default function Header({
               </button>
             )}
 
-            {/* Contact Us - Messenger */}
-            <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/10 rounded-xl border border-white/20 shadow-sm">
-              <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">{lang === 'ar' ? 'تواصل معنا' : 'Contact'}</span>
+            {/* Contact */}
+            <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-sm">
+              <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">{lang === 'ar' ? 'تواصل' : 'Contact'}</span>
               <a
                 href="https://www.facebook.com/messages/e2ee/t/7630276620403742/"
                 target="_blank"
@@ -543,7 +559,7 @@ export default function Header({
               </a>
             </div>
 
-            {/* Auto Analysis + Sync Status (Developer only — merged) */}
+            {/* Auto Analysis + Sync Status */}
             {isDeveloper ? (
               <button
                 onClick={() => {
@@ -551,7 +567,7 @@ export default function Header({
                   onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled });
                 }}
                 className={cn(
-                  "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 shadow-lg transition-all min-w-[180px]",
+                  "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 shadow-lg transition-all min-w-[180px] backdrop-blur-sm",
                   analysisProgress
                     ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/40 animate-pulse'
                     : lastSyncStatus?.ok
@@ -607,40 +623,38 @@ export default function Header({
               </button>
             ) : (
               <div className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl border-2 shadow-lg transition-all min-w-[180px]",
+                "flex items-center gap-2 px-4 py-2 rounded-xl border-2 shadow-lg transition-all min-w-[180px] backdrop-blur-sm",
                 clientRadarRunning
                   ? 'bg-red-600 border-red-700 text-white shadow-red-500/50 animate-pulse'
                   : showRadarComplete
                     ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/50'
-                    : 'bg-emerald-500/20 border-emerald-500/40'
+                    : 'bg-emerald-500/30 border-emerald-500/50 text-white'
               )}>
                 <div className="relative">
-                  <Zap size={28} className={clientRadarRunning || showRadarComplete ? 'text-white' : 'text-emerald-400'} fill="currentColor" />
+                  <Zap size={28} className="text-white" fill="currentColor" />
                   {clientRadarRunning && (
                     <span className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-ping shadow-[0_0_16px_white]" />
                   )}
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">
-                    {lang === 'ar' ? '\u0627\u0644\u062a\u062d\u0644\u064a\u0644 \u0627\u0644\u062a\u0644\u0642\u0627\u0626\u064a' : 'Auto Analysis'}
+                  <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">
+                    {lang === 'ar' ? 'التحليل التلقائي' : 'Auto Analysis'}
                   </span>
-                  <span className={cn(
-                    "text-[12px] font-black uppercase tracking-wider leading-tight",
-                    clientRadarRunning || showRadarComplete ? 'text-white' : 'text-emerald-400'
-                  )}>
+                  <span className="text-[12px] font-black uppercase tracking-wider leading-tight text-white">
                     {clientRadarRunning
-                      ? (lang === 'ar' ? '\u23f3 \u0627\u0646\u062a\u0638\u0631...' : '\u23f3 Waiting...')
+                      ? (lang === 'ar' ? '⏳ انتظار...' : '⏳ Waiting...')
                       : showRadarComplete
-                        ? (lang === 'ar' ? '\u2705 \u062a\u0645' : '\u2705 Done')
-                        : (lang === 'ar' ? '\u0646\u0634\u0637' : 'Active')
+                        ? (lang === 'ar' ? '✅ تم' : '✅ Done')
+                        : (lang === 'ar' ? 'نشط' : 'Active')
                     }
                   </span>
                 </div>
               </div>
             )}
 
-            <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/10 rounded-xl border border-white/20 shadow-sm">
-              <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">Theme</span>
+            {/* Theme */}
+            <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-sm">
+              <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">Theme</span>
               <button 
                 onClick={toggleTheme}
                 className="p-1.5 rounded-lg bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
@@ -649,14 +663,15 @@ export default function Header({
               </button>
             </div>
 
-            <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/10 rounded-xl border border-white/20 shadow-sm">
-              <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">Language</span>
+            {/* Language */}
+            <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-sm">
+              <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">Language</span>
               <div className="relative group">
                 <button className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md">
                   <Globe size={15} />
                   <span className="text-[10px] font-black uppercase tracking-widest hidden lg:inline">{lang}</span>
                 </button>
-                <div className="absolute right-0 top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
+                <div className="absolute right-0 top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
                   {LANGUAGES.map((l) => (
                     <button
                       key={l.code}
@@ -673,25 +688,13 @@ export default function Header({
               </div>
             </div>
 
-            {isPWA && (
-              <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/10 rounded-xl border border-white/20 shadow-sm">
-                <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">{lang === 'ar' ? '\u0645\u062a\u0635\u0641\u062d' : 'Browser'}</span>
-                <button
-                  onClick={() => window.open(window.location.href, '_blank')}
-                  className="p-1.5 rounded-lg bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
-                  title={lang === 'ar' ? '\u0641\u062a\u062d \u0641\u064a \u0627\u0644\u0645\u062a\u0635\u0641\u062d' : 'Open in browser'}
-                >
-                  <ExternalLink size={15} />
-                </button>
-              </div>
-            )}
-
+            {/* Profile */}
             {user ? (
-              <div className="flex flex-col items-center gap-0.5 pl-2 border-l border-black/10 relative" ref={profileMenuRef}>
-                <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">Profile</span>
+              <div className="flex flex-col items-center gap-0.5 pl-2 border-l border-white/30 relative" ref={profileMenuRef}>
+                <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">Profile</span>
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="w-9 h-9 rounded-full bg-[#F59E0B] border-2 border-black/20 flex items-center justify-center overflow-hidden shadow-lg hover:scale-105 transition-all"
+                  className="w-9 h-9 rounded-full bg-[#F59E0B] border-2 border-white/30 flex items-center justify-center overflow-hidden shadow-lg hover:scale-105 transition-all"
                 >
                   {customAvatar ? (
                     <img src={customAvatar} alt="profile" className="w-full h-full object-cover" />
@@ -720,8 +723,8 @@ export default function Header({
                 )}
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-0.5 pl-2 border-l border-black/10">
-                <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">Account</span>
+              <div className="flex flex-col items-center gap-0.5 pl-2 border-l border-white/30">
+                <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">Account</span>
                 <button 
                   onClick={onLogin}
                   className="flex items-center gap-1.5 bg-[#F59E0B] text-black px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest shadow-md hover:bg-[#d97706] active:scale-95 transition-all"
@@ -732,14 +735,14 @@ export default function Header({
               </div>
             )}
 
-            {/* Desktop: sidebar menu toggle - right side */}
+            {/* Menu toggle */}
             {!isPWA && (
               <button
                 onMouseDown={(e) => { e.stopPropagation(); onToggleSidebar(); }}
-                className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/10 rounded-xl border border-white/20 shadow-sm hover:bg-white/20 transition-all ml-2"
+                className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-sm hover:bg-white/30 transition-all ml-2"
                 title={lang === 'ar' ? 'القائمة' : 'Menu'}
               >
-                <span className="text-[9px] font-black uppercase text-black tracking-[0.2em] leading-none">
+                <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">
                   {lang === 'ar' ? 'القائمة' : 'Menu'}
                 </span>
                 <div className="p-2 rounded-lg bg-[#F59E0B] border border-black/10 text-black shadow-md">
@@ -752,7 +755,7 @@ export default function Header({
 
           {/* PWA: hamburger only */}
           {isPWA && (
-          <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setShowMobileMenu(true)}
                 className="p-2.5 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"

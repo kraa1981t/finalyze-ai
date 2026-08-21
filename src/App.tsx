@@ -1686,18 +1686,6 @@ export default function App() {
         freemiumDisabled={freemiumDisabled}
       />
 
-      {/* Branded Trading Banner - visible to all users */}
-      <div className="fixed top-20 left-0 right-0 z-40 h-[50px] bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/20 overflow-hidden flex items-center">
-        <img 
-          src="/trading-banner.png" 
-          alt="Joseph.Trading Institutional Engine" 
-          className="w-full h-full object-cover object-center"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
-        />
-      </div>
-
       {/* Sidebar Panel - dropdown below menu icon */}
       <AnimatePresence>
         {isSidebarOpen && !isPWA && window.self === window.top && (
@@ -1734,7 +1722,7 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-32 relative">
+      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-[140px] relative">
         {/* Dedicated pages (from dashboard) */}
         {effectivePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
