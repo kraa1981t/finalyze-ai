@@ -112,6 +112,9 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
       animate={{ opacity: 1, y: 0 }}
       className="fixed inset-0 z-50 overflow-y-auto bg-[#0a0f1a]"
     >
+      {/* Spacer for main header */}
+      <div className="h-[320px]" />
+      
       {/* Header */}
       <div className="sticky top-0 z-40 bg-[#0a0f1a]/95 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
