@@ -485,60 +485,57 @@ export default function Header({
         </div>
       )}
 
-      <header className="fixed top-0 left-0 right-0 z-50 h-[200px] overflow-hidden shadow-2xl shadow-emerald-500/20">
+      <header className="fixed top-0 left-0 right-0 z-50 h-[50px] overflow-hidden shadow-2xl shadow-emerald-500/20">
         {/* Trading Banner Background */}
         <div className="absolute inset-0">
           <img 
             src="/trading-banner.png" 
             alt="Joseph.Trading" 
-            className="w-full h-full object-cover object-top"
+            className="w-full h-full object-cover object-center"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
-              (e.target as HTMLImageElement).parentElement!.classList.add('bg-[#D1FAE5]');
+              (e.target as HTMLImageElement).parentElement!.classList.add('bg-gradient-to-r', 'from-emerald-600', 'via-emerald-500', 'to-emerald-600');
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-black/60" />
         </div>
         
-        {/* Content Overlay */}
+        {/* Content Overlay - left logo + right icons */}
         <div className="relative max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
           {/* Left: Logo */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {showBack && (
               <button 
                 onClick={onBack}
-                className="p-2 -ml-1 text-white/90 hover:text-white transition-colors flex items-center justify-center"
+                className="p-1 -ml-1 text-white/90 hover:text-white transition-colors flex items-center justify-center"
               >
-                <ArrowLeft size={20} />
+                <ArrowLeft size={18} />
               </button>
             )}
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center overflow-hidden shadow-2xl shadow-sky-500/40 rotate-3 hover:rotate-0 transition-all pointer-events-none border-2 border-white/50">
-                <img src={customLogo || `${BASE_URL}logo.png`} alt="Joseph Trading" className="w-full h-full object-cover" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-2xl font-display font-black tracking-tighter text-white drop-shadow-lg leading-none">
-                  Joseph.<span className="text-sky-200 italic">Trading</span>
-                </span>
-                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/80 ml-1 mt-0.5 drop-shadow-md">Institutional Engine</span>
-              </div>
+            <div className="w-9 h-9 bg-black rounded-xl flex items-center justify-center overflow-hidden shadow-lg border border-white/30">
+              <img src={customLogo || `${BASE_URL}logo.png`} alt="JT" className="w-full h-full object-cover" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-display font-black tracking-tight text-white drop-shadow-lg leading-none">
+                Joseph.<span className="text-sky-300 italic">Trading</span>
+              </span>
+              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-white/70 leading-none">Institutional Engine</span>
             </div>
           </div>
 
-          {/* Right: Icons distributed across header */}
+          {/* Right: Compact icons row */}
           {!isPWA && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {/* Suggestions - developer only */}
             {isDeveloper && (
               <button
                 onClick={onNavigateSuggestions}
-                className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-sm hover:bg-white/30 transition-all relative"
+                className="flex items-center gap-1 px-2 py-1 bg-white/15 backdrop-blur-sm rounded-lg border border-white/20 hover:bg-white/25 transition-all relative"
               >
-                <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">{lang === 'ar' ? 'مقترحات' : 'Suggestions'}</span>
-                <div className="relative p-1.5 rounded-lg bg-[#F59E0B] border border-black/10 text-black shadow-md">
-                  <Bell size={15} />
+                <div className="relative p-1 rounded-md bg-[#F59E0B] text-black">
+                  <Bell size={12} />
                   {newSuggestionsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow-lg">
+                    <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-0.5">
                       {newSuggestionsCount}
                     </span>
                   )}
@@ -547,17 +544,14 @@ export default function Header({
             )}
 
             {/* Contact */}
-            <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-sm">
-              <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">{lang === 'ar' ? 'تواصل' : 'Contact'}</span>
-              <a
-                href="https://www.facebook.com/messages/e2ee/t/7630276620403742/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1.5 rounded-lg bg-[#0084FF] border border-black/10 text-white hover:bg-[#006ADB] transition-all shadow-md"
-              >
-                <MessageCircle size={15} />
-              </a>
-            </div>
+            <a
+              href="https://www.facebook.com/messages/e2ee/t/7630276620403742/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1 rounded-md bg-[#0084FF] text-white hover:bg-[#006ADB] transition-all shadow-md"
+            >
+              <MessageCircle size={12} />
+            </a>
 
             {/* Auto Analysis + Sync Status */}
             {isDeveloper ? (
@@ -567,187 +561,133 @@ export default function Header({
                   onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled });
                 }}
                 className={cn(
-                  "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 shadow-lg transition-all min-w-[180px] backdrop-blur-sm",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border shadow-md transition-all backdrop-blur-sm",
                   analysisProgress
-                    ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/40 animate-pulse'
+                    ? 'bg-emerald-600 border-emerald-700 text-white animate-pulse'
                     : lastSyncStatus?.ok
-                      ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/40'
+                      ? 'bg-emerald-600 border-emerald-700 text-white'
                       : lastSyncStatus
-                        ? 'bg-red-700 border-red-800 text-white shadow-red-500/40'
+                        ? 'bg-red-700 border-red-800 text-white'
                         : autoSettings.isEnabled
-                          ? (isWaiting
-                            ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/40'
-                            : 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/40')
-                          : 'bg-red-700 border-red-800 text-white shadow-red-500/30'
+                          ? 'bg-emerald-600 border-emerald-700 text-white'
+                          : 'bg-red-700 border-red-800 text-white'
                 )}
               >
                 <div className="relative flex-shrink-0">
                   {analysisProgress ? (
-                    <div className="w-5 h-5 rounded-full bg-white animate-bounce shadow-[0_0_16px_rgba(255,255,255,0.8)]" />
+                    <div className="w-4 h-4 rounded-full bg-white animate-bounce" />
                   ) : lastSyncStatus ? (
-                    <span className="text-lg font-black">{lastSyncStatus.ok ? '✓' : '✗'}</span>
+                    <span className="text-sm font-black">{lastSyncStatus.ok ? '✓' : '✗'}</span>
                   ) : (
-                    <Zap size={20} fill={autoSettings.isEnabled ? "currentColor" : "none"} className="text-white" />
-                  )}
-                  {(analysisProgress || (autoSettings.isEnabled && !isWaiting)) && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-ping shadow-[0_0_16px_white]" />
+                    <Zap size={14} fill={autoSettings.isEnabled ? "currentColor" : "none"} className="text-white" />
                   )}
                 </div>
-                <div className="flex items-center gap-2 min-w-0">
-                  {analysisProgress ? (
-                    <>
-                      <span className="text-[14px] font-black text-white uppercase tracking-wider whitespace-nowrap">
-                        {analysisProgress.index + 1}/{analysisProgress.total}
-                      </span>
-                      <span className="text-[14px] font-black text-yellow-300 truncate max-w-[120px]">
-                        {analysisProgress.current}
-                      </span>
-                    </>
-                  ) : lastSyncStatus ? (
-                    <>
-                      <span className="text-[13px] font-black uppercase tracking-wider text-white whitespace-nowrap">
-                        {lastSyncStatus.ok ? 'SYNCED' : 'FAILED'}
-                      </span>
-                      {lastSyncStatus.count !== undefined && (
-                        <span className="text-[13px] font-black text-yellow-300 whitespace-nowrap">
-                          {lastSyncStatus.count} {lang === 'ar' ? 'إشارة' : 'signals'}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-[13px] font-black uppercase tracking-wider text-white whitespace-nowrap">
-                      {autoSettings.isEnabled ? (isWaiting ? (lang === 'ar' ? '⏳ انتظار' : '⏳ Waiting') : (lang === 'ar' ? '🔍 فحص' : '🔍 Scanning')) : '🔴 OFF'}
-                    </span>
-                  )}
-                </div>
+                <span className="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">
+                  {analysisProgress
+                    ? `${analysisProgress.index + 1}/${analysisProgress.total}`
+                    : lastSyncStatus
+                      ? (lastSyncStatus.ok ? 'SYNCED' : 'FAIL')
+                      : autoSettings.isEnabled ? (isWaiting ? 'WAIT' : 'ON') : 'OFF'
+                  }
+                </span>
+                {lastSyncStatus?.count !== undefined && (
+                  <span className="text-[10px] font-black text-yellow-300">{lastSyncStatus.count}</span>
+                )}
               </button>
             ) : (
               <div className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl border-2 shadow-lg transition-all min-w-[180px] backdrop-blur-sm",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border shadow-md backdrop-blur-sm",
                 clientRadarRunning
-                  ? 'bg-red-600 border-red-700 text-white shadow-red-500/50 animate-pulse'
+                  ? 'bg-red-600 border-red-700 text-white animate-pulse'
                   : showRadarComplete
-                    ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/50'
+                    ? 'bg-emerald-600 border-emerald-700 text-white'
                     : 'bg-emerald-500/30 border-emerald-500/50 text-white'
               )}>
-                <div className="relative">
-                  <Zap size={28} className="text-white" fill="currentColor" />
-                  {clientRadarRunning && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-ping shadow-[0_0_16px_white]" />
-                  )}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">
-                    {lang === 'ar' ? 'التحليل التلقائي' : 'Auto Analysis'}
-                  </span>
-                  <span className="text-[12px] font-black uppercase tracking-wider leading-tight text-white">
-                    {clientRadarRunning
-                      ? (lang === 'ar' ? '⏳ انتظار...' : '⏳ Waiting...')
-                      : showRadarComplete
-                        ? (lang === 'ar' ? '✅ تم' : '✅ Done')
-                        : (lang === 'ar' ? 'نشط' : 'Active')
-                    }
-                  </span>
-                </div>
+                <Zap size={14} className="text-white" fill="currentColor" />
+                <span className="text-[11px] font-black uppercase tracking-wider">
+                  {clientRadarRunning ? 'SCANNING' : showRadarComplete ? 'DONE' : 'ACTIVE'}
+                </span>
               </div>
             )}
 
             {/* Theme */}
-            <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-sm">
-              <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">Theme</span>
-              <button 
-                onClick={toggleTheme}
-                className="p-1.5 rounded-lg bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
-              >
-                {isDark ? <Sun size={15} /> : <Moon size={15} />}
-              </button>
-            </div>
+            <button 
+              onClick={toggleTheme}
+              className="p-1 rounded-md bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
+            >
+              {isDark ? <Sun size={12} /> : <Moon size={12} />}
+            </button>
 
             {/* Language */}
-            <div className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-sm">
-              <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">Language</span>
-              <div className="relative group">
-                <button className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md">
-                  <Globe size={15} />
-                  <span className="text-[10px] font-black uppercase tracking-widest hidden lg:inline">{lang}</span>
-                </button>
-                <div className="absolute right-0 top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
-                  {LANGUAGES.map((l) => (
-                    <button
-                      key={l.code}
-                      onClick={() => onLangChange(l.code)}
-                      className={cn(
-                        "w-full px-4 py-3 text-left text-xs font-bold transition-colors hover:bg-primary/10",
-                        lang === l.code ? "text-primary bg-primary/5" : "text-brand-text/60"
-                      )}
-                    >
-                      {l.label}
-                    </button>
-                  ))}
-                </div>
+            <div className="relative group">
+              <button className="flex items-center gap-0.5 px-2 py-1 rounded-md bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md">
+                <Globe size={12} />
+                <span className="text-[9px] font-black uppercase">{lang}</span>
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-36 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
+                {LANGUAGES.map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => onLangChange(l.code)}
+                    className={cn(
+                      "w-full px-3 py-2 text-left text-xs font-bold transition-colors hover:bg-primary/10",
+                      lang === l.code ? "text-primary bg-primary/5" : "text-brand-text/60"
+                    )}
+                  >
+                    {l.label}
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Profile */}
             {user ? (
-              <div className="flex flex-col items-center gap-0.5 pl-2 border-l border-white/30 relative" ref={profileMenuRef}>
-                <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">Profile</span>
+              <div className="relative" ref={profileMenuRef}>
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="w-9 h-9 rounded-full bg-[#F59E0B] border-2 border-white/30 flex items-center justify-center overflow-hidden shadow-lg hover:scale-105 transition-all"
+                  className="w-7 h-7 rounded-full bg-[#F59E0B] border border-white/30 flex items-center justify-center overflow-hidden shadow-md hover:scale-105 transition-all"
                 >
                   {customAvatar ? (
                     <img src={customAvatar} alt="profile" className="w-full h-full object-cover" />
                   ) : user.photoURL ? (
                     <img src={user.photoURL} alt="profile" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-black/10 flex items-center justify-center text-black">
-                      <span className="text-sm font-black">{user.email?.charAt(0).toUpperCase()}</span>
-                    </div>
+                    <span className="text-[10px] font-black text-black">{user.email?.charAt(0).toUpperCase()}</span>
                   )}
                 </button>
                 {showProfileMenu && (
-                  <div className={`absolute top-full mt-2 w-56 bg-[#F59E0B] rounded-2xl shadow-2xl border-2 border-black/20 overflow-hidden z-[60] ${lang === 'ar' ? 'left-0' : 'right-0'}`}>
-                    <div className="px-4 py-3 border-b-2 border-black/10">
-                      <p className="text-sm font-black text-black truncate">{user.displayName || user.email?.split('@')[0]}</p>
-                      <p className="text-[11px] font-bold text-black/70 truncate mt-0.5">{user.email}</p>
+                  <div className={`absolute top-full mt-2 w-48 bg-[#F59E0B] rounded-xl shadow-2xl border-2 border-black/20 overflow-hidden z-[60] ${lang === 'ar' ? 'left-0' : 'right-0'}`}>
+                    <div className="px-3 py-2 border-b-2 border-black/10">
+                      <p className="text-xs font-black text-black truncate">{user.displayName || user.email?.split('@')[0]}</p>
+                      <p className="text-[10px] font-bold text-black/70 truncate">{user.email}</p>
                     </div>
                     <button 
                       onClick={() => { setShowProfileMenu(false); setShowLogoutConfirm(true); }}
-                      className="w-full flex items-center gap-2.5 px-4 py-3 text-red-600 hover:bg-red-500/20 transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-500/20 transition-colors"
                     >
-                      <LogOut size={16} className="text-red-600" />
-                      <span className="text-xs font-black text-red-600">{lang === 'ar' ? 'تسجيل الخروج' : 'Logout'}</span>
+                      <LogOut size={14} className="text-red-600" />
+                      <span className="text-[11px] font-black text-red-600">{lang === 'ar' ? 'خروج' : 'Logout'}</span>
                     </button>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-0.5 pl-2 border-l border-white/30">
-                <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">Account</span>
-                <button 
-                  onClick={onLogin}
-                  className="flex items-center gap-1.5 bg-[#F59E0B] text-black px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest shadow-md hover:bg-[#d97706] active:scale-95 transition-all"
-                >
-                  <LogIn size={15} />
-                  <span className="hidden sm:inline">{t.login}</span>
-                </button>
-              </div>
+              <button 
+                onClick={onLogin}
+                className="flex items-center gap-1 bg-[#F59E0B] text-black px-2 py-1 rounded-md font-black text-[9px] uppercase shadow-md hover:bg-[#d97706] active:scale-95 transition-all"
+              >
+                <LogIn size={12} />
+              </button>
             )}
 
             {/* Menu toggle */}
             {!isPWA && (
               <button
                 onMouseDown={(e) => { e.stopPropagation(); onToggleSidebar(); }}
-                className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-sm hover:bg-white/30 transition-all ml-2"
+                className="p-1.5 rounded-md bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
                 title={lang === 'ar' ? 'القائمة' : 'Menu'}
               >
-                <span className="text-[9px] font-black uppercase text-white tracking-[0.2em] leading-none drop-shadow-md">
-                  {lang === 'ar' ? 'القائمة' : 'Menu'}
-                </span>
-                <div className="p-2 rounded-lg bg-[#F59E0B] border border-black/10 text-black shadow-md">
-                  <Menu size={18} />
-                </div>
+                <Menu size={14} />
               </button>
             )}
           </div>
@@ -755,14 +695,12 @@ export default function Header({
 
           {/* PWA: hamburger only */}
           {isPWA && (
-          <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setShowMobileMenu(true)}
-                className="p-2.5 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
-              >
-                <Menu size={22} />
-              </button>
-            </div>
+            <button
+              onClick={() => setShowMobileMenu(true)}
+              className="p-1.5 rounded-md bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
+            >
+              <Menu size={16} />
+            </button>
           )}
         </div>
       </header>
