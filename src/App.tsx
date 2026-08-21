@@ -1726,15 +1726,6 @@ export default function App() {
         {/* Dedicated pages (from dashboard) */}
         {effectivePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <button
-              onClick={() => { if (effectivePage === 'plans' && paymentPlan) setPaymentPlan(null); goBack(); }}
-              className="sticky top-28 z-30 flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-alt/90 backdrop-blur-xl border border-white/10 text-brand-muted hover:text-brand-text transition-colors mb-6"
-            >
-              <ArrowLeft size={18} />
-              <span className="text-xs font-black uppercase tracking-widest">
-{lang === 'ar' ? '\u0639\u0648\u062f\u0629 \u0644\u0644\u062e\u0644\u0641' : 'Go back'}
-              </span>
-            </button>
 
              {effectivePage === 'settings' && (
                <SettingsModal
@@ -1990,7 +1981,7 @@ export default function App() {
         {(effectivePage !== 'main' || detailResult) && (
           <button
             onClick={() => { if (detailResult) { setDetailResult(null); } else if (analysisResults) { setAnalysisResults(null); setAnalysisError(null); } goBack(); }}
-            className="fixed bottom-6 left-6 z-[90] flex items-center gap-3 bg-[#F59E0B] hover:bg-[#d97706] transition-all rounded-2xl px-5 py-4 shadow-2xl shadow-[#F59E0B]/30 active:scale-95 group"
+            className="fixed top-24 left-4 z-[90] flex items-center gap-3 bg-[#F59E0B] hover:bg-[#d97706] transition-all rounded-2xl px-5 py-4 shadow-2xl shadow-[#F59E0B]/30 active:scale-95 group"
           >
             <ArrowLeft size={22} className="text-black group-hover:-translate-x-1 transition-transform" />
             <span className="text-sm font-black text-black">{lang === 'ar' ? '\u0639\u0648\u062f\u0629 \u0644\u0644\u062e\u0644\u0641' : 'Go back'}</span>
