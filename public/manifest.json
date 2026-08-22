@@ -2,8 +2,8 @@
   "name": "Joseph.Trading - Institutional Engine",
   "short_name": "JosephTrading",
   "description": "AI-Powered Financial Market Analysis Tool - Real-time trading signals with institutional-grade analysis",
-  "start_url": "/finalyze-ai/",
-  "scope": "/finalyze-ai/",
+  "start_url": "/",
+  "scope": "/",
   "id": "com.joseph.trading",
   "display": "standalone",
   "orientation": "any",
@@ -14,27 +14,27 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/finalyze-ai/icon-192x192.png",
+      "src": "/logo.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/finalyze-ai/icon-512x512.png",
+      "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/finalyze-ai/icon-512x512.png",
+      "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/finalyze-ai/icon.svg",
+      "src": "/logo.png",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     }
   ]
