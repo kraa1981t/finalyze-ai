@@ -5,8 +5,31 @@ import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings } from '../types';
 import { initAudio } from '../lib/audioEngine';
 import { BASE_URL } from '../lib/firebase';
+import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
+
+const PROGRESS_CATEGORY_CONFIG: Record<string, { emoji: string; labelAr: string; labelEn: string }> = {
+  forex: { emoji: '\uD83D\uDCB1', labelAr: 'فوركس', labelEn: 'Forex' },
+  crypto: { emoji: '\uD83E\uDDF1', labelAr: 'كريبتو', labelEn: 'Crypto' },
+  stocks: { emoji: '\uD83D\uDCC8', labelAr: 'أسهم', labelEn: 'Stocks' },
+  metals: { emoji: '\uD83D\uDC8E', labelAr: 'معادن', labelEn: 'Metals' },
+};
+
+function detectProgressCategory(symbol: string): { key: string; cfg?: typeof PROGRESS_CATEGORY_CONFIG[string] } {
+  const sym = (symbol || '').toUpperCase().replace(/[-_=]/g, '');
+  for (const [cat, syms] of Object.entries(SYMBOL_CATEGORIES)) {
+    if ((syms as string[]).includes(sym)) return { key: cat, cfg: PROGRESS_CATEGORY_CONFIG[cat] };
+  }
+  for (const [cat, syms] of Object.entries(ALL_SYMBOLS_DB)) {
+    if ((syms as string[]).includes(sym)) return { key: cat, cfg: PROGRESS_CATEGORY_CONFIG[cat] };
+  }
+  const s = symbol.toUpperCase();
+  if (/XAU|XAG|GOLD|SILVER/.test(s)) return { key: 'metals', cfg: PROGRESS_CATEGORY_CONFIG.metals };
+  if (/BTC|ETH|BNB|SOL|XRP|DOGE|ADA|DOT|AVAX|MATIC|LINK|UNI|SHIB|LTC|ATOM/.test(s)) return { key: 'crypto', cfg: PROGRESS_CATEGORY_CONFIG.crypto };
+  if (/EUR|GBP|JPY|CHF|CAD|AUD|NZD|USD/.test(s)) return { key: 'forex', cfg: PROGRESS_CATEGORY_CONFIG.forex };
+  return { key: '', cfg: undefined };
+}
 
 interface HeaderProps {
   user: User | null;
@@ -585,6 +608,14 @@ export default function Header({
                 {lastSyncStatus?.count !== undefined && (
                   <span className="text-[12px] font-black text-yellow-300">{lastSyncStatus.count}</span>
                 )}
+                {analysisProgress && (() => {
+                  const { cfg } = detectProgressCategory(analysisProgress.current);
+                  return (
+                    <span className="text-[12px] font-black text-yellow-300 whitespace-nowrap">
+                      {cfg ? (lang === 'ar' ? `${cfg.emoji} ${cfg.labelAr}` : `${cfg.emoji} ${cfg.labelEn}`) : analysisProgress.current}
+                    </span>
+                  );
+                })()}
               </button>
             ) : (
               <div className={cn(
