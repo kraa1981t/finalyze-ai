@@ -576,7 +576,7 @@ export default function Header({
                   onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled });
                 }}
                 className={cn(
-                  "flex items-center gap-4 px-8 py-5 rounded-2xl border shadow-md transition-all backdrop-blur-sm",
+                  "flex items-center gap-3 px-6 py-3.5 rounded-2xl border shadow-md transition-all backdrop-blur-sm",
                   analysisProgress
                     ? 'bg-emerald-600 border-emerald-700 text-white animate-pulse'
                     : lastSyncStatus?.ok
@@ -590,14 +590,14 @@ export default function Header({
               >
                 <div className="relative flex-shrink-0">
                   {analysisProgress ? (
-                    <div className="w-[40px] h-[40px] rounded-full bg-white animate-bounce" />
+                    <div className="w-[28px] h-[28px] rounded-full bg-white animate-bounce" />
                   ) : lastSyncStatus ? (
-                    <span className="text-[36px] font-black leading-none">{lastSyncStatus.ok ? '✓' : '✗'}</span>
+                    <span className="text-[26px] font-black leading-none">{lastSyncStatus.ok ? '✓' : '✗'}</span>
                   ) : (
-                    <Zap size={36} fill={autoSettings.isEnabled ? "currentColor" : "none"} className="text-white" />
+                    <Zap size={26} fill={autoSettings.isEnabled ? "currentColor" : "none"} className="text-white" />
                   )}
                 </div>
-                <span className="text-[28px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                <span className="text-[20px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
                   {analysisProgress
                     ? `${analysisProgress.index + 1}/${analysisProgress.total}`
                     : lastSyncStatus
@@ -606,12 +606,12 @@ export default function Header({
                   }
                 </span>
                 {lastSyncStatus?.count !== undefined && (
-                  <span className="text-[24px] font-black text-yellow-300 leading-none">{lastSyncStatus.count}</span>
+                  <span className="text-[17px] font-black text-yellow-300 leading-none">{lastSyncStatus.count}</span>
                 )}
                 {analysisProgress && (() => {
                   const { cfg } = detectProgressCategory(analysisProgress.current);
                   return (
-                    <span className="text-[24px] font-black text-yellow-300 whitespace-nowrap leading-none">
+                    <span className="text-[17px] font-black text-yellow-300 whitespace-nowrap leading-none">
                       {cfg ? (lang === 'ar' ? `${cfg.emoji} ${cfg.labelAr}` : `${cfg.emoji} ${cfg.labelEn}`) : analysisProgress.current}
                     </span>
                   );
