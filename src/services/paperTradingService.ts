@@ -1,5 +1,5 @@
 import { db } from '../lib/firebase';
-import { collection, doc, getDoc, setDoc, addDoc, updateDoc, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, addDoc, updateDoc, query, where, getDocs, Timestamp, writeBatch } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import { SYMBOL_CATEGORIES } from '../constants';
 
@@ -21,14 +21,22 @@ export interface PaperTrade {
 }
 
 export const START_BALANCE = 10000;
+export const MIN_BALANCE = 500;
 
 // ---------- Contract specs (TradingView-style) ----------
-export function getDefaultQty(category: string): number {
+// Default lot follows total balance: baseline $500 -> 0.01 lot,
+// every extra $1000 adds 0.01 (e.g. $7000 -> 0.08).
+export function lotMultiplierForBalance(balance: number): number {
+  return Math.floor(Math.max(balance, MIN_BALANCE) / 1000) + 1;
+}
+
+export function getDefaultQty(category: string, balance: number = START_BALANCE): number {
+  const m = lotMultiplierForBalance(balance);
   switch (category) {
-    case 'forex': return 0.1;   // lots (1 lot = 100,000 units)
-    case 'crypto': return 1;    // units of coin
-    case 'stocks': return 10;   // shares
-    case 'metals': return 0.1;  // lots (1 lot = 100 oz)
+    case 'forex': return +(0.01 * m).toFixed(2);   // lots (1 lot = 100,000 units)
+    case 'crypto': return +(0.1 * m).toFixed(2);   // units of coin
+    case 'stocks': return Math.max(1, m);          // shares
+    case 'metals': return +(0.01 * m).toFixed(2);  // lots (1 lot = 100 oz)
     default: return 1;
   }
 }
@@ -178,6 +186,7 @@ interface TradeStore {
   listTrades(): Promise<PaperTrade[]>;
   addTrade(t: Omit<PaperTrade, 'id'>): Promise<string>;
   updateTrade(id: string, patch: Partial<PaperTrade>): Promise<void>;
+  resetAccount(newBalance: number): Promise<void>;
 }
 
 class LocalStore implements TradeStore {
@@ -205,6 +214,9 @@ class LocalStore implements TradeStore {
     const idx = d.trades.findIndex((t) => t.id === id);
     if (idx >= 0) { d.trades[idx] = { ...d.trades[idx], ...patch }; this.write(d); }
   }
+  async resetAccount(newBalance: number) {
+    this.write({ balance: newBalance, trades: [] });
+  }
 }
 
 class FirestoreStore implements TradeStore {
@@ -231,6 +243,13 @@ class FirestoreStore implements TradeStore {
   }
   async updateTrade(id: string, patch: Partial<PaperTrade>) {
     await updateDoc(doc(db, 'paper_trades', id), patch as any);
+  }
+  async resetAccount(newBalance: number) {
+    await setDoc(doc(db, 'paper_accounts', this.uid), { balance: newBalance, startBalance: newBalance, updatedAt: Timestamp.now() }, { merge: true });
+    const snap = await getDocs(query(collection(db, 'paper_trades'), where('uid', '==', this.uid)));
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
   }
 }
 

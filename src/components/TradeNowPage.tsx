@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ExternalLink, TrendingUp, Info, Wallet, X, Loader2, Plus } from 'lucide-react';
+import { ExternalLink, TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { SYMBOL_CATEGORIES } from '../constants';
 import { Language } from '../lib/i18n';
 import TradingViewWidget from './TradingViewWidget';
 import {
   PaperTrade, getTradeStore, getLivePrice, subscribePrices,
-  calcPnl, getDefaultQty, START_BALANCE,
+  calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE,
 } from '../services/paperTradingService';
 import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
 
@@ -101,6 +101,10 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
   const [tab, setTab] = useState<'positions' | 'history'>('positions');
   const [busy, setBusy] = useState(false);
   const [priceLoading, setPriceLoading] = useState(true);
+  // Account reset
+  const [showReset, setShowReset] = useState(false);
+  const [resetInput, setResetInput] = useState('');
+  const resetVal = parseFloat(resetInput) || 0;
 
   const store = getTradeStore(user);
 
@@ -187,7 +191,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     setCategory(key);
     const first = allSymbolsFor(key)[0] || '';
     setSymbol(first);
-    if (first) setQty(getDefaultQty(detectCategory(first)));
+    if (first) setQty(getDefaultQty(detectCategory(first), balance));
   }
 
   function unhideSymbol(sym: string) {
@@ -231,7 +235,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     // Jump straight into the new symbol
     setCategory('custom');
     setSymbol(raw);
-    setQty(getDefaultQty(cat));
+    setQty(getDefaultQty(cat, balance));
   }
 
   function addFromSuggestion(s: SuggestedSymbol) {
@@ -249,7 +253,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     addToCategoryList(s.symbol, dispCat);
     setCategory('custom');
     setSymbol(s.symbol);
-    setQty(getDefaultQty(dispCat));
+    setQty(getDefaultQty(dispCat, balance));
   }
 
   function removeCustomSymbol(sym: string) {
@@ -328,6 +332,21 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     await closeTradeInternal(t, exit, 'manual');
   }
 
+  async function doReset(newBalance: number) {
+    const val = Math.max(MIN_BALANCE, Math.floor(newBalance));
+    setBusy(true);
+    try {
+      await store.resetAccount(val);
+      setBalance(val);
+      setTrades([]);
+      setShowReset(false);
+      setResetInput('');
+      setQty(getDefaultQty(detectCategory(symbol || ''), val));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const stats = React.useMemo(() => {
     const wins = closedTrades.filter((t) => (t.pnl ?? 0) > 0).length;
     const totalPnl = closedTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
@@ -357,6 +376,13 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
             <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'ربح مفتوح' : 'Open P&L'}</div>
             <div className={`text-base font-black ${unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtMoney(unrealizedPnl)}</div>
           </div>
+          <button
+            onClick={() => { setResetInput(''); setShowReset(true); }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/40 text-red-300 font-black uppercase shadow-lg shadow-red-500/10 active:scale-95 transition-all"
+          >
+            <RotateCcw size={16} />
+            {isAr ? 'إعادة تعيين' : 'Reset'}
+          </button>
           <a
             href={`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(toTvSymbol(symbol))}`}
             target="_blank"
@@ -474,7 +500,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
                 return (
                   <div key={sym} className="relative group">
                     <button
-                      onClick={() => { setSymbol(sym); setQty(getDefaultQty(detectCategory(sym))); }}
+                      onClick={() => { setSymbol(sym); setQty(getDefaultQty(detectCategory(sym), balance)); }}
                       className={`pl-3 pr-8 py-2 rounded-xl text-base font-black transition-all border ${
                         symbol === sym
                           ? 'bg-emerald-500 text-black border-emerald-400'
@@ -753,6 +779,95 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
             : 'Fully simulated trading with virtual funds and real-time prices. Add any TradingView-available symbol using the field above.'}
         </span>
       </div>
+
+      {/* Reset Account Modal */}
+      {showReset && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => !busy && setShowReset(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl border border-white/15 bg-[#0a0f1a] p-5 space-y-4 shadow-2xl"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-black text-brand-text flex items-center gap-2">
+                <RotateCcw size={20} className="text-red-400" />
+                {isAr ? 'إعادة تعيين الحساب' : 'Reset Account'}
+              </h3>
+              <button onClick={() => setShowReset(false)} disabled={busy} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs font-bold text-yellow-400/90 leading-relaxed">
+              {isAr
+                ? `⚠️ سيتم حذف جميع الصفقات المفتوحة والسجل بالكامل، وإعادة الرصيد إلى القيمة المحددة (الحد الأدنى $${MIN_BALANCE}).`
+                : `⚠️ All open positions and history will be deleted, and balance reset to the chosen value (minimum $${MIN_BALANCE}).`}
+            </p>
+
+            {/* Same balance */}
+            <button
+              onClick={() => doReset(balance)}
+              disabled={busy}
+              className="w-full py-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 font-black transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <RotateCcw size={16} />
+              {isAr ? `إعادة تعيين بنفس الرصيد ($${balance.toLocaleString('en-US', { maximumFractionDigits: 2 })})` : `Reset to same balance ($${balance.toLocaleString('en-US', { maximumFractionDigits: 2 })})`}
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-xs font-black uppercase text-brand-text/40">{isAr ? 'أو رصيد مخصص' : 'or custom'}</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
+            {/* Custom balance */}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-black text-brand-text/60">$</span>
+                <input
+                  type="text" inputMode="numeric" lang="en" dir="ltr"
+                  value={resetInput}
+                  onChange={(e) => setResetInput(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder={isAr ? 'اكتب أي رصيد — مثال: 5000' : 'Enter any balance — e.g. 5000'}
+                  className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 px-4 text-lg font-black text-brand-text outline-none focus:border-sky-500 placeholder:text-brand-text/25 placeholder:font-medium placeholder:text-sm"
+                  style={{ direction: 'ltr' }}
+                />
+              </div>
+              {resetInput && (
+                <p className={`mt-1.5 text-xs font-bold ${resetVal >= MIN_BALANCE ? 'text-brand-text/50' : 'text-red-400'}`}>
+                  {resetVal >= MIN_BALANCE
+                    ? isAr
+                      ? `الحجم الافتراضي سيكون: ${(getDefaultQty('forex', resetVal)).toFixed(2)} لوت فوركس`
+                      : `Default volume will be: ${(getDefaultQty('forex', resetVal)).toFixed(2)} forex lots`
+                    : isAr
+                      ? `الحد الأدنى للرصيد هو $${MIN_BALANCE}`
+                      : `Minimum balance is $${MIN_BALANCE}`}
+                </p>
+              )}
+            </div>
+
+            {/* Quick presets */}
+            <div className="flex gap-1.5">
+              {[500, 1000, 2500, 5000, 10000].map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setResetInput(String(v))}
+                  className={`flex-1 py-1.5 rounded-lg text-sm font-black transition-all ${resetInput === String(v) ? 'bg-sky-500 text-black' : 'bg-white/5 text-brand-text/60 hover:bg-white/10'}`}
+                >
+                  {v.toLocaleString('en-US')}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => doReset(resetVal)}
+              disabled={busy || resetVal < MIN_BALANCE}
+              className="w-full py-3.5 rounded-xl bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black uppercase tracking-wider shadow-lg shadow-red-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <RotateCcw size={18} />}
+              {isAr ? `تأكيد الإعادة تعيين إلى $${Math.max(MIN_BALANCE, Math.floor(resetVal || 0)).toLocaleString('en-US')}` : `Reset to $${Math.max(MIN_BALANCE, Math.floor(resetVal || 0)).toLocaleString('en-US')}`}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
