@@ -85,7 +85,9 @@ async function fetchBinancePrice(pair: string): Promise<number | null> {
 
 function yahooSymbol(sym: string): string {
   const s = sym.toUpperCase();
-  if ((SYMBOL_CATEGORIES.forex as string[]).includes(s)) return `${s.slice(0,3)}${s.slice(3)}=X`;
+  // Strip exchange prefix if present (e.g., NASDAQ:TSLA -> TSLA)
+  const base = s.includes(':') ? s.split(':')[1] : s;
+  if ((SYMBOL_CATEGORIES.forex as string[]).includes(base)) return `${base.slice(0,3)}${base.slice(3)}=X`;
   if (s === 'XAUUSD') return 'GC=F';
   if (s === 'XAGUSD') return 'SI=F';
   if (s === 'XPTUSD') return 'PL=F';
@@ -94,7 +96,9 @@ function yahooSymbol(sym: string): string {
   if (s === 'US500') return '^GSPC';
   if (s === 'US30') return '^DJI';
   if (s === 'US100') return '^NDX';
-  return s;
+  // Generic 6-letter currency pair (e.g., USDMXN, USDTRY)
+  if (/^[A-Z]{6}$/.test(base)) return `${base}=X`;
+  return base;
 }
 
 async function fetchYahooLastPrice(symbol: string): Promise<number | null> {

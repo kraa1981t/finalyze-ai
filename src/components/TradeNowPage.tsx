@@ -8,11 +8,15 @@ import {
   PaperTrade, getTradeStore, getLivePrice, subscribePrices,
   calcPnl, getDefaultQty, START_BALANCE,
 } from '../services/paperTradingService';
+import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
 
 interface TradeNowPageProps {
   lang: Language;
   user: User | null;
 }
+
+const CUSTOM_KEY = 'paper_trading_custom_symbols';
+const CUSTOM_TV_KEY = 'paper_trading_custom_tv_map';
 
 const CATEGORY_TABS = [
   { key: 'forex', labelAr: 'الفوركس', labelEn: 'Forex', emoji: '\uD83D\uDCB1' },
@@ -21,15 +25,19 @@ const CATEGORY_TABS = [
   { key: 'metals', labelAr: 'المعادن', labelEn: 'Metals', emoji: '\uD83D\uDC8E' },
 ];
 
-const CUSTOM_KEY = 'paper_trading_custom_symbols';
-
 function loadCustomSymbols(): string[] {
   try { return JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]'); } catch { return []; }
 }
 
+function loadTvMap(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_TV_KEY) || '{}'); } catch { return {}; }
+}
+
 function toTvSymbol(sym: string): string {
   const s = sym.trim().toUpperCase();
-  if (s.includes(':')) return s; // user provided full TV symbol e.g. NASDAQ:TSLA
+  const tvMap = loadTvMap();
+  if (tvMap[s]) return tvMap[s];
+  if (s.includes(':')) return s; // full TV symbol e.g. NASDAQ:TSLA
   if ((SYMBOL_CATEGORIES.crypto as string[]).includes(s)) return `BINANCE:${s.replace('USD', 'USDT')}`;
   if ((SYMBOL_CATEGORIES.metals as string[]).includes(s)) return `OANDA:${s}`;
   if ((SYMBOL_CATEGORIES.forex as string[]).includes(s)) return `FX:${s}`;
@@ -65,6 +73,8 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
   // Custom symbols
   const [customSymbols, setCustomSymbols] = useState<string[]>(loadCustomSymbols);
   const [newSymbol, setNewSymbol] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestions = searchSymbols(newSymbol);
 
   // Trading state
   const [balance, setBalance] = useState<number>(START_BALANCE);
@@ -166,24 +176,45 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
   function addCustomSymbol() {
     const raw = newSymbol.trim().toUpperCase();
     if (!raw) return;
-    if (customSymbols.includes(raw)) { setNewSymbol(''); return; }
+    if (customSymbols.includes(raw)) { setNewSymbol(''); setShowSuggestions(false); return; }
     const list = [...customSymbols, raw];
     setCustomSymbols(list);
     localStorage.setItem(CUSTOM_KEY, JSON.stringify(list));
     setNewSymbol('');
+    setShowSuggestions(false);
     // Jump straight into the new symbol
     setCategory('custom');
     setSymbol(raw);
     setQty(getDefaultQty(detectCategory(raw)));
   }
 
+  function addFromSuggestion(s: SuggestedSymbol) {
+    let list = customSymbols;
+    if (!list.includes(s.symbol)) {
+      list = [...list, s.symbol];
+      setCustomSymbols(list);
+      localStorage.setItem(CUSTOM_KEY, JSON.stringify(list));
+      const tvMap = loadTvMap();
+      tvMap[s.symbol] = s.tv;
+      localStorage.setItem(CUSTOM_TV_KEY, JSON.stringify(tvMap));
+    }
+    setNewSymbol('');
+    setShowSuggestions(false);
+    setCategory('custom');
+    setSymbol(s.symbol);
+    setQty(getDefaultQty(detectCategory(s.symbol)));
+  }
+
   function removeCustomSymbol(sym: string) {
     const list = customSymbols.filter((s) => s !== sym);
     setCustomSymbols(list);
     localStorage.setItem(CUSTOM_KEY, JSON.stringify(list));
+    // Also remove from TV map
+    const tvMap = loadTvMap();
+    if (tvMap[sym]) { delete tvMap[sym]; localStorage.setItem(CUSTOM_TV_KEY, JSON.stringify(tvMap)); }
     if (symbol === sym) {
-      setSymbol(list[0] || '');
-      if (!list[0]) setCategory('forex'), setSymbol('EURUSD');
+      if (list[0]) { setSymbol(list[0]); }
+      else { setCategory('forex'); setSymbol('EURUSD'); }
     }
   }
 
@@ -292,25 +323,59 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
               )}
             </div>
 
-            {/* Add custom symbol */}
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                dir="ltr"
-                value={newSymbol}
-                onChange={(e) => setNewSymbol(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addCustomSymbol()}
-                placeholder={isAr ? 'أضف أي رمز من TradingView — مثال: BTCUSD أو NASDAQ:TSLA' : 'Add any TradingView symbol — e.g. BTCUSD or NASDAQ:TSLA'}
-                className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 px-4 text-base font-bold text-brand-text outline-none focus:border-sky-500 placeholder:text-brand-text/30 placeholder:font-medium placeholder:text-sm"
-              />
-              <button
-                onClick={addCustomSymbol}
-                disabled={!newSymbol.trim()}
-                className="h-11 px-5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-black font-black uppercase flex items-center gap-2 transition-all active:scale-95"
-              >
-                <Plus size={18} />
-                {isAr ? 'إضافة' : 'Add'}
-              </button>
+            {/* Add custom symbol with search suggestions */}
+            <div className="relative">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={newSymbol}
+                  onChange={(e) => { setNewSymbol(e.target.value); setShowSuggestions(true); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (suggestions.length > 0 && showSuggestions) addFromSuggestion(suggestions[0]);
+                      else addCustomSymbol();
+                    }
+                    if (e.key === 'Escape') setShowSuggestions(false);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder={isAr ? 'ابحث وأضف أي رمز — مثال: BTC أو Tesla أو EURUSD' : 'Search & add any symbol — e.g. BTC, Tesla, EURUSD'}
+                  className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 px-4 text-base font-bold text-brand-text outline-none focus:border-sky-500 placeholder:text-brand-text/30 placeholder:font-medium placeholder:text-sm"
+                />
+                <button
+                  onClick={addCustomSymbol}
+                  disabled={!newSymbol.trim()}
+                  className="h-11 px-5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-black font-black uppercase flex items-center gap-2 transition-all active:scale-95"
+                >
+                  <Plus size={18} />
+                  {isAr ? 'إضافة' : 'Add'}
+                </button>
+              </div>
+
+              {/* Suggestions dropdown */}
+              {showSuggestions && newSymbol.trim() && suggestions.length > 0 && (
+                <div className="absolute top-full mt-1 left-0 right-0 bg-[#0a0f1a] border border-white/20 rounded-xl shadow-2xl z-40 max-h-[260px] overflow-y-auto">
+                  {suggestions.map((s) => {
+                    const added = customSymbols.includes(s.symbol);
+                    return (
+                      <button
+                        key={s.symbol + s.tv}
+                        onClick={() => addFromSuggestion(s)}
+                        className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors border-b border-white/5 last:border-b-0"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-lg flex-shrink-0">{catEmoji(s.cat)}</span>
+                          <span className="text-sm font-black text-brand-text" dir="ltr">{s.symbol}</span>
+                          <span className="text-xs font-bold text-brand-text/50 truncate">{isAr ? s.name : s.name}</span>
+                        </div>
+                        <span className={`flex-shrink-0 text-[10px] font-black uppercase px-2 py-1 rounded-md ${added ? 'bg-emerald-500/20 text-emerald-400' : 'bg-sky-500/20 text-sky-300'}`}>
+                          {added ? (isAr ? 'مضاف ✓' : 'Added ✓') : (isAr ? '+ إضافة' : '+ Add')}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Symbols grid */}
