@@ -57,7 +57,7 @@ interface HeaderProps {
   showRadarComplete?: boolean;
   onPreview?: (device: 'phone' | 'tablet') => void;
   isPWA?: boolean;
-  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats') => void;
+  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade') => void;
   freemiumDisabled?: boolean;
 }
 
@@ -541,6 +541,17 @@ export default function Header({
           {/* Right: Compact icons row */}
           {!isPWA && (
           <div className="flex items-center gap-3">
+            {/* Trade Now - everyone */}
+            <button
+              onClick={() => onNavigatePage?.('trade')}
+              className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-[#F59E0B] hover:bg-[#d97706] text-black shadow-lg shadow-[#F59E0B]/30 active:scale-95 transition-all border border-black/10"
+            >
+              <TrendingUp size={26} className="flex-shrink-0" />
+              <span className="text-[20px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                {lang === 'ar' ? 'تداول الآن' : 'Trade Now'}
+              </span>
+            </button>
+
             {/* Suggestions - developer only */}
             {isDeveloper && (
               <button
