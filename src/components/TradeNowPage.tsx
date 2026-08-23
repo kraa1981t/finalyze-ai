@@ -225,7 +225,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
   }, [closedTrades]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-3 space-y-3">
+    <div className="max-w-7xl mx-auto px-4 pt-2 pb-3 space-y-3">
       {/* Account bar */}
       <div className="rounded-2xl border border-[#F59E0B]/40 bg-gradient-to-r from-[#F59E0B]/15 via-transparent to-transparent px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -388,9 +388,9 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
               <div className="flex items-center gap-2 mt-1">
                 <button onClick={() => setQty((q) => Math.max(0.01, +(q / 2).toFixed(4)))} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">÷</button>
                 <input
-                  type="number" step="any" min="0" lang="en" dir="ltr"
-                  value={qty}
-                  onChange={(e) => setQty(parseFloat(e.target.value) || 0)}
+                  type="text" inputMode="decimal" lang="en" dir="ltr"
+                  value={String(qty)}
+                  onChange={(e) => setQty(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
                   className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 text-center text-lg font-black text-brand-text outline-none focus:border-emerald-500"
                   style={{ direction: 'ltr' }}
                 />
@@ -414,10 +414,10 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
               <div>
                 <label className="text-xs font-black uppercase text-emerald-400/90 tracking-wider">TP %</label>
                 <input
-                  type="number" step="any" min="0" lang="en" dir="ltr"
+                  type="text" inputMode="decimal" lang="en" dir="ltr"
                   placeholder={isAr ? 'اختياري' : 'optional'}
                   value={tpPercent}
-                  onChange={(e) => setTpPercent(e.target.value)}
+                  onChange={(e) => setTpPercent(e.target.value.replace(/[^0-9.]/g, ''))}
                   className="w-full h-11 mt-1 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-emerald-500 placeholder:text-brand-text/25 placeholder:text-sm"
                   style={{ direction: 'ltr' }}
                 />
@@ -425,10 +425,10 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
               <div>
                 <label className="text-xs font-black uppercase text-red-400/90 tracking-wider">SL %</label>
                 <input
-                  type="number" step="any" min="0" lang="en" dir="ltr"
+                  type="text" inputMode="decimal" lang="en" dir="ltr"
                   placeholder={isAr ? 'اختياري' : 'optional'}
                   value={slPercent}
-                  onChange={(e) => setSlPercent(e.target.value)}
+                  onChange={(e) => setSlPercent(e.target.value.replace(/[^0-9.]/g, ''))}
                   className="w-full h-11 mt-1 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-red-500 placeholder:text-brand-text/25 placeholder:text-sm"
                   style={{ direction: 'ltr' }}
                 />
