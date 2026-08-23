@@ -59,6 +59,7 @@ interface HeaderProps {
   isPWA?: boolean;
   onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade') => void;
   freemiumDisabled?: boolean;
+  compact?: boolean;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
@@ -95,7 +96,8 @@ export default function Header({
   onPreview,
   isPWA: isPWAMode = false,
   onNavigatePage,
-  freemiumDisabled = false
+  freemiumDisabled = false,
+  compact = false,
 }: HeaderProps) {
   const t = translations[lang];
   const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
@@ -508,13 +510,19 @@ export default function Header({
         </div>
       )}
 
-      <header className="fixed top-0 left-0 right-0 z-50 h-[300px] overflow-hidden shadow-2xl shadow-emerald-500/20">
+      <header className={cn(
+        "fixed top-0 left-0 right-0 z-50 overflow-hidden shadow-2xl shadow-emerald-500/20 transition-all duration-300",
+        compact ? 'h-[100px]' : 'h-[300px]'
+      )}>
         {/* Trading Banner Background */}
         <div className="absolute inset-0">
-          <img 
-            src="/trading-banner.png" 
-            alt="Joseph.Trading" 
-            className="w-full h-full object-cover object-[center_50%]"
+          <img
+            src="/trading-banner.png"
+            alt="Joseph.Trading"
+            className={cn(
+              "w-full h-full object-cover transition-all duration-300",
+              compact ? 'object-[center_30%] opacity-60' : 'object-[center_50%]'
+            )}
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
               (e.target as HTMLImageElement).parentElement!.classList.add('bg-gradient-to-r', 'from-emerald-600', 'via-emerald-500', 'to-emerald-600');
@@ -522,19 +530,30 @@ export default function Header({
           />
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-black/60" />
         </div>
-        
+
         {/* Content Overlay - left logo + right icons */}
-        <div className="relative max-w-7xl mx-auto px-4 h-full flex items-start justify-between pt-4">
+        <div className={cn(
+          "relative max-w-7xl mx-auto px-4 h-full flex items-start justify-between transition-all duration-300",
+          compact ? 'items-center pt-2' : 'items-start pt-4'
+        )}>
           {/* Left: Logo */}
           <div className="flex items-center gap-4">
-            <div className="w-[108px] h-[108px] bg-black rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl border-2 border-white/30">
+            <div className={cn(
+              "bg-black rounded-3xl flex items-center justify-center overflow-hidden shadow-2xl border-2 border-white/30 transition-all duration-300",
+              compact ? 'w-[56px] h-[56px] rounded-xl' : 'w-[108px] h-[108px]'
+            )}>
               <img src={customLogo || `${BASE_URL}logo.png`} alt="JT" className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col">
-              <span className="text-4xl font-display font-black tracking-tight text-white drop-shadow-2xl leading-none">
+              <span className={cn(
+                "font-display font-black tracking-tight text-white drop-shadow-2xl leading-none transition-all duration-300",
+                compact ? 'text-lg' : 'text-4xl'
+              )}>
                 Joseph.<span className="text-sky-300 italic">Trading</span>
               </span>
-              <span className="text-[24px] font-black uppercase tracking-[0.3em] text-white/80 leading-none mt-1">For financial market analysis</span>
+              {!compact && (
+                <span className="text-[24px] font-black uppercase tracking-[0.3em] text-white/80 leading-none mt-1">For financial market analysis</span>
+              )}
             </div>
           </div>
 

@@ -1685,6 +1685,7 @@ export default function App() {
         isPWA={isPWA || window.self !== window.top}
         onNavigatePage={(page) => { navigateTo(page); setIsSidebarOpen(false); }}
         freemiumDisabled={freemiumDisabled}
+        compact={effectivePage === 'trade'}
       />
 
       {/* Sidebar Panel - dropdown below menu icon */}
@@ -1723,7 +1724,7 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <main className="flex-grow max-w-7xl mx-auto w-full px-4 py-8 pt-[340px] relative">
+      <main className={`flex-grow max-w-7xl mx-auto w-full px-4 py-8 relative transition-all duration-300 ${effectivePage === 'trade' ? 'pt-[140px]' : 'pt-[340px]'}`}>
         {/* Dedicated pages (from dashboard) */}
         {effectivePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
