@@ -1875,7 +1875,7 @@ export default function App() {
             )}
 
             {effectivePage === 'trade' && (
-              <TradeNowPage lang={lang} />
+              <TradeNowPage lang={lang} user={user} />
             )}
           </motion.div>
         )}
