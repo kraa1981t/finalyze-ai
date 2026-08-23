@@ -188,6 +188,16 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     if (first) setQty(getDefaultQty(detectCategory(first)));
   }
 
+  function unhideSymbol(sym: string) {
+    setHiddenSymbols((prev) => {
+      if (!prev.includes(sym)) return prev;
+      const next = prev.filter((s) => s !== sym);
+      if (next.length === 0) localStorage.removeItem(HIDDEN_KEY);
+      else localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
   function addToWatchlist(sym: string) {
     setCustomSymbols((prev) => {
       if (prev.includes(sym)) return prev;
@@ -213,6 +223,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     setShowSuggestions(false);
     setNewSymbol('');
     const cat = detectCategory(raw);
+    unhideSymbol(raw);
     addToWatchlist(raw);
     addToCategoryList(raw, cat);
     // Jump straight into the new symbol
@@ -232,6 +243,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
       localStorage.setItem(CUSTOM_TV_KEY, JSON.stringify(tvMap));
     }
     addToWatchlist(s.symbol);
+    unhideSymbol(s.symbol);
     addToCategoryList(s.symbol, dispCat);
     setCategory('custom');
     setSymbol(s.symbol);
