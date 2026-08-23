@@ -18,6 +18,7 @@ interface TradeNowPageProps {
 const CUSTOM_KEY = 'paper_trading_custom_symbols';
 const CUSTOM_TV_KEY = 'paper_trading_custom_tv_map';
 const HIDDEN_KEY = 'paper_trading_hidden_symbols';
+const ADDED_CAT_KEY = 'paper_trading_added_by_category';
 
 const CATEGORY_TABS = [
   { key: 'forex', labelAr: 'الفوركس', labelEn: 'Forex', emoji: '\uD83D\uDCB1' },
@@ -36,6 +37,10 @@ function loadTvMap(): Record<string, string> {
 
 function loadHiddenSymbols(): string[] {
   try { return JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]'); } catch { return []; }
+}
+
+function loadAddedByCategory(): Record<string, string[]> {
+  try { return JSON.parse(localStorage.getItem(ADDED_CAT_KEY) || '{}'); } catch { return {}; }
 }
 
 function toTvSymbol(sym: string): string {
@@ -59,6 +64,7 @@ function detectCategory(sym: string): string {
   for (const [cat, syms] of Object.entries(SYMBOL_CATEGORIES)) {
     if ((syms as string[]).includes(s)) return cat;
   }
+  if (/^[A-Z]{6}$/.test(s)) return 'forex';
   if (/BTC|ETH|USDT|COIN|DOGE/.test(s)) return 'crypto';
   if (/XAU|XAG|GOLD|SILVER/.test(s)) return 'metals';
   return 'stocks';
@@ -77,6 +83,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
 
   // Custom symbols
   const [customSymbols, setCustomSymbols] = useState<string[]>(loadCustomSymbols);
+  const [addedByCategory, setAddedByCategory] = useState<Record<string, string[]>>(loadAddedByCategory);
   const [hiddenSymbols, setHiddenSymbols] = useState<string[]>(loadHiddenSymbols);
   const [newSymbol, setNewSymbol] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -97,7 +104,9 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
 
   const allSymbolsFor = (cat: string): string[] => {
     if (cat === 'custom') return customSymbols;
-    return (SYMBOL_CATEGORIES[cat as keyof typeof SYMBOL_CATEGORIES] || []).filter((s) => !hiddenSymbols.includes(s));
+    const base = SYMBOL_CATEGORIES[cat as keyof typeof SYMBOL_CATEGORIES] || [];
+    const extra = addedByCategory[cat] || [];
+    return [...new Set([...base, ...extra])].filter((s) => !hiddenSymbols.includes(s));
   };
   const symbols = allSymbolsFor(category);
   const openTrades = trades.filter((t) => t.status === 'open');
@@ -179,42 +188,70 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     if (first) setQty(getDefaultQty(detectCategory(first)));
   }
 
+  function addToWatchlist(sym: string) {
+    setCustomSymbols((prev) => {
+      if (prev.includes(sym)) return prev;
+      const next = [...prev, sym];
+      localStorage.setItem(CUSTOM_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function addToCategoryList(sym: string, cat: string) {
+    setAddedByCategory((prev) => {
+      const cur = prev[cat] || [];
+      if (cur.includes(sym)) return prev;
+      const next = { ...prev, [cat]: [...cur, sym] };
+      localStorage.setItem(ADDED_CAT_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
   function addCustomSymbol() {
     const raw = newSymbol.trim().toUpperCase();
     if (!raw) return;
-    if (customSymbols.includes(raw)) { setNewSymbol(''); setShowSuggestions(false); return; }
-    const list = [...customSymbols, raw];
-    setCustomSymbols(list);
-    localStorage.setItem(CUSTOM_KEY, JSON.stringify(list));
-    setNewSymbol('');
     setShowSuggestions(false);
+    setNewSymbol('');
+    const cat = detectCategory(raw);
+    addToWatchlist(raw);
+    addToCategoryList(raw, cat);
     // Jump straight into the new symbol
     setCategory('custom');
     setSymbol(raw);
-    setQty(getDefaultQty(detectCategory(raw)));
+    setQty(getDefaultQty(cat));
   }
 
   function addFromSuggestion(s: SuggestedSymbol) {
-    let list = customSymbols;
-    if (!list.includes(s.symbol)) {
-      list = [...list, s.symbol];
-      setCustomSymbols(list);
-      localStorage.setItem(CUSTOM_KEY, JSON.stringify(list));
+    setShowSuggestions(false);
+    setNewSymbol('');
+    const dispCat = s.cat === 'indices' ? 'stocks' : s.cat;
+    // Save TV mapping for accurate chart
+    if (!loadTvMap()[s.symbol]) {
       const tvMap = loadTvMap();
       tvMap[s.symbol] = s.tv;
       localStorage.setItem(CUSTOM_TV_KEY, JSON.stringify(tvMap));
     }
-    setNewSymbol('');
-    setShowSuggestions(false);
+    addToWatchlist(s.symbol);
+    addToCategoryList(s.symbol, dispCat);
     setCategory('custom');
     setSymbol(s.symbol);
-    setQty(getDefaultQty(detectCategory(s.symbol)));
+    setQty(getDefaultQty(dispCat));
   }
 
   function removeCustomSymbol(sym: string) {
+    // Remove from watchlist
     const list = customSymbols.filter((s) => s !== sym);
     setCustomSymbols(list);
     localStorage.setItem(CUSTOM_KEY, JSON.stringify(list));
+    // Remove from its category too
+    setAddedByCategory((prev) => {
+      const next: Record<string, string[]> = {};
+      for (const [cat, syms] of Object.entries(prev)) {
+        next[cat] = syms.filter((s) => s !== sym);
+      }
+      localStorage.setItem(ADDED_CAT_KEY, JSON.stringify(next));
+      return next;
+    });
     // Also remove from TV map
     const tvMap = loadTvMap();
     if (tvMap[sym]) { delete tvMap[sym]; localStorage.setItem(CUSTOM_TV_KEY, JSON.stringify(tvMap)); }
@@ -346,7 +383,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
                       : 'bg-sky-500/10 text-sky-300 border-sky-500/30 hover:bg-sky-500/20'
                   }`}
                 >
-                  ⭐ {isAr ? 'مخصص' : 'Custom'} ({customSymbols.length})
+                  👁️ {isAr ? 'قائمة مشاهدة' : 'Watchlist'} ({customSymbols.length})
                 </button>
               )}
             </div>
