@@ -1724,7 +1724,7 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <main className={`flex-grow max-w-7xl mx-auto w-full px-4 py-8 relative transition-all duration-300 ${effectivePage === 'trade' ? 'pt-[140px]' : 'pt-[340px]'}`}>
+      <main className={`flex-grow max-w-7xl mx-auto w-full px-4 py-8 relative transition-all duration-300 ${effectivePage === 'trade' ? 'pt-[108px] pb-4' : 'pt-[340px]'}`}>
         {/* Dedicated pages (from dashboard) */}
         {effectivePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
