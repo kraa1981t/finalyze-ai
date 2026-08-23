@@ -70,6 +70,8 @@ function detectCategory(sym: string): string {
   return 'stocks';
 }
 
+const ORIGINAL_SYMBOLS = new Set<string>(Object.values(SYMBOL_CATEGORIES).flat() as string[]);
+
 const fmtMoney = (v: number) =>
   `${v >= 0 ? '+' : '-'}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -468,7 +470,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
                 </span>
               )}
               {symbols.map((sym) => {
-                const isCustom = category === 'custom';
+                const isCustom = category === 'custom' || !ORIGINAL_SYMBOLS.has(sym);
                 return (
                   <div key={sym} className="relative group">
                     <button
