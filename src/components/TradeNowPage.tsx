@@ -17,6 +17,7 @@ interface TradeNowPageProps {
 
 const CUSTOM_KEY = 'paper_trading_custom_symbols';
 const CUSTOM_TV_KEY = 'paper_trading_custom_tv_map';
+const HIDDEN_KEY = 'paper_trading_hidden_symbols';
 
 const CATEGORY_TABS = [
   { key: 'forex', labelAr: 'الفوركس', labelEn: 'Forex', emoji: '\uD83D\uDCB1' },
@@ -31,6 +32,10 @@ function loadCustomSymbols(): string[] {
 
 function loadTvMap(): Record<string, string> {
   try { return JSON.parse(localStorage.getItem(CUSTOM_TV_KEY) || '{}'); } catch { return {}; }
+}
+
+function loadHiddenSymbols(): string[] {
+  try { return JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]'); } catch { return []; }
 }
 
 function toTvSymbol(sym: string): string {
@@ -72,6 +77,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
 
   // Custom symbols
   const [customSymbols, setCustomSymbols] = useState<string[]>(loadCustomSymbols);
+  const [hiddenSymbols, setHiddenSymbols] = useState<string[]>(loadHiddenSymbols);
   const [newSymbol, setNewSymbol] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestions = searchSymbols(newSymbol);
@@ -91,7 +97,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
 
   const allSymbolsFor = (cat: string): string[] => {
     if (cat === 'custom') return customSymbols;
-    return SYMBOL_CATEGORIES[cat as keyof typeof SYMBOL_CATEGORIES] || [];
+    return (SYMBOL_CATEGORIES[cat as keyof typeof SYMBOL_CATEGORIES] || []).filter((s) => !hiddenSymbols.includes(s));
   };
   const symbols = allSymbolsFor(category);
   const openTrades = trades.filter((t) => t.status === 'open');
@@ -216,6 +222,28 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
       if (list[0]) { setSymbol(list[0]); }
       else { setCategory('forex'); setSymbol('EURUSD'); }
     }
+  }
+
+  function hideSymbol(sym: string) {
+    const list = [...new Set([...hiddenSymbols, sym])];
+    setHiddenSymbols(list);
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify(list));
+    if (symbol === sym) {
+      const remaining = symbols.filter((s) => s !== sym);
+      if (remaining[0]) setSymbol(remaining[0]);
+      else {
+        // Fall back to first category with visible symbols
+        for (const c of ['forex', 'crypto', 'stocks', 'metals']) {
+          const vis = allSymbolsFor(c);
+          if (vis.length > 0) { setCategory(c); setSymbol(vis[0]); return; }
+        }
+      }
+    }
+  }
+
+  function restoreAllSymbols() {
+    setHiddenSymbols([]);
+    localStorage.removeItem(HIDDEN_KEY);
   }
 
   async function openTrade(side: 'buy' | 'sell') {
@@ -381,36 +409,51 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
             {/* Symbols grid */}
             <div className="flex flex-wrap gap-1.5 max-h-[130px] overflow-y-auto">
               {symbols.length === 0 && category !== 'custom' && (
-                <span className="text-sm font-bold text-brand-text/40 py-2">{isAr ? 'لا رموز' : 'No symbols'}</span>
+                <span className="text-sm font-bold text-brand-text/40 py-2">
+                  {isAr ? 'لا رموز ظاهرة' : 'No visible symbols'}
+                </span>
               )}
               {category === 'custom' && customSymbols.length === 0 && (
                 <span className="text-sm font-bold text-brand-text/40 py-2">
-                  {isAr ? 'أضف رمزك الأول من الحقل أعلاه' : 'Add your first symbol above'}
+                  {isAr ? 'أضف رمزك الأول من حقل البحث أعلاه' : 'Add your first symbol from the search field above'}
                 </span>
               )}
-              {symbols.map((sym) => (
-                <div key={sym} className="relative">
-                  <button
-                    onClick={() => { setSymbol(sym); setQty(getDefaultQty(detectCategory(sym))); }}
-                    className={`px-4 py-2 rounded-xl text-base font-black transition-all border ${
-                      symbol === sym
-                        ? 'bg-emerald-500 text-black border-emerald-400'
-                        : 'bg-white/5 text-brand-text/80 border-white/10 hover:bg-white/10'
-                    }`}
-                  >
-                    {sym}
-                  </button>
-                  {category === 'custom' && (
+              {symbols.map((sym) => {
+                const isCustom = category === 'custom';
+                return (
+                  <div key={sym} className="relative group">
                     <button
-                      onClick={() => removeCustomSymbol(sym)}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600"
+                      onClick={() => { setSymbol(sym); setQty(getDefaultQty(detectCategory(sym))); }}
+                      className={`pl-3 pr-8 py-2 rounded-xl text-base font-black transition-all border ${
+                        symbol === sym
+                          ? 'bg-emerald-500 text-black border-emerald-400'
+                          : 'bg-white/5 text-brand-text/80 border-white/10 hover:bg-white/10'
+                      }`}
                     >
-                      <X size={12} />
+                      {sym}
                     </button>
-                  )}
-                </div>
-              ))}
+                    {/* Delete mark on every symbol */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); isCustom ? removeCustomSymbol(sym) : hideSymbol(sym); }}
+                      title={isAr ? `حذف ${sym}` : `Remove ${sym}`}
+                      className="absolute top-0 right-0 w-5 h-5 rounded-bl-lg rounded-tr-xl bg-red-500/80 hover:bg-red-600 text-white flex items-center justify-center opacity-70 group-hover:opacity-100 transition-all"
+                    >
+                      <X size={11} strokeWidth={3} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
+
+            {/* Restore hidden symbols */}
+            {hiddenSymbols.length > 0 && category !== 'custom' && (
+              <button
+                onClick={restoreAllSymbols}
+                className="text-xs font-black text-sky-400 hover:text-sky-300 underline underline-offset-2"
+              >
+                {isAr ? `↩ استعادة الرموز المحذوفة (${hiddenSymbols.length})` : `↩ Restore removed symbols (${hiddenSymbols.length})`}
+              </button>
+            )}
           </div>
 
           {/* Chart */}
