@@ -1914,12 +1914,12 @@ export default function App() {
           </motion.div>
         )}
 
-        {/* Top Signals + Subscription Banner - developer main page */}
-        <div style={{ display: isAnalyzing || analysisResults || effectivePage !== 'main' || !!needsApiKey || !isDeveloperSession() ? 'none' : 'block' }}>
-          {activeSubscription && (() => {
-            const daysLeft = Math.ceil((new Date(activeSubscription.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-            return (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 mb-6 flex items-center justify-between">
+        {/* Subscription Banner - developer main page */}
+        {!analysisResults && !isAnalyzing && effectivePage === 'main' && !!needsApiKey && isDeveloperSession() && activeSubscription && (() => {
+          const daysLeft = Math.ceil((new Date(activeSubscription.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+          return (
+            <div className="max-w-4xl mx-auto px-4 mt-4">
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between">
                 <div>
                   <span className="text-sm font-bold text-emerald-400">{activeSubscription.label} Plan Active</span>
                   <span className="text-xs text-slate-500 mr-3">{daysLeft} days remaining</span>
@@ -1931,14 +1931,20 @@ export default function App() {
                   Cancel
                 </button>
               </div>
-            );
-          })()}
-          <TopSignals 
-            signals={topSignals} onRemove={removeSignal} 
-            onSelect={handleSelectSignal} onDetail={setDetailResult} onClearAll={handleClearAll}
-            lang={lang} 
-          />
-        </div>
+            </div>
+          );
+        })()}
+
+        {/* Top Signals - developer main page - always visible */}
+        {effectivePage === 'main' && isDeveloperSession() && !isAnalyzing && (
+          <div className="max-w-4xl mx-auto px-4">
+            <TopSignals 
+              signals={topSignals} onRemove={removeSignal} 
+              onSelect={handleSelectSignal} onDetail={setDetailResult} onClearAll={handleClearAll}
+              lang={lang} 
+            />
+          </div>
+        )}
 
         {/* Ads for all users */}
         <AdSlot position="between" lang={lang} />
