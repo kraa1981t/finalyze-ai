@@ -160,7 +160,25 @@ export function searchSymbols(queryStr: string, limit = 8): SuggestedSymbol[] {
     else if (s.name.toUpperCase().startsWith(q) || s.name.toUpperCase().includes(` ${q}`)) includesName.push(s);
     else if (s.symbol.includes(q)) includesSym.push(s);
   }
-  return [...startsWith, ...includesName, ...includesSym].slice(0, limit);
+
+  const dbResults = [...startsWith, ...includesName, ...includesSym].slice(0, limit);
+
+  // If query looks like a full TV symbol (e.g., NYSE:JNJ) or no results, allow adding directly
+  if (q.includes(':') || (dbResults.length === 0 && q.length >= 2)) {
+    const shortSym = q.includes(':') ? q.split(':')[1] : q;
+    const tvSym = q.includes(':') ? q : `NYSE:${q}`;
+    const exists = dbResults.some((s) => s.symbol === shortSym);
+    if (!exists) {
+      dbResults.unshift({
+        symbol: shortSym,
+        tv: tvSym,
+        name: q.includes(':') ? `${q.split(':')[0]} Exchange` : 'TradingView Symbol',
+        cat: 'stocks' as const,
+      });
+    }
+  }
+
+  return dbResults.slice(0, limit);
 }
 
 export function catEmoji(cat: SuggestedSymbol['cat']): string {

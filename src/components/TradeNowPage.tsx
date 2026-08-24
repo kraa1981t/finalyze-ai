@@ -48,16 +48,34 @@ function toTvSymbol(sym: string): string {
   const s = sym.trim().toUpperCase();
   const tvMap = loadTvMap();
   if (tvMap[s]) return tvMap[s];
-  if (s.includes(':')) return s; // full TV symbol e.g. NASDAQ:TSLA
+  if (s.includes(':')) return s; // full TV symbol e.g. NYSE:JNJ
   if ((SYMBOL_CATEGORIES.crypto as string[]).includes(s)) return `BINANCE:${s.replace('USD', 'USDT')}`;
   if ((SYMBOL_CATEGORIES.metals as string[]).includes(s)) return `OANDA:${s}`;
   if ((SYMBOL_CATEGORIES.forex as string[]).includes(s)) return `FX:${s}`;
   const indexMap: Record<string, string> = {
     US500: 'FOREXCOM:SPXUSD', US30: 'FOREXCOM:NSXUSD', US100: 'FOREXCOM:NDXUSD',
-    SPY: 'AMEX:SPY', QQQ: 'NASDAQ:QQQ',
+    SPY: 'AMEX:SPY', QQQ: 'NASDAQ:QQQ', DIA: 'AMEX:DIA',
+    VIX: 'TVC:VIX', VIX3M: 'TVC:VIX3M',
+    DXY: 'TVC:DXY', GOLD: 'TVC:GOLD',白银: 'TVC:SILVER',
+    SOXX: 'NASDAQ:SOXX', IWM: 'NYSE:IWM', XLK: 'NYSE:XLK',
+    TSLA: 'NASDAQ:TSLA', AAPL: 'NASDAQ:AAPL', NVDA: 'NASDAQ:NVDA',
+    AMD: 'NASDAQ:AMD', INTC: 'NASDAQ:INTC', META: 'NASDAQ:META',
+    GOOGL: 'NASDAQ:GOOGL', MSFT: 'NASDAQ:MSFT', AMZN: 'NASDAQ:AMZN',
+    NFLX: 'NASDAQ:NFLX', COIN: 'NASDAQ:COIN', PLTR: 'NYSE:PLTR',
+    JPM: 'NYSE:JPM', V: 'NYSE:V', MA: 'NYSE:MA', JNJ: 'NYSE:JNJ',
+    WMT: 'NYSE:WMT', PG: 'NYSE:PG', UNH: 'NYSE:UNH', HD: 'NYSE:HD',
+    BAC: 'NYSE:BAC', XOM: 'NYSE:XOM', CVX: 'NYSE:CVX', KO: 'NYSE:KO',
+    PEP: 'NASDAQ:PEP', DIS: 'NYSE:DIS', BA: 'NYSE:BA', CAT: 'NYSE:CAT',
+    CRM: 'NYSE:CRM', ORCL: 'NYSE:ORCL', T: 'NYSE:T', VZ: 'NYSE:VZ',
+    MU: 'NASDAQ:MU', QCOM: 'NASDAQ:QCOM', CSCO: 'NASDAQ:CSCO',
+    ABBV: 'NYSE:ABBV', LLY: 'NYSE:LLY', MRK: 'NYSE:MRK', COST: 'NASDAQ:COST',
+    ASML: 'NYSE:ASML', TSM: 'NYSE:TSM', ARM: 'NASDAQ:ARM', SMCI: 'NASDAQ:SMCI',
+    NOW: 'NYSE:NOW', SHOP: 'NYSE:SHOP', SQ: 'NYSE:SQ', ROKU: 'NASDAQ:ROKU',
+    NIO: 'NYSE:NIO', Baba: 'NYSE:BABA', PDD: 'NASDAQ:PDD', JD: 'NASDAQ:JD',
   };
   if (indexMap[s]) return indexMap[s];
-  return `NASDAQ:${s}`;
+  // For unknown symbols, try NYSE first (most US stocks)
+  return `NYSE:${s}`;
 }
 
 function detectCategory(sym: string): string {
@@ -256,13 +274,25 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     if (!raw) return;
     setShowSuggestions(false);
     setNewSymbol('');
-    const cat = detectCategory(raw);
-    unhideSymbol(raw);
-    addToWatchlist(raw);
-    addToCategoryList(raw, cat);
-    // Jump straight into the new symbol
+    // Check if user typed a full TV symbol (e.g., NYSE:JNJ)
+    let shortSym = raw;
+    let tvSym = raw;
+    if (raw.includes(':')) {
+      shortSym = raw.split(':')[1];
+      tvSym = raw;
+    }
+    const cat = detectCategory(shortSym);
+    unhideSymbol(shortSym);
+    addToWatchlist(shortSym);
+    addToCategoryList(shortSym, cat);
+    // Save TV mapping if it's a full symbol
+    if (raw.includes(':')) {
+      const tvMap = loadTvMap();
+      tvMap[shortSym] = tvSym;
+      localStorage.setItem(CUSTOM_TV_KEY, JSON.stringify(tvMap));
+    }
     setCategory('custom');
-    setSymbol(raw);
+    setSymbol(shortSym);
     setQty(getDefaultQty(cat, balance));
   }
 
@@ -271,11 +301,9 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     setNewSymbol('');
     const dispCat = s.cat === 'indices' ? 'stocks' : s.cat;
     // Save TV mapping for accurate chart
-    if (!loadTvMap()[s.symbol]) {
-      const tvMap = loadTvMap();
-      tvMap[s.symbol] = s.tv;
-      localStorage.setItem(CUSTOM_TV_KEY, JSON.stringify(tvMap));
-    }
+    const tvMap = loadTvMap();
+    tvMap[s.symbol] = s.tv;
+    localStorage.setItem(CUSTOM_TV_KEY, JSON.stringify(tvMap));
     addToWatchlist(s.symbol);
     unhideSymbol(s.symbol);
     addToCategoryList(s.symbol, dispCat);
@@ -473,7 +501,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
                     if (e.key === 'Escape') setShowSuggestions(false);
                   }}
                   onFocus={() => setShowSuggestions(true)}
-                  placeholder={isAr ? 'ابحث وأضف أي رمز — مثال: BTC أو Tesla أو EURUSD' : 'Search & add any symbol — e.g. BTC, Tesla, EURUSD'}
+                  placeholder={isAr ? 'أي رمز TradingView — NYSE:JNJ أو BINANCE:BTCUSDT أو اكتب الرمز مباشرة' : 'Any TradingView symbol — NYSE:JNJ, BINANCE:BTCUSDT, or type directly'}
                   className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 px-4 text-base font-bold text-brand-text outline-none focus:border-sky-500 placeholder:text-brand-text/30 placeholder:font-medium placeholder:text-sm"
                 />
                 <button
@@ -491,6 +519,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
                 <div className="absolute top-full mt-1 left-0 right-0 bg-[#0a0f1a] border border-white/20 rounded-xl shadow-2xl z-40 max-h-[260px] overflow-y-auto">
                   {suggestions.map((s) => {
                     const added = customSymbols.includes(s.symbol);
+                    const isCustom = !ORIGINAL_SYMBOLS.has(s.symbol);
                     return (
                       <button
                         key={s.symbol + s.tv}
@@ -498,7 +527,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
                         className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors border-b border-white/5 last:border-b-0"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="text-lg flex-shrink-0">{catEmoji(s.cat)}</span>
+                          <span className="text-lg flex-shrink-0">{isCustom ? '➕' : catEmoji(s.cat)}</span>
                           <span className="text-sm font-black text-brand-text" dir="ltr">{s.symbol}</span>
                           <span className="text-xs font-bold text-brand-text/50 truncate">{isAr ? s.name : s.name}</span>
                         </div>
