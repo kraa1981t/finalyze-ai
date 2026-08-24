@@ -79,7 +79,7 @@ const CRYPTO_MAP: Record<string, string> = {
 };
 
 const _priceCache = new Map<string, { price: number; ts: number }>();
-const PRICE_TTL = 8000;
+const PRICE_TTL = 2500;
 
 async function fetchBinancePrice(pair: string): Promise<number | null> {
   try {
@@ -175,7 +175,7 @@ export function subscribePrices(symbols: string[], listener: (symbol: string, pr
     }));
   };
   tick();
-  const iv = setInterval(tick, 10000);
+  const iv = setInterval(tick, 3000);
   return () => { alive = false; clearInterval(iv); };
 }
 

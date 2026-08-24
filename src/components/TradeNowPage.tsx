@@ -72,6 +72,12 @@ function detectCategory(sym: string): string {
 
 const ORIGINAL_SYMBOLS = new Set<string>(Object.values(SYMBOL_CATEGORIES).flat() as string[]);
 
+function calcMargin(t: Pick<PaperTrade, 'category' | 'symbol' | 'qty' | 'entryPrice'>): number {
+  const notional = t.entryPrice * t.qty * (t.category === 'forex' ? 100000 : t.category === 'metals' ? 100 : 1);
+  const leverage = t.category === 'forex' || t.category === 'metals' ? 100 : t.category === 'crypto' ? 10 : 20;
+  return notional / leverage;
+}
+
 const fmtMoney = (v: number) =>
   `${v >= 0 ? '+' : '-'}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -377,8 +383,10 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
   const stats = React.useMemo(() => {
     const wins = closedTrades.filter((t) => (t.pnl ?? 0) > 0).length;
     const totalPnl = closedTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
-    return { total: closedTrades.length, winRate: closedTrades.length ? Math.round((wins / closedTrades.length) * 100) : 0, totalPnl };
-  }, [closedTrades]);
+    const totalMargin = openTrades.reduce((s, t) => s + calcMargin(t), 0);
+    const marginLevel = totalMargin > 0 ? Math.round((equity / totalMargin) * 100) : 0;
+    return { total: closedTrades.length, winRate: closedTrades.length ? Math.round((wins / closedTrades.length) * 100) : 0, totalPnl, totalMargin, marginLevel };
+  }, [closedTrades, openTrades.length, equity]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 pt-2 pb-3 space-y-3">
@@ -663,7 +671,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
           </div>
 
           {/* Stats mini */}
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4 grid grid-cols-4 gap-2 text-center">
             <div>
               <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'صفقات' : 'Trades'}</div>
               <div className="text-lg font-black text-brand-text">{stats.total}</div>
@@ -675,6 +683,12 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
             <div>
               <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'صافي الربح' : 'Net P&L'}</div>
               <div className={`text-lg font-black ${stats.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtMoney(stats.totalPnl)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'الهامش' : 'Margin'}</div>
+              <div className={`text-lg font-black ${stats.marginLevel > 200 ? 'text-emerald-400' : stats.marginLevel > 100 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {stats.totalMargin > 0 ? `${stats.marginLevel}%` : '—'}
+              </div>
             </div>
           </div>
         </div>
@@ -697,46 +711,58 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
           </button>
         </div>
 
-        <div className="max-h-[300px] overflow-y-auto">
+        <div className="max-h-[400px] overflow-y-auto">
           {tab === 'positions' ? (
             openTrades.length === 0 ? (
-              <div className="py-8 text-center text-base font-bold text-brand-text/40">
-                {isAr ? 'لا توجد صفقات مفتوحة — افتح صفقة من لوحة الأوامر' : 'No open positions — place a trade from the order panel'}
+              <div className="py-8 text-center text-lg font-bold text-brand-text/40">
+                {isAr ? 'لا توجد صفقات مفتوحة' : 'No open positions'}
               </div>
             ) : (
               <table className="w-full text-left">
                 <thead>
-                  <tr className="text-xs font-black uppercase text-brand-text/40 tracking-wider border-b border-white/10">
-                    <th className="px-4 py-2">{isAr ? 'الرمز' : 'Symbol'}</th>
-                    <th className="px-4 py-2">{isAr ? 'الاتجاه' : 'Side'}</th>
-                    <th className="px-4 py-2">{isAr ? 'الحجم' : 'Qty'}</th>
-                    <th className="px-4 py-2">{isAr ? 'الدخول' : 'Entry'}</th>
-                    <th className="px-4 py-2">{isAr ? 'الحالي' : 'Current'}</th>
-                    <th className="px-4 py-2">{isAr ? 'الربح/الخسارة' : 'P&L'}</th>
-                    <th className="px-4 py-2"></th>
+                  <tr className="text-sm font-black uppercase text-brand-text/40 tracking-wider border-b border-white/10">
+                    <th className="px-4 py-3">{isAr ? 'الرمز' : 'Symbol'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الاتجاه' : 'Side'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الحجم' : 'Qty'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الدخول' : 'Entry'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الحالي' : 'Current'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الهامش' : 'Margin'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الوقت' : 'Time'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الربح/الخسارة' : 'P&L'}</th>
+                    <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {openTrades.map((t) => {
                     const cur = priceOf(t);
                     const pnl = cur != null ? calcPnl(t, cur) : 0;
+                    const margin = calcMargin(t);
+                    const now = Date.now();
+                    const elapsed = now - t.openedAt;
+                    const timeStr = elapsed < 60000
+                      ? `${Math.floor(elapsed / 1000)}${isAr ? 'ث' : 's'}`
+                      : elapsed < 3600000
+                        ? `${Math.floor(elapsed / 60000)}${isAr ? 'د' : 'm'}`
+                        : `${Math.floor(elapsed / 3600000)}${isAr ? 'س' : 'h'}${Math.floor((elapsed % 3600000) / 60000) > 0 ? ` ${Math.floor((elapsed % 3600000) / 60000)}${isAr ? 'د' : 'm'}` : ''}`;
                     return (
                       <tr key={t.id} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="px-4 py-2.5 text-sm font-black text-brand-text">{t.symbol}</td>
-                        <td className="px-4 py-2.5">
-                          <span className={`px-2.5 py-1 rounded-md text-xs font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                        <td className="px-4 py-3 text-base font-black text-brand-text">{t.symbol}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-3 py-1.5 rounded-lg text-sm font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                             {t.side === 'buy' ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-sm font-bold text-brand-text/80" dir="ltr">{t.qty}</td>
-                        <td className="px-4 py-2.5 text-sm font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
-                        <td className="px-4 py-2.5 text-sm font-bold text-brand-text/80" dir="ltr">{cur ? fmtPrice(cur) : '—'}</td>
-                        <td className={`px-4 py-2.5 text-sm font-black ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{cur ? fmtMoney(pnl) : '—'}</td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{t.qty}</td>
+                        <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
+                        <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{cur ? fmtPrice(cur) : '—'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-sky-400" dir="ltr">${margin.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-brand-text/50">{timeStr}</td>
+                        <td className={`px-4 py-3 text-base font-black ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{cur ? fmtMoney(pnl) : '—'}</td>
+                        <td className="px-4 py-3">
                           <button
                             onClick={() => closeTrade(t)}
                             disabled={!cur}
-                            className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/40 disabled:opacity-40 text-xs font-black uppercase transition-colors"
+                            className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/40 disabled:opacity-40 text-sm font-black uppercase transition-colors"
                           >
                             {isAr ? 'إغلاق' : 'Close'}
                           </button>
