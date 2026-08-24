@@ -101,6 +101,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
   const [tab, setTab] = useState<'positions' | 'history'>('positions');
   const [busy, setBusy] = useState(false);
   const [priceLoading, setPriceLoading] = useState(true);
+  const [priceTick, setPriceTick] = useState(0); // triggers re-render for open trades P&L
   // Account reset
   const [showReset, setShowReset] = useState(false);
   const [resetInput, setResetInput] = useState('');
@@ -171,6 +172,8 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
       priceMapRef.current[sym] = price;
       if (sym === symbol) { setLivePrice(price); setPriceLoading(false); }
       checkAutoClose(sym, price);
+      // Trigger re-render so open trades P&L updates live
+      if (openTrades.some((t) => t.symbol === sym)) setPriceTick((p) => p + 1);
     });
     return unsub;
   }, [symbol, openTrades.length]);
