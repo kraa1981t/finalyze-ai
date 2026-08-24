@@ -138,7 +138,13 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
         if (!alive) return;
         setBalance(acc.balance);
         setTrades(list.sort((a, b) => b.openedAt - a.openedAt));
-      } catch {}
+      } catch {
+        // Fallback: load from localStorage
+        try {
+          const raw = JSON.parse(localStorage.getItem('paper_trading_data') || '{"balance":10000,"trades":[]}');
+          if (alive) { setBalance(raw.balance); setTrades((raw.trades || []).sort((a: any, b: any) => b.openedAt - a.openedAt)); }
+        } catch {}
+      }
     })();
     return () => { alive = false; };
   }, [user?.uid]);
@@ -180,10 +186,21 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
 
   async function closeTradeInternal(t: PaperTrade, exitPrice: number, reason: 'manual' | 'tp' | 'sl') {
     const pnl = calcPnl(t, exitPrice);
-    await store.updateTrade(t.id, { status: 'closed', exitPrice, pnl, closeReason: reason, closedAt: Date.now() });
     const newBalance = balance + pnl;
+    try {
+      await store.updateTrade(t.id, { status: 'closed', exitPrice, pnl, closeReason: reason, closedAt: Date.now() });
+      await store.saveBalance(newBalance);
+    } catch {
+      // Fallback: save locally
+      try {
+        const raw = JSON.parse(localStorage.getItem('paper_trading_data') || '{"balance":10000,"trades":[]}');
+        const idx = raw.trades.findIndex((x: any) => x.id === t.id);
+        if (idx >= 0) raw.trades[idx] = { ...raw.trades[idx], status: 'closed', exitPrice, pnl, closeReason: reason, closedAt: Date.now() };
+        raw.balance = newBalance;
+        localStorage.setItem('paper_trading_data', JSON.stringify(raw));
+      } catch {}
+    }
     setBalance(newBalance);
-    await store.saveBalance(newBalance);
     setTrades((prev) => prev.map((x) => x.id === t.id ? { ...x, status: 'closed', exitPrice, pnl, closeReason: reason, closedAt: Date.now() } : x));
   }
 
@@ -304,26 +321,29 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
   async function openTrade(side: 'buy' | 'sell') {
     if (!livePrice || busy || qty <= 0) return;
     setBusy(true);
+    const tpVal = tpPercent ? (side === 'buy'
+      ? livePrice * (1 + parseFloat(tpPercent) / 100)
+      : livePrice * (1 - parseFloat(tpPercent) / 100)) : null;
+    const slVal = slPercent ? (side === 'buy'
+      ? livePrice * (1 - parseFloat(slPercent) / 100)
+      : livePrice * (1 + parseFloat(slPercent) / 100)) : null;
+    const cat = detectCategory(symbol);
+    const tradeData = { symbol, category: cat, side, qty, entryPrice: livePrice, status: 'open' as const, tp: tpVal, sl: slVal, openedAt: Date.now() };
+    let id: string;
     try {
-      const tpVal = tpPercent ? (side === 'buy'
-        ? livePrice * (1 + parseFloat(tpPercent) / 100)
-        : livePrice * (1 - parseFloat(tpPercent) / 100)) : null;
-      const slVal = slPercent ? (side === 'buy'
-        ? livePrice * (1 - parseFloat(slPercent) / 100)
-        : livePrice * (1 + parseFloat(slPercent) / 100)) : null;
-      const cat = detectCategory(symbol);
-      const id = await store.addTrade({
-        symbol, category: cat, side, qty,
-        entryPrice: livePrice,
-        status: 'open',
-        tp: tpVal, sl: slVal,
-        openedAt: Date.now(),
-      });
-      setTrades((prev) => [{ id, symbol, category: cat, side, qty, entryPrice: livePrice, status: 'open', tp: tpVal, sl: slVal, openedAt: Date.now() }, ...prev]);
-      setTpPercent(''); setSlPercent('');
-    } finally {
-      setBusy(false);
+      id = await store.addTrade(tradeData);
+    } catch (e) {
+      // Fallback: save locally if Firestore fails
+      id = `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      try {
+        const raw = JSON.parse(localStorage.getItem('paper_trading_data') || '{"balance":10000,"trades":[]}');
+        raw.trades.unshift({ ...tradeData, id });
+        localStorage.setItem('paper_trading_data', JSON.stringify(raw));
+      } catch {}
     }
+    setTrades((prev) => [{ id, ...tradeData }, ...prev]);
+    setTpPercent(''); setSlPercent('');
+    setBusy(false);
   }
 
   async function closeTrade(t: PaperTrade) {
