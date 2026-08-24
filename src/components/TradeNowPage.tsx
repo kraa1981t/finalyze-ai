@@ -342,6 +342,11 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
       setShowReset(false);
       setResetInput('');
       setQty(getDefaultQty(detectCategory(symbol || ''), val));
+    } catch (e) {
+      console.error('Account reset failed:', e);
+      alert(isAr
+        ? 'فشلت إعادة التعيين — تأكد من تسجيل الدخول وأن الاتصال يعمل، ثم أعد المحاولة.'
+        : 'Reset failed — make sure you are signed in and connected, then try again.');
     } finally {
       setBusy(false);
     }
@@ -810,6 +815,16 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
             >
               <RotateCcw size={16} />
               {isAr ? `إعادة تعيين بنفس الرصيد ($${balance.toLocaleString('en-US', { maximumFractionDigits: 2 })})` : `Reset to same balance ($${balance.toLocaleString('en-US', { maximumFractionDigits: 2 })})`}
+            </button>
+
+            {/* Default balance */}
+            <button
+              onClick={() => doReset(START_BALANCE)}
+              disabled={busy}
+              className="w-full py-3.5 rounded-xl bg-sky-500/15 border border-sky-500/40 hover:bg-sky-500/30 text-sky-300 font-black transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <RotateCcw size={16} />
+              {isAr ? `إعادة تعيين للحساب الجديد ($${START_BALANCE.toLocaleString('en-US')})` : `Reset to fresh account ($${START_BALANCE.toLocaleString('en-US')})`}
             </button>
 
             <div className="flex items-center gap-3">
