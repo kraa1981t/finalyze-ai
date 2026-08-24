@@ -1943,6 +1943,7 @@ export default function App() {
               onSelect={handleSelectSignal} onDetail={setDetailResult} onClearAll={handleClearAll}
               lang={lang} 
             />
+            <div className="w-full bg-[#D1FAE5]/40 backdrop-blur-xl rounded-full h-3 border border-[#D1FAE5]/60 shadow-[0_0_25px_rgba(209,250,229,0.3)]" />
           </div>
         )}
 
