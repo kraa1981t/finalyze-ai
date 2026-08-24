@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ExternalLink, TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw } from 'lucide-react';
+import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { SYMBOL_CATEGORIES } from '../constants';
 import { Language } from '../lib/i18n';
@@ -337,19 +337,18 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     setBusy(true);
     try {
       await store.resetAccount(val);
-      setBalance(val);
-      setTrades([]);
-      setShowReset(false);
-      setResetInput('');
-      setQty(getDefaultQty(detectCategory(symbol || ''), val));
     } catch (e) {
-      console.error('Account reset failed:', e);
-      alert(isAr
-        ? 'فشلت إعادة التعيين — تأكد من تسجيل الدخول وأن الاتصال يعمل، ثم أعد المحاولة.'
-        : 'Reset failed — make sure you are signed in and connected, then try again.');
-    } finally {
-      setBusy(false);
+      // Fallback: always save locally if Firestore fails
+      try {
+        localStorage.setItem('paper_trading_data', JSON.stringify({ balance: val, trades: [] }));
+      } catch {}
     }
+    setBalance(val);
+    setTrades([]);
+    setShowReset(false);
+    setResetInput('');
+    setQty(getDefaultQty(detectCategory(symbol || ''), val));
+    setBusy(false);
   }
 
   const stats = React.useMemo(() => {
@@ -388,15 +387,6 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
             <RotateCcw size={16} />
             {isAr ? 'إعادة تعيين' : 'Reset'}
           </button>
-          <a
-            href={`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(toTvSymbol(symbol))}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#F59E0B] hover:bg-[#d97706] text-black font-black uppercase shadow-lg shadow-[#F59E0B]/30 active:scale-95 transition-all"
-          >
-            <ExternalLink size={16} />
-            TradingView
-          </a>
         </div>
       </div>
 
@@ -644,7 +634,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
             </div>
             {!livePrice && !priceLoading && symbol && (
               <p className="text-xs font-bold text-yellow-400/90 text-center">
-                {isAr ? 'السعر غير متاح لهذا الرمز — يمكنك المتابعة عبر TradingView' : 'Live price unavailable — trade via TradingView instead'}
+                {isAr ? 'السعر غير متاح لهذا الرمز حالياً' : 'Live price unavailable for this symbol'}
               </p>
             )}
           </div>
@@ -780,8 +770,8 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
         <Info size={16} className="text-sky-400 flex-shrink-0 mt-0.5" />
         <span className="text-xs font-bold text-brand-text/60 leading-relaxed">
           {isAr
-            ? 'تداول تجريبي بالكامل بأموال وهمية وأسعار حقيقية لحظية. يمكنك إضافة أي رمز متاح على TradingView من حقل الإضافة أعلاه.'
-            : 'Fully simulated trading with virtual funds and real-time prices. Add any TradingView-available symbol using the field above.'}
+            ? 'تداول تجريبي بالكامل بأموال وهمية وأسعار حقيقية لحظية. يمكنك إضافة أي رمز من حقل الإضافة أعلاه.'
+            : 'Fully simulated trading with virtual funds and real-time prices. Add any symbol using the field above.'}
         </span>
       </div>
 
@@ -803,58 +793,32 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
             </div>
             <p className="text-xs font-bold text-yellow-400/90 leading-relaxed">
               {isAr
-                ? `⚠️ سيتم حذف جميع الصفقات المفتوحة والسجل بالكامل، وإعادة الرصيد إلى القيمة المحددة (الحد الأدنى $${MIN_BALANCE}).`
-                : `⚠️ All open positions and history will be deleted, and balance reset to the chosen value (minimum $${MIN_BALANCE}).`}
+                ? 'سيتم حذف جميع الصفقات وإعادة الرصيد إلى القيمة المحددة.'
+                : 'All trades will be deleted and balance reset to the chosen value.'}
             </p>
 
-            {/* Same balance */}
-            <button
-              onClick={() => doReset(balance)}
-              disabled={busy}
-              className="w-full py-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 font-black transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              <RotateCcw size={16} />
-              {isAr ? `إعادة تعيين بنفس الرصيد ($${balance.toLocaleString('en-US', { maximumFractionDigits: 2 })})` : `Reset to same balance ($${balance.toLocaleString('en-US', { maximumFractionDigits: 2 })})`}
-            </button>
-
-            {/* Default balance */}
-            <button
-              onClick={() => doReset(START_BALANCE)}
-              disabled={busy}
-              className="w-full py-3.5 rounded-xl bg-sky-500/15 border border-sky-500/40 hover:bg-sky-500/30 text-sky-300 font-black transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              <RotateCcw size={16} />
-              {isAr ? `إعادة تعيين للحساب الجديد ($${START_BALANCE.toLocaleString('en-US')})` : `Reset to fresh account ($${START_BALANCE.toLocaleString('en-US')})`}
-            </button>
-
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-white/10" />
-              <span className="text-xs font-black uppercase text-brand-text/40">{isAr ? 'أو رصيد مخصص' : 'or custom'}</span>
-              <div className="flex-1 h-px bg-white/10" />
-            </div>
-
-            {/* Custom balance */}
+            {/* Custom balance input */}
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-black text-brand-text/60">$</span>
+                <span className="text-2xl font-black text-brand-text/60">$</span>
                 <input
                   type="text" inputMode="numeric" lang="en" dir="ltr"
                   value={resetInput}
                   onChange={(e) => setResetInput(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder={isAr ? 'اكتب أي رصيد — مثال: 5000' : 'Enter any balance — e.g. 5000'}
-                  className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 px-4 text-lg font-black text-brand-text outline-none focus:border-sky-500 placeholder:text-brand-text/25 placeholder:font-medium placeholder:text-sm"
+                  placeholder={isAr ? 'اكتب الرصيد المطلوب' : 'Enter balance'}
+                  className="flex-1 h-14 rounded-xl bg-black/40 border border-white/15 px-4 text-2xl font-black text-brand-text outline-none focus:border-sky-500 placeholder:text-brand-text/25 placeholder:text-base"
                   style={{ direction: 'ltr' }}
+                  autoFocus
                 />
               </div>
-              {resetInput && (
-                <p className={`mt-1.5 text-xs font-bold ${resetVal >= MIN_BALANCE ? 'text-brand-text/50' : 'text-red-400'}`}>
-                  {resetVal >= MIN_BALANCE
-                    ? isAr
-                      ? `الحجم الافتراضي سيكون: ${(getDefaultQty('forex', resetVal)).toFixed(2)} لوت فوركس`
-                      : `Default volume will be: ${(getDefaultQty('forex', resetVal)).toFixed(2)} forex lots`
-                    : isAr
-                      ? `الحد الأدنى للرصيد هو $${MIN_BALANCE}`
-                      : `Minimum balance is $${MIN_BALANCE}`}
+              {resetInput && resetVal >= MIN_BALANCE && (
+                <p className="mt-2 text-xs font-bold text-brand-text/50">
+                  {isAr ? `الحجم الافتراضي: ${(getDefaultQty('forex', resetVal)).toFixed(2)} لوت` : `Default volume: ${(getDefaultQty('forex', resetVal)).toFixed(2)} lots`}
+                </p>
+              )}
+              {resetInput && resetVal < MIN_BALANCE && (
+                <p className="mt-2 text-xs font-bold text-red-400">
+                  {isAr ? `الحد الأدنى $${MIN_BALANCE}` : `Minimum $${MIN_BALANCE}`}
                 </p>
               )}
             </div>
@@ -865,7 +829,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
                 <button
                   key={v}
                   onClick={() => setResetInput(String(v))}
-                  className={`flex-1 py-1.5 rounded-lg text-sm font-black transition-all ${resetInput === String(v) ? 'bg-sky-500 text-black' : 'bg-white/5 text-brand-text/60 hover:bg-white/10'}`}
+                  className={`flex-1 py-2 rounded-lg text-sm font-black transition-all ${resetInput === String(v) ? 'bg-sky-500 text-black' : 'bg-white/5 text-brand-text/60 hover:bg-white/10'}`}
                 >
                   {v.toLocaleString('en-US')}
                 </button>
@@ -875,10 +839,10 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
             <button
               onClick={() => doReset(resetVal)}
               disabled={busy || resetVal < MIN_BALANCE}
-              className="w-full py-3.5 rounded-xl bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black uppercase tracking-wider shadow-lg shadow-red-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-black font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-lg"
             >
-              {busy ? <Loader2 size={18} className="animate-spin" /> : <RotateCcw size={18} />}
-              {isAr ? `تأكيد الإعادة تعيين إلى $${Math.max(MIN_BALANCE, Math.floor(resetVal || 0)).toLocaleString('en-US')}` : `Reset to $${Math.max(MIN_BALANCE, Math.floor(resetVal || 0)).toLocaleString('en-US')}`}
+              {busy ? <Loader2 size={20} className="animate-spin" /> : <RotateCcw size={20} />}
+              {isAr ? 'تأكيد' : 'Confirm'}
             </button>
           </div>
         </div>
