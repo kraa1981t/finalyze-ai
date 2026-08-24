@@ -50,12 +50,23 @@ function getStatusStyle(status: string) {
 }
 
 function parseCandleInfo(value: string) {
-  const parts = value.split(',').map((p: string) => p.trim());
+  // New format: "1d: 66.8 Bearish ↑ ✓ | 1w: 65.5 Bearish ↑ ✓"
+  // Old format: "1d: 18.8 ↑ ✓, 1w: 25.3 ↑"
+  const parts = value.split(/[|,]/).map((p: string) => p.trim());
   return parts.map((part: string) => {
-    const match = part.match(/^(\S+):\s*([\d.]+)\s*\((.)\s*(.)?\)/);
-    if (!match) return null;
-    const [, tf, body, dirChar, checkChar] = match;
-    return { tf, body, dirChar, checkChar, isBullish: dirChar === '↑', isMatch: checkChar === '✓' };
+    // Try new format first: "1d: 66.8 Bearish ↑ ✓"
+    const newMatch = part.match(/^(\S+):\s*([\d.]+)\s+(Bullish|Bearish)\s+(↑|↓)\s*(✓|✗)?/);
+    if (newMatch) {
+      const [, tf, body, dirName, dirChar, checkChar] = newMatch;
+      return { tf, body, dirChar, checkChar, isBullish: dirName === 'Bullish', isMatch: checkChar !== '✗' };
+    }
+    // Try old format: "1d: 18.8 ↑ ✓"
+    const oldMatch = part.match(/^(\S+):\s*([\d.]+)\s*\((.)\s*(.)?\)/);
+    if (oldMatch) {
+      const [, tf, body, dirChar, checkChar] = oldMatch;
+      return { tf, body, dirChar, checkChar, isBullish: dirChar === '↑', isMatch: checkChar === '✓' };
+    }
+    return null;
   }).filter(Boolean);
 }
 
