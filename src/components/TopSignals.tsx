@@ -1,9 +1,10 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AnalysisResult, SignalType } from '../types';
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
+import TradingViewWidget from './TradingViewWidget';
 
 interface TopSignalsProps {
   signals: AnalysisResult[];
@@ -58,6 +59,8 @@ const formatPublishDate = (timestamp: string, lang: string) => {
 export default function TopSignals({ signals, onRemove, onSelect, onDetail, onClearAll, lang }: TopSignalsProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [selectedResult, setSelectedResult] = useState<AnalysisResult | null>(null);
 
   if (signals.length === 0) return null;
 
@@ -108,27 +111,61 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
             </div>
 
             {strong.map((res, idx) => (
-              <SignalCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={onSelect} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} />
+              <SignalCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={(r) => {
+                if (selectedSymbol === r.symbol) {
+                  setSelectedSymbol(null);
+                  setSelectedResult(null);
+                } else {
+                  setSelectedSymbol(r.symbol);
+                  setSelectedResult(r);
+                }
+              }} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} isSelected={selectedSymbol === res.symbol} />
             ))}
 
             {top3.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {top3.map((res, idx) => (
-                  <SignalCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={onSelect} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`r_${res.symbol}_${idx}`} />
+                  <SignalCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={(r) => {
+                    if (selectedSymbol === r.symbol) {
+                      setSelectedSymbol(null);
+                      setSelectedResult(null);
+                    } else {
+                      setSelectedSymbol(r.symbol);
+                      setSelectedResult(r);
+                    }
+                  }} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`r_${res.symbol}_${idx}`} isSelected={selectedSymbol === res.symbol} />
                 ))}
               </div>
             )}
           </div>
         );
       })}
+
+      {/* Inline TradingView Chart */}
+      {selectedSymbol && selectedResult && (
+        <div className="bg-brand-alt rounded-3xl border border-white/10 overflow-hidden shadow-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart2 size={18} className="text-primary" />
+            <span className="text-base font-black text-white italic tracking-wider">{selectedSymbol}</span>
+            {SIGNAL_META[selectedResult.signal] && (
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${SIGNAL_META[selectedResult.signal].bg} ${SIGNAL_META[selectedResult.signal].color} border ${SIGNAL_META[selectedResult.signal].border}`}>
+                {isAr ? SIGNAL_META[selectedResult.signal].labelAr : SIGNAL_META[selectedResult.signal].labelEn}
+              </span>
+            )}
+          </div>
+          <div className="h-[350px] md:h-[500px] rounded-2xl overflow-hidden relative">
+            <TradingViewWidget symbol={selectedSymbol} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate, cardKey }: {
+function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate, cardKey, isSelected }: {
   res: AnalysisResult; isAr: boolean;
   onSelect: (r: AnalysisResult) => void; onDetail: (r: AnalysisResult) => void; onRemove: (s: string) => void;
-  formatPublishDate: (ts: string, lang: string) => string; cardKey: string;
+  formatPublishDate: (ts: string, lang: string) => string; cardKey: string; isSelected?: boolean;
 }) {
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.BUY];
   const isJPY = res.symbol.includes('JPY');
@@ -138,7 +175,7 @@ function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate
   const slPrice = res.stopLoss || 0;
 
   return (
-    <div className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden relative" style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
+    <div className={cn("signal-card rounded-xl border-2 transition-all overflow-hidden relative", isSelected ? 'border-yellow-400 shadow-lg shadow-yellow-400/20' : 'border-amber-600/40')} style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
       {/* Main card content */}
       <button onClick={() => { onSelect(res); }} className="w-full px-3 py-1.5 flex flex-col items-center gap-1">
         <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
