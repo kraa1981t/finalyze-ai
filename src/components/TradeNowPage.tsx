@@ -9,6 +9,7 @@ import {
   calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE,
 } from '../services/paperTradingService';
 import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
+import { playOpenSound, playCloseSound } from '../lib/tradeSounds';
 
 interface TradeNowPageProps {
   lang: Language;
@@ -211,6 +212,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     }
     setBalance(newBalance);
     setTrades((prev) => prev.map((x) => x.id === t.id ? { ...x, status: 'closed', exitPrice, pnl, closeReason: reason, closedAt: Date.now() } : x));
+    playCloseSound();
   }
 
   function selectCategory(key: string) {
@@ -353,6 +355,7 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
     setTrades((prev) => [{ id, ...tradeData }, ...prev]);
     setTpPercent(''); setSlPercent('');
     setBusy(false);
+    playOpenSound();
   }
 
   async function closeTrade(t: PaperTrade) {
@@ -737,13 +740,6 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
                     const cur = priceOf(t);
                     const pnl = cur != null ? calcPnl(t, cur) : 0;
                     const margin = calcMargin(t);
-                    const now = Date.now();
-                    const elapsed = now - t.openedAt;
-                    const timeStr = elapsed < 60000
-                      ? `${Math.floor(elapsed / 1000)}${isAr ? 'ث' : 's'}`
-                      : elapsed < 3600000
-                        ? `${Math.floor(elapsed / 60000)}${isAr ? 'د' : 'm'}`
-                        : `${Math.floor(elapsed / 3600000)}${isAr ? 'س' : 'h'}${Math.floor((elapsed % 3600000) / 60000) > 0 ? ` ${Math.floor((elapsed % 3600000) / 60000)}${isAr ? 'د' : 'm'}` : ''}`;
                     return (
                       <tr key={t.id} className="border-b border-white/5 hover:bg-white/5">
                         <td className="px-4 py-3 text-base font-black text-brand-text">{t.symbol}</td>
@@ -756,7 +752,12 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
                         <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
                         <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{cur ? fmtPrice(cur) : '—'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-sky-400" dir="ltr">${margin.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-brand-text/50">{timeStr}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-brand-text/60" dir="ltr">
+                          {(() => {
+                            const d = new Date(t.openedAt);
+                            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                          })()}
+                        </td>
                         <td className={`px-4 py-3 text-base font-black ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{cur ? fmtMoney(pnl) : '—'}</td>
                         <td className="px-4 py-3">
                           <button
