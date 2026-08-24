@@ -119,12 +119,12 @@ export default function App() {
     }
     setNeedsApiKeyState(email);
   };
-  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' => {
+  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' => {
     const hash = window.location.hash.slice(1);
-    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade'].includes(hash)) return hash as any;
+    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis'].includes(hash)) return hash as any;
     return 'main';
   };
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade'>(getPageFromHash);
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis'>(getPageFromHash);
   const navStackRef = useRef<string[]>([]);
 
   const navigateTo = (page: any) => {
@@ -193,7 +193,7 @@ export default function App() {
     return DEV_EMAILS.includes(email);
   };
 
-  const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats'];
+  const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis'];
   const effectivePage = (DEV_ONLY_PAGES.includes(activePage) && !isDeveloperSession()) ? 'main' : activePage;
 
   // CLIENT: Mirror results from developer via Firestore ΓÇö poll collection every 10s, NO orderBy
@@ -587,8 +587,8 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade'];
-    const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats'];
+    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis'];
+    const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis'];
     const onHashChange = () => {
       const hash = window.location.hash.slice(1);
       if (!VALID_PAGES.includes(hash)) { setActivePage('main'); return; }
@@ -1878,10 +1878,43 @@ export default function App() {
             {effectivePage === 'trade' && (
               <TradeNowPage lang={lang} user={user} />
             )}
+
+            {effectivePage === 'manualAnalysis' && isDeveloperSession() && (
+              <div className="max-w-4xl mx-auto px-4 py-8">
+                <h2 className="text-2xl font-black text-brand-text mb-6 text-center">
+                  {lang === 'ar' ? 'التحليل اليدوي' : 'Manual Analysis'}
+                </h2>
+                <AnalysisForm
+                  user={user} lang={lang} settings={settings}
+                  hasActivePlan={hasActivePlan}
+                  onUpgrade={() => navigateTo('plans')}
+                  onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); try { playStart(autoSettings.volume || 0.5); } catch {} }}
+                  onProgress={(current, total, index, failed) => setProgress({ current, total, index, failed })}
+                  onResult={(results) => {
+                    const day = new Date().getDay();
+                    const allCryptos = ALL_SYMBOLS_DB.crypto || [];
+                    const filtered = (day === 0 || day === 6)
+                      ? results.filter(r => {
+                          const sym = r.symbol.toUpperCase();
+                          return allCryptos.includes(sym) || sym.includes('-USD') || sym.endsWith('USD');
+                        })
+                      : results;
+                    setAnalysisResults(filtered);
+                    setIsAnalyzing(false);
+                    setAnalysisError(null);
+                    setProgress(null);
+                    updateTopSignals(filtered);
+                    playAudio('fail');
+                  }}
+                  onError={(errMsg, allFailed) => { setAnalysisResults(null); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); }}
+                />
+                <ConnectionStatus lang={lang} />
+              </div>
+            )}
           </motion.div>
         )}
 
-        {/* FORM - hidden during analysis, hidden when results show, hidden when ApiKey is needed, hidden for clients */}
+        {/* Top Signals + Subscription Banner - developer main page */}
         <div style={{ display: isAnalyzing || analysisResults || effectivePage !== 'main' || !!needsApiKey || !isDeveloperSession() ? 'none' : 'block' }}>
           {activeSubscription && (() => {
             const daysLeft = Math.ceil((new Date(activeSubscription.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -1905,36 +1938,6 @@ export default function App() {
             onSelect={handleSelectSignal} onDetail={setDetailResult} onClearAll={handleClearAll}
             lang={lang} 
           />
-
-          <div className="w-full bg-[#D1FAE5]/40 backdrop-blur-xl rounded-full my-10 h-3 border border-[#D1FAE5]/60 shadow-[0_0_25px_rgba(209,250,229,0.3)]" />
-
-          <AnalysisForm 
-             user={user} lang={lang} settings={settings}
-             hasActivePlan={hasActivePlan}
-              onUpgrade={() => navigateTo('plans')}
-              onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); try { playStart(autoSettings.volume || 0.5); } catch {} }}
-             onProgress={(current, total, index, failed) => setProgress({ current, total, index, failed })}
-             onResult={(results) => {
-               const day = new Date().getDay();
-               const allCryptos = ALL_SYMBOLS_DB.crypto || [];
-               
-               const filtered = (day === 0 || day === 6) 
-                 ? results.filter(r => {
-                     const sym = r.symbol.toUpperCase();
-                     return allCryptos.includes(sym) || sym.includes('-USD') || sym.endsWith('USD');
-                   })
-                 : results;
-               
-                setAnalysisResults(filtered);
-                setIsAnalyzing(false);
-                setAnalysisError(null);
-                setProgress(null);
-                updateTopSignals(filtered);
-                playAudio('fail');
-             }} 
-              onError={(errMsg, allFailed) => { setAnalysisResults(null); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); }}
-          />
-          <ConnectionStatus lang={lang} />
         </div>
 
         {/* Ads for all users */}

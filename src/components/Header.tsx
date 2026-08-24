@@ -57,7 +57,7 @@ interface HeaderProps {
   showRadarComplete?: boolean;
   onPreview?: (device: 'phone' | 'tablet') => void;
   isPWA?: boolean;
-  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade') => void;
+  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis') => void;
   freemiumDisabled?: boolean;
   compact?: boolean;
 }
@@ -661,6 +661,24 @@ export default function Header({
                   {clientRadarRunning ? 'SCANNING' : showRadarComplete ? 'DONE' : 'ACTIVE'}
                 </span>
               </div>
+            )}
+
+            {/* Manual Analysis - developer only */}
+            {isDeveloper && (
+              <button
+                onClick={() => onNavigatePage?.('manualAnalysis')}
+                className="flex items-center gap-3 px-6 py-3.5 rounded-2xl border shadow-md transition-all backdrop-blur-sm bg-red-700 border-red-800 text-white hover:bg-red-600 active:scale-95"
+              >
+                <div className="relative flex-shrink-0">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                  </svg>
+                </div>
+                <span className="text-[20px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                  {lang === 'ar' ? 'التحليل اليدوي' : 'MANUAL'}
+                </span>
+              </button>
             )}
 
             {/* Theme */}
