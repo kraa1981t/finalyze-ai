@@ -814,7 +814,18 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                     const margin = calcMargin(t);
                     return (
                       <tr key={t.id} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="px-4 py-3 text-base font-black text-brand-text">{t.symbol}</td>
+                        <td
+                          className="px-4 py-3 text-base font-black text-sky-400 hover:text-sky-300 cursor-pointer underline underline-offset-2 decoration-sky-400/40 hover:decoration-sky-300/60 transition-colors"
+                          onClick={() => {
+                            const cat = detectCategory(t.symbol);
+                            setCategory(cat);
+                            setSymbol(t.symbol);
+                            setQty(getDefaultQty(cat, balance));
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                        >
+                          {t.symbol}
+                        </td>
                         <td className="px-4 py-3">
                           <span className={`px-3 py-1.5 rounded-lg text-sm font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                             {t.side === 'buy' ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
