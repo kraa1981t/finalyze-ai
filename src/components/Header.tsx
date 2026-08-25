@@ -560,7 +560,7 @@ export default function Header({
 
             {/* Icons - scrollable row */}
             {!isPWA && (
-            <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0 justify-end" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
               {/* Trade Now */}
               <button
                 onClick={() => onNavigatePage?.('trade')}
