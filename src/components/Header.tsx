@@ -553,7 +553,7 @@ export default function Header({
                   Joseph.<span className="text-sky-300 italic">Trading</span>
                 </span>
                 {!compact && (
-                  <span className="text-[16px] font-black uppercase tracking-[0.2em] text-white/70 leading-none mt-1">For Financial Market Analysis</span>
+                  <span className="text-[14px] font-black uppercase tracking-[0.15em] text-white/70 leading-tight mt-1 block">For Financial<br/>Market Analysis</span>
                 )}
               </div>
             </div>
