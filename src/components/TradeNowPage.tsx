@@ -134,6 +134,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [resetInput, setResetInput] = useState('');
   const resetVal = parseFloat(resetInput) || 0;
 
+  // Bubble pop animation when clicking symbol
+  const [popId, setPopId] = useState<string | null>(null);
+
   const store = getTradeStore(user);
 
   // Find matching signal for current symbol
@@ -629,6 +632,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               const activeTrade = openTrades.find(t => t.symbol === symbol);
               return (
                 <TradingViewWidget
+                  key={symbol}
                   symbol={toTvSymbol(symbol)}
                   entryPrice={activeTrade?.entryPrice ?? matchedSignal?.entryPrice}
                   sl={activeTrade?.sl ?? matchedSignal?.stopLoss}
@@ -813,18 +817,27 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                     const pnl = cur != null ? calcPnl(t, cur) : 0;
                     const margin = calcMargin(t);
                     return (
-                      <tr key={t.id} className="border-b border-white/5 hover:bg-white/5">
-                        <td
-                          className="px-4 py-3 text-base font-black text-sky-400 hover:text-sky-300 cursor-pointer underline underline-offset-2 decoration-sky-400/40 hover:decoration-sky-300/60 transition-colors"
-                          onClick={() => {
-                            const cat = detectCategory(t.symbol);
-                            setCategory(cat);
-                            setSymbol(t.symbol);
-                            setQty(getDefaultQty(cat, balance));
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                        >
-                          {t.symbol}
+                      <tr key={t.id} className="border-b border-white/5 hover:bg-white/5 relative">
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const cat = detectCategory(t.symbol);
+                              setCategory(cat);
+                              setSymbol(t.symbol);
+                              setQty(getDefaultQty(cat, balance));
+                              // Bubble pop animation
+                              setPopId(t.id);
+                              setTimeout(() => setPopId(null), 600);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="relative px-3 py-1.5 rounded-lg text-base font-black text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-400/50 cursor-pointer transition-all active:scale-95"
+                          >
+                            {popId === t.id && (
+                              <span className="absolute inset-0 rounded-lg animate-ping bg-sky-400/30 pointer-events-none" />
+                            )}
+                            {t.symbol}
+                          </button>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-3 py-1.5 rounded-lg text-sm font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
