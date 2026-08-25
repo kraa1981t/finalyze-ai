@@ -2,7 +2,6 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { AnalysisResult, SignalType, MarketType } from '../types';
 import { Activity, Zap, BarChart2, Info, Lock } from 'lucide-react';
 import TradingViewWidget from './TradingViewWidget';
-import LotSizeCalculator from './LotSizeCalculator';
 import { Language, translations } from '../lib/i18n';
 import { playClick, initAudio } from '../lib/audioEngine';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
@@ -60,8 +59,6 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
   const t = translations[lang];
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [symbolExplicitlySelected, setSymbolExplicitlySelected] = useState(false);
-  const [expandedCard, setExpandedCard] = useState<string | null>(null);
-  const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set());
   const audioInitRef = useRef(false);
 
   const handleClick = useCallback(() => {
@@ -153,7 +150,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {displaySignals.map((res, idx) => (
-                  <ClientSignalCard key={`all_${res.symbol}_${idx}`} res={res} isAr={isAr} lang={lang} selectedSymbol={selectedSymbol} expandedCard={expandedCard} expandedReasons={expandedReasons} onExpandCard={setExpandedCard} onExpandReasons={setExpandedReasons} onSelect={(sym) => { if (selectedSymbol === sym) { setSelectedSymbol(null); setSymbolExplicitlySelected(false); } else { setSelectedSymbol(sym); setSymbolExplicitlySelected(true); } handleClick(); }} onDetail={onDetail} hasActivePlan={hasActivePlan} formatPublishDate={formatPublishDate} cardKey={`all_${res.symbol}_${idx}`} onClick={handleClick} />
+                  <ClientSignalCard key={`all_${res.symbol}_${idx}`} res={res} isAr={isAr} lang={lang} selectedSymbol={selectedSymbol} onSelect={(sym) => { if (selectedSymbol === sym) { setSelectedSymbol(null); setSymbolExplicitlySelected(false); } else { setSelectedSymbol(sym); setSymbolExplicitlySelected(true); } handleClick(); }} onDetail={onDetail} hasActivePlan={hasActivePlan} formatPublishDate={formatPublishDate} cardKey={`all_${res.symbol}_${idx}`} onClick={handleClick} />
                 ))}
               </div>
             </div>
@@ -182,59 +179,18 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
   );
 }
 
-function ClientSignalCard({ res, isAr, lang, selectedSymbol, expandedCard, expandedReasons, onExpandCard, onExpandReasons, onSelect, onDetail, hasActivePlan, formatPublishDate, cardKey, onClick }: {
+function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail, hasActivePlan, formatPublishDate, cardKey, onClick }: {
   res: AnalysisResult; isAr: boolean; lang: Language; selectedSymbol: string | null;
-  expandedCard: string | null; expandedReasons: Set<string>;
-  onExpandCard: (v: string | null) => void; onExpandReasons: (v: Set<string>) => void;
   onSelect: (sym: string) => void; onDetail?: (r: AnalysisResult) => void; hasActivePlan: boolean;
   formatPublishDate: (ts: string, lang: string) => string; cardKey: string;
   onClick?: () => void;
 }) {
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.BUY];
   const isSelected = selectedSymbol === res.symbol;
-  const isExpanded = expandedCard === cardKey;
-  const cardRef = useRef<HTMLDivElement>(null);
   const isJPY = res.symbol.includes('JPY');
   const decimals = isJPY ? 3 : 5;
-  const entry = res.entryPrice || 0;
   const tp = res.takeProfit || 0;
   const sl = res.stopLoss || 0;
-
-  const PRIMARY_CHECKS = ['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'];
-  const primaryReasons = res.detailedReasons?.filter((r: any) => PRIMARY_CHECKS.some(p => r.check?.includes(p))) || [];
-  const supportingReasons = res.detailedReasons?.filter((r: any) => !PRIMARY_CHECKS.some(p => r.check?.includes(p))) || [];
-
-  const getAgeBadge = () => {
-    if (res.trendAge === undefined) return null;
-    const age = res.trendAge;
-    if (age < 10) return { label: isAr ? 'طفل' : 'Infant', color: 'text-red-300 bg-red-500/20 border-red-500/30' };
-    if (age < 25) return { label: isAr ? 'شاب' : 'Youth', color: 'text-yellow-300 bg-yellow-500/20 border-yellow-500/30' };
-    if (age <= 75) return { label: isAr ? 'ناضج' : 'Mature', color: 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' };
-    return { label: isAr ? 'شيخ' : 'Old', color: 'text-orange-300 bg-orange-500/20 border-orange-500/30' };
-  };
-  const ageBadge = getAgeBadge();
-
-  const renderReason = (reason: any, i: number) => (
-    <div key={i} style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)'}} className="rounded-lg p-3" title={reason.impact || ''}>
-      <div className="flex items-center gap-2.5">
-        <div className={`w-4 h-4 rounded-full shrink-0 ${reason.status === 'positive' ? 'bg-emerald-400' : reason.status === 'negative' ? 'bg-red-400' : 'bg-white/70'}`} />
-        <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-bold text-base sm:text-lg shrink-0">{reason.check}</span>
-        <span style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff'}} className="font-mono text-sm sm:text-base break-all font-bold">{reason.value}</span>
-      </div>
-      {reason.dates && <div style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff',opacity:0.8}} className="ml-6 mt-2 text-sm font-mono whitespace-pre-line">{reason.dates}</div>}
-      {reason.impact && <p style={{color: reason.status === 'positive' ? '#00ff88' : reason.status === 'negative' ? '#ff4444' : '#ffffff',opacity:0.7}} className="text-sm mt-2 ml-6 leading-relaxed">{reason.impact}</p>}
-    </div>
-  );
-
-  const isReasonsExpanded = expandedReasons.has(cardKey);
-
-  useEffect(() => {
-    if (isExpanded && cardRef.current) {
-      setTimeout(() => {
-        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 50);
-    }
-  }, [isExpanded]);
 
   return (
     <div ref={cardRef} data-card={cardKey} style={{ alignSelf: 'start', backgroundColor: 'rgba(var(--card-bg),0.88)' }} className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden">
@@ -261,20 +217,6 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, expandedCard, expan
           </div>
         </div>
       </button>
-
-      {/* Expand/Collapse for LotSize + Summary only */}
-      <button onClick={(e) => { e.stopPropagation(); onExpandCard(isExpanded ? null : cardKey); }} className="w-full flex items-center justify-center py-1 text-white/40 hover:text-white/70 transition-colors">
-        <span className="text-xs">{isExpanded ? '\u25B2' : '\u25BC'}</span>
-      </button>
-
-      {isExpanded && (
-        <div className="border-t border-white/10 px-3 py-2 space-y-2">
-          {res.signal !== 'neutral' && res.signal !== 'no_entry' && (
-            <LotSizeCalculator symbol={res.symbol} stopLoss={sl} takeProfit={tp} entryPrice={entry} signal={res.signal as any} lang={(isAr ? 'ar' : 'en') as 'ar' | 'en'} />
-          )}
-          {res.summary && <div className="bg-white/10 rounded-lg p-2.5 border border-white/10 text-sm text-white/80 leading-relaxed"><p className="font-bold">{res.summary}</p></div>}
-        </div>
-      )}
 
       {/* Bright yellow Analysis Reasons button - attached to card bottom */}
       {res.detailedReasons && res.detailedReasons.length > 0 && (
