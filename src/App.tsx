@@ -1937,7 +1937,7 @@ export default function App() {
 
         {/* Top Signals - developer main page - always visible */}
         {effectivePage === 'main' && isDeveloperSession() && !isAnalyzing && (
-          <div className="max-w-4xl mx-auto px-4">
+          <div className="max-w-7xl mx-auto px-4">
             <TopSignals 
               signals={topSignals} onRemove={removeSignal} 
               onSelect={handleSelectSignal} onDetail={setDetailResult} onClearAll={handleClearAll}
