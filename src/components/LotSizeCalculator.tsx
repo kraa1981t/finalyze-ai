@@ -39,12 +39,14 @@ function detectInstrumentType(symbol: string): 'forex_jpy' | 'forex' | 'crypto' 
 
 function getInstrumentConfig(type: ReturnType<typeof detectInstrumentType>) {
   switch (type) {
-    case 'forex': return { decimals: 5, pipSize: 0.0001, pipLabel: 'pip', contractSize: 100000 };
-    case 'forex_jpy': return { decimals: 3, pipSize: 0.01, pipLabel: 'pip', contractSize: 100000 };
-    case 'crypto': return { decimals: 2, pipSize: 0.01, pipLabel: 'point', contractSize: 100 };
-    case 'stock': return { decimals: 2, pipSize: 0.01, pipLabel: 'point', contractSize: 100 };
+    case 'forex': return { decimals: 5, pipSize: 0.0001, pipLabel: 'pip', contractSize: 100000, quoteIsUSD: true };
+    case 'forex_jpy': return { decimals: 3, pipSize: 0.01, pipLabel: 'pip', contractSize: 100000, quoteIsUSD: false };
+    case 'crypto': return { decimals: 2, pipSize: 0.01, pipLabel: 'point', contractSize: 100, quoteIsUSD: true };
+    case 'stock': return { decimals: 2, pipSize: 0.01, pipLabel: 'point', contractSize: 100, quoteIsUSD: true };
   }
 }
+
+const USDJPY_APPROX = 150;
 
 export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryPrice, signal, lang }: LotSizeCalculatorProps) {
   const isAr = lang === 'ar';
@@ -117,11 +119,17 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
     const slPercent = entry > 0 ? (slDistance / entry * 100) : 0;
     const tpPercent = entry > 0 ? (adjustedTpDistance / entry * 100) : 0;
 
-    const pipValuePerLot = (pipSize * contractSize);
-    const pipValue = lotSize * pipValuePerLot;
+    // Pip value in USD per 1 lot
+    const pipValuePerLotUSD = instConfig.quoteIsUSD
+      ? (contractSize * pipSize)
+      : (contractSize * pipSize) / USDJPY_APPROX;
 
-    const riskDollars = slDistance * lotSize * contractSize;
-    const rewardDollars = adjustedTpDistance * lotSize * contractSize;
+    // Pip value in USD for current lot size
+    const pipValue = lotSize * pipValuePerLotUSD;
+
+    // Risk/Reward in USD = pips * pipValue
+    const riskDollars = slPips * pipValue;
+    const rewardDollars = tpPips * pipValue;
     const riskOfBalance = accountBalance > 0 ? (riskDollars / accountBalance * 100) : 0;
 
     const riskLevel = riskOfBalance <= 1 ? 'safe' : riskOfBalance <= 3 ? 'ok' : riskOfBalance <= 5 ? 'warn' : 'danger';
@@ -140,7 +148,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
       riskOfBalance,
       riskLevel,
     };
-  }, [entry, stopLoss, rrRatio, lotSize, accountBalance, pipSize, contractSize, isBuy]);
+  }, [entry, stopLoss, rrRatio, lotSize, accountBalance, pipSize, contractSize, isBuy, instConfig]);
 
   const lotPresets = [0.01, 0.05, 0.1, 0.5, 1.0];
   const balancePresets = [500, 1000, 5000, 10000];
