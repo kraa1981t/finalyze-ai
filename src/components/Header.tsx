@@ -141,32 +141,27 @@ export default function Header({
     <div className="flex flex-col">
       {/* Logout Confirmation Dialog */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 mx-4 max-w-sm w-full">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <LogOut size={20} className="text-red-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-800">
-                {lang === 'ar' ? 'تسجيل الخروج' : 'Logout'}
-              </h3>
+        <div className="fixed inset-0 z-[100]" onClick={() => setShowLogoutConfirm(false)}>
+          <div className={`absolute top-[60px] w-64 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl overflow-hidden z-[100] ${lang === 'ar' ? 'left-4' : 'right-4'}`} onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-white/10">
+              <p className="text-sm font-black text-white">{lang === 'ar' ? 'تسجيل الخروج' : 'Logout'}</p>
             </div>
-            <p className="text-gray-600 mb-6">
-              {lang === 'ar' ? 'هل أنت متأكد من تسجيل الخروج؟' : 'Are you sure you want to logout?'}
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl border-2 border-gray-200 text-gray-700 font-bold text-sm hover:bg-gray-50 transition-colors"
-              >
-                {lang === 'ar' ? 'إلغاء' : 'Cancel'}
-              </button>
-              <button
-                onClick={() => { setShowLogoutConfirm(false); onLogout(); }}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition-colors"
-              >
-                {lang === 'ar' ? 'تأكيد' : 'Confirm'}
-              </button>
+            <div className="px-4 py-3">
+              <p className="text-xs text-white/60 mb-3">{lang === 'ar' ? 'هل أنت متأكد؟' : 'Are you sure?'}</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-white/20 text-white/60 text-xs font-bold hover:bg-white/10 transition-colors"
+                >
+                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  onClick={() => { setShowLogoutConfirm(false); onLogout(); }}
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors"
+                >
+                  {lang === 'ar' ? 'خروج' : 'Logout'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -511,11 +506,11 @@ export default function Header({
       )}
 
       <header className={cn(
-        "fixed top-0 left-0 right-0 z-50 overflow-hidden shadow-2xl shadow-emerald-500/20 transition-all duration-300",
+        "fixed top-0 left-0 right-0 z-50 shadow-2xl shadow-emerald-500/20 transition-all duration-300",
         compact ? 'h-[100px]' : 'h-[300px]'
       )}>
         {/* Trading Banner Background */}
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 overflow-hidden">
           <img
             src="/trading-banner.png"
             alt="Joseph.Trading"
@@ -708,11 +703,11 @@ export default function Header({
                 </div>
               </div>
 
-              {/* Profile */}
+              {/* Profile / Logout */}
               {user ? (
                 <div className="relative flex-shrink-0" ref={profileMenuRef}>
                   <button 
-                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                    onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
                     className="w-[48px] h-[48px] rounded-full bg-[#F59E0B] border-2 border-white/30 flex items-center justify-center overflow-hidden shadow-lg hover:scale-105 transition-all"
                   >
                     {customAvatar ? (
@@ -723,21 +718,6 @@ export default function Header({
                       <span className="text-sm font-black text-black">{user.email?.charAt(0).toUpperCase()}</span>
                     )}
                   </button>
-                  {showProfileMenu && (
-                    <div className={`absolute top-full mt-2 w-56 bg-[#F59E0B] rounded-xl shadow-2xl border-2 border-black/20 overflow-hidden z-[60] ${lang === 'ar' ? 'left-0' : 'right-0'}`}>
-                      <div className="px-4 py-3 border-b-2 border-black/10">
-                        <p className="text-sm font-black text-black truncate">{user.displayName || user.email?.split('@')[0]}</p>
-                        <p className="text-xs font-bold text-black/70 truncate">{user.email}</p>
-                      </div>
-                      <button 
-                        onClick={() => { setShowProfileMenu(false); setShowLogoutConfirm(true); }}
-                        className="w-full flex items-center gap-2 px-4 py-3 text-red-600 hover:bg-red-500/20 transition-colors"
-                      >
-                        <LogOut size={20} className="text-red-600" />
-                        <span className="text-sm font-black text-red-600">{lang === 'ar' ? 'خروج' : 'Logout'}</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <button 
