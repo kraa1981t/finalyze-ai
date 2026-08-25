@@ -80,7 +80,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: 
       <div className="tv-embed-chart h-full w-full" />
 
       {hasLines && (
-        <div className="absolute inset-0 pointer-events-none z-10">
+        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 9999 }}>
           {/* Entry line - green for buy, red for sell */}
           {entryPrice != null && (
             <div
