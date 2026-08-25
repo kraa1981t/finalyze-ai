@@ -143,7 +143,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
             ))}
 
             {top3.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {top3.map((res, idx) => (
                   <SignalCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={(r) => {
                     if (selectedSymbol === r.symbol) {
@@ -195,17 +195,17 @@ function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate
   const slPrice = res.stopLoss || 0;
 
   return (
-    <div className={cn("signal-card rounded-2xl border-2 transition-all overflow-hidden relative", isSelected ? 'border-yellow-400 shadow-lg shadow-yellow-400/20' : 'border-amber-600/40')} style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
+    <div className={cn("signal-card rounded-xl border-2 transition-all overflow-hidden relative", isSelected ? 'border-yellow-400 shadow-lg shadow-yellow-400/20' : 'border-amber-600/40')} style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
       {/* Main card content */}
-      <button onClick={() => { onSelect(res); }} className="w-full px-4 py-3 flex flex-col items-center gap-1.5">
-        <div className="flex items-center justify-center w-full gap-3 overflow-hidden">
-          <span className="text-base sm:text-lg font-black font-mono" style={{color:'#00ff88'}}>{tpPrice ? tpPrice.toFixed(decimals) : '—'}</span>
-          <span className="text-xl sm:text-2xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
-          <span className="text-base sm:text-lg font-black font-mono" style={{color:'#ff4444'}}>{slPrice ? slPrice.toFixed(decimals) : '—'}</span>
+      <button onClick={() => { onSelect(res); }} className="w-full px-3 py-1.5 flex flex-col items-center gap-1">
+        <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
+          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tpPrice ? tpPrice.toFixed(decimals) : '—'}</span>
+          <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
+          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{slPrice ? slPrice.toFixed(decimals) : '—'}</span>
         </div>
         <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
         <div className="flex items-center gap-2">
-          <span className="text-2xl sm:text-4xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
+          <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
           {res.isSideways !== undefined && (
             <span className={`text-xs font-black px-2 py-0.5 rounded-full border ${
               res.isSideways ? 'text-white bg-white/20 border-white/30' :
@@ -221,7 +221,7 @@ function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate
 
       {/* Yellow Analysis Reasons button - directly under percentage */}
       {res.detailedReasons && res.detailedReasons.length > 0 && (
-        <button onClick={(e) => { e.stopPropagation(); onDetail(res); }} className="w-full py-3 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+        <button onClick={(e) => { e.stopPropagation(); onDetail(res); }} className="w-full py-2.5 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2">
           <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
           <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[9px]">{res.detailedReasons.length}</span>
         </button>

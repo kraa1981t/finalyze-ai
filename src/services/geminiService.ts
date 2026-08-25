@@ -1836,7 +1836,14 @@ Return ONLY valid JSON:
       primaryMetCount,
       direction: direction || 'sideways',
       isSideways: metrics?.isSideways || false,
-      sidewaysDirection: metrics?.sidewaysDirection || 'sideways',
+      sidewaysDirection: (() => {
+        const raw = metrics?.sidewaysDirection || 'sideways';
+        if (raw === 'sideways') return raw;
+        const sig = resultData.signal || '';
+        if (sig.includes('buy') && raw === 'downtrend') return 'uptrend';
+        if (sig.includes('sell') && raw === 'uptrend') return 'downtrend';
+        return raw;
+      })(),
       adx: metrics?.adx,
       adxDirection: metrics?.adxDirection,
       maAlignment: metrics?.maAlignment,
