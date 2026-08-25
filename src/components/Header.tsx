@@ -106,10 +106,12 @@ export default function Header({
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showLangMenu, setShowLangMenu] = useState(false);
   const isPWA = isPWAMode;
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [mobileLangOpen, setMobileLangOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const langMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setCustomAvatar(localStorage.getItem('finalyze_custom_avatar'));
@@ -126,6 +128,9 @@ export default function Header({
     const handleClickOutside = (e: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
         setShowProfileMenu(false);
+      }
+      if (langMenuRef.current && !langMenuRef.current.contains(e.target as Node)) {
+        setShowLangMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -682,25 +687,30 @@ export default function Header({
               </button>
 
               {/* Language */}
-              <div className="relative group flex-shrink-0">
-                <button className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md">
+              <div className="relative flex-shrink-0" ref={langMenuRef}>
+                <button 
+                  onClick={() => setShowLangMenu(!showLangMenu)}
+                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
+                >
                   <Globe size={22} />
                   <span className="text-[14px] font-black uppercase">{lang}</span>
                 </button>
-                <div className="absolute right-0 top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
-                  {LANGUAGES.map((l) => (
-                    <button
-                      key={l.code}
-                      onClick={() => onLangChange(l.code)}
-                      className={cn(
-                        "w-full px-4 py-3 text-left text-sm font-bold transition-colors hover:bg-primary/10",
-                        lang === l.code ? "text-primary bg-primary/5" : "text-brand-text/60"
-                      )}
-                    >
-                      {l.label}
-                    </button>
-                  ))}
-                </div>
+                {showLangMenu && (
+                  <div className={`absolute top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl z-[60] overflow-hidden ${lang === 'ar' ? 'left-0' : 'right-0'}`}>
+                    {LANGUAGES.map((l) => (
+                      <button
+                        key={l.code}
+                        onClick={() => { onLangChange(l.code); setShowLangMenu(false); }}
+                        className={cn(
+                          "w-full px-4 py-3 text-left text-sm font-bold transition-colors hover:bg-primary/10",
+                          lang === l.code ? "text-primary bg-primary/5" : "text-brand-text/60"
+                        )}
+                      >
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Profile / Logout */}
