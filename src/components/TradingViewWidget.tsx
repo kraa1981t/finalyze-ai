@@ -142,7 +142,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, on
                 style={{ backgroundColor: entryColor, borderColor: entryColor, boxShadow: `0 0 8px ${entryColor}` }}
               />
               <div className={`absolute right-2 -top-3 px-2 py-0.5 rounded text-[10px] font-black shadow-lg whitespace-nowrap ${isBuy ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'}`}>
-                {isAr ? 'دخول' : 'ENTRY'} {fmtP(entryPrice)}
+                ENTRY {fmtP(entryPrice)}
               </div>
             </div>
           )}
