@@ -136,6 +136,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
 
   // Bubble pop animation when clicking symbol
   const [popId, setPopId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const store = getTradeStore(user);
 
@@ -638,6 +639,16 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   sl={activeTrade?.sl ?? matchedSignal?.stopLoss}
                   tp={activeTrade?.tp ?? matchedSignal?.takeProfit}
                   side={activeTrade?.side ?? (matchedSignal?.signal?.includes('buy') ? 'buy' : matchedSignal?.signal?.includes('sell') ? 'sell' : null)}
+                  onSlChange={(newSl) => {
+                    if (activeTrade) {
+                      setTrades(prev => prev.map(t => t.id === activeTrade.id ? { ...t, sl: newSl } : t));
+                    }
+                  }}
+                  onTpChange={(newTp) => {
+                    if (activeTrade) {
+                      setTrades(prev => prev.map(t => t.id === activeTrade.id ? { ...t, tp: newTp } : t));
+                    }
+                  }}
                 />
               );
             })()}
@@ -826,9 +837,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                               setCategory(cat);
                               setSymbol(t.symbol);
                               setQty(getDefaultQty(cat, balance));
-                              // Bubble pop animation
                               setPopId(t.id);
                               setTimeout(() => setPopId(null), 600);
+                              setToast(`${isAr ? 'تم فتح شارت' : 'Opening chart for'} ${t.symbol}`);
+                              setTimeout(() => setToast(null), 2000);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
                             className="relative px-3 py-1.5 rounded-lg text-base font-black text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-400/50 cursor-pointer transition-all active:scale-95"
@@ -990,6 +1002,15 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               {busy ? <Loader2 size={20} className="animate-spin" /> : <RotateCcw size={20} />}
               {isAr ? 'تأكيد' : 'Confirm'}
             </button>
+          </div>
+        </div>
+      )}
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] animate-bounce">
+          <div className="px-5 py-3 rounded-2xl bg-sky-500 text-white text-sm font-black shadow-2xl shadow-sky-500/40 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+            {toast}
           </div>
         </div>
       )}
