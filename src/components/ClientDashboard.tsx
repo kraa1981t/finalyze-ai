@@ -193,7 +193,7 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
   const sl = res.stopLoss || 0;
 
   return (
-    <div ref={cardRef} data-card={cardKey} style={{ alignSelf: 'start', backgroundColor: 'rgba(var(--card-bg),0.88)' }} className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden">
+    <div data-card={cardKey} style={{ alignSelf: 'start', backgroundColor: 'rgba(var(--card-bg),0.88)' }} className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden">
       <button onClick={() => { onSelect(res.symbol); onClick?.(); }} className="w-full px-3 py-1.5 flex flex-col items-center gap-1">
         <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
           <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tp ? tp.toFixed(decimals) : '\u2014'}</span>

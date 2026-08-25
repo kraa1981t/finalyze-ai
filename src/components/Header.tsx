@@ -112,6 +112,8 @@ export default function Header({
   const [mobileLangOpen, setMobileLangOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const langMenuRef = useRef<HTMLDivElement>(null);
+  const langButtonRef = useRef<HTMLButtonElement>(null);
+  const [langMenuPos, setLangMenuPos] = useState<{top: number; left: number} | null>(null);
 
   useEffect(() => {
     setCustomAvatar(localStorage.getItem('finalyze_custom_avatar'));
@@ -126,12 +128,14 @@ export default function Header({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
-        setShowProfileMenu(false);
-      }
-      if (langMenuRef.current && !langMenuRef.current.contains(e.target as Node)) {
-        setShowLangMenu(false);
-      }
+      setTimeout(() => {
+        if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+          setShowProfileMenu(false);
+        }
+        if (langMenuRef.current && !langMenuRef.current.contains(e.target as Node)) {
+          setShowLangMenu(false);
+        }
+      }, 0);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -687,16 +691,24 @@ export default function Header({
               </button>
 
               {/* Language */}
-              <div className="relative flex-shrink-0" ref={langMenuRef}>
+              <div className="relative flex-shrink-0">
                 <button 
-                  onClick={() => setShowLangMenu(!showLangMenu)}
+                  ref={langButtonRef}
+                  onClick={() => {
+                    if (showLangMenu) { setShowLangMenu(false); return; }
+                    const rect = langButtonRef.current?.getBoundingClientRect();
+                    if (rect) {
+                      setLangMenuPos({ top: rect.bottom + 8, left: lang === 'ar' ? rect.left : rect.right - 160 });
+                    }
+                    setShowLangMenu(true);
+                  }}
                   className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md"
                 >
                   <Globe size={22} />
                   <span className="text-[14px] font-black uppercase">{lang}</span>
                 </button>
-                {showLangMenu && (
-                  <div className={`absolute top-full mt-2 w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl z-[60] overflow-hidden ${lang === 'ar' ? 'left-0' : 'right-0'}`}>
+                {showLangMenu && langMenuPos && (
+                  <div ref={langMenuRef} className="fixed w-40 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl z-[60] overflow-hidden" style={{ top: langMenuPos.top, left: langMenuPos.left }}>
                     {LANGUAGES.map((l) => (
                       <button
                         key={l.code}
