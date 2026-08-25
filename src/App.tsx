@@ -1876,7 +1876,7 @@ export default function App() {
             )}
 
             {effectivePage === 'trade' && (
-              <TradeNowPage lang={lang} user={user} />
+              <TradeNowPage lang={lang} user={user} signals={topSignals} />
             )}
 
             {effectivePage === 'manualAnalysis' && isDeveloperSession() && (

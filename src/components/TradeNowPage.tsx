@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw } from 'lucide-react';
 import { User } from 'firebase/auth';
+import { AnalysisResult } from '../types';
 import { SYMBOL_CATEGORIES } from '../constants';
 import { Language } from '../lib/i18n';
 import TradingViewWidget from './TradingViewWidget';
@@ -14,6 +15,7 @@ import { playOpenSound, playCloseSound } from '../lib/tradeSounds';
 interface TradeNowPageProps {
   lang: Language;
   user: User | null;
+  signals?: AnalysisResult[];
 }
 
 const CUSTOM_KEY = 'paper_trading_custom_symbols';
@@ -103,7 +105,7 @@ const fmtMoney = (v: number) =>
 const fmtPrice = (v: number | null | undefined) =>
   v == null ? '—' : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 });
 
-export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
+export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageProps) {
   const isAr = lang === 'ar';
   const [category, setCategory] = useState<string>('forex');
   const [symbol, setSymbol] = useState<string>('EURUSD');
@@ -133,6 +135,26 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
   const resetVal = parseFloat(resetInput) || 0;
 
   const store = getTradeStore(user);
+
+  // Find matching signal for current symbol
+  const matchedSignal = React.useMemo(() => {
+    if (!symbol || signals.length === 0) return null;
+    return signals.find((s) => s.symbol.toUpperCase() === symbol.toUpperCase()) || null;
+  }, [symbol, signals]);
+
+  // Auto-fill SL/TP when symbol changes and matches a signal
+  useEffect(() => {
+    if (matchedSignal && matchedSignal.stopLoss && matchedSignal.takeProfit && matchedSignal.entryPrice) {
+      const entry = matchedSignal.entryPrice;
+      const slDist = Math.abs(entry - matchedSignal.stopLoss) / entry * 100;
+      const tpDist = Math.abs(matchedSignal.takeProfit - entry) / entry * 100;
+      setSlPercent(slDist.toFixed(2));
+      setTpPercent(tpDist.toFixed(2));
+    } else {
+      setSlPercent('');
+      setTpPercent('');
+    }
+  }, [matchedSignal]);
 
   const allSymbolsFor = (cat: string): string[] => {
     if (cat === 'custom') return customSymbols;
@@ -360,12 +382,22 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
   async function openTrade(side: 'buy' | 'sell') {
     if (!livePrice || busy || qty <= 0) return;
     setBusy(true);
-    const tpVal = tpPercent ? (side === 'buy'
-      ? livePrice * (1 + parseFloat(tpPercent) / 100)
-      : livePrice * (1 - parseFloat(tpPercent) / 100)) : null;
-    const slVal = slPercent ? (side === 'buy'
-      ? livePrice * (1 - parseFloat(slPercent) / 100)
-      : livePrice * (1 + parseFloat(slPercent) / 100)) : null;
+
+    // Use signal SL/TP if available, otherwise calculate from percentage
+    let tpVal: number | null = null;
+    let slVal: number | null = null;
+
+    if (matchedSignal && matchedSignal.stopLoss && matchedSignal.takeProfit) {
+      slVal = matchedSignal.stopLoss;
+      tpVal = matchedSignal.takeProfit;
+    } else {
+      tpVal = tpPercent ? (side === 'buy'
+        ? livePrice * (1 + parseFloat(tpPercent) / 100)
+        : livePrice * (1 - parseFloat(tpPercent) / 100)) : null;
+      slVal = slPercent ? (side === 'buy'
+        ? livePrice * (1 - parseFloat(slPercent) / 100)
+        : livePrice * (1 + parseFloat(slPercent) / 100)) : null;
+    }
     const cat = detectCategory(symbol);
     const tradeData = { symbol, category: cat, side, qty, entryPrice: livePrice, status: 'open' as const, tp: tpVal, sl: slVal, openedAt: Date.now() };
     let id: string;
@@ -593,7 +625,18 @@ export default function TradeNowPage({ lang, user }: TradeNowPageProps) {
 
           {/* Chart */}
           <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[calc(100vh-420px)] min-h-[380px] relative">
-            <TradingViewWidget symbol={toTvSymbol(symbol)} />
+            {(() => {
+              const activeTrade = openTrades.find(t => t.symbol === symbol);
+              return (
+                <TradingViewWidget
+                  symbol={toTvSymbol(symbol)}
+                  entryPrice={activeTrade?.entryPrice ?? matchedSignal?.entryPrice}
+                  sl={activeTrade?.sl ?? matchedSignal?.stopLoss}
+                  tp={activeTrade?.tp ?? matchedSignal?.takeProfit}
+                  side={activeTrade?.side ?? (matchedSignal?.signal?.includes('buy') ? 'buy' : matchedSignal?.signal?.includes('sell') ? 'sell' : null)}
+                />
+              );
+            })()}
             <div className="absolute top-3 left-3 z-10 px-4 py-2 rounded-full bg-black/70 backdrop-blur-sm border border-white/20 text-white text-base font-black flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               {symbol}
