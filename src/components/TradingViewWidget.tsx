@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, CandlestickSeries, LineSeries, IChartApi, ISeriesApi, Time } from 'lightweight-charts';
+import { createChart, CandlestickSeries, IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { subscribePrices } from '../services/paperTradingService';
 
 interface TradingViewWidgetProps {
@@ -22,10 +22,8 @@ function fmt(price: number): string {
   return price.toFixed(price < 10 ? 5 : 2);
 }
 
-function symbolToFmp(sym: string): string {
-  const s = sym.toUpperCase();
-  if (s.endsWith('USD') && s.length === 6 && !s.startsWith('XAU') && !s.startsWith('XAG')) return s;
-  if (s === 'BTCUSD' || s === 'ETHUSD') return s;
+function toYahooSymbol(sym: string): string {
+  const s = sym.toUpperCase().trim();
   const map: Record<string, string> = {
     EURUSD: 'EURUSD=X', GBPUSD: 'GBPUSD=X', USDJPY: 'USDJPY=X',
     USDCHF: 'USDCHF=X', AUDUSD: 'AUDUSD=X', NZDUSD: 'NZDUSD=X',
@@ -37,39 +35,71 @@ function symbolToFmp(sym: string): string {
     AUDNZD: 'AUDNZD=X', NZDJPY: 'NZDJPY=X', NZDCAD: 'NZDCAD=X',
     NZDCHF: 'NZDCHF=X', CADJPY: 'CADJPY=X', CADCHF: 'CADCHF=X',
     CHFJPY: 'CHFJPY=X', USDTRY: 'USDTRY=X', USDMXN: 'USDMXN=X',
+    USDPLN: 'USDPLN=X', USDSEK: 'USDSEK=X', USDNOK: 'USDNOK=X',
+    USDDKK: 'USDDKK=X', USDHUF: 'USDHUF=X', USDCZK: 'USDCZK=X',
+    USDZAR: 'USDZAR=X', USDSGD: 'USDSGD=X', USDHKD: 'USDHKD=X',
+    USDTWD: 'USDTWD=X', USDCNH: 'USDCNH=X', USDTHB: 'USDTHB=X',
+    USDINR: 'USDINR=X', USDBRL: 'USDBRL=X', USDIDR: 'USDIDR=X',
+    USDPHP: 'USDPHP=X', USDMYR: 'USDMYR=X',
     XAUUSD: 'GC=F', XAGUSD: 'SI=F',
+    BTCUSD: 'BTC-USD', ETHUSD: 'ETH-USD',
+    US500: '^GSPC', US30: '^DJI', US100: '^IXIC',
+    SPY: 'SPY', QQQ: 'QQQ',
+    DXY: 'DX-Y.NYB',
+    GOLD: 'GC=F', SILVER: 'SI=F',
   };
   if (map[s]) return map[s];
-  if (s.length === 6 && !s.includes(':') && !s.includes('USD')) return `${s.slice(0,3)}USD=X`;
-  return sym;
+  if (s.endsWith('USD') && s.length === 6) return s;
+  if (s.length === 6) return `${s}=X`;
+  return s;
 }
 
-async function fetchCandles(tvSymbol: string, range: string, interval: string): Promise<Candle[]> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(tvSymbol)}?interval=${interval}&range=${range}`;
-  const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-  try {
-    const res = await fetch(proxy);
-    if (!res.ok) return [];
-    const json = await res.json();
-    const result = json?.chart?.result?.[0];
-    if (!result) return [];
-    const ts = result.timestamp;
-    const ohlcv = result.indicators?.quote?.[0];
-    if (!ts || !ohlcv) return [];
-    const candles: Candle[] = [];
-    for (let i = 0; i < ts.length; i++) {
-      const o = ohlcv.open?.[i];
-      const h = ohlcv.high?.[i];
-      const l = ohlcv.low?.[i];
-      const c = ohlcv.close?.[i];
-      if (o != null && h != null && l != null && c != null) {
-        candles.push({ time: ts[i] as Time, open: o, high: h, low: l, close: c });
+async function fetchYahooCandles(yahooSym: string, range: string, interval: string): Promise<Candle[]> {
+  const urls = [
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=${interval}&range=${range}`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=${interval}&range=${range}`,
+  ];
+
+  for (const url of urls) {
+    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(proxy, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) continue;
+      const json = await res.json();
+      const result = json?.chart?.result?.[0];
+      if (!result) continue;
+      const ts: number[] = result.timestamp || [];
+      const q = result.indicators?.quote?.[0];
+      if (!q || ts.length === 0) continue;
+      const candles: Candle[] = [];
+      for (let i = 0; i < ts.length; i++) {
+        const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], c = q.close?.[i];
+        if (o != null && h != null && l != null && c != null && !isNaN(o) && !isNaN(c)) {
+          candles.push({ time: ts[i] as Time, open: o, high: h, low: l, close: c });
+        }
       }
-    }
-    return candles;
-  } catch {
-    return [];
+      if (candles.length > 0) return candles;
+    } catch {}
   }
+  return [];
+}
+
+function generateFallbackCandles(basePrice: number): Candle[] {
+  const candles: Candle[] = [];
+  const now = Math.floor(Date.now() / 86400000) * 86400;
+  for (let i = 60; i >= 0; i--) {
+    const time = (now - i * 86400) as Time;
+    const variation = basePrice * 0.005;
+    const o = basePrice + (Math.random() - 0.5) * variation;
+    const c = basePrice + (Math.random() - 0.5) * variation;
+    const h = Math.max(o, c) + Math.random() * variation * 0.5;
+    const l = Math.min(o, c) - Math.random() * variation * 0.5;
+    candles.push({ time, open: o, high: h, low: l, close: c });
+  }
+  return candles;
 }
 
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: TradingViewWidgetProps) {
@@ -78,8 +108,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: 
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const linesRef = useRef<any[]>([]);
   const candlesRef = useRef<Candle[]>([]);
+  const unsubRef = useRef<(() => void) | null>(null);
 
-  // Initialize chart
+  // Initialize chart once
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -89,10 +120,11 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: 
       layout: {
         background: { color: '#0a0f1a' },
         textColor: '#94a3b8',
+        fontSize: 12,
       },
       grid: {
-        vertLines: { color: 'rgba(255,255,255,0.04)' },
-        horzLines: { color: 'rgba(255,255,255,0.04)' },
+        vertLines: { color: 'rgba(255,255,255,0.03)' },
+        horzLines: { color: 'rgba(255,255,255,0.06)' },
       },
       crosshair: {
         mode: 0,
@@ -101,12 +133,13 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: 
       },
       rightPriceScale: {
         borderColor: 'rgba(255,255,255,0.1)',
-        scaleMargins: { top: 0.1, bottom: 0.1 },
+        scaleMargins: { top: 0.15, bottom: 0.15 },
       },
       timeScale: {
         borderColor: 'rgba(255,255,255,0.1)',
         timeVisible: true,
         secondsVisible: false,
+        rightOffset: 5,
       },
     });
 
@@ -119,11 +152,11 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: 
       borderDownColor: '#ef5350',
       wickUpColor: '#26a69a',
       wickDownColor: '#ef5350',
+      priceLineVisible: false,
     });
 
     seriesRef.current = series;
 
-    // Resize handler
     const ro = new ResizeObserver(() => {
       if (containerRef.current && chartRef.current) {
         chartRef.current.applyOptions({
@@ -139,108 +172,80 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: 
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
-      candlesRef.current = [];
-      linesRef.current = [];
     };
   }, []);
 
-  // Load data & subscribe when symbol changes
+  // Load data & subscribe per symbol
   useEffect(() => {
     const series = seriesRef.current;
     const chart = chartRef.current;
     if (!series || !chart) return;
 
+    if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
     candlesRef.current = [];
     series.setData([]);
 
-    // Clear old price lines
     for (const line of linesRef.current) {
       try { series.removePriceLine(line); } catch {}
     }
     linesRef.current = [];
 
-    const fmpSym = symbolToFmp(symbol);
+    const yahooSym = toYahooSymbol(symbol);
 
-    // Fetch candles
     (async () => {
-      const candles = await fetchCandles(fmpSym, '3mo', '1d');
+      let candles = await fetchYahooCandles(yahooSym, '3mo', '1d');
+      if (candles.length === 0) candles = await fetchYahooCandles(yahooSym, '1mo', '1h');
+      if (candles.length === 0) candles = await fetchYahooCandles(yahooSym, '1mo', '5m');
+
       if (candles.length > 0) {
         candlesRef.current = candles;
         series.setData(candles);
         chart.timeScale().fitContent();
-      } else {
-        // Fallback: build from live price
-        const sub = subscribePrices([symbol], (sym, price) => {
-          if (sym !== symbol) return;
-          const now = Math.floor(Date.now() / 60000) * 60 as Time;
-          const last = candlesRef.current[candlesRef.current.length - 1];
-          if (last && last.time === now) {
-            last.high = Math.max(last.high, price);
-            last.low = Math.min(last.low, price);
-            last.close = price;
-            series.update(last);
-          } else {
-            const candle: Candle = { time: now, open: price, high: price, low: price, close: price };
-            candlesRef.current.push(candle);
-            series.update(candle);
-          }
-        });
-        return () => sub();
       }
+
+      unsubRef.current = subscribePrices([symbol], (sym, price) => {
+        if (sym !== symbol || !price) return;
+        const now5m = Math.floor(Date.now() / 300000) * 300 as Time;
+        const last = candlesRef.current[candlesRef.current.length - 1];
+        if (last && last.time === now5m) {
+          last.high = Math.max(last.high, price);
+          last.low = Math.min(last.low, price);
+          last.close = price;
+          series.update(last);
+        } else {
+          const candle: Candle = { time: now5m, open: price, high: price, low: price, close: price };
+          candlesRef.current.push(candle);
+          series.update(candle);
+        }
+      });
     })();
 
-    // Subscribe to live updates
-    let lastCandleTime: Time | null = null;
-    const unsub = subscribePrices([symbol], (sym, price) => {
-      if (sym !== symbol) return;
-      // Update existing candle or create new one (5-min candles)
-      const now5m = Math.floor(Date.now() / 300000) * 300 as Time;
-      const last = candlesRef.current[candlesRef.current.length - 1];
-      if (last && last.time === now5m) {
-        last.high = Math.max(last.high, price);
-        last.low = Math.min(last.low, price);
-        last.close = price;
-        series.update(last);
-      } else {
-        const candle: Candle = { time: now5m, open: price, high: price, low: price, close: price };
-        candlesRef.current.push(candle);
-        series.update(candle);
-      }
-    });
-
-    return () => unsub();
+    return () => { if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; } };
   }, [symbol]);
 
-  // Price lines for actual trades only
+  // Price lines
   useEffect(() => {
     const series = seriesRef.current;
     if (!series) return;
 
-    // Remove old lines
     for (const line of linesRef.current) {
       try { series.removePriceLine(line); } catch {}
     }
     linesRef.current = [];
 
-    const isBuy = side === 'buy';
-
-    // Entry line
     if (entryPrice != null) {
-      const line = series.createPriceLine({
+      linesRef.current.push(series.createPriceLine({
         price: entryPrice,
-        color: isBuy ? '#00E676' : '#FF5252',
+        color: side === 'buy' ? '#00E676' : '#FF5252',
         title: ` ENTRY ${fmt(entryPrice)} `,
         lineWidth: 2,
         lineStyle: 1,
         axisLabelVisible: true,
-        axisLabelColor: isBuy ? '#00E676' : '#FF5252',
-      });
-      linesRef.current.push(line);
+        axisLabelColor: side === 'buy' ? '#00E676' : '#FF5252',
+      }));
     }
-
-    // Stop Loss
     if (sl != null) {
-      const line = series.createPriceLine({
+      linesRef.current.push(series.createPriceLine({
         price: sl,
         color: '#FF1744',
         title: ` SL ${fmt(sl)} `,
@@ -248,13 +253,10 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: 
         lineStyle: 1,
         axisLabelVisible: true,
         axisLabelColor: '#FF1744',
-      });
-      linesRef.current.push(line);
+      }));
     }
-
-    // Take Profit
     if (tp != null) {
-      const line = series.createPriceLine({
+      linesRef.current.push(series.createPriceLine({
         price: tp,
         color: '#00E676',
         title: ` TP ${fmt(tp)} `,
@@ -262,8 +264,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: 
         lineStyle: 1,
         axisLabelVisible: true,
         axisLabelColor: '#00E676',
-      });
-      linesRef.current.push(line);
+      }));
     }
   }, [entryPrice, sl, tp, side]);
 
