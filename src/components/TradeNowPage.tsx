@@ -675,6 +675,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         sl={activeTrade?.sl}
                         tp={activeTrade?.tp}
                         side={activeTrade?.side}
+                        category={activeTrade?.category}
+                        qty={activeTrade?.qty}
                       />
                     );
                   })()}
