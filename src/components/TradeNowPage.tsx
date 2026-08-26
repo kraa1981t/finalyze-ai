@@ -687,6 +687,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         side={activeTrade?.side}
                         category={activeTrade?.category}
                         qty={activeTrade?.qty}
+                        openedAt={activeTrade?.openedAt}
                         onSlChange={activeTrade ? (p) => adjustSl(activeTrade.id, p) : undefined}
                         onTpChange={activeTrade ? (p) => adjustTp(activeTrade.id, p) : undefined}
                       />

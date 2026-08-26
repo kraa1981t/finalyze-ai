@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { subscribePrices, calcPnl } from '../services/paperTradingService';
-import { Maximize2, Minimize2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Maximize2, Minimize2, AlertTriangle } from 'lucide-react';
 
 interface TradingViewWidgetProps {
   symbol: string;
@@ -13,18 +13,13 @@ interface TradingViewWidgetProps {
   onCloseTrade?: () => void;
   onSlChange?: (price: number) => void;
   onTpChange?: (price: number) => void;
+  openedAt?: number;
 }
 
 const TIMEFRAMES = [
-  { label: '1', value: '1' },
-  { label: '5', value: '5' },
-  { label: '15', value: '15' },
-  { label: '30', value: '30' },
-  { label: '1H', value: '60' },
-  { label: '4H', value: '240' },
-  { label: '1D', value: 'D' },
-  { label: '1W', value: 'W' },
-  { label: '1M', value: 'M' },
+  { label: '1', value: '1' }, { label: '5', value: '5' }, { label: '15', value: '15' },
+  { label: '30', value: '30' }, { label: '1H', value: '60' }, { label: '4H', value: '240' },
+  { label: '1D', value: 'D' }, { label: '1W', value: 'W' }, { label: '1M', value: 'M' },
 ];
 
 function toTvSymbol(sym: string): string {
@@ -73,35 +68,60 @@ function fmtPnl(v: number): string {
   return `${v >= 0 ? '+' : '-'}$${Math.abs(v).toFixed(2)}`;
 }
 
-function PriceLine({ price, label, color, pnlValue, yPos, onRemove, onAdjust, step }: {
+function PriceLine({ price, label, color, pnlValue, yPos, onRemove, onAdjust, step, isActive }: {
   price: number; label: string; color: string; pnlValue?: number; yPos: number;
-  onRemove?: () => void; onAdjust?: (p: number) => void; step?: number;
+  onRemove?: () => void; onAdjust?: (p: number) => void; step?: number; isActive?: boolean;
 }) {
+  const isEntry = label === 'ENTRY';
   const isTp = label === 'TP';
   const isSl = label === 'SL';
-  const bg = isTp ? 'bg-emerald-500' : isSl ? 'bg-red-500/90' : color === '#2196F3' ? 'bg-blue-500' : 'bg-orange-500';
   const adj = step || 0.0001;
+  const bgColor = isTp ? '#10B981' : isSl ? '#EF4444' : isEntry ? (color === '#2196F3' ? '#2563EB' : '#F97316') : color;
 
   return (
     <div className="absolute left-0 right-0 z-10 pointer-events-none" style={{ top: `${yPos}%` }}>
       <div className="relative w-full h-0">
-        <div className="absolute inset-x-0 border-t-2 border-dashed opacity-80" style={{ borderColor: color }} />
-        <div className={`absolute right-0 flex items-center gap-0.5 rounded text-[10px] font-black pointer-events-auto ${bg} text-white shadow-lg`} style={{ transform: 'translateY(-50%)' }}>
-          {onAdjust && (
-            <button onClick={() => onAdjust(price - adj)} className="px-1 py-0.5 hover:bg-white/20 rounded-l text-[9px]">▼</button>
+        {/* The line itself */}
+        <div
+          className="absolute inset-x-0 opacity-90"
+          style={{
+            borderTop: isEntry ? '3px solid' : '2px dashed',
+            borderColor: bgColor,
+            boxShadow: `0 0 8px ${bgColor}40`,
+          }}
+        />
+
+        {/* Entry marker - circle on left */}
+        {isEntry && (
+          <div className="absolute left-3 flex items-center gap-1.5 pointer-events-none" style={{ transform: 'translateY(-50%)' }}>
+            <div className="w-4 h-4 rounded-full border-[3px] shadow-lg" style={{ borderColor: bgColor, backgroundColor: bgColor + '30' }} />
+            <span className="text-[11px] font-black px-2 py-0.5 rounded" style={{ backgroundColor: bgColor, color: 'white' }}>
+              ● ENTRY {fmt(price)}
+            </span>
+          </div>
+        )}
+
+        {/* Right label */}
+        <div
+          className="absolute right-0 flex items-center gap-0.5 rounded text-[10px] font-black pointer-events-auto shadow-lg"
+          style={{ backgroundColor: bgColor, color: 'white', transform: 'translateY(-50%)', border: `1px solid ${bgColor}` }}
+        >
+          {onAdjust && !isEntry && (
+            <button onClick={() => onAdjust(price - adj)} className="px-1.5 py-1 hover:bg-white/20 rounded-l text-[11px] font-black" title="Lower">▼</button>
           )}
-          <span className="px-1.5 py-0.5 font-mono whitespace-nowrap">{fmt(price)}</span>
-          <span className="opacity-80 px-0.5">{label}</span>
+          <span className="px-2 py-1 font-mono whitespace-nowrap text-[11px]">{fmt(price)}</span>
+          {!isEntry && <span className="opacity-80 px-1 text-[9px]">{label}</span>}
+          {isEntry && <span className="opacity-80 px-1 text-[9px]">ENTRY</span>}
           {pnlValue != null && (
-            <span className={`px-1 text-[9px] ${pnlValue >= 0 ? 'text-emerald-200' : 'text-red-200'}`}>
+            <span className={`px-1.5 text-[9px] font-bold ${pnlValue >= 0 ? 'bg-emerald-600/50 text-emerald-200' : 'bg-red-600/50 text-red-200'}`}>
               {fmtPnl(pnlValue)}
             </span>
           )}
-          {onAdjust && (
-            <button onClick={() => onAdjust(price + adj)} className="px-1 py-0.5 hover:bg-white/20 text-[9px]">▲</button>
+          {onAdjust && !isEntry && (
+            <button onClick={() => onAdjust(price + adj)} className="px-1.5 py-1 hover:bg-white/20 text-[11px] font-black" title="Raise">▲</button>
           )}
           {onRemove && (
-            <button onClick={onRemove} className="px-1.5 py-0.5 hover:bg-white/20 rounded-r text-[10px] font-bold">×</button>
+            <button onClick={onRemove} className="px-1.5 py-1 hover:bg-white/20 rounded-r text-[11px] font-bold border-l border-white/20" title="Remove">✕</button>
           )}
         </div>
       </div>
@@ -109,7 +129,7 @@ function PriceLine({ price, label, color, pnlValue, yPos, onRemove, onAdjust, st
   );
 }
 
-export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, category, qty, onCloseTrade, onSlChange, onTpChange }: TradingViewWidgetProps) {
+export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, category, qty, onCloseTrade, onSlChange, onTpChange, openedAt }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const unsubRef = useRef<(() => void) | null>(null);
@@ -182,7 +202,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
     const sorted = [...prices].sort((a, b) => a - b);
     const min = sorted[0];
     const max = sorted[sorted.length - 1];
-    const pad = Math.max((max - min) * 0.25, (max - min) * 0.05 + 0.0001);
+    const pad = Math.max((max - min) * 0.3, (max - min) * 0.05 + 0.0001);
     return { min: min - pad, max: max + pad, range: max - min + pad * 2 };
   }, [currentPrice, entryPrice, tp, sl]);
 
@@ -194,77 +214,62 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
 
   return (
     <div ref={wrapperRef} className={`relative h-full w-full flex flex-col ${isFullscreen ? 'bg-black' : ''}`}>
-      {/* Toolbar: Timeframes + Fullscreen */}
+      {/* Toolbar */}
       <div className="flex items-center justify-between px-2 py-1 bg-[#0a0f1a] border-b border-white/5 flex-shrink-0">
         <div className="flex items-center gap-0.5">
           {TIMEFRAMES.map(tf => (
-            <button
-              key={tf.value}
-              onClick={() => setInterval(tf.value)}
-              className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
-                interval === tf.value
-                  ? 'bg-amber-500 text-black'
-                  : 'text-white/50 hover:text-white hover:bg-white/10'
-              }`}
-            >
+            <button key={tf.value} onClick={() => setInterval(tf.value)}
+              className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${interval === tf.value ? 'bg-amber-500 text-black' : 'text-white/50 hover:text-white hover:bg-white/10'}`}>
               {tf.label}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1">
-          {hasTradeData && entryPrice && (
-            <div className="flex items-center gap-1 mr-2">
-              <span className="text-[9px] text-white/40">TP</span>
-              <input
-                type="text"
-                value={tp != null ? fmt(tp) : '--'}
-                readOnly
-                className="w-16 text-[10px] text-center bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded px-1 py-0.5 font-mono"
-              />
-              <span className="text-[9px] text-white/40">SL</span>
-              <input
-                type="text"
-                value={sl != null ? fmt(sl) : '--'}
-                readOnly
-                className="w-16 text-[10px] text-center bg-red-500/20 text-red-400 border border-red-500/30 rounded px-1 py-0.5 font-mono"
-              />
+        <div className="flex items-center gap-2">
+          {hasTradeData && (
+            <div className="flex items-center gap-1 text-[9px] text-white/40">
+              <AlertTriangle size={10} className="text-amber-400" />
+              <span>AUTO-CLOSE {isBuy ? 'BUY' : 'SELL'}</span>
             </div>
           )}
-          <button onClick={toggleFullscreen} className="p-1.5 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors" title="Fullscreen">
+          <button onClick={toggleFullscreen} className="p-1.5 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors">
             {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         </div>
       </div>
 
-      {/* Chart + Price Lines */}
+      {/* Chart + Lines */}
       <div className="flex-1 relative">
         <div ref={containerRef} className="h-full w-full" />
 
+        {/* Trade info badge */}
         {hasTradeData && (
           <div className="absolute top-2 left-2 z-20 flex items-center gap-2 pointer-events-auto">
             {side && (
-              <div className={`px-2 py-1 rounded text-[10px] font-black ${isBuy ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'}`}>
-                {isBuy ? 'BUY' : 'SELL'} {qty} ● {fmt(entryPrice || 0)}
+              <div className={`px-2.5 py-1 rounded text-[11px] font-black shadow-lg ${isBuy ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'}`}>
+                {isBuy ? '▲ BUY' : '▼ SELL'} {qty} @ {fmt(entryPrice || 0)}
               </div>
             )}
             {currentPrice && (
-              <div className={`px-2 py-1 rounded text-[10px] font-bold ${pnl >= 0 ? 'bg-emerald-500/90 text-white' : 'bg-red-500/90 text-white'}`}>
+              <div className={`px-2 py-1 rounded text-[11px] font-bold shadow-lg ${pnl >= 0 ? 'bg-emerald-500/90 text-white' : 'bg-red-500/90 text-white'}`}>
                 {fmtPnl(pnl)}
               </div>
             )}
           </div>
         )}
 
+        {/* Price lines overlay */}
         {hasTradeData && currentPrice && (
           <div className="absolute inset-0 z-10 pointer-events-none" style={{ top: '5%', bottom: '5%' }}>
             {tp != null && onTpChange && (
-              <PriceLine price={tp} label="TP" color="#4CAF50" pnlValue={tpPnl} yPos={priceToY(tp)} step={entryStep} onAdjust={onTpChange} onRemove={onCloseTrade ? () => onTpChange(0) : undefined} />
+              <PriceLine price={tp} label="TP" color="#10B981" pnlValue={tpPnl} yPos={priceToY(tp)} step={entryStep}
+                onAdjust={onTpChange} onRemove={onCloseTrade ? () => onTpChange(0) : undefined} isActive />
             )}
             {entryPrice != null && (
-              <PriceLine price={entryPrice} label="ENTRY" color={isBuy ? '#2196F3' : '#FF9800'} yPos={priceToY(entryPrice)} />
+              <PriceLine price={entryPrice} label="ENTRY" color={isBuy ? '#2563EB' : '#F97316'} yPos={priceToY(entryPrice)} isActive />
             )}
             {sl != null && onSlChange && (
-              <PriceLine price={sl} label="SL" color="#FF5722" pnlValue={slPnl} yPos={priceToY(sl)} step={entryStep} onAdjust={onSlChange} onRemove={onCloseTrade ? () => onSlChange(0) : undefined} />
+              <PriceLine price={sl} label="SL" color="#EF4444" pnlValue={slPnl} yPos={priceToY(sl)} step={entryStep}
+                onAdjust={onSlChange} onRemove={onCloseTrade ? () => onSlChange(0) : undefined} isActive />
             )}
           </div>
         )}
