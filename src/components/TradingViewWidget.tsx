@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { subscribePrices, calcPnl } from '../services/paperTradingService';
+import { Maximize2, Minimize2, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface TradingViewWidgetProps {
   symbol: string;
@@ -13,6 +14,18 @@ interface TradingViewWidgetProps {
   onSlChange?: (price: number) => void;
   onTpChange?: (price: number) => void;
 }
+
+const TIMEFRAMES = [
+  { label: '1', value: '1' },
+  { label: '5', value: '5' },
+  { label: '15', value: '15' },
+  { label: '30', value: '30' },
+  { label: '1H', value: '60' },
+  { label: '4H', value: '240' },
+  { label: '1D', value: 'D' },
+  { label: '1W', value: 'W' },
+  { label: '1M', value: 'M' },
+];
 
 function toTvSymbol(sym: string): string {
   const s = sym.trim().toUpperCase();
@@ -56,23 +69,39 @@ function fmt(price: number): string {
   return price.toFixed(price < 10 ? 5 : 2);
 }
 
-function PriceLine({ price, label, color, pnlValue, yPos, onRemove }: {
-  price: number; label: string; color: string; pnlValue?: number; yPos: number; onRemove?: () => void;
+function fmtPnl(v: number): string {
+  return `${v >= 0 ? '+' : '-'}$${Math.abs(v).toFixed(2)}`;
+}
+
+function PriceLine({ price, label, color, pnlValue, yPos, onRemove, onAdjust, step }: {
+  price: number; label: string; color: string; pnlValue?: number; yPos: number;
+  onRemove?: () => void; onAdjust?: (p: number) => void; step?: number;
 }) {
+  const isTp = label === 'TP';
+  const isSl = label === 'SL';
+  const bg = isTp ? 'bg-emerald-500' : isSl ? 'bg-red-500/90' : color === '#2196F3' ? 'bg-blue-500' : 'bg-orange-500';
+  const adj = step || 0.0001;
+
   return (
     <div className="absolute left-0 right-0 z-10 pointer-events-none" style={{ top: `${yPos}%` }}>
       <div className="relative w-full h-0">
-        <div className="absolute inset-0 border-t-2 border-dashed opacity-80" style={{ borderColor: color }} />
-        <div className={`absolute right-0 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black pointer-events-auto ${color === '#4CAF50' ? 'bg-emerald-500 text-white' : color === '#2196F3' ? 'bg-blue-500 text-white' : color === '#FF9800' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'}`} style={{ transform: 'translateY(-50%)' }}>
-          <span className="font-mono">{fmt(price)}</span>
-          <span className="opacity-80">{label}</span>
+        <div className="absolute inset-x-0 border-t-2 border-dashed opacity-80" style={{ borderColor: color }} />
+        <div className={`absolute right-0 flex items-center gap-0.5 rounded text-[10px] font-black pointer-events-auto ${bg} text-white shadow-lg`} style={{ transform: 'translateY(-50%)' }}>
+          {onAdjust && (
+            <button onClick={() => onAdjust(price - adj)} className="px-1 py-0.5 hover:bg-white/20 rounded-l text-[9px]">▼</button>
+          )}
+          <span className="px-1.5 py-0.5 font-mono whitespace-nowrap">{fmt(price)}</span>
+          <span className="opacity-80 px-0.5">{label}</span>
           {pnlValue != null && (
-            <span className={`ml-1 text-[9px] ${pnlValue >= 0 ? 'text-emerald-200' : 'text-red-200'}`}>
-              {pnlValue >= 0 ? '+' : ''}${pnlValue.toFixed(2)}
+            <span className={`px-1 text-[9px] ${pnlValue >= 0 ? 'text-emerald-200' : 'text-red-200'}`}>
+              {fmtPnl(pnlValue)}
             </span>
           )}
+          {onAdjust && (
+            <button onClick={() => onAdjust(price + adj)} className="px-1 py-0.5 hover:bg-white/20 text-[9px]">▲</button>
+          )}
           {onRemove && (
-            <button onClick={onRemove} className="ml-0.5 w-3.5 h-3.5 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-[8px] font-bold leading-none">×</button>
+            <button onClick={onRemove} className="px-1.5 py-0.5 hover:bg-white/20 rounded-r text-[10px] font-bold">×</button>
           )}
         </div>
       </div>
@@ -82,12 +111,19 @@ function PriceLine({ price, label, color, pnlValue, yPos, onRemove }: {
 
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, category, qty, onCloseTrade, onSlChange, onTpChange }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const unsubRef = useRef<(() => void) | null>(null);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
+  const [interval, setInterval] = useState('60');
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const hasTradeData = entryPrice != null || sl != null || tp != null;
   const isBuy = side === 'buy';
   const tvSymbol = toTvSymbol(symbol);
+
+  const buildUrl = useCallback((sym: string, intv: string) => {
+    return `https://www.tradingview.com/widgetembed/?frameElementId=tv_${Date.now()}_f${intv}&symbol=${encodeURIComponent(sym)}&interval=${intv}&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=f0f3fa&studies=[]&theme=dark&style=1&timezone=exchange&locale=en`;
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -95,14 +131,14 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
     container.innerHTML = '';
     const iframe = document.createElement('iframe');
     iframe.id = `tv_${Date.now()}`;
-    iframe.src = `https://www.tradingview.com/widgetembed/?frameElementId=${iframe.id}&symbol=${encodeURIComponent(tvSymbol)}&interval=60&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=f0f3fa&studies=[]&theme=dark&style=1&timezone=exchange&locale=en`;
+    iframe.src = buildUrl(tvSymbol, interval);
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';
     iframe.allowFullscreen = true;
     container.appendChild(iframe);
     return () => { container.innerHTML = ''; };
-  }, [tvSymbol]);
+  }, [tvSymbol, interval, buildUrl]);
 
   useEffect(() => {
     if (unsubRef.current) unsubRef.current();
@@ -111,6 +147,23 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
     });
     return () => { if (unsubRef.current) unsubRef.current(); };
   }, [symbol]);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!wrapperRef.current) return;
+    if (!document.fullscreenElement) {
+      wrapperRef.current.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   const pnl = (currentPrice && entryPrice && side && category && qty)
     ? calcPnl({ category, symbol, side, qty, entryPrice }, currentPrice) : 0;
@@ -137,38 +190,85 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
     return ((linePositions.max - price) / linePositions.range) * 100;
   };
 
+  const entryStep = entryPrice ? (entryPrice < 10 ? 0.0001 : entryPrice < 1000 ? 0.01 : 0.1) : 0.0001;
+
   return (
-    <div className="relative h-full w-full">
-      <div ref={containerRef} className="h-full w-full" />
-
-      {hasTradeData && (
-        <div className="absolute top-2 left-2 z-20 flex items-center gap-2 pointer-events-auto">
-          {side && (
-            <div className={`px-2 py-1 rounded text-[10px] font-black ${isBuy ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'}`}>
-              {isBuy ? 'BUY' : 'SELL'} {qty} ● {fmt(entryPrice || 0)}
+    <div ref={wrapperRef} className={`relative h-full w-full flex flex-col ${isFullscreen ? 'bg-black' : ''}`}>
+      {/* Toolbar: Timeframes + Fullscreen */}
+      <div className="flex items-center justify-between px-2 py-1 bg-[#0a0f1a] border-b border-white/5 flex-shrink-0">
+        <div className="flex items-center gap-0.5">
+          {TIMEFRAMES.map(tf => (
+            <button
+              key={tf.value}
+              onClick={() => setInterval(tf.value)}
+              className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
+                interval === tf.value
+                  ? 'bg-amber-500 text-black'
+                  : 'text-white/50 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              {tf.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+          {hasTradeData && entryPrice && (
+            <div className="flex items-center gap-1 mr-2">
+              <span className="text-[9px] text-white/40">TP</span>
+              <input
+                type="text"
+                value={tp != null ? fmt(tp) : '--'}
+                readOnly
+                className="w-16 text-[10px] text-center bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded px-1 py-0.5 font-mono"
+              />
+              <span className="text-[9px] text-white/40">SL</span>
+              <input
+                type="text"
+                value={sl != null ? fmt(sl) : '--'}
+                readOnly
+                className="w-16 text-[10px] text-center bg-red-500/20 text-red-400 border border-red-500/30 rounded px-1 py-0.5 font-mono"
+              />
             </div>
           )}
-          {currentPrice && (
-            <div className={`px-2 py-1 rounded text-[10px] font-bold ${pnl >= 0 ? 'bg-emerald-500/90 text-white' : 'bg-red-500/90 text-white'}`}>
-              {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
-            </div>
-          )}
+          <button onClick={toggleFullscreen} className="p-1.5 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors" title="Fullscreen">
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
         </div>
-      )}
+      </div>
 
-      {hasTradeData && currentPrice && (
-        <div className="absolute inset-0 z-10 pointer-events-none" style={{ top: '8%', bottom: '8%' }}>
-          {tp != null && (
-            <PriceLine price={tp} label="TP" color="#4CAF50" pnlValue={tpPnl} yPos={priceToY(tp)} onRemove={onCloseTrade ? () => onTpChange?.(0) : undefined} />
-          )}
-          {entryPrice != null && (
-            <PriceLine price={entryPrice} label="ENTRY" color={isBuy ? '#2196F3' : '#FF9800'} yPos={priceToY(entryPrice)} />
-          )}
-          {sl != null && (
-            <PriceLine price={sl} label="SL" color="#FF5722" pnlValue={slPnl} yPos={priceToY(sl)} onRemove={onCloseTrade ? () => onSlChange?.(0) : undefined} />
-          )}
-        </div>
-      )}
+      {/* Chart + Price Lines */}
+      <div className="flex-1 relative">
+        <div ref={containerRef} className="h-full w-full" />
+
+        {hasTradeData && (
+          <div className="absolute top-2 left-2 z-20 flex items-center gap-2 pointer-events-auto">
+            {side && (
+              <div className={`px-2 py-1 rounded text-[10px] font-black ${isBuy ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'}`}>
+                {isBuy ? 'BUY' : 'SELL'} {qty} ● {fmt(entryPrice || 0)}
+              </div>
+            )}
+            {currentPrice && (
+              <div className={`px-2 py-1 rounded text-[10px] font-bold ${pnl >= 0 ? 'bg-emerald-500/90 text-white' : 'bg-red-500/90 text-white'}`}>
+                {fmtPnl(pnl)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {hasTradeData && currentPrice && (
+          <div className="absolute inset-0 z-10 pointer-events-none" style={{ top: '5%', bottom: '5%' }}>
+            {tp != null && onTpChange && (
+              <PriceLine price={tp} label="TP" color="#4CAF50" pnlValue={tpPnl} yPos={priceToY(tp)} step={entryStep} onAdjust={onTpChange} onRemove={onCloseTrade ? () => onTpChange(0) : undefined} />
+            )}
+            {entryPrice != null && (
+              <PriceLine price={entryPrice} label="ENTRY" color={isBuy ? '#2196F3' : '#FF9800'} yPos={priceToY(entryPrice)} />
+            )}
+            {sl != null && onSlChange && (
+              <PriceLine price={sl} label="SL" color="#FF5722" pnlValue={slPnl} yPos={priceToY(sl)} step={entryStep} onAdjust={onSlChange} onRemove={onCloseTrade ? () => onSlChange(0) : undefined} />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

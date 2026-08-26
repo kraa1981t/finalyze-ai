@@ -432,6 +432,16 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     await closeTradeInternal(t, exit, 'manual');
   }
 
+  async function adjustSl(tradeId: string, newSl: number) {
+    await store.updateTrade(tradeId, { sl: newSl > 0 ? newSl : null });
+    setPriceTick(p => p + 1);
+  }
+
+  async function adjustTp(tradeId: string, newTp: number) {
+    await store.updateTrade(tradeId, { tp: newTp > 0 ? newTp : null });
+    setPriceTick(p => p + 1);
+  }
+
   async function doReset(newBalance: number) {
     const val = Math.max(MIN_BALANCE, Math.floor(newBalance));
     setBusy(true);
@@ -677,6 +687,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         side={activeTrade?.side}
                         category={activeTrade?.category}
                         qty={activeTrade?.qty}
+                        onSlChange={activeTrade ? (p) => adjustSl(activeTrade.id, p) : undefined}
+                        onTpChange={activeTrade ? (p) => adjustTp(activeTrade.id, p) : undefined}
                       />
                     );
                   })()}
