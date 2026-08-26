@@ -272,7 +272,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
               <div className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-500/90 text-white text-[10px] font-black shadow-lg">
                 <span>+${tpPnl.toFixed(2)}</span>
                 {onCloseTrade && (
-                  <button onClick={() => onTpChange?.(0)} className="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-[8px] font-bold">×</button>
+                  <button onClick={onCloseTrade} className="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-[8px] font-bold">×</button>
                 )}
               </div>
             </div>
@@ -283,7 +283,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
               <div className="flex items-center gap-1 px-2 py-1 rounded bg-red-500/90 text-white text-[10px] font-black shadow-lg">
                 <span>${slPnl.toFixed(2)}</span>
                 {onCloseTrade && (
-                  <button onClick={() => onSlChange?.(0)} className="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-[8px] font-bold">×</button>
+                  <button onClick={onCloseTrade} className="ml-1 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-[8px] font-bold">×</button>
                 )}
               </div>
             </div>
