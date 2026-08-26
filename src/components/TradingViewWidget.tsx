@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface TradingViewWidgetProps {
   symbol: string;
@@ -10,213 +10,183 @@ interface TradingViewWidgetProps {
   onTpChange?: (price: number) => void;
 }
 
-const DASHED_BG = (color: string) =>
-  `repeating-linear-gradient(to right, ${color} 0, ${color} 12px, transparent 12px, transparent 18px)`;
+declare global {
+  interface Window {
+    TradingView: any;
+  }
+}
 
-export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, onSlChange, onTpChange }: TradingViewWidgetProps) {
-  const container = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const [dragging, setDragging] = useState<'sl' | 'tp' | null>(null);
-  const dragDataRef = useRef<{ startY: number; startPrice: number; startPct: number } | null>(null);
+let tvScriptLoaded = false;
 
-  useEffect(() => {
-    if (!container.current) return;
-    const inner = container.current.querySelector('.tv-embed-chart') as HTMLDivElement;
-    if (!inner) return;
-    inner.innerHTML = '';
-
+function loadTradingViewScript(): Promise<void> {
+  if (tvScriptLoaded && window.TradingView) return Promise.resolve();
+  return new Promise((resolve) => {
+    if (document.getElementById('tradingview-widget-script')) {
+      const check = () => {
+        if (window.TradingView) { tvScriptLoaded = true; resolve(); }
+        else setTimeout(check, 100);
+      };
+      check();
+      return;
+    }
     const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.type = 'text/javascript';
+    script.id = 'tradingview-widget-script';
+    script.src = 'https://s3.tradingview.com/tv-widget.js';
     script.async = true;
-    script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol,
-      interval: 'D',
-      timezone: 'Etc/UTC',
-      theme: 'dark',
-      style: '1',
-      locale: 'en',
-      enable_publishing: false,
-      allow_symbol_change: true,
-      calendar: false,
-      support_host: 'https://www.tradingview.com',
-    });
-    inner.appendChild(script);
-    return () => { inner.innerHTML = ''; };
+    script.onload = () => {
+      const check = () => {
+        if (window.TradingView) { tvScriptLoaded = true; resolve(); }
+        else setTimeout(check, 100);
+      };
+      check();
+    };
+    document.head.appendChild(script);
+  });
+}
+
+export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: TradingViewWidgetProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetRef = useRef<any>(null);
+  const chartReadyRef = useRef(false);
+  const priceLinesRef = useRef<any[]>([]);
+
+  // Initialize
+  useEffect(() => {
+    let disposed = false;
+
+    (async () => {
+      await loadTradingViewScript();
+      if (disposed || !containerRef.current || !window.TradingView) return;
+
+      const containerId = `tv_chart_${Math.random().toString(36).slice(2, 9)}`;
+      containerRef.current.id = containerId;
+      containerRef.current.innerHTML = '';
+
+      const widget = new window.TradingView.widget({
+        container_id: containerId,
+        autosize: true,
+        symbol: symbol,
+        interval: 'D',
+        timezone: 'Etc/UTC',
+        theme: 'dark',
+        style: '1',
+        locale: 'en',
+        enable_publishing: false,
+        allow_symbol_change: true,
+        calendar: false,
+        support_host: 'https://www.tradingview.com',
+        overrides: {
+          'mainSeriesProperties.candleStyle.upColor': '#26a69a',
+          'mainSeriesProperties.candleStyle.downColor': '#ef5350',
+          'mainSeriesProperties.candleStyle.borderUpColor': '#26a69a',
+          'mainSeriesProperties.candleStyle.borderDownColor': '#ef5350',
+        },
+      });
+
+      widgetRef.current = widget;
+
+      widget.onChartReady(() => {
+        if (disposed) return;
+        chartReadyRef.current = true;
+        updatePriceLines(entryPrice, sl, tp, side);
+      });
+    })();
+
+    return () => {
+      disposed = true;
+      chartReadyRef.current = false;
+      widgetRef.current = null;
+      priceLinesRef.current = [];
+      if (containerRef.current) containerRef.current.innerHTML = '';
+    };
   }, [symbol]);
 
-  const hasLines = entryPrice || sl || tp;
+  // Update price lines when props change
+  function updatePriceLines(
+    entry: number | null | undefined,
+    stopLoss: number | null | undefined,
+    takeProfit: number | null | undefined,
+    tradeSide: 'buy' | 'sell' | null | undefined,
+  ) {
+    const widget = widgetRef.current;
+    if (!widget || !chartReadyRef.current) return;
 
-  const getLinePositions = () => {
-    const prices = [entryPrice, sl, tp].filter((p): p is number => p != null);
-    if (prices.length === 0) return { entryY: 50, slY: 55, tpY: 45, minP: 0, maxP: 1, range: 1 };
-    const minP = Math.min(...prices);
-    const maxP = Math.max(...prices);
-    const range = maxP - minP || 1;
-    const map = (price: number) => 15 + ((maxP - price) / range) * 70;
-    return {
-      entryY: entryPrice != null ? map(entryPrice) : 50,
-      slY: sl != null ? map(sl) : 55,
-      tpY: tp != null ? map(tp) : 45,
-      minP, maxP, range,
-    };
-  };
+    try {
+      const chart = widget.activeChart();
+      if (!chart) return;
 
-  const pos = getLinePositions();
+      // Remove old lines
+      for (const line of priceLinesRef.current) {
+        try { chart.removePriceLine(line); } catch {}
+      }
+      priceLinesRef.current = [];
 
-  const yPctToPrice = useCallback((yPct: number) => {
-    return pos.maxP - ((yPct - 15) / 70) * pos.range;
-  }, [pos.maxP, pos.range]);
+      const isBuy = tradeSide === 'buy';
 
-  const handleDragStart = useCallback((type: 'sl' | 'tp', e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const startY = e.clientY;
-    const startPrice = type === 'sl' ? (sl ?? 0) : (tp ?? 0);
-    const startPct = type === 'sl' ? pos.slY : pos.tpY;
-    dragDataRef.current = { startY, startPrice, startPct };
-    setDragging(type);
-  }, [sl, tp, pos.slY, pos.tpY]);
+      // Entry price line
+      if (entry != null) {
+        const entryLine = chart.createPriceLine({
+          price: entry,
+          color: isBuy ? '#00E676' : '#FF5252',
+          title: isAr(entry) ? ` ENTRY ${fmt(entry)} ` : ` ENTRY ${fmt(entry)} `,
+          lineWidth: 2,
+          lineStyle: window.TradingView.LineStyle.Dashed,
+          axisLabelVisible: true,
+          axisLabelColor: isBuy ? '#00E676' : '#FF5252',
+        });
+        priceLinesRef.current.push(entryLine);
+      }
 
+      // Stop Loss
+      if (stopLoss != null) {
+        const slLine = chart.createPriceLine({
+          price: stopLoss,
+          color: '#FF1744',
+          title: ` SL ${fmt(stopLoss)} `,
+          lineWidth: 2,
+          lineStyle: window.TradingView.LineStyle.Dashed,
+          axisLabelVisible: true,
+          axisLabelColor: '#FF1744',
+        });
+        priceLinesRef.current.push(slLine);
+      }
+
+      // Take Profit
+      if (takeProfit != null) {
+        const tpLine = chart.createPriceLine({
+          price: takeProfit,
+          color: '#00E676',
+          title: ` TP ${fmt(takeProfit)} `,
+          lineWidth: 2,
+          lineStyle: window.TradingView.LineStyle.Dashed,
+          axisLabelVisible: true,
+          axisLabelColor: '#00E676',
+        });
+        priceLinesRef.current.push(tpLine);
+      }
+    } catch (e) {
+      console.warn('Price line error:', e);
+    }
+  }
+
+  // React to prop changes
   useEffect(() => {
-    if (!dragging || !dragDataRef.current || !overlayRef.current) return;
-    const overlay = overlayRef.current;
-    const startY = dragDataRef.current.startY;
-    const startPct = dragDataRef.current.startPct;
-
-    const onMove = (e: MouseEvent) => {
-      const overlayHeight = overlay.getBoundingClientRect().height;
-      const deltaY = e.clientY - startY;
-      const deltaPct = (deltaY / overlayHeight) * 100;
-      const newPct = startPct + deltaPct;
-      const clamped = Math.max(5, Math.min(90, newPct));
-      const newPrice = yPctToPrice(clamped);
-      if (dragging === 'sl') onSlChange?.(newPrice);
-      else onTpChange?.(newPrice);
-    };
-
-    const onUp = () => {
-      setDragging(null);
-      dragDataRef.current = null;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    return () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-  }, [dragging, yPctToPrice, onSlChange, onTpChange]);
-
-  const isBuy = side === 'buy';
-
-  const entryColor = isBuy ? '#00E676' : '#FF5252';
-  const tpColor = '#00E676';
-  const tpDark = '#00C853';
-  const slColor = '#FF5252';
-  const slDark = '#D32F2F';
-
-  const tpBg = DASHED_BG(isBuy ? tpDark : tpColor);
-  const slBg = DASHED_BG(isBuy ? slColor : slDark);
-
-  const fmtP = (v: number) => v.toFixed(v < 10 ? 5 : 2);
+    if (chartReadyRef.current) {
+      updatePriceLines(entryPrice, sl, tp, side);
+    }
+  }, [entryPrice, sl, tp, side]);
 
   return (
-    <div className="relative h-full w-full" ref={container}>
-      <div className="tv-embed-chart h-full w-full" />
-
-      {hasLines && (
-        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 9999 }} ref={overlayRef}>
-          {/* Entry line */}
-          {entryPrice != null && (
-            <div
-              className="absolute left-0 right-0 h-[3px] pointer-events-auto"
-              style={{ top: `${pos.entryY}%`, backgroundImage: DASHED_BG(entryColor) }}
-            >
-              {/* Entry circle */}
-              <div
-                className="absolute left-1/2 -translate-x-1/2 -translate-y-[1px] w-3 h-3 rounded-full border-2 pointer-events-auto"
-                style={{ backgroundColor: entryColor, borderColor: entryColor, boxShadow: `0 0 8px ${entryColor}` }}
-              />
-              <div className={`absolute right-2 -top-3 px-2 py-0.5 rounded text-[10px] font-black shadow-lg whitespace-nowrap ${isBuy ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'}`}>
-                ENTRY {fmtP(entryPrice)}
-              </div>
-            </div>
-          )}
-
-          {/* SL line - draggable */}
-          {sl != null && (
-            <div
-              className="absolute left-0 right-0 h-[3px] pointer-events-auto"
-              style={{
-                top: `${pos.slY}%`,
-                backgroundImage: slBg,
-                opacity: dragging === 'sl' ? 1 : 0.85,
-              }}
-            >
-              <div
-                className="absolute left-4 -translate-y-1/2 top-1/2 cursor-ns-resize pointer-events-auto flex items-center gap-1"
-                onMouseDown={(e) => handleDragStart('sl', e)}
-              >
-                <div className={`w-8 h-5 rounded flex items-center justify-center text-[9px] font-black ${isBuy ? 'bg-red-500 text-white' : 'bg-[#D32F2F] text-white'}`}>
-                  SL
-                </div>
-                <div className="flex flex-col gap-[1px]">
-                  <div className="w-2 h-[2px] bg-white/60 rounded" />
-                  <div className="w-2 h-[2px] bg-white/60 rounded" />
-                  <div className="w-2 h-[2px] bg-white/60 rounded" />
-                </div>
-              </div>
-              <div className={`absolute right-2 -top-3 px-2 py-0.5 rounded text-[10px] font-black shadow-lg whitespace-nowrap ${isBuy ? 'bg-red-500 text-white' : 'bg-[#D32F2F] text-white'}`}>
-                SL {fmtP(sl)}
-              </div>
-            </div>
-          )}
-
-          {/* TP line - draggable */}
-          {tp != null && (
-            <div
-              className="absolute left-0 right-0 h-[3px] pointer-events-auto"
-              style={{
-                top: `${pos.tpY}%`,
-                backgroundImage: tpBg,
-                opacity: dragging === 'tp' ? 1 : 0.85,
-              }}
-            >
-              <div
-                className="absolute left-4 -translate-y-1/2 top-1/2 cursor-ns-resize pointer-events-auto flex items-center gap-1"
-                onMouseDown={(e) => handleDragStart('tp', e)}
-              >
-                <div className={`w-8 h-5 rounded flex items-center justify-center text-[9px] font-black ${isBuy ? 'bg-[#00C853] text-white' : 'bg-emerald-500 text-black'}`}>
-                  TP
-                </div>
-                <div className="flex flex-col gap-[1px]">
-                  <div className="w-2 h-[2px] bg-white/60 rounded" />
-                  <div className="w-2 h-[2px] bg-white/60 rounded" />
-                  <div className="w-2 h-[2px] bg-white/60 rounded" />
-                </div>
-              </div>
-              <div className={`absolute right-2 -top-3 px-2 py-0.5 rounded text-[10px] font-black shadow-lg whitespace-nowrap ${isBuy ? 'bg-[#00C853] text-white' : 'bg-emerald-500 text-black'}`}>
-                TP {fmtP(tp)}
-              </div>
-            </div>
-          )}
-
-          {/* Side badge */}
-          {side && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-auto">
-              <div className={`px-3 py-1 rounded-full text-xs font-black shadow-lg ${
-                isBuy ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'
-              }`}>
-                {side.toUpperCase()}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
     </div>
   );
+}
+
+function isAr(price: number): boolean {
+  return price < 10;
+}
+
+function fmt(price: number): string {
+  return price.toFixed(price < 10 ? 5 : 2);
 }

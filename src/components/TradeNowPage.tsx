@@ -639,16 +639,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   sl={activeTrade?.sl ?? matchedSignal?.stopLoss}
                   tp={activeTrade?.tp ?? matchedSignal?.takeProfit}
                   side={activeTrade?.side ?? (matchedSignal?.signal?.includes('buy') ? 'buy' : matchedSignal?.signal?.includes('sell') ? 'sell' : null)}
-                  onSlChange={(newSl) => {
-                    if (activeTrade) {
-                      setTrades(prev => prev.map(t => t.id === activeTrade.id ? { ...t, sl: newSl } : t));
-                    }
-                  }}
-                  onTpChange={(newTp) => {
-                    if (activeTrade) {
-                      setTrades(prev => prev.map(t => t.id === activeTrade.id ? { ...t, tp: newTp } : t));
-                    }
-                  }}
                 />
               );
             })()}
