@@ -1,6 +1,7 @@
 let _ctx: AudioContext | null = null;
 function ctx(): AudioContext {
-  if (!_ctx) _ctx = new AudioContext();
+  if (!_ctx || _ctx.state === 'closed') _ctx = new AudioContext();
+  if (_ctx.state === 'suspended') _ctx.resume();
   return _ctx;
 }
 

@@ -677,7 +677,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         side={activeTrade?.side}
                         category={activeTrade?.category}
                         qty={activeTrade?.qty}
-                        onCloseTrade={activeTrade ? () => closeTrade(activeTrade) : undefined}
                       />
                     );
                   })()}

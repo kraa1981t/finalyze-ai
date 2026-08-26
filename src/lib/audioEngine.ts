@@ -17,7 +17,7 @@ export function initAudio() {
 }
 
 function getCtx(): AudioContext | null {
-  if (!unlocked) return null;
+  if (!unlocked) { initAudio(); }
   if (!ctx || ctx.state === 'closed') return null;
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
