@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import { subscribePrices } from '../services/paperTradingService';
 
 interface TradingViewWidgetProps {
   symbol: string;
@@ -16,8 +15,7 @@ function fmt(price: number): string {
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const linesContainerRef = useRef<HTMLDivElement>(null);
-  const unsubRef = useRef<(() => void) | null>(null);
-  const pricesRef = useRef<{ min: number; max: number }>({ min: 0, max: 1 });
+  const hasTradeData = entryPrice != null || sl != null || tp != null;
 
   // Initialize TradingView embed
   useEffect(() => {
@@ -52,7 +50,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: 
       allow_symbol_change: true,
       calendar: false,
       support_host: 'https://www.tradingview.com',
-      studies_overrides: {},
     });
     wrapper.appendChild(script);
     inner.appendChild(wrapper);
@@ -60,93 +57,57 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: 
     return () => { inner.innerHTML = ''; };
   }, [symbol]);
 
-  // Subscribe to live prices to estimate price range for line positioning
+  // Only draw lines when trade data exists — no price subscription on main page
   useEffect(() => {
-    if (unsubRef.current) unsubRef.current();
-    const currentPrices: number[] = [];
-    
-    unsubRef.current = subscribePrices([symbol], (sym, price) => {
-      if (sym !== symbol || !price) return;
-      currentPrices.push(price);
-      if (currentPrices.length > 50) currentPrices.shift();
-      if (currentPrices.length > 0) {
-        const min = Math.min(...currentPrices);
-        const max = Math.max(...currentPrices);
-        const margin = (max - min) * 0.3 || max * 0.001;
-        pricesRef.current = { min: min - margin, max: max + margin };
-        updateLines();
-      }
-    });
-
-    return () => { if (unsubRef.current) unsubRef.current(); };
-  }, [symbol]);
-
-  // Draw/update price lines
-  function updateLines() {
+    if (!hasTradeData || !linesContainerRef.current) return;
     const container = linesContainerRef.current;
-    if (!container) return;
-    container.innerHTML = '';
-
-    const { min, max } = pricesRef.current;
-    const range = max - min || 1;
-    const isBuy = side === 'buy';
 
     const lines: { price: number; color: string; label: string; labelBg: string; labelFg: string }[] = [];
+    const isBuy = side === 'buy';
 
     if (entryPrice != null) {
       lines.push({
-        price: entryPrice,
-        color: isBuy ? '#00E676' : '#FF5252',
-        label: `ENTRY ${fmt(entryPrice)}`,
-        labelBg: isBuy ? '#00E676' : '#FF5252',
-        labelFg: isBuy ? '#000' : '#fff',
+        price: entryPrice, color: isBuy ? '#00E676' : '#FF5252',
+        label: `ENTRY ${fmt(entryPrice)}`, labelBg: isBuy ? '#00E676' : '#FF5252', labelFg: isBuy ? '#000' : '#fff',
       });
     }
     if (sl != null) {
       lines.push({
-        price: sl,
-        color: '#FF1744',
-        label: `SL ${fmt(sl)}`,
-        labelBg: '#FF1744',
-        labelFg: '#fff',
+        price: sl, color: '#FF1744',
+        label: `SL ${fmt(sl)}`, labelBg: '#FF1744', labelFg: '#fff',
       });
     }
     if (tp != null) {
       lines.push({
-        price: tp,
-        color: '#00E676',
-        label: `TP ${fmt(tp)}`,
-        labelBg: '#00C853',
-        labelFg: '#fff',
+        price: tp, color: '#00E676',
+        label: `TP ${fmt(tp)}`, labelBg: '#00C853', labelFg: '#fff',
       });
     }
 
-    for (const line of lines) {
-      const yPct = ((max - line.price) / range) * 100;
-      if (yPct < 0 || yPct > 100) continue;
+    // Simple centered layout for lines
+    const prices = lines.map(l => l.price);
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const range = maxP - minP || 1;
 
+    container.innerHTML = '';
+    for (const line of lines) {
+      const yPct = 15 + ((maxP - line.price) / range) * 70;
       const el = document.createElement('div');
       el.style.cssText = `position:absolute;left:0;right:0;top:${yPct}%;height:2px;pointer-events:none;z-index:10;`;
-
-      // Dashed line
       el.style.backgroundImage = `repeating-linear-gradient(to right, ${line.color} 0, ${line.color} 12px, transparent 12px, transparent 18px)`;
-
-      // Label
       const label = document.createElement('div');
-      label.style.cssText = `position:absolute;right:8px;top:-12px;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:900;white-space:nowrap;background:${line.labelBg};color:${line.labelFg};pointer-events:auto;`;
+      label.style.cssText = `position:absolute;right:8px;top:-12px;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:900;white-space:nowrap;background:${line.labelBg};color:${line.labelFg};`;
       label.textContent = line.label;
       el.appendChild(label);
-
       container.appendChild(el);
     }
-  }
-
-  useEffect(() => { updateLines(); }, [entryPrice, sl, tp, side]);
+  }, [entryPrice, sl, tp, side, hasTradeData]);
 
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
-      <div ref={linesContainerRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 9999 }} />
+      {hasTradeData && <div ref={linesContainerRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 9999 }} />}
     </div>
   );
 }

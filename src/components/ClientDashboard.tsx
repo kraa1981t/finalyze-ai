@@ -193,7 +193,15 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
   const sl = res.stopLoss || 0;
 
   return (
-    <div data-card={cardKey} style={{ alignSelf: 'start', backgroundColor: 'rgba(var(--card-bg),0.88)' }} className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden">
+    <div data-card={cardKey} style={{ alignSelf: 'start', backgroundColor: 'rgba(var(--card-bg),0.88)' }} className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden relative">
+      {/* Very strong signal star */}
+      {res.confidence >= 95 && (
+        <div className="absolute top-1 right-1 z-20 animate-pulse" title={isAr ? 'فرصة قوية جداً' : 'Very Strong Opportunity'}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white" className="drop-shadow-[0_0_6px_rgba(255,255,255,0.9)]">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        </div>
+      )}
       <button onClick={() => { onSelect(res.symbol); onClick?.(); }} className="w-full px-3 py-1.5 flex flex-col items-center gap-1">
         <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
           <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tp ? tp.toFixed(decimals) : '\u2014'}</span>
