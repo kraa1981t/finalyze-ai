@@ -141,7 +141,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
                       setSelectedSymbol(r.symbol);
                       setSelectedResult(r);
                     }
-                  }} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} isSelected={selectedSymbol === r.symbol} />
+                  }} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} isSelected={selectedSymbol === res.symbol} />
                 ))}
               </div>
             )}
