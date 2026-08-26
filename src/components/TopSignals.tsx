@@ -130,17 +130,21 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
               <span className="text-[10px] text-white/30 font-bold">({catSignals.length})</span>
             </div>
 
-            {strong.map((res, idx) => (
-              <SignalCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={(r) => {
-                if (selectedSymbol === r.symbol) {
-                  setSelectedSymbol(null);
-                  setSelectedResult(null);
-                } else {
-                  setSelectedSymbol(r.symbol);
-                  setSelectedResult(r);
-                }
-              }} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} isSelected={selectedSymbol === res.symbol} />
-            ))}
+            {strong.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {strong.map((res, idx) => (
+                  <SignalCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={(r) => {
+                    if (selectedSymbol === r.symbol) {
+                      setSelectedSymbol(null);
+                      setSelectedResult(null);
+                    } else {
+                      setSelectedSymbol(r.symbol);
+                      setSelectedResult(r);
+                    }
+                  }} onDetail={onDetail} onRemove={onRemove} formatPublishDate={formatPublishDate} cardKey={`s_${res.symbol}_${idx}`} isSelected={selectedSymbol === r.symbol} />
+                ))}
+              </div>
+            )}
 
             {top3.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
@@ -199,8 +203,8 @@ function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate
     <div className={cn("signal-card rounded-xl border-2 transition-all overflow-hidden relative", isSelected ? 'border-yellow-400 shadow-lg shadow-yellow-400/20' : 'border-amber-600/40')} style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
       {/* Very strong signal star */}
       {isVeryStrong && (
-        <div className="absolute top-1 right-1 z-20 animate-pulse" title={isAr ? 'فرصة قوية جداً' : 'Very Strong Opportunity'}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white" className="drop-shadow-[0_0_6px_rgba(255,255,255,0.9)]">
+        <div className="absolute top-1 right-1 z-20" title={isAr ? 'فرصة قوية جداً' : 'Very Strong Opportunity'}>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="white" className="drop-shadow-[0_0_8px_rgba(255,255,255,1)] animate-[pulse_1.5s_ease-in-out_infinite]">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
           </svg>
         </div>
