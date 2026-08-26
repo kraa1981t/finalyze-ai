@@ -5,6 +5,7 @@ import { AnalysisResult } from '../types';
 import { SYMBOL_CATEGORIES } from '../constants';
 import { Language } from '../lib/i18n';
 import TradingViewWidget from './TradingViewWidget';
+import MT5Web from './MT5Web';
 import {
   PaperTrade, getTradeStore, getLivePrice, subscribePrices,
   calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE,
@@ -137,6 +138,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   // Bubble pop animation when clicking symbol
   const [popId, setPopId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<'chart' | 'mt5'>('chart');
 
   const store = getTradeStore(user);
 
@@ -627,28 +629,54 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             )}
           </div>
 
-          {/* Chart */}
-          <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[calc(100vh-420px)] min-h-[380px] relative">
-            {(() => {
-              const activeTrade = openTrades.find(t => t.symbol === symbol);
-              return (
-                <TradingViewWidget
-                  key={symbol}
-                  symbol={toTvSymbol(symbol)}
-                  entryPrice={activeTrade?.entryPrice}
-                  sl={activeTrade?.sl}
-                  tp={activeTrade?.tp}
-                  side={activeTrade?.side}
-                />
-              );
-            })()}
-            <div className="absolute top-3 left-3 z-10 px-4 py-2 rounded-full bg-black/70 backdrop-blur-sm border border-white/20 text-white text-base font-black flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              {symbol}
-              {priceLoading ? (
-                <Loader2 size={14} className="animate-spin" />
+          {/* Chart / MT5 Toggle */}
+          <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[calc(100vh-420px)] min-h-[380px] relative flex flex-col">
+            {/* Toggle bar */}
+            <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
+              <button
+                onClick={() => setPlatform('chart')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${
+                  platform === 'chart' ? 'bg-emerald-500 text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'
+                }`}
+              >
+                {isAr ? '📊 الشارت' : '📊 Chart'}
+              </button>
+              <button
+                onClick={() => setPlatform('mt5')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${
+                  platform === 'mt5' ? 'bg-sky-500 text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'
+                }`}
+              >
+                {isAr ? '📈 MT5 ويب' : '📈 MT5 Web'}
+              </button>
+              {platform === 'chart' && (
+                <div className="ml-auto flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-black text-white">{symbol}</span>
+                  {!priceLoading && <span className="text-xs font-bold text-emerald-400">{fmtPrice(livePrice)}</span>}
+                </div>
+              )}
+            </div>
+            {/* Content */}
+            <div className="flex-1 relative">
+              {platform === 'chart' ? (
+                <>
+                  {(() => {
+                    const activeTrade = openTrades.find(t => t.symbol === symbol);
+                    return (
+                      <TradingViewWidget
+                        key={symbol}
+                        symbol={toTvSymbol(symbol)}
+                        entryPrice={activeTrade?.entryPrice}
+                        sl={activeTrade?.sl}
+                        tp={activeTrade?.tp}
+                        side={activeTrade?.side}
+                      />
+                    );
+                  })()}
+                </>
               ) : (
-                <span className="text-emerald-400">{fmtPrice(livePrice)}</span>
+                <MT5Web symbol={symbol} />
               )}
             </div>
           </div>

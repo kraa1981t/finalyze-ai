@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, CandlestickSeries, IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { subscribePrices } from '../services/paperTradingService';
 
 interface TradingViewWidgetProps {
@@ -10,267 +9,144 @@ interface TradingViewWidgetProps {
   side?: 'buy' | 'sell' | null;
 }
 
-interface Candle {
-  time: Time;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-}
-
 function fmt(price: number): string {
   return price.toFixed(price < 10 ? 5 : 2);
 }
 
-function toYahooSymbol(sym: string): string {
-  const s = sym.toUpperCase().trim();
-  const map: Record<string, string> = {
-    EURUSD: 'EURUSD=X', GBPUSD: 'GBPUSD=X', USDJPY: 'USDJPY=X',
-    USDCHF: 'USDCHF=X', AUDUSD: 'AUDUSD=X', NZDUSD: 'NZDUSD=X',
-    USDCAD: 'USDCAD=X', EURGBP: 'EURGBP=X', EURJPY: 'EURJPY=X',
-    EURCHF: 'EURCHF=X', EURAUD: 'EURAUD=X', EURNZD: 'EURNZD=X',
-    EURCAD: 'EURCAD=X', GBPJPY: 'GBPJPY=X', GBPAUD: 'GBPAUD=X',
-    GBPNZD: 'GBPNZD=X', GBPCAD: 'GBPCAD=X', GBPCHF: 'GBPCHF=X',
-    AUDJPY: 'AUDJPY=X', AUDCAD: 'AUDCAD=X', AUDCHF: 'AUDCHF=X',
-    AUDNZD: 'AUDNZD=X', NZDJPY: 'NZDJPY=X', NZDCAD: 'NZDCAD=X',
-    NZDCHF: 'NZDCHF=X', CADJPY: 'CADJPY=X', CADCHF: 'CADCHF=X',
-    CHFJPY: 'CHFJPY=X', USDTRY: 'USDTRY=X', USDMXN: 'USDMXN=X',
-    USDPLN: 'USDPLN=X', USDSEK: 'USDSEK=X', USDNOK: 'USDNOK=X',
-    USDDKK: 'USDDKK=X', USDHUF: 'USDHUF=X', USDCZK: 'USDCZK=X',
-    USDZAR: 'USDZAR=X', USDSGD: 'USDSGD=X', USDHKD: 'USDHKD=X',
-    USDTWD: 'USDTWD=X', USDCNH: 'USDCNH=X', USDTHB: 'USDTHB=X',
-    USDINR: 'USDINR=X', USDBRL: 'USDBRL=X', USDIDR: 'USDIDR=X',
-    USDPHP: 'USDPHP=X', USDMYR: 'USDMYR=X',
-    XAUUSD: 'GC=F', XAGUSD: 'SI=F',
-    BTCUSD: 'BTC-USD', ETHUSD: 'ETH-USD',
-    US500: '^GSPC', US30: '^DJI', US100: '^IXIC',
-    SPY: 'SPY', QQQ: 'QQQ',
-    DXY: 'DX-Y.NYB',
-    GOLD: 'GC=F', SILVER: 'SI=F',
-  };
-  if (map[s]) return map[s];
-  if (s.endsWith('USD') && s.length === 6) return s;
-  if (s.length === 6) return `${s}=X`;
-  return s;
-}
-
-async function fetchYahooCandles(yahooSym: string, range: string, interval: string): Promise<Candle[]> {
-  const urls = [
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=${interval}&range=${range}`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=${interval}&range=${range}`,
-  ];
-
-  for (const url of urls) {
-    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(proxy, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (!res.ok) continue;
-      const json = await res.json();
-      const result = json?.chart?.result?.[0];
-      if (!result) continue;
-      const ts: number[] = result.timestamp || [];
-      const q = result.indicators?.quote?.[0];
-      if (!q || ts.length === 0) continue;
-      const candles: Candle[] = [];
-      for (let i = 0; i < ts.length; i++) {
-        const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], c = q.close?.[i];
-        if (o != null && h != null && l != null && c != null && !isNaN(o) && !isNaN(c)) {
-          candles.push({ time: ts[i] as Time, open: o, high: h, low: l, close: c });
-        }
-      }
-      if (candles.length > 0) return candles;
-    } catch {}
-  }
-  return [];
-}
-
-function generateFallbackCandles(basePrice: number): Candle[] {
-  const candles: Candle[] = [];
-  const now = Math.floor(Date.now() / 86400000) * 86400;
-  for (let i = 60; i >= 0; i--) {
-    const time = (now - i * 86400) as Time;
-    const variation = basePrice * 0.005;
-    const o = basePrice + (Math.random() - 0.5) * variation;
-    const c = basePrice + (Math.random() - 0.5) * variation;
-    const h = Math.max(o, c) + Math.random() * variation * 0.5;
-    const l = Math.min(o, c) - Math.random() * variation * 0.5;
-    candles.push({ time, open: o, high: h, low: l, close: c });
-  }
-  return candles;
-}
-
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const linesRef = useRef<any[]>([]);
-  const candlesRef = useRef<Candle[]>([]);
+  const linesContainerRef = useRef<HTMLDivElement>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const pricesRef = useRef<{ min: number; max: number }>({ min: 0, max: 1 });
 
-  // Initialize chart once
+  // Initialize TradingView embed
   useEffect(() => {
     if (!containerRef.current) return;
+    const inner = containerRef.current;
+    inner.innerHTML = '';
 
-    const chart = createChart(containerRef.current, {
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
-      layout: {
-        background: { color: '#0a0f1a' },
-        textColor: '#94a3b8',
-        fontSize: 12,
-      },
-      grid: {
-        vertLines: { color: 'rgba(255,255,255,0.03)' },
-        horzLines: { color: 'rgba(255,255,255,0.06)' },
-      },
-      crosshair: {
-        mode: 0,
-        vertLine: { color: 'rgba(255,255,255,0.3)', width: 1, style: 2, labelBackgroundColor: '#F59E0B' },
-        horzLine: { color: 'rgba(255,255,255,0.3)', width: 1, style: 2, labelBackgroundColor: '#F59E0B' },
-      },
-      rightPriceScale: {
-        borderColor: 'rgba(255,255,255,0.1)',
-        scaleMargins: { top: 0.15, bottom: 0.15 },
-      },
-      timeScale: {
-        borderColor: 'rgba(255,255,255,0.1)',
-        timeVisible: true,
-        secondsVisible: false,
-        rightOffset: 5,
-      },
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tradingview-widget-container';
+    wrapper.style.height = '100%';
+    wrapper.style.width = '100%';
+
+    const chartDiv = document.createElement('div');
+    chartDiv.className = 'tradingview-widget-container__widget';
+    chartDiv.style.height = '100%';
+    chartDiv.style.width = '100%';
+    wrapper.appendChild(chartDiv);
+
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.type = 'text/javascript';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      autosize: true,
+      symbol: symbol,
+      interval: '60',
+      timezone: 'Etc/UTC',
+      theme: 'dark',
+      style: '1',
+      locale: 'en',
+      enable_publishing: false,
+      allow_symbol_change: true,
+      calendar: false,
+      support_host: 'https://www.tradingview.com',
+      studies_overrides: {},
     });
+    wrapper.appendChild(script);
+    inner.appendChild(wrapper);
 
-    chartRef.current = chart;
-
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: '#26a69a',
-      downColor: '#ef5350',
-      borderUpColor: '#26a69a',
-      borderDownColor: '#ef5350',
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
-      priceLineVisible: false,
-    });
-
-    seriesRef.current = series;
-
-    const ro = new ResizeObserver(() => {
-      if (containerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
-      }
-    });
-    ro.observe(containerRef.current);
-
-    return () => {
-      ro.disconnect();
-      chart.remove();
-      chartRef.current = null;
-      seriesRef.current = null;
-    };
-  }, []);
-
-  // Load data & subscribe per symbol
-  useEffect(() => {
-    const series = seriesRef.current;
-    const chart = chartRef.current;
-    if (!series || !chart) return;
-
-    if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
-    candlesRef.current = [];
-    series.setData([]);
-
-    for (const line of linesRef.current) {
-      try { series.removePriceLine(line); } catch {}
-    }
-    linesRef.current = [];
-
-    const yahooSym = toYahooSymbol(symbol);
-
-    (async () => {
-      let candles = await fetchYahooCandles(yahooSym, '3mo', '1d');
-      if (candles.length === 0) candles = await fetchYahooCandles(yahooSym, '1mo', '1h');
-      if (candles.length === 0) candles = await fetchYahooCandles(yahooSym, '1mo', '5m');
-
-      if (candles.length > 0) {
-        candlesRef.current = candles;
-        series.setData(candles);
-        chart.timeScale().fitContent();
-      }
-
-      unsubRef.current = subscribePrices([symbol], (sym, price) => {
-        if (sym !== symbol || !price) return;
-        const now5m = Math.floor(Date.now() / 300000) * 300 as Time;
-        const last = candlesRef.current[candlesRef.current.length - 1];
-        if (last && last.time === now5m) {
-          last.high = Math.max(last.high, price);
-          last.low = Math.min(last.low, price);
-          last.close = price;
-          series.update(last);
-        } else {
-          const candle: Candle = { time: now5m, open: price, high: price, low: price, close: price };
-          candlesRef.current.push(candle);
-          series.update(candle);
-        }
-      });
-    })();
-
-    return () => { if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; } };
+    return () => { inner.innerHTML = ''; };
   }, [symbol]);
 
-  // Price lines
+  // Subscribe to live prices to estimate price range for line positioning
   useEffect(() => {
-    const series = seriesRef.current;
-    if (!series) return;
+    if (unsubRef.current) unsubRef.current();
+    const currentPrices: number[] = [];
+    
+    unsubRef.current = subscribePrices([symbol], (sym, price) => {
+      if (sym !== symbol || !price) return;
+      currentPrices.push(price);
+      if (currentPrices.length > 50) currentPrices.shift();
+      if (currentPrices.length > 0) {
+        const min = Math.min(...currentPrices);
+        const max = Math.max(...currentPrices);
+        const margin = (max - min) * 0.3 || max * 0.001;
+        pricesRef.current = { min: min - margin, max: max + margin };
+        updateLines();
+      }
+    });
 
-    for (const line of linesRef.current) {
-      try { series.removePriceLine(line); } catch {}
-    }
-    linesRef.current = [];
+    return () => { if (unsubRef.current) unsubRef.current(); };
+  }, [symbol]);
+
+  // Draw/update price lines
+  function updateLines() {
+    const container = linesContainerRef.current;
+    if (!container) return;
+    container.innerHTML = '';
+
+    const { min, max } = pricesRef.current;
+    const range = max - min || 1;
+    const isBuy = side === 'buy';
+
+    const lines: { price: number; color: string; label: string; labelBg: string; labelFg: string }[] = [];
 
     if (entryPrice != null) {
-      linesRef.current.push(series.createPriceLine({
+      lines.push({
         price: entryPrice,
-        color: side === 'buy' ? '#00E676' : '#FF5252',
-        title: ` ENTRY ${fmt(entryPrice)} `,
-        lineWidth: 2,
-        lineStyle: 1,
-        axisLabelVisible: true,
-        axisLabelColor: side === 'buy' ? '#00E676' : '#FF5252',
-      }));
+        color: isBuy ? '#00E676' : '#FF5252',
+        label: `ENTRY ${fmt(entryPrice)}`,
+        labelBg: isBuy ? '#00E676' : '#FF5252',
+        labelFg: isBuy ? '#000' : '#fff',
+      });
     }
     if (sl != null) {
-      linesRef.current.push(series.createPriceLine({
+      lines.push({
         price: sl,
         color: '#FF1744',
-        title: ` SL ${fmt(sl)} `,
-        lineWidth: 2,
-        lineStyle: 1,
-        axisLabelVisible: true,
-        axisLabelColor: '#FF1744',
-      }));
+        label: `SL ${fmt(sl)}`,
+        labelBg: '#FF1744',
+        labelFg: '#fff',
+      });
     }
     if (tp != null) {
-      linesRef.current.push(series.createPriceLine({
+      lines.push({
         price: tp,
         color: '#00E676',
-        title: ` TP ${fmt(tp)} `,
-        lineWidth: 2,
-        lineStyle: 1,
-        axisLabelVisible: true,
-        axisLabelColor: '#00E676',
-      }));
+        label: `TP ${fmt(tp)}`,
+        labelBg: '#00C853',
+        labelFg: '#fff',
+      });
     }
-  }, [entryPrice, sl, tp, side]);
+
+    for (const line of lines) {
+      const yPct = ((max - line.price) / range) * 100;
+      if (yPct < 0 || yPct > 100) continue;
+
+      const el = document.createElement('div');
+      el.style.cssText = `position:absolute;left:0;right:0;top:${yPct}%;height:2px;pointer-events:none;z-index:10;`;
+
+      // Dashed line
+      el.style.backgroundImage = `repeating-linear-gradient(to right, ${line.color} 0, ${line.color} 12px, transparent 12px, transparent 18px)`;
+
+      // Label
+      const label = document.createElement('div');
+      label.style.cssText = `position:absolute;right:8px;top:-12px;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:900;white-space:nowrap;background:${line.labelBg};color:${line.labelFg};pointer-events:auto;`;
+      label.textContent = line.label;
+      el.appendChild(label);
+
+      container.appendChild(el);
+    }
+  }
+
+  useEffect(() => { updateLines(); }, [entryPrice, sl, tp, side]);
 
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
+      <div ref={linesContainerRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 9999 }} />
     </div>
   );
 }
