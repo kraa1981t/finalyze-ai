@@ -635,10 +635,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                 <TradingViewWidget
                   key={symbol}
                   symbol={toTvSymbol(symbol)}
-                  entryPrice={activeTrade?.entryPrice ?? matchedSignal?.entryPrice}
-                  sl={activeTrade?.sl ?? matchedSignal?.stopLoss}
-                  tp={activeTrade?.tp ?? matchedSignal?.takeProfit}
-                  side={activeTrade?.side ?? (matchedSignal?.signal?.includes('buy') ? 'buy' : matchedSignal?.signal?.includes('sell') ? 'sell' : null)}
+                  entryPrice={activeTrade?.entryPrice}
+                  sl={activeTrade?.sl}
+                  tp={activeTrade?.tp}
+                  side={activeTrade?.side}
                 />
               );
             })()}
