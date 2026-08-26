@@ -139,6 +139,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [popId, setPopId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [platform, setPlatform] = useState<'chart' | 'mt5'>('chart');
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
 
   const store = getTradeStore(user);
 
@@ -490,10 +492,11 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div className="flex gap-2">
         {/* Left: Symbol selector + Chart */}
-        <div className="lg:col-span-2 space-y-2">
+        <div className={`${rightCollapsed ? 'flex-1' : 'lg:w-2/3'} space-y-2 transition-all duration-300 min-w-0`}>
           {/* Symbol Selector */}
+          {!leftCollapsed && (
           <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-3 space-y-2">
             <div className="flex flex-wrap gap-2">
               {CATEGORY_TABS.map((tabC) => (
@@ -628,6 +631,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               </button>
             )}
           </div>
+          )}
 
           {/* Chart / MT5 Toggle */}
           <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[calc(100vh-420px)] min-h-[380px] relative flex flex-col">
@@ -682,8 +686,31 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
         </div>
 
+        {/* Collapse/Expand arrows */}
+        <div className="flex flex-col items-center justify-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => setLeftCollapsed(!leftCollapsed)}
+            className="w-6 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all"
+            title={leftCollapsed ? (isAr ? 'توسيع الشارت' : 'Expand chart') : (isAr ? 'تصغير الشارت' : 'Collapse chart')}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${leftCollapsed ? 'rotate-180' : ''}`}>
+              <path d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setRightCollapsed(!rightCollapsed)}
+            className="w-6 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all"
+            title={rightCollapsed ? (isAr ? 'توسيع لوحة الطلب' : 'Expand order panel') : (isAr ? 'تصغير لوحة الطلب' : 'Collapse order panel')}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${rightCollapsed ? '' : 'rotate-180'}`}>
+              <path d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        </div>
+
         {/* Right: Order ticket */}
-        <div className="space-y-3">
+        {!rightCollapsed && (
+        <div className={`${leftCollapsed ? 'flex-1' : 'lg:w-1/3'} space-y-2 transition-all duration-300 flex-shrink-0`}>
           <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-sm p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xl font-black text-brand-text uppercase tracking-wide">{symbol || '—'}</span>
@@ -800,6 +827,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Positions / History */}
