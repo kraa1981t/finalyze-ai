@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { createChart, CandlestickSeries, IChartApi, ISeriesApi, Time } from 'lightweight-charts';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { subscribePrices, calcPnl } from '../services/paperTradingService';
-import { Maximize2, Minimize2, AlertTriangle } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
 interface TradingViewWidgetProps {
   symbol: string;
@@ -17,125 +16,124 @@ interface TradingViewWidgetProps {
 }
 
 const TIMEFRAMES = [
-  { label: '1', value: '1m' }, { label: '5', value: '5m' }, { label: '15', value: '15m' },
-  { label: '30', value: '15m' }, { label: '1H', value: '1h' }, { label: '4H', value: '4h' },
-  { label: '1D', value: '1d' }, { label: '1W', value: '1w' },
+  { label: '1m', value: '1m' }, { label: '5m', value: '5m' }, { label: '15m', value: '15m' },
+  { label: '1H', value: '1h' }, { label: '4H', value: '4h' }, { label: '1D', value: '1d' },
+  { label: '1W', value: '1w' },
 ];
 
-interface Candle { time: Time; open: number; high: number; low: number; close: number; }
-
-function toApiSymbol(sym: string): string {
-  return sym.toUpperCase().trim();
-}
+interface Candle { time: number; open: number; high: number; low: number; close: number; }
 
 function fmt(price: number): string {
   return price.toFixed(price < 10 ? 5 : 2);
 }
-
 function fmtPnl(v: number): string {
   return `${v >= 0 ? '+' : '-'}$${Math.abs(v).toFixed(2)}`;
 }
 
-async function fetchCandles(symbol: string, timeframe: string): Promise<Candle[]> {
-  try {
-    const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`);
-    if (!r.ok) return [];
-    const d = await r.json();
-    const result = d?.chart?.result?.[0];
-    if (!result) return [];
-    const ts: number[] = result.timestamp || [];
-    const q = result.indicators?.quote?.[0];
-    if (!q || ts.length === 0) return [];
-    const candles: Candle[] = [];
-    for (let i = 0; i < ts.length; i++) {
-      const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], c = q.close?.[i];
-      if (o != null && h != null && l != null && c != null && !isNaN(c) && c > 0) {
-        candles.push({ time: ts[i] as Time, open: o, high: h, low: l, close: c });
-      }
-    }
-    return candles;
-  } catch {
-    return [];
-  }
-}
-
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, category, qty, onCloseTrade, onSlChange, onTpChange }: TradingViewWidgetProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const entryLineRef = useRef<any>(null);
-  const slLineRef = useRef<any>(null);
-  const tpLineRef = useRef<any>(null);
-  const candlesRef = useRef<Candle[]>([]);
+  const chartRef = useRef<any>(null);
+  const seriesRef = useRef<any>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const candlesRef = useRef<Candle[]>([]);
+  const dragRef = useRef<{ type: 'tp' | 'sl' | null; startY: number; startPrice: number }>({ type: null, startY: 0, startPrice: 0 });
 
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [interval, setInterval] = useState('1h');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [chartReady, setChartReady] = useState(false);
 
   const hasTradeData = entryPrice != null || sl != null || tp != null;
   const isBuy = side === 'buy';
 
-  // Init chart
+  // Import lightweight-charts dynamically
   useEffect(() => {
-    if (!containerRef.current) return;
-    const chart = createChart(containerRef.current, {
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
-      layout: { background: { color: '#0a0f1a' }, textColor: '#94a3b8', fontSize: 11 },
-      grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
-      crosshair: { mode: 0, vertLine: { color: 'rgba(255,255,255,0.3)', width: 1, style: 2, labelBackgroundColor: '#F59E0B' }, horzLine: { color: 'rgba(255,255,255,0.3)', width: 1, style: 2, labelBackgroundColor: '#F59E0B' } },
-      rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)', scaleMargins: { top: 0.15, bottom: 0.15 } },
-      timeScale: { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true, rightOffset: 5 },
-    });
-    chartRef.current = chart;
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: '#26a69a', downColor: '#ef5350', borderUpColor: '#26a69a', borderDownColor: '#ef5350', wickUpColor: '#26a69a', wickDownColor: '#ef5350', priceLineVisible: false,
-    });
-    seriesRef.current = series;
-    setChartReady(true);
+    let chart: any = null;
+    let series: any = null;
+    let ro: ResizeObserver | null = null;
+    let disposed = false;
 
-    const ro = new ResizeObserver(() => {
-      if (containerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({ width: containerRef.current.clientWidth, height: containerRef.current.clientHeight });
-      }
-    });
-    ro.observe(containerRef.current);
+    async function init() {
+      const lc = await import('lightweight-charts');
+      if (disposed || !canvasRef.current) return;
 
-    return () => { ro.disconnect(); chart.remove(); chartRef.current = null; seriesRef.current = null; };
+      chart = lc.createChart(canvasRef.current, {
+        width: canvasRef.current.clientWidth,
+        height: canvasRef.current.clientHeight,
+        layout: { background: { color: '#0a0f1a' }, textColor: '#94a3b8', fontSize: 11 },
+        grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
+        crosshair: { mode: 0 },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+        timeScale: { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true },
+      });
+      chartRef.current = chart;
+
+      series = chart.addCandlestickSeries({
+        upColor: '#26a69a', downColor: '#ef5350',
+        borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+        wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+        priceLineVisible: false,
+      });
+      seriesRef.current = series;
+
+      ro = new ResizeObserver(() => {
+        if (canvasRef.current && chart) {
+          chart.applyOptions({ width: canvasRef.current.clientWidth, height: canvasRef.current.clientHeight });
+        }
+      });
+      ro.observe(canvasRef.current);
+    }
+
+    init();
+
+    return () => {
+      disposed = true;
+      ro?.disconnect();
+      chart?.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+    };
   }, []);
 
-  // Load data when symbol or interval changes
-  useEffect(() => {
+  // Load candles + subscribe price
+   useEffect(() => {
     const series = seriesRef.current;
-    const chart = chartRef.current;
-    if (!series || !chart) return;
-
+    if (!series) return;
     if (unsubRef.current) unsubRef.current();
     candlesRef.current = [];
     series.setData([]);
 
     (async () => {
-      const candles = await fetchCandles(symbol, interval);
-      if (candles.length > 0) {
-        candlesRef.current = candles;
-        series.setData(candles);
-        chart.timeScale().fitContent();
-      }
+      try {
+        const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${interval}`);
+        if (r.ok) {
+          const d = await r.json();
+          const result = d?.chart?.result?.[0];
+          const ts: number[] = result?.timestamp || [];
+          const q = result?.indicators?.quote?.[0];
+          if (q && ts.length > 0) {
+            const candles: Candle[] = [];
+            for (let i = 0; i < ts.length; i++) {
+              const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], c = q.close?.[i];
+              if (o != null && h != null && l != null && c != null && !isNaN(c) && c > 0) {
+                candles.push({ time: ts[i], open: o, high: h, low: l, close: c });
+              }
+            }
+            if (candles.length > 0) {
+              candlesRef.current = candles;
+              series.setData(candles);
+              chartRef.current?.timeScale().fitContent();
+            }
+          }
+        }
+      } catch {}
 
       unsubRef.current = subscribePrices([symbol], (sym, price) => {
         if (sym !== symbol || !price) return;
         setCurrentPrice(price);
-        const tf = interval;
-        let periodMs = 60000;
-        if (tf === '5m') periodMs = 300000;
-        else if (tf === '15m') periodMs = 900000;
-        else if (tf === '1h') periodMs = 3600000;
-        else if (tf === '4h') periodMs = 14400000;
-        else if (tf === '1d') periodMs = 86400000;
-        const nowPeriod = Math.floor(Date.now() / periodMs) * (periodMs / 1000) as Time;
+        const periodMs: Record<string, number> = { '1m': 60000, '5m': 300000, '15m': 900000, '1h': 3600000, '4h': 14400000, '1d': 86400000, '1w': 604800000 };
+        const ms = periodMs[interval] || 3600000;
+        const nowPeriod = Math.floor(Date.now() / ms) * (ms / 1000);
         const last = candlesRef.current[candlesRef.current.length - 1];
         if (last && last.time === nowPeriod) {
           last.high = Math.max(last.high, price);
@@ -153,93 +151,72 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
     return () => { if (unsubRef.current) unsubRef.current(); };
   }, [symbol, interval]);
 
-  // Price lines — real lines on the chart
+  // Price lines
   useEffect(() => {
     const series = seriesRef.current;
     if (!series) return;
-
-    try { if (entryLineRef.current) series.removePriceLine(entryLineRef.current); } catch {}
-    try { if (slLineRef.current) series.removePriceLine(slLineRef.current); } catch {}
-    try { if (tpLineRef.current) series.removePriceLine(tpLineRef.current); } catch {}
-    entryLineRef.current = null;
-    slLineRef.current = null;
-    tpLineRef.current = null;
-
+    try { series.removeAllLines?.(); } catch {}
     if (!hasTradeData) return;
 
     if (entryPrice != null) {
-      entryLineRef.current = series.createPriceLine({
-        price: entryPrice,
-        color: isBuy ? '#2563EB' : '#F97316',
-        title: ` ● ENTRY ${fmt(entryPrice)} `,
-        lineWidth: 3,
-        lineStyle: 0,
-        axisLabelVisible: true,
-        axisLabelColor: isBuy ? '#2563EB' : '#F97316',
-      });
-    }
-    if (sl != null) {
-      slLineRef.current = series.createPriceLine({
-        price: sl,
-        color: '#EF4444',
-        title: ` ● SL ${fmt(sl)} ▼ `,
-        lineWidth: 2,
-        lineStyle: 2,
-        axisLabelVisible: true,
-        axisLabelColor: '#EF4444',
-      });
+      series.createPriceLine({ price: entryPrice, color: isBuy ? '#2563EB' : '#F97316', title: ` ENTRY ${fmt(entryPrice)} `, lineWidth: 3, lineStyle: 0, axisLabelVisible: true });
     }
     if (tp != null) {
-      tpLineRef.current = series.createPriceLine({
-        price: tp,
-        color: '#10B981',
-        title: ` ● TP ${fmt(tp)} ▲ `,
-        lineWidth: 2,
-        lineStyle: 2,
-        axisLabelVisible: true,
-        axisLabelColor: '#10B981',
-      });
+      series.createPriceLine({ price: tp, color: '#10B981', title: ` TP ${fmt(tp)} `, lineWidth: 2, lineStyle: 2, axisLabelVisible: true });
     }
-  }, [entryPrice, sl, tp, hasTradeData, isBuy]);
+    if (sl != null) {
+      series.createPriceLine({ price: sl, color: '#EF4444', title: ` SL ${fmt(sl)} `, lineWidth: 2, lineStyle: 2, axisLabelVisible: true });
+    }
+  }, [entryPrice, sl, tp, hasTradeData, isBuy, currentPrice]);
 
-  useEffect(() => {
-    if (unsubRef.current) unsubRef.current();
-    unsubRef.current = subscribePrices([symbol], (sym, price) => {
-      if (sym === symbol && price) setCurrentPrice(price);
-    });
-    return () => { if (unsubRef.current) unsubRef.current(); };
-  }, [symbol]);
+  // Drag handlers for SL/TP
+  const handlePointerDown = useCallback((type: 'tp' | 'sl', e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const price = type === 'tp' ? tp : sl;
+    if (price == null) return;
+    dragRef.current = { type, startY: e.clientY, startPrice: price };
+    const onMove = (ev: PointerEvent) => {
+      const series = seriesRef.current;
+      const chart = chartRef.current;
+      if (!series || !chart || !dragRef.current.type) return;
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const priceScale = chart.priceScale('right');
+      const startYCoord = priceScale.priceToCoordinate(dragRef.current.startPrice)!;
+      const currentYCoord = startYCoord + (ev.clientY - dragRef.current.startY);
+      const newPrice = priceScale.coordinateToPrice(currentYCoord);
+      if (newPrice != null && newPrice > 0) {
+        if (dragRef.current.type === 'tp' && onTpChange) onTpChange(newPrice);
+        if (dragRef.current.type === 'sl' && onSlChange) onSlChange(newPrice);
+      }
+    };
+    const onUp = () => { dragRef.current.type = null; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, [tp, sl, onTpChange, onSlChange]);
 
   const toggleFullscreen = useCallback(() => {
     if (!wrapperRef.current) return;
-    if (!document.fullscreenElement) {
-      wrapperRef.current.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
+    if (!document.fullscreenElement) { wrapperRef.current.requestFullscreen(); setIsFullscreen(true); }
+    else { document.exitFullscreen(); setIsFullscreen(false); }
   }, []);
 
   useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
+    const h = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', h);
+    return () => document.removeEventListener('fullscreenchange', h);
   }, []);
 
-  const pnl = (currentPrice && entryPrice && side && category && qty)
-    ? calcPnl({ category, symbol, side, qty, entryPrice }, currentPrice) : 0;
-  const tpPnl = (tp && entryPrice && side && category && qty)
-    ? calcPnl({ category, symbol, side, qty, entryPrice }, tp) : 0;
-  const slPnl = (sl && entryPrice && side && category && qty)
-    ? calcPnl({ category, symbol, side, qty, entryPrice }, sl) : 0;
-
+  const pnl = (currentPrice && entryPrice && side && category && qty) ? calcPnl({ category, symbol, side, qty, entryPrice }, currentPrice) : 0;
+  const tpPnl = (tp && entryPrice && side && category && qty) ? calcPnl({ category, symbol, side, qty, entryPrice }, tp) : 0;
+  const slPnl = (sl && entryPrice && side && category && qty) ? calcPnl({ category, symbol, side, qty, entryPrice }, sl) : 0;
   const step = entryPrice ? (entryPrice < 10 ? 0.0001 : entryPrice < 1000 ? 0.01 : 0.1) : 0.0001;
 
   return (
     <div ref={wrapperRef} className={`relative h-full w-full flex flex-col ${isFullscreen ? 'bg-black' : ''}`}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-2 py-1 bg-[#0a0f1a] border-b border-white/5 flex-shrink-0">
+      <div className="flex items-center justify-between px-2 py-1 bg-[#0a0f1a] border-b border-white/5 flex-shrink-0 z-30">
         <div className="flex items-center gap-0.5">
           {TIMEFRAMES.map(tf => (
             <button key={tf.value} onClick={() => setInterval(tf.value)}
@@ -250,20 +227,18 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
         </div>
         <div className="flex items-center gap-2">
           {hasTradeData && (
-            <div className="flex items-center gap-1 text-[9px] text-white/40">
-              <AlertTriangle size={10} className="text-amber-400" />
-              <span>AUTO-CLOSE {isBuy ? 'BUY' : 'SELL'}</span>
+            <div className="flex items-center gap-1.5 text-[9px]">
+              <span className="text-amber-400/70">AUTO-CLOSE</span>
             </div>
           )}
-          {/* TP/SL inputs */}
           {hasTradeData && (
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] text-emerald-400">TP</span>
               <input type="text" value={tp != null ? fmt(tp) : '--'} readOnly
-                className="w-16 text-[10px] text-center bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded px-1 py-0.5 font-mono" />
+                className="w-16 text-[10px] text-center bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded px-1 py-0.5 font-mono cursor-pointer" />
               <span className="text-[9px] text-red-400">SL</span>
               <input type="text" value={sl != null ? fmt(sl) : '--'} readOnly
-                className="w-16 text-[10px] text-center bg-red-500/20 text-red-400 border border-red-500/30 rounded px-1 py-0.5 font-mono" />
+                className="w-16 text-[10px] text-center bg-red-500/20 text-red-400 border border-red-500/30 rounded px-1 py-0.5 font-mono cursor-pointer" />
             </div>
           )}
           <button onClick={toggleFullscreen} className="p-1.5 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors">
@@ -274,8 +249,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
 
       {/* Chart */}
       <div className="flex-1 relative">
-        <div ref={containerRef} className="h-full w-full" />
+        <canvas ref={canvasRef} className="h-full w-full" />
 
+        {/* Trade badge */}
         {hasTradeData && (
           <div className="absolute top-2 left-2 z-20 flex items-center gap-2 pointer-events-auto">
             {side && (
@@ -291,27 +267,45 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
           </div>
         )}
 
-        {/* TP/SL adjust buttons — floating on chart */}
-        {hasTradeData && currentPrice && (
-          <div className="absolute right-2 z-20 flex flex-col gap-2 pointer-events-auto" style={{ top: '10%' }}>
+        {/* Draggable TP/SL controls */}
+        {hasTradeData && (
+          <div className="absolute right-12 z-20 flex flex-col gap-3 pointer-events-auto" style={{ top: '15%' }}>
             {tp != null && onTpChange && (
-              <div className="flex flex-col items-center gap-0.5">
-                <button onClick={() => onTpChange(tp + step)} className="w-6 h-5 rounded bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-400 text-[10px] font-black">▲</button>
-                <div className="px-2 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-black shadow-lg whitespace-nowrap">
-                  TP {fmt(tp)} <span className="text-emerald-200">{fmtPnl(tpPnl)}</span>
-                  {onCloseTrade && <button onClick={() => onTpChange(0)} className="ml-1 text-[8px]">✕</button>}
+              <div className="flex flex-col items-center gap-0.5 cursor-grab active:cursor-grabbing"
+                onPointerDown={(e) => handlePointerDown('tp', e)}>
+                <button onClick={(e) => { e.stopPropagation(); onTpChange(tp + step); }}
+                  className="w-6 h-4 rounded bg-emerald-600/40 hover:bg-emerald-600/60 text-emerald-300 text-[10px] font-black leading-none">▲</button>
+                <div className="px-2 py-1 rounded bg-emerald-500 text-white text-[10px] font-black shadow-lg whitespace-nowrap flex items-center gap-1">
+                  <span>TP</span><span className="font-mono">{fmt(tp)}</span>
+                  <span className="text-emerald-200 text-[9px]">{fmtPnl(tpPnl)}</span>
+                  <button onClick={(e) => { e.stopPropagation(); onTpChange(0); }}
+                    className="ml-0.5 text-[8px] hover:text-red-200">✕</button>
                 </div>
-                <button onClick={() => onTpChange(tp - step)} className="w-6 h-5 rounded bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-400 text-[10px] font-black">▼</button>
+                <button onClick={(e) => { e.stopPropagation(); onTpChange(tp - step); }}
+                  className="w-6 h-4 rounded bg-emerald-600/40 hover:bg-emerald-600/60 text-emerald-300 text-[10px] font-black leading-none">▼</button>
               </div>
             )}
+
+            {entryPrice != null && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded bg-blue-500/80 text-white text-[10px] font-black shadow-lg whitespace-nowrap pointer-events-none">
+                <span className="w-2 h-2 rounded-full bg-blue-300" />
+                <span>ENTRY</span><span className="font-mono">{fmt(entryPrice)}</span>
+              </div>
+            )}
+
             {sl != null && onSlChange && (
-              <div className="flex flex-col items-center gap-0.5 mt-8">
-                <button onClick={() => onSlChange(sl + step)} className="w-6 h-5 rounded bg-red-500/30 hover:bg-red-500/50 text-red-400 text-[10px] font-black">▲</button>
-                <div className="px-2 py-0.5 rounded bg-red-500 text-white text-[10px] font-black shadow-lg whitespace-nowrap">
-                  SL {fmt(sl)} <span className="text-red-200">{fmtPnl(slPnl)}</span>
-                  {onCloseTrade && <button onClick={() => onSlChange(0)} className="ml-1 text-[8px]">✕</button>}
+              <div className="flex flex-col items-center gap-0.5 cursor-grab active:cursor-grabbing"
+                onPointerDown={(e) => handlePointerDown('sl', e)}>
+                <button onClick={(e) => { e.stopPropagation(); onSlChange(sl + step); }}
+                  className="w-6 h-4 rounded bg-red-600/40 hover:bg-red-600/60 text-red-300 text-[10px] font-black leading-none">▲</button>
+                <div className="px-2 py-1 rounded bg-red-500 text-white text-[10px] font-black shadow-lg whitespace-nowrap flex items-center gap-1">
+                  <span>SL</span><span className="font-mono">{fmt(sl)}</span>
+                  <span className="text-red-200 text-[9px]">{fmtPnl(slPnl)}</span>
+                  <button onClick={(e) => { e.stopPropagation(); onSlChange(0); }}
+                    className="ml-0.5 text-[8px] hover:text-red-200">✕</button>
                 </div>
-                <button onClick={() => onSlChange(sl - step)} className="w-6 h-5 rounded bg-red-500/30 hover:bg-red-500/50 text-red-400 text-[10px] font-black">▼</button>
+                <button onClick={(e) => { e.stopPropagation(); onSlChange(sl - step); }}
+                  className="w-6 h-4 rounded bg-red-600/40 hover:bg-red-600/60 text-red-300 text-[10px] font-black leading-none">▼</button>
               </div>
             )}
           </div>
