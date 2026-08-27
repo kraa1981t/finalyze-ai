@@ -1557,22 +1557,24 @@ Return ONLY valid JSON:
       // CRYPTO: keep as-is (BTC at 60000, body already meaningful)
       const bodyMultiplier = isCrypto ? 1 : (type === MarketType.FOREX ? 10000 : 100);
 
-      const calcBody = (raw: any): { body: number; direction: 'bullish' | 'bearish' | 'unknown' } | null => {
+      const calcBody = (raw: any, label: string): { body: number; direction: 'bullish' | 'bearish' | 'unknown' } | null => {
         const q = raw?.chart?.result?.[0]?.indicators?.quote?.[0];
         if (!q?.close || !q?.open) return null;
         const closes = q.close.filter((c: any) => c != null);
         const opens = q.open.filter((o: any) => o != null);
-        if (closes.length < 1 || opens.length < 1) return null;
-        const lastClose = closes[closes.length - 1];
-        const lastOpen = opens[opens.length - 1];
+        if (closes.length < 2 || opens.length < 2) return null;
+        const idx = closes.length - 2;
+        const lastClose = closes[idx];
+        const lastOpen = opens[idx];
         const body = Math.abs(lastClose - lastOpen) * bodyMultiplier;
         const dir = lastClose > lastOpen ? 'bullish' : lastClose < lastOpen ? 'bearish' : 'unknown';
+        console.log(`[CandleMatch] ${label} last completed candle: O=${lastOpen} C=${lastClose} body=${body.toFixed(1)} dir=${dir} (used idx ${idx} of ${closes.length})`);
         return { body, direction: dir };
       };
 
-      const dailyBody = calcBody(candleMatchData.daily);
-      const weeklyBody = calcBody(candleMatchData.weekly);
-      const monthlyBody = calcBody(candleMatchData.monthly);
+      const dailyBody = calcBody(candleMatchData.daily, '1D');
+      const weeklyBody = calcBody(candleMatchData.weekly, '1W');
+      const monthlyBody = calcBody(candleMatchData.monthly, '1M');
 
       // Collect active candles (enabled + threshold > 0)
       const activeCandles: { label: string; data: { body: number; direction: string } | null; threshold: number }[] = [];
