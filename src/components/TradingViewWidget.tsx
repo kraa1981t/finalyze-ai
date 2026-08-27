@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { createChart, CandlestickSeries, IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { subscribePrices, calcPnl } from '../services/paperTradingService';
 import { Maximize2, Minimize2, AlertTriangle } from 'lucide-react';
 
@@ -13,51 +14,18 @@ interface TradingViewWidgetProps {
   onCloseTrade?: () => void;
   onSlChange?: (price: number) => void;
   onTpChange?: (price: number) => void;
-  openedAt?: number;
 }
 
 const TIMEFRAMES = [
-  { label: '1', value: '1' }, { label: '5', value: '5' }, { label: '15', value: '15' },
-  { label: '30', value: '30' }, { label: '1H', value: '60' }, { label: '4H', value: '240' },
-  { label: '1D', value: 'D' }, { label: '1W', value: 'W' }, { label: '1M', value: 'M' },
+  { label: '1', value: '1m' }, { label: '5', value: '5m' }, { label: '15', value: '15m' },
+  { label: '30', value: '15m' }, { label: '1H', value: '1h' }, { label: '4H', value: '4h' },
+  { label: '1D', value: '1d' }, { label: '1W', value: '1w' },
 ];
 
-function toTvSymbol(sym: string): string {
-  const s = sym.trim().toUpperCase();
-  const map: Record<string, string> = {
-    EURUSD: 'FX:EURUSD', GBPUSD: 'FX:GBPUSD', USDJPY: 'FX:USDJPY',
-    USDCHF: 'FX:USDCHF', AUDUSD: 'FX:AUDUSD', NZDUSD: 'FX:NZDUSD',
-    USDCAD: 'FX:USDCAD', EURGBP: 'FX:EURGBP', EURJPY: 'FX:EURJPY',
-    EURCHF: 'FX:EURCHF', EURAUD: 'FX:EURAUD', EURNZD: 'FX:EURNZD',
-    EURCAD: 'FX:EURCAD', GBPJPY: 'FX:GBPJPY', GBPAUD: 'FX:GBPAUD',
-    GBPNZD: 'FX:GBPNZD', GBPCAD: 'FX:GBPCAD', GBPCHF: 'FX:GBPCHF',
-    AUDJPY: 'FX:AUDJPY', AUDCAD: 'FX:AUDCAD', AUDCHF: 'FX:AUDCHF',
-    AUDNZD: 'FX:AUDNZD', NZDJPY: 'FX:NZDJPY', NZDCAD: 'FX:NZDCAD',
-    NZDCHF: 'FX:NZDCHF', CADJPY: 'FX:CADJPY', CADCHF: 'FX:CADCHF',
-    CHFJPY: 'FX:CHFJPY', USDTRY: 'FX:USDTRY', USDMXN: 'FX:USDMXN',
-    XAUUSD: 'OANDA:XAUUSD', XAGUSD: 'OANDA:XAGUSD', GOLD: 'TVC:GOLD', SILVER: 'TVC:SILVER',
-    BTCUSD: 'BINANCE:BTCUSDT', ETHUSD: 'BINANCE:ETHUSDT',
-    US500: 'FOREXCOM:SPXUSD', US30: 'FOREXCOM:DJI', US100: 'FOREXCOM:NDXUSD',
-    SPY: 'AMEX:SPY', QQQ: 'NASDAQ:QQQ', DXY: 'TVC:DXY',
-    GLD: 'NYSEARCA:GLD', SLV: 'NYSEARCA:SLV',
-    TSLA: 'NASDAQ:TSLA', AAPL: 'NASDAQ:AAPL', NVDA: 'NASDAQ:NVDA',
-    AMD: 'NASDAQ:AMD', META: 'NASDAQ:META', GOOGL: 'NASDAQ:GOOGL',
-    MSFT: 'NASDAQ:MSFT', AMZN: 'NASDAQ:AMZN', NFLX: 'NASDAQ:NFLX',
-    PLTR: 'NYSE:PLTR', COIN: 'NASDAQ:COIN', NIO: 'NYSE:NIO',
-    BABA: 'NYSE:BABA', ARM: 'NASDAQ:ARM', ASML: 'NYSE:ASML',
-    TSM: 'NYSE:TSM', SMCI: 'NASDAQ:SMCI',
-    JPM: 'NYSE:JPM', V: 'NYSE:V', MA: 'NYSE:MA', JNJ: 'NYSE:JNJ',
-    WMT: 'NYSE:WMT', PG: 'NYSE:PG', UNH: 'NYSE:UNH', HD: 'NYSE:HD',
-    DIS: 'NYSE:DIS', BA: 'NYSE:BA', CRM: 'NYSE:CRM', ORCL: 'NYSE:ORCL',
-    ABBV: 'NYSE:ABBV', LLY: 'NYSE:LLY', MRK: 'NYSE:MRK',
-    PEP: 'NASDAQ:PEP', COST: 'NASDAQ:COST', KO: 'NYSE:KO',
-    MU: 'NASDAQ:MU', QCOM: 'NASDAQ:QCOM', CSCO: 'NASDAQ:CSCO',
-    INTC: 'NASDAQ:INTC',
-  };
-  if (map[s]) return map[s];
-  if (s.includes(':')) return s;
-  if (s.length === 6) return `FX:${s}`;
-  return s;
+interface Candle { time: Time; open: number; high: number; low: number; close: number; }
+
+function toApiSymbol(sym: string): string {
+  return sym.toUpperCase().trim();
 }
 
 function fmt(price: number): string {
@@ -68,97 +36,171 @@ function fmtPnl(v: number): string {
   return `${v >= 0 ? '+' : '-'}$${Math.abs(v).toFixed(2)}`;
 }
 
-function PriceLine({ price, label, color, pnlValue, yPos, onRemove, onAdjust, step, isActive }: {
-  price: number; label: string; color: string; pnlValue?: number; yPos: number;
-  onRemove?: () => void; onAdjust?: (p: number) => void; step?: number; isActive?: boolean;
-}) {
-  const isEntry = label === 'ENTRY';
-  const isTp = label === 'TP';
-  const isSl = label === 'SL';
-  const adj = step || 0.0001;
-  const bgColor = isTp ? '#10B981' : isSl ? '#EF4444' : isEntry ? (color === '#2196F3' ? '#2563EB' : '#F97316') : color;
-
-  return (
-    <div className="absolute left-0 right-0 z-10 pointer-events-none" style={{ top: `${yPos}%` }}>
-      <div className="relative w-full h-0">
-        {/* The line itself */}
-        <div
-          className="absolute inset-x-0 opacity-90"
-          style={{
-            borderTop: isEntry ? '3px solid' : '2px dashed',
-            borderColor: bgColor,
-            boxShadow: `0 0 8px ${bgColor}40`,
-          }}
-        />
-
-        {/* Entry marker - circle on left */}
-        {isEntry && (
-          <div className="absolute left-3 flex items-center gap-1.5 pointer-events-none" style={{ transform: 'translateY(-50%)' }}>
-            <div className="w-4 h-4 rounded-full border-[3px] shadow-lg" style={{ borderColor: bgColor, backgroundColor: bgColor + '30' }} />
-            <span className="text-[11px] font-black px-2 py-0.5 rounded" style={{ backgroundColor: bgColor, color: 'white' }}>
-              ● ENTRY {fmt(price)}
-            </span>
-          </div>
-        )}
-
-        {/* Right label */}
-        <div
-          className="absolute right-0 flex items-center gap-0.5 rounded text-[10px] font-black pointer-events-auto shadow-lg"
-          style={{ backgroundColor: bgColor, color: 'white', transform: 'translateY(-50%)', border: `1px solid ${bgColor}` }}
-        >
-          {onAdjust && !isEntry && (
-            <button onClick={() => onAdjust(price - adj)} className="px-1.5 py-1 hover:bg-white/20 rounded-l text-[11px] font-black" title="Lower">▼</button>
-          )}
-          <span className="px-2 py-1 font-mono whitespace-nowrap text-[11px]">{fmt(price)}</span>
-          {!isEntry && <span className="opacity-80 px-1 text-[9px]">{label}</span>}
-          {isEntry && <span className="opacity-80 px-1 text-[9px]">ENTRY</span>}
-          {pnlValue != null && (
-            <span className={`px-1.5 text-[9px] font-bold ${pnlValue >= 0 ? 'bg-emerald-600/50 text-emerald-200' : 'bg-red-600/50 text-red-200'}`}>
-              {fmtPnl(pnlValue)}
-            </span>
-          )}
-          {onAdjust && !isEntry && (
-            <button onClick={() => onAdjust(price + adj)} className="px-1.5 py-1 hover:bg-white/20 text-[11px] font-black" title="Raise">▲</button>
-          )}
-          {onRemove && (
-            <button onClick={onRemove} className="px-1.5 py-1 hover:bg-white/20 rounded-r text-[11px] font-bold border-l border-white/20" title="Remove">✕</button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+async function fetchCandles(symbol: string, timeframe: string): Promise<Candle[]> {
+  try {
+    const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`);
+    if (!r.ok) return [];
+    const d = await r.json();
+    const result = d?.chart?.result?.[0];
+    if (!result) return [];
+    const ts: number[] = result.timestamp || [];
+    const q = result.indicators?.quote?.[0];
+    if (!q || ts.length === 0) return [];
+    const candles: Candle[] = [];
+    for (let i = 0; i < ts.length; i++) {
+      const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], c = q.close?.[i];
+      if (o != null && h != null && l != null && c != null && !isNaN(c) && c > 0) {
+        candles.push({ time: ts[i] as Time, open: o, high: h, low: l, close: c });
+      }
+    }
+    return candles;
+  } catch {
+    return [];
+  }
 }
 
-export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, category, qty, onCloseTrade, onSlChange, onTpChange, openedAt }: TradingViewWidgetProps) {
+export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, category, qty, onCloseTrade, onSlChange, onTpChange }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const entryLineRef = useRef<any>(null);
+  const slLineRef = useRef<any>(null);
+  const tpLineRef = useRef<any>(null);
+  const candlesRef = useRef<Candle[]>([]);
   const unsubRef = useRef<(() => void) | null>(null);
+
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
-  const [interval, setInterval] = useState('60');
+  const [interval, setInterval] = useState('1h');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [chartReady, setChartReady] = useState(false);
 
   const hasTradeData = entryPrice != null || sl != null || tp != null;
   const isBuy = side === 'buy';
-  const tvSymbol = toTvSymbol(symbol);
 
-  const buildUrl = useCallback((sym: string, intv: string) => {
-    return `https://www.tradingview.com/widgetembed/?frameElementId=tv_${Date.now()}_f${intv}&symbol=${encodeURIComponent(sym)}&interval=${intv}&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=f0f3fa&studies=[]&theme=dark&style=1&timezone=exchange&locale=en`;
+  // Init chart
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const chart = createChart(containerRef.current, {
+      width: containerRef.current.clientWidth,
+      height: containerRef.current.clientHeight,
+      layout: { background: { color: '#0a0f1a' }, textColor: '#94a3b8', fontSize: 11 },
+      grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
+      crosshair: { mode: 0, vertLine: { color: 'rgba(255,255,255,0.3)', width: 1, style: 2, labelBackgroundColor: '#F59E0B' }, horzLine: { color: 'rgba(255,255,255,0.3)', width: 1, style: 2, labelBackgroundColor: '#F59E0B' } },
+      rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)', scaleMargins: { top: 0.15, bottom: 0.15 } },
+      timeScale: { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true, rightOffset: 5 },
+    });
+    chartRef.current = chart;
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: '#26a69a', downColor: '#ef5350', borderUpColor: '#26a69a', borderDownColor: '#ef5350', wickUpColor: '#26a69a', wickDownColor: '#ef5350', priceLineVisible: false,
+    });
+    seriesRef.current = series;
+    setChartReady(true);
+
+    const ro = new ResizeObserver(() => {
+      if (containerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({ width: containerRef.current.clientWidth, height: containerRef.current.clientHeight });
+      }
+    });
+    ro.observe(containerRef.current);
+
+    return () => { ro.disconnect(); chart.remove(); chartRef.current = null; seriesRef.current = null; };
   }, []);
 
+  // Load data when symbol or interval changes
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    container.innerHTML = '';
-    const iframe = document.createElement('iframe');
-    iframe.id = `tv_${Date.now()}`;
-    iframe.src = buildUrl(tvSymbol, interval);
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.border = 'none';
-    iframe.allowFullscreen = true;
-    container.appendChild(iframe);
-    return () => { container.innerHTML = ''; };
-  }, [tvSymbol, interval, buildUrl]);
+    const series = seriesRef.current;
+    const chart = chartRef.current;
+    if (!series || !chart) return;
+
+    if (unsubRef.current) unsubRef.current();
+    candlesRef.current = [];
+    series.setData([]);
+
+    (async () => {
+      const candles = await fetchCandles(symbol, interval);
+      if (candles.length > 0) {
+        candlesRef.current = candles;
+        series.setData(candles);
+        chart.timeScale().fitContent();
+      }
+
+      unsubRef.current = subscribePrices([symbol], (sym, price) => {
+        if (sym !== symbol || !price) return;
+        setCurrentPrice(price);
+        const tf = interval;
+        let periodMs = 60000;
+        if (tf === '5m') periodMs = 300000;
+        else if (tf === '15m') periodMs = 900000;
+        else if (tf === '1h') periodMs = 3600000;
+        else if (tf === '4h') periodMs = 14400000;
+        else if (tf === '1d') periodMs = 86400000;
+        const nowPeriod = Math.floor(Date.now() / periodMs) * (periodMs / 1000) as Time;
+        const last = candlesRef.current[candlesRef.current.length - 1];
+        if (last && last.time === nowPeriod) {
+          last.high = Math.max(last.high, price);
+          last.low = Math.min(last.low, price);
+          last.close = price;
+          series.update(last);
+        } else {
+          const candle: Candle = { time: nowPeriod, open: price, high: price, low: price, close: price };
+          candlesRef.current.push(candle);
+          series.update(candle);
+        }
+      });
+    })();
+
+    return () => { if (unsubRef.current) unsubRef.current(); };
+  }, [symbol, interval]);
+
+  // Price lines — real lines on the chart
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+
+    try { if (entryLineRef.current) series.removePriceLine(entryLineRef.current); } catch {}
+    try { if (slLineRef.current) series.removePriceLine(slLineRef.current); } catch {}
+    try { if (tpLineRef.current) series.removePriceLine(tpLineRef.current); } catch {}
+    entryLineRef.current = null;
+    slLineRef.current = null;
+    tpLineRef.current = null;
+
+    if (!hasTradeData) return;
+
+    if (entryPrice != null) {
+      entryLineRef.current = series.createPriceLine({
+        price: entryPrice,
+        color: isBuy ? '#2563EB' : '#F97316',
+        title: ` ● ENTRY ${fmt(entryPrice)} `,
+        lineWidth: 3,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        axisLabelColor: isBuy ? '#2563EB' : '#F97316',
+      });
+    }
+    if (sl != null) {
+      slLineRef.current = series.createPriceLine({
+        price: sl,
+        color: '#EF4444',
+        title: ` ● SL ${fmt(sl)} ▼ `,
+        lineWidth: 2,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        axisLabelColor: '#EF4444',
+      });
+    }
+    if (tp != null) {
+      tpLineRef.current = series.createPriceLine({
+        price: tp,
+        color: '#10B981',
+        title: ` ● TP ${fmt(tp)} ▲ `,
+        lineWidth: 2,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        axisLabelColor: '#10B981',
+      });
+    }
+  }, [entryPrice, sl, tp, hasTradeData, isBuy]);
 
   useEffect(() => {
     if (unsubRef.current) unsubRef.current();
@@ -192,25 +234,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
   const slPnl = (sl && entryPrice && side && category && qty)
     ? calcPnl({ category, symbol, side, qty, entryPrice }, sl) : 0;
 
-  const linePositions = useMemo(() => {
-    const prices: number[] = [];
-    if (currentPrice != null) prices.push(currentPrice);
-    if (entryPrice != null) prices.push(entryPrice);
-    if (tp != null) prices.push(tp);
-    if (sl != null) prices.push(sl);
-    if (prices.length < 2) return { min: 0, max: 1, range: 1 };
-    const sorted = [...prices].sort((a, b) => a - b);
-    const min = sorted[0];
-    const max = sorted[sorted.length - 1];
-    const pad = Math.max((max - min) * 0.3, (max - min) * 0.05 + 0.0001);
-    return { min: min - pad, max: max + pad, range: max - min + pad * 2 };
-  }, [currentPrice, entryPrice, tp, sl]);
-
-  const priceToY = (price: number): number => {
-    return ((linePositions.max - price) / linePositions.range) * 100;
-  };
-
-  const entryStep = entryPrice ? (entryPrice < 10 ? 0.0001 : entryPrice < 1000 ? 0.01 : 0.1) : 0.0001;
+  const step = entryPrice ? (entryPrice < 10 ? 0.0001 : entryPrice < 1000 ? 0.01 : 0.1) : 0.0001;
 
   return (
     <div ref={wrapperRef} className={`relative h-full w-full flex flex-col ${isFullscreen ? 'bg-black' : ''}`}>
@@ -231,17 +255,27 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
               <span>AUTO-CLOSE {isBuy ? 'BUY' : 'SELL'}</span>
             </div>
           )}
+          {/* TP/SL inputs */}
+          {hasTradeData && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-emerald-400">TP</span>
+              <input type="text" value={tp != null ? fmt(tp) : '--'} readOnly
+                className="w-16 text-[10px] text-center bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded px-1 py-0.5 font-mono" />
+              <span className="text-[9px] text-red-400">SL</span>
+              <input type="text" value={sl != null ? fmt(sl) : '--'} readOnly
+                className="w-16 text-[10px] text-center bg-red-500/20 text-red-400 border border-red-500/30 rounded px-1 py-0.5 font-mono" />
+            </div>
+          )}
           <button onClick={toggleFullscreen} className="p-1.5 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors">
             {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         </div>
       </div>
 
-      {/* Chart + Lines */}
+      {/* Chart */}
       <div className="flex-1 relative">
         <div ref={containerRef} className="h-full w-full" />
 
-        {/* Trade info badge */}
         {hasTradeData && (
           <div className="absolute top-2 left-2 z-20 flex items-center gap-2 pointer-events-auto">
             {side && (
@@ -257,19 +291,28 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
           </div>
         )}
 
-        {/* Price lines overlay */}
+        {/* TP/SL adjust buttons — floating on chart */}
         {hasTradeData && currentPrice && (
-          <div className="absolute inset-0 z-10 pointer-events-none" style={{ top: '5%', bottom: '5%' }}>
+          <div className="absolute right-2 z-20 flex flex-col gap-2 pointer-events-auto" style={{ top: '10%' }}>
             {tp != null && onTpChange && (
-              <PriceLine price={tp} label="TP" color="#10B981" pnlValue={tpPnl} yPos={priceToY(tp)} step={entryStep}
-                onAdjust={onTpChange} onRemove={onCloseTrade ? () => onTpChange(0) : undefined} isActive />
-            )}
-            {entryPrice != null && (
-              <PriceLine price={entryPrice} label="ENTRY" color={isBuy ? '#2563EB' : '#F97316'} yPos={priceToY(entryPrice)} isActive />
+              <div className="flex flex-col items-center gap-0.5">
+                <button onClick={() => onTpChange(tp + step)} className="w-6 h-5 rounded bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-400 text-[10px] font-black">▲</button>
+                <div className="px-2 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-black shadow-lg whitespace-nowrap">
+                  TP {fmt(tp)} <span className="text-emerald-200">{fmtPnl(tpPnl)}</span>
+                  {onCloseTrade && <button onClick={() => onTpChange(0)} className="ml-1 text-[8px]">✕</button>}
+                </div>
+                <button onClick={() => onTpChange(tp - step)} className="w-6 h-5 rounded bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-400 text-[10px] font-black">▼</button>
+              </div>
             )}
             {sl != null && onSlChange && (
-              <PriceLine price={sl} label="SL" color="#EF4444" pnlValue={slPnl} yPos={priceToY(sl)} step={entryStep}
-                onAdjust={onSlChange} onRemove={onCloseTrade ? () => onSlChange(0) : undefined} isActive />
+              <div className="flex flex-col items-center gap-0.5 mt-8">
+                <button onClick={() => onSlChange(sl + step)} className="w-6 h-5 rounded bg-red-500/30 hover:bg-red-500/50 text-red-400 text-[10px] font-black">▲</button>
+                <div className="px-2 py-0.5 rounded bg-red-500 text-white text-[10px] font-black shadow-lg whitespace-nowrap">
+                  SL {fmt(sl)} <span className="text-red-200">{fmtPnl(slPnl)}</span>
+                  {onCloseTrade && <button onClick={() => onSlChange(0)} className="ml-1 text-[8px]">✕</button>}
+                </div>
+                <button onClick={() => onSlChange(sl - step)} className="w-6 h-5 rounded bg-red-500/30 hover:bg-red-500/50 text-red-400 text-[10px] font-black">▼</button>
+              </div>
             )}
           </div>
         )}
