@@ -23,10 +23,6 @@ const TIMEFRAMES = [
 
 interface Candle { time: number; open: number; high: number; low: number; close: number; }
 
-function fmt(price: number): string {
-  return price.toFixed(price < 10 ? 5 : 2);
-}
-
 export default function TradingViewWidget({ symbol }: TradingViewWidgetProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -34,16 +30,23 @@ export default function TradingViewWidget({ symbol }: TradingViewWidgetProps) {
   const seriesRef = useRef<any>(null);
   const unsubRef = useRef<(() => void) | null>(null);
   const candlesRef = useRef<Candle[]>([]);
+  const symRef = useRef(symbol);
+  const intRef = useRef('1h');
 
   const [interval, setInterval] = useState('1h');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Init chart
+  // Keep refs in sync
+  useEffect(() => { symRef.current = symbol; }, [symbol]);
+  useEffect(() => { intRef.current = interval; }, [interval]);
+
+  // Init chart + load data (single effect to avoid race condition)
   useEffect(() => {
     let chart: any = null;
     let series: any = null;
     let ro: ResizeObserver | null = null;
     let disposed = false;
+    let unsub: (() => void) | null = null;
 
     async function init() {
       const lc = await import('lightweight-charts');
@@ -74,30 +77,18 @@ export default function TradingViewWidget({ symbol }: TradingViewWidgetProps) {
         }
       });
       ro.observe(canvasRef.current);
+
+      await loadData(series, chart);
     }
 
-    init();
+    async function loadData(s: any, c: any) {
+      const curSym = symRef.current;
+      const curInt = intRef.current;
+      candlesRef.current = [];
+      s.setData([]);
 
-    return () => {
-      disposed = true;
-      ro?.disconnect();
-      chart?.remove();
-      chartRef.current = null;
-      seriesRef.current = null;
-    };
-  }, []);
-
-  // Load candles + subscribe price
-  useEffect(() => {
-    const series = seriesRef.current;
-    if (!series) return;
-    if (unsubRef.current) unsubRef.current();
-    candlesRef.current = [];
-    series.setData([]);
-
-    (async () => {
       try {
-        const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${interval}`);
+        const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(curSym)}&timeframe=${curInt}`);
         if (r.ok) {
           const d = await r.json();
           const result = d?.chart?.result?.[0];
@@ -106,39 +97,112 @@ export default function TradingViewWidget({ symbol }: TradingViewWidgetProps) {
           if (q && ts.length > 0) {
             const candles: Candle[] = [];
             for (let i = 0; i < ts.length; i++) {
-              const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], c = q.close?.[i];
-              if (o != null && h != null && l != null && c != null && !isNaN(c) && c > 0) {
-                candles.push({ time: ts[i], open: o, high: h, low: l, close: c });
+              const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], cl = q.close?.[i];
+              if (o != null && h != null && l != null && cl != null && !isNaN(cl) && cl > 0) {
+                candles.push({ time: ts[i], open: o, high: h, low: l, close: cl });
               }
             }
             if (candles.length > 0) {
               candlesRef.current = candles;
-              series.setData(candles);
-              chartRef.current?.timeScale().fitContent();
+              s.setData(candles);
+              c.timeScale().fitContent();
             }
           }
         }
       } catch {}
 
       const { subscribePrices } = await import('../services/paperTradingService');
-      unsubRef.current = subscribePrices([symbol], (sym: string, price: number) => {
-        if (sym !== symbol || !price) return;
+      unsub = subscribePrices([curSym], (sym: string, price: number) => {
+        if (sym !== curSym || !price) return;
         const periodMs: Record<string, number> = { '1m': 60000, '5m': 300000, '15m': 900000, '1h': 3600000, '4h': 14400000, '1d': 86400000, '1w': 604800000, '1mo': 2592000000 };
-        const ms = periodMs[interval] || 3600000;
+        const ms = periodMs[curInt] || 3600000;
         const nowPeriod = Math.floor(Date.now() / ms) * (ms / 1000);
         const last = candlesRef.current[candlesRef.current.length - 1];
         if (last && last.time === nowPeriod) {
           last.high = Math.max(last.high, price);
           last.low = Math.min(last.low, price);
           last.close = price;
-          series.update(last);
+          s.update(last);
         } else {
           const candle: Candle = { time: nowPeriod, open: price, high: price, low: price, close: price };
           candlesRef.current.push(candle);
-          series.update(candle);
+          s.update(candle);
         }
       });
-    })();
+      unsubRef.current = unsub;
+    }
+
+    init();
+
+    return () => {
+      disposed = true;
+      unsub?.();
+      ro?.disconnect();
+      chart?.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+    };
+  }, []);
+
+  // Reload data when symbol or interval changes
+  useEffect(() => {
+    const s = seriesRef.current;
+    const c = chartRef.current;
+    if (!s || !c) return;
+    loadData(s, c);
+
+    function loadData(s: any, c: any) {
+      const curSym = symRef.current;
+      const curInt = intRef.current;
+      if (unsubRef.current) unsubRef.current();
+      candlesRef.current = [];
+      s.setData([]);
+
+      (async () => {
+        try {
+          const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(curSym)}&timeframe=${curInt}`);
+          if (r.ok) {
+            const d = await r.json();
+            const result = d?.chart?.result?.[0];
+            const ts: number[] = result?.timestamp || [];
+            const q = result?.indicators?.quote?.[0];
+            if (q && ts.length > 0) {
+              const candles: Candle[] = [];
+              for (let i = 0; i < ts.length; i++) {
+                const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], cl = q.close?.[i];
+                if (o != null && h != null && l != null && cl != null && !isNaN(cl) && cl > 0) {
+                  candles.push({ time: ts[i], open: o, high: h, low: l, close: cl });
+                }
+              }
+              if (candles.length > 0) {
+                candlesRef.current = candles;
+                s.setData(candles);
+                c.timeScale().fitContent();
+              }
+            }
+          }
+        } catch {}
+
+        const { subscribePrices } = await import('../services/paperTradingService');
+        unsubRef.current = subscribePrices([curSym], (sym: string, price: number) => {
+          if (sym !== curSym || !price) return;
+          const periodMs: Record<string, number> = { '1m': 60000, '5m': 300000, '15m': 900000, '1h': 3600000, '4h': 14400000, '1d': 86400000, '1w': 604800000, '1mo': 2592000000 };
+          const ms = periodMs[curInt] || 3600000;
+          const nowPeriod = Math.floor(Date.now() / ms) * (ms / 1000);
+          const last = candlesRef.current[candlesRef.current.length - 1];
+          if (last && last.time === nowPeriod) {
+            last.high = Math.max(last.high, price);
+            last.low = Math.min(last.low, price);
+            last.close = price;
+            s.update(last);
+          } else {
+            const candle: Candle = { time: nowPeriod, open: price, high: price, low: price, close: price };
+            candlesRef.current.push(candle);
+            s.update(candle);
+          }
+        });
+      })();
+    }
 
     return () => { if (unsubRef.current) unsubRef.current(); };
   }, [symbol, interval]);
@@ -157,7 +221,6 @@ export default function TradingViewWidget({ symbol }: TradingViewWidgetProps) {
 
   return (
     <div ref={wrapperRef} className={`relative h-full w-full flex flex-col ${isFullscreen ? 'bg-black' : ''}`}>
-      {/* Toolbar */}
       <div className="flex items-center justify-between px-2 py-1 bg-[#0a0f1a] border-b border-white/5 flex-shrink-0 z-30">
         <div className="flex items-center gap-0.5">
           {TIMEFRAMES.map(tf => (
@@ -171,8 +234,6 @@ export default function TradingViewWidget({ symbol }: TradingViewWidgetProps) {
           {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
       </div>
-
-      {/* Chart */}
       <div className="flex-1 relative">
         <canvas ref={canvasRef} className="h-full w-full" />
       </div>
