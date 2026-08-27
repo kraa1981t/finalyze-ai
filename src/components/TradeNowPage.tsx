@@ -506,48 +506,70 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           {/* Symbol Selector */}
           {!leftCollapsed && (
           <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-3 space-y-2">
-            {/* Category sections with symbols inline */}
-            <div className="space-y-2">
-              {CATEGORY_TABS.map((tabC) => {
-                const catSyms = allSymbolsFor(tabC.key);
-                if (catSyms.length === 0) return null;
-                return (
-                  <div key={tabC.key} className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-sm font-black text-[#F59E0B] min-w-[80px]">{tabC.emoji} {isAr ? tabC.labelAr : tabC.labelEn}</span>
-                    {catSyms.map((sym) => (
-                      <button
-                        key={sym}
-                        onClick={() => { setCategory(tabC.key); setSymbol(sym); setQty(getDefaultQty(detectCategory(sym), balance)); }}
-                        className={`px-4 py-2 rounded-xl text-xl font-black transition-all border ${
-                          symbol === sym
-                            ? 'bg-sky-400 text-black border-sky-300 shadow-lg shadow-sky-400/30 scale-110'
-                            : 'bg-sky-500/15 text-sky-300 border-sky-500/25 hover:bg-sky-500/30 hover:text-sky-200'
-                        }`}
-                      >
-                        {sym}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })}
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_TABS.map((tabC) => (
+                <button
+                  key={tabC.key}
+                  onClick={() => selectCategory(tabC.key)}
+                  className={`px-4 py-2 rounded-xl text-2xl font-black transition-all border ${
+                    category === tabC.key
+                      ? 'bg-sky-500 text-black border-sky-400 shadow-lg shadow-sky-500/25'
+                      : 'bg-sky-500/10 text-sky-300 border-sky-500/20 hover:bg-sky-500/20'
+                  }`}
+                >
+                  {tabC.emoji} {isAr ? tabC.labelAr : tabC.labelEn}
+                </button>
+              ))}
               {customSymbols.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-sm font-black text-sky-400 min-w-[80px]">👁️ {isAr ? 'المشاهد' : 'Watch'}</span>
-                  {customSymbols.map((sym) => (
+                <button
+                  onClick={() => selectCategory('custom')}
+                  className={`px-4 py-2 rounded-xl text-2xl font-black transition-all border ${
+                    category === 'custom'
+                      ? 'bg-sky-500 text-black border-sky-400 shadow-lg shadow-sky-500/25'
+                      : 'bg-sky-500/10 text-sky-300 border-sky-500/20 hover:bg-sky-500/20'
+                  }`}
+                >
+                  👁️ {isAr ? 'المشاهد' : 'Watch'} ({customSymbols.length})
+                </button>
+              )}
+            </div>
+
+            {/* Symbols grid */}
+            <div className="flex flex-wrap gap-1.5 max-h-[130px] overflow-y-auto">
+              {symbols.length === 0 && category !== 'custom' && (
+                <span className="text-sm font-bold text-brand-text/40 py-2">
+                  {isAr ? 'لا رموز ظاهرة' : 'No visible symbols'}
+                </span>
+              )}
+              {category === 'custom' && customSymbols.length === 0 && (
+                <span className="text-sm font-bold text-brand-text/40 py-2">
+                  {isAr ? 'أضف رمزك الأول من حقل البحث أعلاه' : 'Add your first symbol from the search field above'}
+                </span>
+              )}
+              {symbols.map((sym) => {
+                const isCustom = category === 'custom' || !ORIGINAL_SYMBOLS.has(sym);
+                return (
+                  <div key={sym} className="relative group">
                     <button
-                      key={sym}
-                      onClick={() => { setCategory('custom'); setSymbol(sym); setQty(getDefaultQty(detectCategory(sym), balance)); }}
-                      className={`px-4 py-2 rounded-xl text-xl font-black transition-all border ${
+                      onClick={() => { setSymbol(sym); setQty(getDefaultQty(detectCategory(sym), balance)); }}
+                      className={`pl-4 pr-8 py-2.5 rounded-xl text-lg font-black transition-all border ${
                         symbol === sym
-                          ? 'bg-sky-400 text-black border-sky-300 shadow-lg shadow-sky-400/30 scale-110'
-                          : 'bg-sky-500/15 text-sky-300 border-sky-500/25 hover:bg-sky-500/30'
+                          ? 'bg-sky-400 text-black border-sky-300 shadow-lg shadow-sky-400/30'
+                          : 'bg-sky-500/15 text-sky-300 border-sky-500/25 hover:bg-sky-500/30 hover:text-sky-200'
                       }`}
                     >
                       {sym}
                     </button>
-                  ))}
-                </div>
-              )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); isCustom ? removeCustomSymbol(sym) : hideSymbol(sym); }}
+                      title={isAr ? `حذف ${sym}` : `Remove ${sym}`}
+                      className="absolute top-0 right-0 w-5 h-5 rounded-bl-lg rounded-tr-xl bg-red-500/80 hover:bg-red-600 text-white flex items-center justify-center opacity-70 group-hover:opacity-100 transition-all"
+                    >
+                      <X size={11} strokeWidth={3} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Add custom symbol with search suggestions */}
