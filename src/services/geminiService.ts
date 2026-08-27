@@ -836,6 +836,38 @@ export async function analyzeMarket(params: {
     return cached.result;
   }
 
+  // Block stock/ETF analysis when US market is closed
+  if (type === MarketType.STOCKS || type === MarketType.METALS) {
+    const now = new Date();
+    const etHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }));
+    const etMin = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', minute: 'numeric' }));
+    const etDay = now.toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short' });
+    const etMinutes = etHour * 60 + etMin;
+    const isWeekday = etDay !== 'Sat' && etDay !== 'Sun';
+    const marketOpen = 9 * 60 + 30; // 9:30 AM ET
+    const marketClose = 16 * 60; // 4:00 PM ET
+    const isMarketOpen = isWeekday && etMinutes >= marketOpen && etMinutes < marketClose;
+
+    if (!isMarketOpen) {
+      const etTimeStr = now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: true });
+      const blockedResult: AnalysisResult = {
+        symbol, type, timeframe,
+        signal: 'no_entry' as any,
+        confidence: 0,
+        summary: `${symbol} — market closed (${etTimeStr} ET)`,
+        detailedReasons: [{
+          check: 'Market Hours',
+          value: `${etDay} ${etTimeStr} ET`,
+          status: 'negative',
+          impact: `BLOCKED: ${type === MarketType.STOCKS ? 'Stock' : 'Metal'} market is closed — US exchanges open Mon-Fri 9:30AM-4:00PM ET`
+        }],
+        technicalScore: 0, sentimentScore: 0,
+        timestamp: new Date().toISOString(), userId: '',
+      };
+      return blockedResult;
+    }
+  }
+
   try {
     const TF_PROGRESSION = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M', '1Y'];
     const currentIndex = TF_PROGRESSION.indexOf(timeframe);
