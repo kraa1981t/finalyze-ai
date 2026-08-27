@@ -647,15 +647,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             {/* Toggle bar */}
             <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
               <button
-                onClick={() => setLeftCollapsed(!leftCollapsed)}
-                className="w-7 h-7 rounded-lg bg-sky-500/30 hover:bg-sky-500/50 flex items-center justify-center text-sky-300 hover:text-sky-100 transition-all"
-                title={leftCollapsed ? (isAr ? 'توسيع' : 'Expand') : (isAr ? 'تصغير' : 'Collapse')}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${leftCollapsed ? 'rotate-180' : ''}`}>
-                  <path d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <button
                 onClick={() => setPlatform('chart')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${
                   platform === 'chart' ? 'bg-emerald-500 text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'
@@ -710,13 +701,22 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         </div>
 
         {/* Collapse/Expand arrows */}
-        <div className="flex flex-col items-center justify-center gap-1 flex-shrink-0">
+        <div className="flex flex-col items-center justify-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setLeftCollapsed(!leftCollapsed)}
+            className="w-12 h-16 rounded-xl bg-sky-500/30 hover:bg-sky-500/50 flex items-center justify-center text-sky-300 hover:text-sky-100 transition-all border border-sky-500/30"
+            title={leftCollapsed ? (isAr ? 'توسيع الشارت' : 'Expand chart') : (isAr ? 'تصغير الشارت' : 'Collapse chart')}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${leftCollapsed ? 'rotate-180' : ''}`}>
+              <path d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
           <button
             onClick={() => setRightCollapsed(!rightCollapsed)}
-            className="w-6 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all"
+            className="w-12 h-16 rounded-xl bg-sky-500/30 hover:bg-sky-500/50 flex items-center justify-center text-sky-300 hover:text-sky-100 transition-all border border-sky-500/30"
             title={rightCollapsed ? (isAr ? 'توسيع لوحة الطلب' : 'Expand order panel') : (isAr ? 'تصغير لوحة الطلب' : 'Collapse order panel')}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${rightCollapsed ? '' : 'rotate-180'}`}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${rightCollapsed ? '' : 'rotate-180'}`}>
               <path d="M15 19l-7-7 7-7" />
             </svg>
           </button>
