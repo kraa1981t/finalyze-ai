@@ -157,10 +157,13 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
       if (entry <= 0) return;
       const slDist = Math.abs(entry - matchedSignal.stopLoss) / entry * 100;
       const tpDist = Math.abs(matchedSignal.takeProfit - entry) / entry * 100;
-      if (slDist > 0) setSlPercent(slDist.toFixed(2));
-      if (tpDist > 0) setTpPercent(tpDist.toFixed(2));
+      setSlPercent(slDist > 0 ? slDist.toFixed(2) : '');
+      setTpPercent(tpDist > 0 ? tpDist.toFixed(2) : '');
+    } else {
+      setSlPercent('');
+      setTpPercent('');
     }
-  }, [matchedSignal, livePrice]);
+  }, [matchedSignal?.symbol, matchedSignal?.stopLoss, matchedSignal?.takeProfit, livePrice]);
 
   const allSymbolsFor = (cat: string): string[] => {
     if (cat === 'custom') return customSymbols;
@@ -781,6 +784,11 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   className="w-full h-11 mt-1 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-emerald-500 placeholder:text-brand-text/25 placeholder:text-sm"
                   style={{ direction: 'ltr' }}
                 />
+                {matchedSignal?.takeProfit && livePrice && (
+                  <div className="text-[10px] font-bold text-emerald-400/70 text-center mt-0.5" dir="ltr">
+                    → ${matchedSignal.takeProfit.toFixed(matchedSignal.takeProfit > 100 ? 2 : 4)}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs font-black uppercase text-red-400/90 tracking-wider">SL %</label>
@@ -792,6 +800,11 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   className="w-full h-11 mt-1 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-red-500 placeholder:text-brand-text/25 placeholder:text-sm"
                   style={{ direction: 'ltr' }}
                 />
+                {matchedSignal?.stopLoss && livePrice && (
+                  <div className="text-[10px] font-bold text-red-400/70 text-center mt-0.5" dir="ltr">
+                    → ${matchedSignal.stopLoss.toFixed(matchedSignal.stopLoss > 100 ? 2 : 4)}
+                  </div>
+                )}
               </div>
             </div>
 
