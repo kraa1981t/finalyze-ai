@@ -58,8 +58,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
       if (disposed || !canvasRef.current) return;
 
       chart = lc.createChart(canvasRef.current, {
-        width: canvasRef.current.clientWidth,
-        height: canvasRef.current.clientHeight,
+        width: canvasRef.current.clientWidth || 600,
+        height: canvasRef.current.clientHeight || 400,
         layout: { background: { color: '#0a0f1a' }, textColor: '#94a3b8', fontSize: 11 },
         grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
         crosshair: { mode: 0 },
@@ -68,7 +68,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, side, ca
       });
       chartRef.current = chart;
 
-      series = chart.addCandlestickSeries({
+      series = chart.addSeries(lc.CandlestickSeries, {
         upColor: '#26a69a', downColor: '#ef5350',
         borderUpColor: '#26a69a', borderDownColor: '#ef5350',
         wickUpColor: '#26a69a', wickDownColor: '#ef5350',
