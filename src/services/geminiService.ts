@@ -1579,101 +1579,74 @@ Return ONLY valid JSON:
       });
     }
 
-    // ═══ STEP 5e: Candle Body Match Filter (Daily/Weekly/Monthly) ═══
+    // ═══ STEP 5e: Candle Contradiction Filter (Daily/Weekly/Monthly) ═══
+    // NEW LOGIC: Simple contradiction-only filter
+    // - Uses close-to-close direction (current close vs previous close)
+    // - Only BLOCKS when a candle actively CONTRADICTS the signal
+    // - Does NOT require all timeframes to agree
+    // - Does NOT check body size threshold
     var candleMatchBlocked = false;
     if (settings?.useCandleMatch && candleMatchData) {
-      // FOREX 4-digit pairs: multiply by 10000 (0.00188 → 18.8 pips)
-      // FOREX 2-digit pairs (JPY): multiply by 100 (0.188 → 18.8 pips)
-      // METALS (XAUUSD etc): multiply by 100 (0.188 → 18.8 points)
-      // STOCKS/INDICES: multiply by 100 (price ~5000, move 10 = 1000 points → 10 points)
-      // CRYPTO: keep as-is (BTC at 60000, body already meaningful)
-      const bodyMultiplier = isCrypto ? 1 : (type === MarketType.FOREX ? 10000 : 100);
-
-      const calcBody = (raw: any, label: string): { body: number; direction: 'bullish' | 'bearish' | 'unknown' } | null => {
+      const calcCandleDirection = (raw: any, label: string): 'bullish' | 'bearish' | 'unknown' | null => {
         const q = raw?.chart?.result?.[0]?.indicators?.quote?.[0];
-        if (!q?.close || !q?.open) return null;
+        if (!q?.close) return null;
         const closes = q.close.filter((c: any) => c != null);
-        const opens = q.open.filter((o: any) => o != null);
-        if (closes.length < 1 || opens.length < 1) return null;
-        const lastClose = closes[closes.length - 1];
-        const lastOpen = opens[opens.length - 1];
-        const body = Math.abs(lastClose - lastOpen) * bodyMultiplier;
-        const dir = lastClose > lastOpen ? 'bullish' : lastClose < lastOpen ? 'bearish' : 'unknown';
-        console.log(`[CandleMatch] ${label} current candle: O=${lastOpen} C=${lastClose} body=${body.toFixed(1)} dir=${dir}`);
-        return { body, direction: dir };
+        if (closes.length < 2) return null;
+        const currentClose = closes[closes.length - 1];
+        const prevClose = closes[closes.length - 2];
+        const dir = currentClose > prevClose ? 'bullish' : currentClose < prevClose ? 'bearish' : 'unknown';
+        console.log(`[CandleMatch] ${label} close-to-close: prev=${prevClose} curr=${currentClose} dir=${dir}`);
+        return dir;
       };
 
-      const dailyBody = calcBody(candleMatchData.daily, '1D');
-      const weeklyBody = calcBody(candleMatchData.weekly, '1W');
-      const monthlyBody = calcBody(candleMatchData.monthly, '1M');
+      const signalIsBuy = finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY;
+      const signalIsSell = finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL;
 
-      // Collect ALL enabled candles — include them even if below threshold
-      // so the filter can block when any candle fails
-      const activeCandles: { label: string; data: { body: number; direction: string } | null; threshold: number; enabled: boolean }[] = [];
-      if (settings.candleMatchDailyEnabled !== false && (settings.candleMatchDailyThreshold ?? 200) > 0) {
-        activeCandles.push({ label: '1d', data: dailyBody, threshold: settings.candleMatchDailyThreshold ?? 200, enabled: true });
+      // Check each enabled timeframe for contradictions
+      const contradictions: string[] = [];
+      const candleDirs: { label: string; dir: string | null }[] = [];
+
+      if (settings.candleMatchDailyEnabled !== false) {
+        const dir = calcCandleDirection(candleMatchData.daily, '1D');
+        candleDirs.push({ label: '1D', dir });
+        if (dir && signalIsBuy && dir === 'bearish') contradictions.push('1D: Bearish ↓ vs BUY signal');
+        if (dir && signalIsSell && dir === 'bullish') contradictions.push('1D: Bullish ↑ vs SELL signal');
       }
-      if (settings.candleMatchWeeklyEnabled !== false && (settings.candleMatchWeeklyThreshold ?? 200) > 0) {
-        activeCandles.push({ label: '1w', data: weeklyBody, threshold: settings.candleMatchWeeklyThreshold ?? 200, enabled: true });
+      if (settings.candleMatchWeeklyEnabled !== false) {
+        const dir = calcCandleDirection(candleMatchData.weekly, '1W');
+        candleDirs.push({ label: '1W', dir });
+        if (dir && signalIsBuy && dir === 'bearish') contradictions.push('1W: Bearish ↓ vs BUY signal');
+        if (dir && signalIsSell && dir === 'bullish') contradictions.push('1W: Bullish ↑ vs SELL signal');
       }
-      if (settings.candleMatchMonthlyEnabled !== false && (settings.candleMatchMonthlyThreshold ?? 200) > 0) {
-        activeCandles.push({ label: '1M', data: monthlyBody, threshold: settings.candleMatchMonthlyThreshold ?? 200, enabled: true });
+      if (settings.candleMatchMonthlyEnabled !== false) {
+        const dir = calcCandleDirection(candleMatchData.monthly, '1M');
+        candleDirs.push({ label: '1M', dir });
+        if (dir && signalIsBuy && dir === 'bearish') contradictions.push('1M: Bearish ↓ vs BUY signal');
+        if (dir && signalIsSell && dir === 'bullish') contradictions.push('1M: Bullish ↑ vs SELL signal');
       }
 
-      if (activeCandles.length >= 2) {
-        // BLOCK if any candle has no data (fetch failed)
-        const hasNullData = activeCandles.some(c => c.data === null);
-        if (hasNullData) {
-          candleMatchBlocked = true;
-          const candleInfo = activeCandles.map(c => `${c.label}: ${c.data ? `${c.data.body.toFixed(1)} ${c.data.direction === 'bullish' ? 'Bullish ↑' : 'Bearish ↓'}` : 'NO DATA ✗'}`).join(' | ');
-          detailedReasons.push({
-            check: 'Candle Match Filter',
-            value: candleInfo,
-            status: 'negative',
-            impact: 'BLOCKED: candle data unavailable — cannot confirm direction'
-          });
-        } else {
-          // Check 1: All active candles must be same direction
-          const firstDir = activeCandles[0].data!.direction;
-          const allSameDir = activeCandles.every(c => c.data!.direction === firstDir);
-
-          // Check 2: All active candle bodies must meet their thresholds
-          const allAboveThreshold = activeCandles.every(c => c.data!.body >= c.threshold);
-
-          // Check 3: Candle direction MUST match signal direction
-          const signalIsBuy = finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY;
-          const signalIsSell = finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL;
-          const candlesMatchSignal = (signalIsBuy && firstDir === 'bullish') || (signalIsSell && firstDir === 'bearish');
-
-          const candleMatch = allSameDir && allAboveThreshold && candlesMatchSignal;
-
-          if (!candleMatch) {
-            candleMatchBlocked = true;
-            if (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
-                finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL) {
-              finalSignal = SignalType.NEUTRAL;
-            }
-            const candleInfo = activeCandles.map(c => `${c.label}: ${c.data!.body.toFixed(1)} ${c.data!.direction === 'bullish' ? 'Bullish ↑' : 'Bearish ↓'} ${c.data!.direction === firstDir ? '✓' : '✗'}`).join(' | ');
-            let blockReason = '';
-            if (!allSameDir) blockReason = 'BLOCKED: candle directions conflict across timeframes';
-            else if (!allAboveThreshold) blockReason = 'BLOCKED: candle body size below threshold';
-            else if (!candlesMatchSignal) blockReason = `BLOCKED: candles are ${firstDir} but signal is ${signalIsBuy ? 'BUY' : 'SELL'} — direction contradiction`;
-            detailedReasons.push({
-              check: 'Candle Match Filter',
-              value: candleInfo,
-              status: 'negative',
-              impact: blockReason
-            });
-          } else {
-            const candleInfo = activeCandles.map(c => `${c.label}: ${c.data!.body.toFixed(1)} ${c.data!.direction === 'bullish' ? 'Bullish ↑' : 'Bearish ↓'}`).join(' | ');
-            detailedReasons.push({
-              check: 'Candle Match Filter',
-              value: candleInfo,
-              status: 'positive',
-              impact: `candle bodies match across timeframes (${firstDir}) — aligns with ${signalIsBuy ? 'BUY' : 'SELL'} signal`
-            });
-          }
+      // Only block if there are actual contradictions
+      if (contradictions.length > 0) {
+        candleMatchBlocked = true;
+        if (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
+            finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL) {
+          finalSignal = SignalType.NEUTRAL;
         }
+        const dirInfo = candleDirs.map(c => `${c.label}: ${c.dir || 'NO DATA'}`).join(' | ');
+        detailedReasons.push({
+          check: 'Candle Contradiction Filter',
+          value: dirInfo,
+          status: 'negative',
+          impact: `BLOCKED: ${contradictions.join('; ')}`
+        });
+      } else if (candleDirs.length > 0) {
+        const dirInfo = candleDirs.map(c => `${c.label}: ${c.dir || 'NO DATA'}`).join(' | ');
+        detailedReasons.push({
+          check: 'Candle Contradiction Filter',
+          value: dirInfo,
+          status: 'positive',
+          impact: 'no candle contradicts signal direction'
+        });
       }
     }
 
