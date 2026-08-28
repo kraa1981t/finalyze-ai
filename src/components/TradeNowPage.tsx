@@ -531,15 +531,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-3 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-black uppercase tracking-wider text-brand-text/60">{isAr ? 'الرموز' : 'Symbols'}</span>
-            <button
-              onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
-              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
-              title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${symbolsCollapsed ? '' : 'rotate-180'}`}>
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
           </div>
           {!symbolsCollapsed && (
           <>
@@ -678,28 +669,28 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             )}
           </>
           )}
+          <div className="flex justify-center">
+            <button
+              onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
+              className="w-16 h-16 rounded-2xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
+              title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
+            >
+              <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${symbolsCollapsed ? '' : 'rotate-180'}`}>
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </div>
           </div>
 
           {/* Order Ticket (full width) */}
           <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-sm p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xl font-black text-brand-text uppercase tracking-wide">{symbol || '—'}</span>
-              <div className="flex items-center gap-2">
-                {priceLoading ? (
-                  <Loader2 size={18} className="animate-spin text-brand-text/50" />
-                ) : (
-                  <span dir="ltr" className="text-2xl font-black text-emerald-400">{fmtPrice(livePrice)}</span>
-                )}
-                <button
-                  onClick={() => setTicketCollapsed(!ticketCollapsed)}
-                  className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
-                  title={ticketCollapsed ? (isAr ? 'توسيع فتح الصفقات' : 'Expand order ticket') : (isAr ? 'طي فتح الصفقات' : 'Collapse order ticket')}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${ticketCollapsed ? '' : 'rotate-180'}`}>
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                </button>
-              </div>
+              {priceLoading ? (
+                <Loader2 size={18} className="animate-spin text-brand-text/50" />
+              ) : (
+                <span dir="ltr" className="text-2xl font-black text-emerald-400">{fmtPrice(livePrice)}</span>
+              )}
             </div>
             {!ticketCollapsed && (
             <>
@@ -817,6 +808,17 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
           </>
           )}
+          <div className="flex justify-center">
+            <button
+              onClick={() => setTicketCollapsed(!ticketCollapsed)}
+              className="w-16 h-16 rounded-2xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
+              title={ticketCollapsed ? (isAr ? 'توسيع فتح الصفقات' : 'Expand order ticket') : (isAr ? 'طي فتح الصفقات' : 'Collapse order ticket')}
+            >
+              <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${ticketCollapsed ? '' : 'rotate-180'}`}>
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </div>
           </div>
 
           {/* Chart / MT5 (full width, below order ticket) */}
