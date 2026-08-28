@@ -171,8 +171,8 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
       </div>
 
       {/* SL - Symbol - TP */}
-      <div className="flex items-center gap-1.5">
-        <div className="flex-1 bg-red-500/10 border border-red-500/20 rounded-lg p-1.5 text-center">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden bg-red-500/10 border border-red-500/20 rounded-lg p-1.5 text-center">
           <div className="flex items-center justify-center gap-1 mb-0.5">
             <TrendingDown size={12} className="text-red-400" />
             <span className="text-[10px] text-red-400 font-bold uppercase">{isAr ? 'وقف الخسارة' : 'SL'}</span>
@@ -183,9 +183,6 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
           <div className="text-xs font-black text-red-400 font-mono mt-0.5">
             {calculations.slPips} {instConfig.pipLabel} ({calculations.slPercent.toFixed(1)}%)
           </div>
-          <div className="text-[10px] text-red-400/70 font-mono">
-            -{formatNum(calculations.riskDollars)}$
-          </div>
         </div>
 
         {/* Symbol name between SL and TP */}
@@ -193,7 +190,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
           <span className="text-sm font-black text-emerald-400 font-mono">{symbol}</span>
         </div>
 
-        <div className="flex-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5 text-center">
+        <div className="flex-1 min-w-0 overflow-hidden bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5 text-center">
           <div className="flex items-center justify-center gap-1 mb-0.5">
             <TrendingUp size={12} className="text-emerald-400" />
             <span className="text-[10px] text-emerald-400 font-bold uppercase">{isAr ? 'جني الأرباح' : 'TP'}</span>
@@ -203,9 +200,6 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
           </span>
           <div className="text-xs font-black text-emerald-400 font-mono mt-0.5">
             {calculations.tpPips} {instConfig.pipLabel} ({calculations.tpPercent.toFixed(1)}%)
-          </div>
-          <div className="text-[10px] text-emerald-400/70 font-mono">
-            +{formatNum(calculations.rewardDollars)}$
           </div>
         </div>
       </div>
