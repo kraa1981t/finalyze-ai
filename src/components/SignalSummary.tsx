@@ -12,9 +12,7 @@ interface SignalSummaryProps {
 const CATEGORY_CONFIG: Record<string, { icon: any; color: string; labelAr: string; labelEn: string }> = {
   forex: { icon: DollarSign, color: '#3B82F6', labelAr: 'الفوركس', labelEn: 'Forex' },
   crypto: { icon: Bitcoin, color: '#F59E0B', labelAr: 'الكريبتو', labelEn: 'Crypto' },
-  stocks_us: { icon: Activity, color: '#8B5CF6', labelAr: 'أسهم أمريكا', labelEn: 'US Stocks' },
-  stocks_eu: { icon: Activity, color: '#10B981', labelAr: 'أسهم أوروبا', labelEn: 'EU Stocks' },
-  stocks_jp: { icon: Activity, color: '#EF4444', labelAr: 'أسهم اليابان', labelEn: 'JP Stocks' },
+  stocks: { icon: Activity, color: '#8B5CF6', labelAr: 'الأسهم', labelEn: 'Stocks' },
   metals: { icon: Gem, color: '#EC4899', labelAr: 'المعادن', labelEn: 'Metals' },
 };
 
@@ -31,16 +29,12 @@ const SYMBOL_CATEGORIES: Record<string, string[]> = {
     'DOGEUSD', 'SHIBUSD', 'PEPEUSD', 'WIFUSD', 'BONKUSD',
     'DOTUSD', 'LINKUSD', 'MATICUSD', 'UNIUSD', 'LTCUSD', 'BCHUSD'
   ],
-  stocks_us: [
+  stocks: [
     'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
-    'XOM', 'CVX', 'JPM', 'BAC', 'WFC', 'C', 'GS'
-  ],
-  stocks_eu: [
+    'XOM', 'CVX', 'JPM', 'BAC', 'WFC', 'C', 'GS',
     'ASML.AS', 'MC.PA', 'NESN.SW', 'SAP.DE', 'SHEL.L',
     'ULVR.L', 'ALV.DE', 'OR.PA', 'AZN.L', 'NVO',
-    'ROG.SW', 'MBG.DE', 'BARC.L', 'BNP.PA'
-  ],
-  stocks_jp: [
+    'ROG.SW', 'MBG.DE', 'BARC.L', 'BNP.PA',
     '7203.T', '6758.T', '8306.T', '9984.T', '7974.T',
     '7267.T', '9432.T', '6861.T', '6501.T', '8035.T'
   ],

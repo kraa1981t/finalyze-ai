@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 import { getStatus, subscribe } from '../services/rateLimitTracker';
+import { getOpenStockExchanges } from '../lib/marketHours';
 
 interface AnalysisFormProps {
   user: User | null;
@@ -156,6 +157,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
 
   const isMarketOpen = (category: string) => {
     if (category === 'crypto') return true;
+    if (category === 'stocks') return getOpenStockExchanges().length > 0;
     const day = new Date().getDay();
     if (day === 0 || day === 6) return false;
     return true;

@@ -28,7 +28,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
   };
 
   const selectedList = autoSettings.category === 'all'
-    ? ['forex', 'crypto', 'stocks_us', 'stocks_eu', 'stocks_jp', 'metals']
+    ? ['forex', 'crypto', 'stocks', 'metals']
     : (autoSettings.category || 'all').split(',');
 
   const handleStrategyChange = (value: string) => {
@@ -162,9 +162,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           {[
             { id: 'forex', label: lang === 'ar' ? 'فوركس' : 'Forex' },
             { id: 'crypto', label: lang === 'ar' ? 'كريبتو' : 'Crypto' },
-            { id: 'stocks_us', label: lang === 'ar' ? 'أسهم أمريكا' : 'US Stocks' },
-            { id: 'stocks_eu', label: lang === 'ar' ? 'أسهم أوروبا' : 'EU Stocks' },
-            { id: 'stocks_jp', label: lang === 'ar' ? 'أسهم اليابان' : 'JP Stocks' },
+            { id: 'stocks', label: lang === 'ar' ? 'الأسهم' : 'Stocks' },
             { id: 'metals', label: lang === 'ar' ? 'معادن' : 'Metals' }
           ].map((cat) => {
             const isSelected = selectedList.includes(cat.id);

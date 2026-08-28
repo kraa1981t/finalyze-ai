@@ -646,6 +646,14 @@ export default function Header({
                     <span className="text-[16px] font-black text-yellow-300 leading-none">{lastSyncStatus.count}</span>
                   )}
                   {analysisProgress && (() => {
+                    // Show the currently-open exchange name when analyzing stocks, else the category chip
+                    if (analysisProgress.exchange) {
+                      return (
+                        <span className="text-[16px] font-black text-yellow-300 whitespace-nowrap leading-none">
+                          {analysisProgress.exchange}
+                        </span>
+                      );
+                    }
                     const { cfg } = detectProgressCategory(analysisProgress.current);
                     return (
                       <span className="text-[16px] font-black text-yellow-300 whitespace-nowrap leading-none">

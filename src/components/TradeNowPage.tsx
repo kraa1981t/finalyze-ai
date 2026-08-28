@@ -27,9 +27,7 @@ const ADDED_CAT_KEY = 'paper_trading_added_by_category';
 const CATEGORY_TABS = [
   { key: 'forex', labelAr: 'الفوركس', labelEn: 'Forex', emoji: '\uD83D\uDCB1' },
   { key: 'crypto', labelAr: 'الكريبتو', labelEn: 'Crypto', emoji: '\uD83E\uDDF1' },
-  { key: 'stocks_us', labelAr: 'أسهم أمريكا', labelEn: 'US Stocks', emoji: '\uD83C\uDDFA\uD83C\uDDF8' },
-  { key: 'stocks_eu', labelAr: 'أسهم أوروبا', labelEn: 'EU Stocks', emoji: '\uD83C\uDDEA\uD83C\uDDFA' },
-  { key: 'stocks_jp', labelAr: 'أسهم اليابان', labelEn: 'JP Stocks', emoji: '\uD83C\uDDEF\uD83C\uDDF5' },
+  { key: 'stocks', labelAr: 'الأسهم', labelEn: 'Stocks', emoji: '\uD83D\uDCC8' },
   { key: 'metals', labelAr: 'المعادن', labelEn: 'Metals', emoji: '\uD83D\uDC8E' },
 ];
 
@@ -99,9 +97,9 @@ function detectCategory(sym: string): string {
   if (/^[A-Z]{6}$/.test(s)) return 'forex';
   if (/BTC|ETH|USDT|COIN|DOGE/.test(s)) return 'crypto';
   if (/XAU|XAG|GOLD|SILVER/.test(s)) return 'metals';
-  if (/\.T$/.test(sym)) return 'stocks_jp';
-  if (/\.(AS|PA|DE|L|SW|CO)$/.test(sym)) return 'stocks_eu';
-  return 'stocks_us';
+  if (/\.T$/.test(sym)) return 'stocks';
+  if (/\.(AS|PA|DE|L|SW|CO)$/.test(sym)) return 'stocks';
+  return 'stocks';
 }
 
 const ORIGINAL_SYMBOLS = new Set<string>(Object.values(SYMBOL_CATEGORIES).flat() as string[]);
@@ -179,13 +177,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
 
   const allSymbolsFor = (cat: string): string[] => {
     if (cat === 'custom') return customSymbols;
-    if (cat === 'stocks') {
-      return [
-        ...allSymbolsFor('stocks_us'),
-        ...allSymbolsFor('stocks_eu'),
-        ...allSymbolsFor('stocks_jp'),
-      ];
-    }
     const base = SYMBOL_CATEGORIES[cat as keyof typeof SYMBOL_CATEGORIES] || [];
     const extra = addedByCategory[cat] || [];
     return [...new Set([...base, ...extra])].filter((s) => !hiddenSymbols.includes(s));
@@ -394,7 +385,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
       if (remaining[0]) setSymbol(remaining[0]);
       else {
         // Fall back to first category with visible symbols
-        for (const c of ['forex', 'crypto', 'stocks_us', 'stocks_eu', 'stocks_jp', 'metals']) {
+        for (const c of ['forex', 'crypto', 'stocks', 'metals']) {
           const vis = allSymbolsFor(c);
           if (vis.length > 0) { setCategory(c); setSymbol(vis[0]); return; }
         }

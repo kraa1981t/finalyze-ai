@@ -21,7 +21,8 @@ import ClientDashboard from './components/ClientDashboard';
 import AnalysisDetailPage from './components/AnalysisDetailPage';
 
 import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType, TradingStyle } from './types';
-import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS, FREE_SYMBOLS } from './constants';
+import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS, FREE_SYMBOLS, STOCKS_BY_EXCHANGE } from './constants';
+import { getOpenStockExchanges, exchangeLabel, StockExchangeKey, OpenExchange } from './lib/marketHours';
 import { Language, translations } from './lib/i18n';
 import { analyzeMarket, getApiKey } from './services/geminiService';
 import { waitIfRateLimited } from './services/rateLimitTracker';
@@ -536,6 +537,14 @@ export default function App() {
     if (saved) {
       try { base = { ...base, ...JSON.parse(saved) }; } catch (e) { base = DEFAULT_AUTO_SETTINGS; }
     }
+    // Migrate old split stock categories into the single merged "stocks" category
+    if (base.category && base.category !== 'all') {
+      const parts = base.category.split(',').map((x: string) => x.trim());
+      const normalized = parts.map((x: string) =>
+        (x === 'stocks_us' || x === 'stocks_eu' || x === 'stocks_jp') ? 'stocks' : x
+      );
+      base = { ...base, category: [...new Set(normalized)].join(',') };
+    }
     return base;
   });
 
@@ -599,7 +608,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, [user]);
 
-  const [progress, setProgress] = useState<{ current: string, total: number, index: number, failed?: number } | null>(null);
+  const [progress, setProgress] = useState<{ current: string, total: number, index: number, failed?: number, exchange?: string } | null>(null);
   const [topSignals, setTopSignals] = useState<AnalysisResult[]>(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('top_signals_persistent') || '[]');
@@ -986,11 +995,22 @@ export default function App() {
     try { playAudio('start'); } catch {}
 
     const cats = s.category === 'all'
-      ? (Object.keys(SYMBOL_CATEGORIES).filter(k => k !== 'stocks') as (keyof typeof SYMBOL_CATEGORIES)[])
+      ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
       : (s.category || 'all').split(',') as (keyof typeof SYMBOL_CATEGORIES)[];
 
-    const open = cats.filter(isMarketOpen);
-    if (open.length === 0) return;
+    // Expand "stocks" into only the exchanges that are OPEN right now.
+    // Each job carries the region + label so the UI can show which exchange is being scanned.
+    const openJobs: { cat: string; region?: StockExchangeKey; exchange?: OpenExchange }[] = [];
+    for (const cat of cats) {
+      if (cat === 'stocks') {
+        for (const ex of getOpenStockExchanges()) {
+          openJobs.push({ cat, region: ex.key, exchange: ex });
+        }
+      } else if (isMarketOpen(cat)) {
+        openJobs.push({ cat, region: undefined, exchange: undefined });
+      }
+    }
+    if (openJobs.length === 0) return;
 
     setIsScanningFinished(false);
 
@@ -1005,27 +1025,34 @@ export default function App() {
     const scanResults: AnalysisResult[] = [];
     let scanFailed = 0;
 
-    for (const cat of open) {
+    for (const { cat, region, exchange } of openJobs) {
       if (!autoSettingsRef.current.isEnabled) break;
-
-      const syms = hasActivePlan
-        ? (() => {
-            const g = SYMBOL_GROUPS[cat]?.flatMap(x => x.symbols) || [];
-            const c = custom.filter(x =>
-              (ALL_SYMBOLS_DB[cat] || []).includes(x) && !g.includes(x)
-            );
-            return [...g, ...c].filter(x => !hidden.includes(x));
-          })()
-        : (FREE_SYMBOLS[cat] || []);
 
       const mt = cat === 'crypto' ? MarketType.CRYPTO :
                  cat.startsWith('stocks') ? MarketType.STOCKS :
                  cat === 'metals' ? MarketType.METALS : MarketType.FOREX;
 
+      const regional = new Set<string>(region ? (STOCKS_BY_EXCHANGE[region] || []) : []);
+
+      const syms = hasActivePlan
+        ? (() => {
+            const g = SYMBOL_GROUPS[cat]?.flatMap(x => x.symbols) || [];
+            const gFiltered = region ? g.filter(x => regional.has(x)) : g;
+            const c = custom.filter(x =>
+              (ALL_SYMBOLS_DB[cat] || []).includes(x) && !g.includes(x) &&
+              (!region || regional.has(x))
+            );
+            return [...gFiltered, ...c].filter(x => !hidden.includes(x));
+          })()
+        : (() => {
+            const free = FREE_SYMBOLS[cat] || [];
+            return region ? free.filter(x => regional.has(x)) : free;
+          })();
+
       for (const sym of syms) {
         if (!autoSettingsRef.current.isEnabled) break;
 
-        setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed });
+        setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed, exchange: exchange?.labelAr });
 
         let lastError: any = null;
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -1073,7 +1100,7 @@ export default function App() {
         if (lastError) {
           console.error(`Radar Error [${sym}]:`, lastError.message);
           scanFailed++;
-          setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed });
+          setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed, exchange: exchange?.labelAr });
           await new Promise(r => setTimeout(r, 3000));
         } else {
           const key = getApiKey();
