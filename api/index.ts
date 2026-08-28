@@ -315,11 +315,29 @@ const TWELVE_DATA_OUTPUTSIZE: Record<string, number> = {
 };
 
 function twelveDataSymbol(symbol: string): string | null {
-  const s = symbol.toUpperCase().replace(/[^A-Z]/g, '');
-  if (s.length !== 6) return null;
-  const base = s.slice(0, 3);
-  const quote = s.slice(3);
-  return `${base}/${quote}`;
+  const s = symbol.toUpperCase().trim();
+  
+  // Forex pairs: EURUSD → EUR/USD
+  const clean = s.replace(/[^A-Z]/g, '');
+  if (clean.length === 6 && /^[A-Z]{6}$/.test(clean)) {
+    return `${clean.slice(0, 3)}/${clean.slice(3)}`;
+  }
+  
+  // Japanese stocks: 7203.T → 7203.T
+  if (/^\d{4}\.T$/.test(s)) return s;
+  
+  // European stocks: ASML.AS, MC.PA, SAP.DE, SHEL.L, NESN.SW, NOVO-B.CO
+  if (/\.(AS|PA|DE|L|SW|CO|MI|MCX|WSE|STO|HEL|OSL|COP)$/.test(s)) return s;
+  
+  // US stocks: AAPL, MSFT, TSLA, SPY, QQQ
+  if (/^[A-Z]{1,5}$/.test(clean)) return s;
+  
+  // Crypto: BTCUSD → BTC/USD
+  if (clean.length === 6 && /USD$/.test(clean)) {
+    return `${clean.slice(0, 3)}/USD`;
+  }
+  
+  return null;
 }
 
 const fetchTwelveDataOHLC = async (symbol: string, timeframe: string): Promise<any> => {
