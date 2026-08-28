@@ -32,12 +32,13 @@ const CATEGORY_CONFIG: Record<string, { emoji: string; labelAr: string; labelEn:
 function getSymbolCategory(symbol: string): string {
   const sym = symbol.toUpperCase().replace(/[-_=]/g, '');
   for (const [cat, syms] of Object.entries(SYMBOL_CATEGORIES)) {
-    if ((syms as string[]).includes(sym)) return cat;
+    if ((syms as string[]).includes(sym)) return cat.startsWith('stocks') ? 'stocks' : cat;
   }
   for (const [cat, syms] of Object.entries(ALL_SYMBOLS_DB)) {
-    if ((syms as string[]).includes(sym)) return cat;
+    if ((syms as string[]).includes(sym)) return cat.startsWith('stocks') ? 'stocks' : cat;
   }
   if (sym.endsWith('USD') && !sym.startsWith('USD') && sym.length > 6) return 'crypto';
+  if (/\.(T|AS|PA|DE|L|SW|CO)$/.test(symbol)) return 'stocks';
   return 'forex';
 }
 

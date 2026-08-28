@@ -27,7 +27,9 @@ const ADDED_CAT_KEY = 'paper_trading_added_by_category';
 const CATEGORY_TABS = [
   { key: 'forex', labelAr: 'الفوركس', labelEn: 'Forex', emoji: '\uD83D\uDCB1' },
   { key: 'crypto', labelAr: 'الكريبتو', labelEn: 'Crypto', emoji: '\uD83E\uDDF1' },
-  { key: 'stocks', labelAr: 'الأسهم', labelEn: 'Stocks', emoji: '\uD83D\uDCC8' },
+  { key: 'stocks_us', labelAr: 'أسهم أمريكا', labelEn: 'US Stocks', emoji: '\uD83C\uDDFA\uD83C\uDDF8' },
+  { key: 'stocks_eu', labelAr: 'أسهم أوروبا', labelEn: 'EU Stocks', emoji: '\uD83C\uDDEA\uD83C\uDDFA' },
+  { key: 'stocks_jp', labelAr: 'أسهم اليابان', labelEn: 'JP Stocks', emoji: '\uD83C\uDDEF\uD83C\uDDF5' },
   { key: 'metals', labelAr: 'المعادن', labelEn: 'Metals', emoji: '\uD83D\uDC8E' },
 ];
 
@@ -75,6 +77,14 @@ function toTvSymbol(sym: string): string {
     ASML: 'NYSE:ASML', TSM: 'NYSE:TSM', ARM: 'NASDAQ:ARM', SMCI: 'NASDAQ:SMCI',
     NOW: 'NYSE:NOW', SHOP: 'NYSE:SHOP', SQ: 'NYSE:SQ', ROKU: 'NASDAQ:ROKU',
     NIO: 'NYSE:NIO', Baba: 'NYSE:BABA', PDD: 'NASDAQ:PDD', JD: 'NASDAQ:JD',
+    '7203.T': 'TSE:7203', '6758.T': 'TSE:6758', '8306.T': 'TSE:8306',
+    '9984.T': 'TSE:9984', '7974.T': 'TSE:7974', '7267.T': 'TSE:7267',
+    '9432.T': 'TSE:9432', '6861.T': 'TSE:6861', '6501.T': 'TSE:6501', '8035.T': 'TSE:8035',
+    '7751.T': 'TSE:7751', '6954.T': 'TSE:6954', '6301.T': 'TSE:6301', '5020.T': 'TSE:5020', '9020.T': 'TSE:9020',
+    'ASML.AS': 'AMS:ASML', 'MC.PA': 'EPA:MC', 'NESN.SW': 'SWX:NESN', 'SAP.DE': 'ETR:SAP',
+    'SHEL.L': 'LON:SHEL', 'ULVR.L': 'LON:ULVR', 'ALV.DE': 'ETR:ALV', 'OR.PA': 'EPA:OR',
+    'AZN.L': 'LON:AZN', 'NVO': 'NYSE:NVO', 'ROG.SW': 'SWX:ROG', 'MBG.DE': 'ETR:MBG',
+    'BARC.L': 'LON:BARC', 'BNP.PA': 'EPA:BNP',
   };
   if (indexMap[s]) return indexMap[s];
   // For unknown symbols, try NYSE first (most US stocks)
@@ -89,7 +99,9 @@ function detectCategory(sym: string): string {
   if (/^[A-Z]{6}$/.test(s)) return 'forex';
   if (/BTC|ETH|USDT|COIN|DOGE/.test(s)) return 'crypto';
   if (/XAU|XAG|GOLD|SILVER/.test(s)) return 'metals';
-  return 'stocks';
+  if (/\.T$/.test(sym)) return 'stocks_jp';
+  if (/\.(AS|PA|DE|L|SW|CO)$/.test(sym)) return 'stocks_eu';
+  return 'stocks_us';
 }
 
 const ORIGINAL_SYMBOLS = new Set<string>(Object.values(SYMBOL_CATEGORIES).flat() as string[]);
@@ -167,6 +179,13 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
 
   const allSymbolsFor = (cat: string): string[] => {
     if (cat === 'custom') return customSymbols;
+    if (cat === 'stocks') {
+      return [
+        ...allSymbolsFor('stocks_us'),
+        ...allSymbolsFor('stocks_eu'),
+        ...allSymbolsFor('stocks_jp'),
+      ];
+    }
     const base = SYMBOL_CATEGORIES[cat as keyof typeof SYMBOL_CATEGORIES] || [];
     const extra = addedByCategory[cat] || [];
     return [...new Set([...base, ...extra])].filter((s) => !hiddenSymbols.includes(s));
@@ -375,7 +394,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
       if (remaining[0]) setSymbol(remaining[0]);
       else {
         // Fall back to first category with visible symbols
-        for (const c of ['forex', 'crypto', 'stocks', 'metals']) {
+        for (const c of ['forex', 'crypto', 'stocks_us', 'stocks_eu', 'stocks_jp', 'metals']) {
           const vis = allSymbolsFor(c);
           if (vis.length > 0) { setCategory(c); setSymbol(vis[0]); return; }
         }

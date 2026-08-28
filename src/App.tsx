@@ -1019,7 +1019,7 @@ export default function App() {
         : (FREE_SYMBOLS[cat] || []);
 
       const mt = cat === 'crypto' ? MarketType.CRYPTO :
-                 cat === 'stocks' ? MarketType.STOCKS :
+                 cat.startsWith('stocks') ? MarketType.STOCKS :
                  cat === 'metals' ? MarketType.METALS : MarketType.FOREX;
 
       for (const sym of syms) {

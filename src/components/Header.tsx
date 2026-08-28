@@ -12,7 +12,9 @@ const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 const PROGRESS_CATEGORY_CONFIG: Record<string, { emoji: string; labelAr: string; labelEn: string }> = {
   forex: { emoji: '\uD83D\uDCB1', labelAr: 'فوركس', labelEn: 'Forex' },
   crypto: { emoji: '\uD83E\uDDF1', labelAr: 'كريبتو', labelEn: 'Crypto' },
-  stocks: { emoji: '\uD83D\uDCC8', labelAr: 'أسهم', labelEn: 'Stocks' },
+  stocks_us: { emoji: '\uD83C\uDDFA\uD83C\uDDF8', labelAr: 'أسهم أمريكا', labelEn: 'US Stocks' },
+  stocks_eu: { emoji: '\uD83C\uDDEA\uD83C\uDDFA', labelAr: 'أسهم أوروبا', labelEn: 'EU Stocks' },
+  stocks_jp: { emoji: '\uD83C\uDDEF\uD83C\uDDF5', labelAr: 'أسهم اليابان', labelEn: 'JP Stocks' },
   metals: { emoji: '\uD83D\uDC8E', labelAr: 'معادن', labelEn: 'Metals' },
 };
 
@@ -28,7 +30,9 @@ function detectProgressCategory(symbol: string): { key: string; cfg?: typeof PRO
   if (/XAU|XAG|GOLD|SILVER/.test(s)) return { key: 'metals', cfg: PROGRESS_CATEGORY_CONFIG.metals };
   if (/BTC|ETH|BNB|SOL|XRP|DOGE|ADA|DOT|AVAX|MATIC|LINK|UNI|SHIB|LTC|ATOM/.test(s)) return { key: 'crypto', cfg: PROGRESS_CATEGORY_CONFIG.crypto };
   if (/EUR|GBP|JPY|CHF|CAD|AUD|NZD|USD/.test(s)) return { key: 'forex', cfg: PROGRESS_CATEGORY_CONFIG.forex };
-  return { key: '', cfg: undefined };
+  if (/\.(T)$/.test(symbol)) return { key: 'stocks_jp', cfg: PROGRESS_CATEGORY_CONFIG.stocks_jp };
+  if (/\.(AS|PA|DE|L|SW|CO)$/.test(symbol)) return { key: 'stocks_eu', cfg: PROGRESS_CATEGORY_CONFIG.stocks_eu };
+  return { key: 'stocks_us', cfg: PROGRESS_CATEGORY_CONFIG.stocks_us };
 }
 
 interface HeaderProps {

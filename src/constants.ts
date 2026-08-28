@@ -79,6 +79,16 @@ export const SYMBOL_CATEGORIES = {
     'BABA', 'NIO',
     'SPY', 'QQQ', 'US500', 'US30', 'US100',
   ],
+  stocks_jp: [
+    '7203.T', '6758.T', '8306.T', '9984.T', '7974.T',
+    '7267.T', '9432.T', '6861.T', '6501.T', '8035.T',
+    '7751.T', '6954.T', '6301.T', '5020.T', '9020.T',
+  ],
+  stocks_eu: [
+    'ASML.AS', 'MC.PA', 'NESN.SW', 'SAP.DE', 'SHEL.L',
+    'ULVR.L', 'ALV.DE', 'OR.PA', 'AZN.L', 'NVO',
+    'ROG.SW', 'NOVO-B.CO', 'MBG.DE', 'BARC.L', 'BNP.PA',
+  ],
   metals: [
     'XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD',
   ]
@@ -112,7 +122,9 @@ export const DEFAULT_COMPLETION_SOUNDS = [
 export const FREE_SYMBOLS: Record<string, string[]> = {
   forex: ['EURUSD', 'GBPUSD', 'USDJPY', 'EURJPY', 'GBPJPY'],
   crypto: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'XRPUSD', 'ADAUSD'],
-  stocks: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'],
+  stocks_us: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'],
+  stocks_eu: ['ASML.AS', 'MC.PA', 'SAP.DE', 'SHEL.L', 'NVO'],
+  stocks_jp: ['7203.T', '6758.T', '8306.T', '9984.T', '7974.T'],
   metals: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD'],
 };
 
