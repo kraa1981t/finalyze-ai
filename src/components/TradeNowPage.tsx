@@ -501,7 +501,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           <div className="w-9 h-9 rounded-xl bg-[#F59E0B] flex items-center justify-center shadow-lg shadow-[#F59E0B]/30">
             <TrendingUp size={20} className="text-black" />
           </div>
-          <span className="text-lg font-black text-brand-text">{isAr ? 'تداول الآن' : 'Trade Now'}</span>
+          <span className="text-lg font-black text-brand-text">{isAr ? 'تداول تلقائي' : 'Automatic Trading'}</span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -960,7 +960,12 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         <td className="px-4 py-3 text-sm font-bold text-brand-text/60" dir="ltr">
                           {(() => {
                             const d = new Date(t.openedAt);
-                            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                            const y = d.getFullYear();
+                            const mo = String(d.getMonth() + 1).padStart(2, '0');
+                            const day = String(d.getDate()).padStart(2, '0');
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const mm = String(d.getMinutes()).padStart(2, '0');
+                            return `${y}-${mo}-${day} ${hh}:${mm}`;
                           })()}
                         </td>
                         <td className={`px-4 py-3 text-base font-black ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{cur ? fmtMoney(pnl) : '—'}</td>
