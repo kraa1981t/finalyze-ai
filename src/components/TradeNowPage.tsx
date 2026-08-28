@@ -150,6 +150,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [popId, setPopId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [platform, setPlatform] = useState<'chart' | 'mt5'>('chart');
+  const [symbolsCollapsed, setSymbolsCollapsed] = useState(false);
+  const [ticketCollapsed, setTicketCollapsed] = useState(false);
 
   const store = getTradeStore(user);
 
@@ -527,7 +529,21 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
       <div className="space-y-2">
         {/* Symbol Selector (full width) */}
         <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-3 space-y-2">
-            <div className="flex flex-wrap gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-black uppercase tracking-wider text-brand-text/60">{isAr ? 'الرموز' : 'Symbols'}</span>
+            <button
+              onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
+              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
+              title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${symbolsCollapsed ? '' : 'rotate-180'}`}>
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+          {!symbolsCollapsed && (
+          <>
+          <div className="flex flex-wrap gap-2">
               {CATEGORY_TABS.map((tabC) => (
                 <button
                   key={tabC.key}
@@ -660,19 +676,33 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                 {isAr ? `↩ استعادة الرموز المحذوفة (${hiddenSymbols.length})` : `↩ Restore removed symbols (${hiddenSymbols.length})`}
               </button>
             )}
+          </>
+          )}
           </div>
 
           {/* Order Ticket (full width) */}
           <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-sm p-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-xl font-black text-brand-text uppercase tracking-wide">{symbol || '—'}</span>
-              {priceLoading ? (
-                <Loader2 size={18} className="animate-spin text-brand-text/50" />
-              ) : (
-                <span dir="ltr" className="text-2xl font-black text-emerald-400">{fmtPrice(livePrice)}</span>
-              )}
+              <div className="flex items-center gap-2">
+                {priceLoading ? (
+                  <Loader2 size={18} className="animate-spin text-brand-text/50" />
+                ) : (
+                  <span dir="ltr" className="text-2xl font-black text-emerald-400">{fmtPrice(livePrice)}</span>
+                )}
+                <button
+                  onClick={() => setTicketCollapsed(!ticketCollapsed)}
+                  className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
+                  title={ticketCollapsed ? (isAr ? 'توسيع فتح الصفقات' : 'Expand order ticket') : (isAr ? 'طي فتح الصفقات' : 'Collapse order ticket')}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${ticketCollapsed ? '' : 'rotate-180'}`}>
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+              </div>
             </div>
-
+            {!ticketCollapsed && (
+            <>
             {/* Qty */}
             <div>
               <label className="text-xs font-black uppercase text-brand-text/50 tracking-wider">
@@ -763,7 +793,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                 {isAr ? 'السعر غير متاح لهذا الرمز حالياً' : 'Live price unavailable for this symbol'}
               </p>
             )}
-          </div>
 
           {/* Stats mini */}
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4 grid grid-cols-4 gap-2 text-center">
@@ -785,6 +814,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                 {stats.totalMargin > 0 ? `${stats.marginLevel}%` : '—'}
               </div>
             </div>
+          </div>
+          </>
+          )}
           </div>
 
           {/* Chart / MT5 (full width, below order ticket) */}
