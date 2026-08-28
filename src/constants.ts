@@ -79,6 +79,18 @@ export const SYMBOL_CATEGORIES = {
     'BABA', 'NIO',
     'SPY', 'QQQ', 'US500', 'US30', 'US100',
   ],
+  stocks_us: [
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX',
+    'AMD', 'INTC', 'TSM', 'ASML', 'ARM', 'SMCI',
+    'CRM', 'PLTR', 'COIN', 'NOW',
+    'JPM', 'BAC', 'V', 'MA',
+    'JNJ', 'UNH', 'LLY', 'PFE',
+    'WMT', 'MCD', 'NKE', 'DIS',
+    'XOM', 'CVX', 'COP',
+    'BA', 'CAT', 'GE',
+    'BABA', 'NIO',
+    'SPY', 'QQQ', 'US500', 'US30', 'US100',
+  ],
   stocks_jp: [
     '7203.T', '6758.T', '8306.T', '9984.T', '7974.T',
     '7267.T', '9432.T', '6861.T', '6501.T', '8035.T',
@@ -172,6 +184,32 @@ export const SYMBOL_GROUPS: Record<string, { label: string, symbols: string[] }[
     { label: 'indices', symbols: ['US500', 'US30', 'US100', 'UK100', 'DE40', 'JP225'] },
     { label: 'etfs', symbols: ['SPY', 'QQQ', 'DIA', 'GLD', 'SLV'] },
   ],
+  stocks_us: [
+    { label: 'techStocks', symbols: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX'] },
+    { label: 'semiconductors', symbols: ['AMD', 'INTC', 'TSM', 'ASML', 'AVGO', 'QCOM', 'ARM', 'SMCI'] },
+    { label: 'softwareCloud', symbols: ['CRM', 'PLTR', 'NOW', 'SNOW', 'COIN', 'DDOG', 'NET'] },
+    { label: 'finance', symbols: ['JPM', 'BAC', 'V', 'MA', 'GS', 'MS', 'BLK'] },
+    { label: 'healthcare', symbols: ['JNJ', 'UNH', 'LLY', 'PFE', 'ABBV', 'MRK'] },
+    { label: 'consumer', symbols: ['WMT', 'MCD', 'NKE', 'DIS', 'COST', 'SBUX'] },
+    { label: 'energy', symbols: ['XOM', 'CVX', 'COP', 'SLB'] },
+    { label: 'chinese', symbols: ['BABA', 'NIO', 'JD', 'PDD'] },
+    { label: 'indices', symbols: ['US500', 'US30', 'US100'] },
+    { label: 'etfs', symbols: ['SPY', 'QQQ', 'DIA', 'GLD', 'SLV'] },
+  ],
+  stocks_eu: [
+    { label: 'europeanTech', symbols: ['ASML.AS', 'SAP.DE', 'NVO', 'SIE.DE', 'IFX.DE'] },
+    { label: 'europeanLuxury', symbols: ['MC.PA', 'OR.PA', 'NESN.SW', 'ROG.SW', 'LVMH.PA'] },
+    { label: 'ukStocks', symbols: ['SHEL.L', 'ULVR.L', 'AZN.L', 'BARC.L', 'BP.L', 'GSK.L', 'HSBA.L'] },
+    { label: 'germanStocks', symbols: ['ALV.DE', 'MBG.DE', 'DBK.DE', 'ADS.DE', 'DHL.DE', 'BMW.DE'] },
+    { label: 'frenchStocks', symbols: ['MC.PA', 'OR.PA', 'BNP.PA', 'TTE.PA', 'AIR.PA', 'SAN.PA'] },
+    { label: 'scandinavian', symbols: ['NOVO-B.CO', 'NVO', 'ERIC-B.ST', 'VOLV-B.ST', 'SBAB'] },
+  ],
+  stocks_jp: [
+    { label: 'japaneseAuto', symbols: ['7203.T', '7267.T', '6758.T', '6902.T', '7201.T'] },
+    { label: 'japaneseTech', symbols: ['9984.T', '6501.T', '6861.T', '8035.T', '6752.T'] },
+    { label: 'japaneseFinance', symbols: ['8306.T', '8411.T', '8316.T', '7182.T'] },
+    { label: 'japaneseConglomerate', symbols: ['8058.T', '8001.T', '8015.T', '9433.T'] },
+  ],
   metals: [
     { label: 'preciousMetals', symbols: ['XAUUSD', 'XAGUSD', 'XPTUSD'] },
     { label: 'industrialMetals', symbols: ['XCUUSD', 'XPDUSD'] },
@@ -251,6 +289,45 @@ export const ALL_SYMBOLS_DB: Record<string, string[]> = {
     'SPY', 'QQQ', 'DIA', 'IWM', 'VTI', 'ARKK', 'XLF', 'XLK', 'XLE', 'XLV', 'GLD', 'SLV', 'USO',
     // Indices (CFD)
     'US500', 'US30', 'US100', 'UK100', 'DE40', 'JP225', 'HK50', 'AU200',
+  ].sort(),
+  stocks_us: [
+    // US Tech Giants (FAANG+)
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX',
+    // US Semiconductors
+    'AMD', 'INTC', 'QCOM', 'AVGO', 'MU', 'MRVL', 'LRCX', 'KLAC', 'AMAT', 'TSM', 'ASML', 'ARM', 'SMCI',
+    // US Software & Cloud
+    'CRM', 'ADBE', 'ORCL', 'NOW', 'SNOW', 'PLTR', 'UBER', 'SQ', 'SHOP', 'COIN', 'DDOG', 'NET', 'ZS',
+    // US AI & Growth
+    'APP', 'MSTR', 'CRWD', 'PANW', 'SOFI', 'DKNG', 'RBLX',
+    // US Finance
+    'JPM', 'BAC', 'WFC', 'C', 'GS', 'MS', 'BLK', 'SCHW', 'AXP', 'V', 'MA', 'PYPL',
+    // US Healthcare
+    'JNJ', 'UNH', 'PFE', 'ABBV', 'MRK', 'LLY', 'TMO', 'ABT', 'DHR', 'BMY', 'AMGN', 'GILD', 'MRNA', 'ISRG',
+    // US Consumer & Retail
+    'WMT', 'COST', 'HD', 'LOW', 'TGT', 'SBUX', 'MCD', 'NKE', 'DIS', 'PG', 'KO', 'PEP', 'LULU',
+    // US Energy
+    'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO', 'OXY', 'DVN',
+    // US Industrial & Defense
+    'BA', 'CAT', 'HON', 'GE', 'LMT', 'RTX', 'NOC', 'MMM', 'DE', 'UPS', 'FDX',
+    // US Telecom
+    'T', 'VZ', 'TMUS', 'CSCO',
+    // US EV & Social
+    'RIVN', 'LCID', 'SNAP', 'PINS',
+    // Chinese Tech (US-listed)
+    'BABA', 'JD', 'PDD', 'BIDU', 'NIO', 'LI', 'XPEV',
+    // ETFs
+    'SPY', 'QQQ', 'DIA', 'IWM', 'VTI', 'ARKK', 'XLF', 'XLK', 'XLE', 'XLV', 'GLD', 'SLV', 'USO',
+    // Indices (CFD)
+    'US500', 'US30', 'US100',
+  ].sort(),
+  stocks_eu: [
+    'ASML.AS', 'MC.PA', 'NESN.SW', 'SAP.DE', 'SHEL.L', 'ULVR.L', 'ALV.DE', 'OR.PA', 'AZN.L', 'NVO',
+    'ROG.SW', 'NOVO-B.CO', 'MBG.DE', 'BARC.L', 'BNP.PA', 'TTE.PA', 'BP.L', 'DBK.DE', 'IFX.DE', 'ADS.DE',
+    'UK100', 'DE40',
+  ].sort(),
+  stocks_jp: [
+    '7203.T', '6758.T', '8306.T', '9984.T', '7974.T', '7267.T', '9432.T', '6861.T', '6501.T', '8035.T',
+    '7751.T', '6954.T', '6301.T', '5020.T', '9020.T', 'JP225',
   ].sort(),
   metals: [
     'XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'XCUUSD',

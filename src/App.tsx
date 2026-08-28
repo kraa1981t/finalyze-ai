@@ -986,7 +986,7 @@ export default function App() {
     try { playAudio('start'); } catch {}
 
     const cats = s.category === 'all'
-      ? Object.keys(SYMBOL_CATEGORIES) as (keyof typeof SYMBOL_CATEGORIES)[]
+      ? (Object.keys(SYMBOL_CATEGORIES).filter(k => k !== 'stocks') as (keyof typeof SYMBOL_CATEGORIES)[])
       : (s.category || 'all').split(',') as (keyof typeof SYMBOL_CATEGORIES)[];
 
     const open = cats.filter(isMarketOpen);
