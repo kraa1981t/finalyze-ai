@@ -808,9 +808,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   />
                   <button onClick={() => adjustPrice('tp', 1)} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">+</button>
                 </div>
-                {tpPrice && (
-                  <div className="text-[10px] font-bold text-emerald-400/70 text-center mt-0.5" dir="ltr">$ {tpPrice}</div>
-                )}
               </div>
               <div>
                 <label className="text-xs font-black uppercase text-red-400/90 tracking-wider">{isAr ? 'وقف الخسارة ($)' : 'Stop Loss ($)'}</label>
@@ -826,9 +823,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   />
                   <button onClick={() => adjustPrice('sl', 1)} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">+</button>
                 </div>
-                {slPrice && (
-                  <div className="text-[10px] font-bold text-red-400/70 text-center mt-0.5" dir="ltr">$ {slPrice}</div>
-                )}
               </div>
             </div>
 

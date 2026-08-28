@@ -162,7 +162,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 overflow-hidden">
       {/* Signal type with color */}
       <div className="flex items-center justify-center">
         <span className={`text-xs font-bold ${signalDisplay.color}`}>
@@ -196,7 +196,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
             <span className="text-[10px] text-emerald-400 font-bold uppercase">{isAr ? 'جني الأرباح' : 'TP'}</span>
           </div>
           <span className="text-lg font-extrabold text-emerald-500 font-mono block">
-            {formatNum(calculations.adjustedTpPrice, decimals)}
+            {formatNum(takeProfit, decimals)}
           </span>
           <div className="text-xs font-black text-emerald-400 font-mono mt-0.5">
             {calculations.tpPips} {instConfig.pipLabel} ({calculations.tpPercent.toFixed(1)}%)
