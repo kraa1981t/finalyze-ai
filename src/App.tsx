@@ -1052,7 +1052,7 @@ export default function App() {
       for (const sym of syms) {
         if (!autoSettingsRef.current.isEnabled) break;
 
-        setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed, exchange: exchange?.labelAr });
+          setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed, exchange: exchange ? exchangeLabel(exchange.key, lang) : undefined });
 
         let lastError: any = null;
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -1100,7 +1100,7 @@ export default function App() {
         if (lastError) {
           console.error(`Radar Error [${sym}]:`, lastError.message);
           scanFailed++;
-          setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed, exchange: exchange?.labelAr });
+        setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed, exchange: exchange ? exchangeLabel(exchange.key, lang) : undefined });
           await new Promise(r => setTimeout(r, 3000));
         } else {
           const key = getApiKey();
