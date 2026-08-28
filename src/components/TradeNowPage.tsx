@@ -795,36 +795,36 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               </div>
             </div>
 
-            {/* TP/SL percent */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-black uppercase text-emerald-400/90 tracking-wider">{isAr ? 'جني الأرباح ($)' : 'Take Profit ($)'}</label>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <button onClick={() => adjustPrice('tp', -1)} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">−</button>
+            {/* TP/SL dollar amounts */}
+            <div className="grid grid-cols-2 gap-2 items-start">
+              <div className="min-w-0">
+                <label className="block text-xs font-black uppercase text-emerald-400/90 tracking-wider truncate">{isAr ? 'جني الأرباح ($)' : 'Take Profit ($)'}</label>
+                <div className="flex items-stretch gap-1.5 mt-1 min-w-0">
+                  <button onClick={() => adjustPrice('tp', -1)} className="w-11 h-11 shrink-0 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">−</button>
                   <input
                     type="text" inputMode="decimal" lang="en" dir="ltr"
                     placeholder="$"
                     value={tpPrice}
                     onChange={(e) => setTpPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-emerald-500 placeholder:text-brand-text/25 placeholder:text-sm"
+                    className="flex-1 w-full min-w-0 h-11 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-emerald-500 placeholder:text-brand-text/25 placeholder:text-sm"
                     style={{ direction: 'ltr' }}
                   />
-                  <button onClick={() => adjustPrice('tp', 1)} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">+</button>
+                  <button onClick={() => adjustPrice('tp', 1)} className="w-11 h-11 shrink-0 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">+</button>
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-black uppercase text-red-400/90 tracking-wider">{isAr ? 'وقف الخسارة ($)' : 'Stop Loss ($)'}</label>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <button onClick={() => adjustPrice('sl', -1)} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">−</button>
+              <div className="min-w-0">
+                <label className="block text-xs font-black uppercase text-red-400/90 tracking-wider truncate">{isAr ? 'وقف الخسارة ($)' : 'Stop Loss ($)'}</label>
+                <div className="flex items-stretch gap-1.5 mt-1 min-w-0">
+                  <button onClick={() => adjustPrice('sl', -1)} className="w-11 h-11 shrink-0 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">−</button>
                   <input
                     type="text" inputMode="decimal" lang="en" dir="ltr"
                     placeholder="$"
                     value={slPrice}
                     onChange={(e) => setSlPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                    className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-red-500 placeholder:text-brand-text/25 placeholder:text-sm"
+                    className="flex-1 w-full min-w-0 h-11 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-red-500 placeholder:text-brand-text/25 placeholder:text-sm"
                     style={{ direction: 'ltr' }}
                   />
-                  <button onClick={() => adjustPrice('sl', 1)} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">+</button>
+                  <button onClick={() => adjustPrice('sl', 1)} className="w-11 h-11 shrink-0 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">+</button>
                 </div>
               </div>
             </div>
