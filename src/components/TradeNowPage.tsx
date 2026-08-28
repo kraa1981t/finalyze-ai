@@ -116,6 +116,20 @@ const fmtMoney = (v: number) =>
 const fmtPrice = (v: number | null | undefined) =>
   v == null ? '—' : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 });
 
+// Mirror the calculator's decimal precision per instrument for TP/SL dollar values
+function priceDecimals(symbol: string): number {
+  const s = symbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (/[^.]*\.T$/.test(symbol) || /[^.]*\.(AS|PA|DE|L|SW|CO)$/.test(symbol)) return 2; // stocks
+  const cryptoNames = ['BTC','ETH','DOGE','SOL','XRP','ADA','DOT','SHIB','AVAX','MATIC','LINK','UNI','ATOM','LTC','BCH','NEAR','FIL','APT','ARB','OP','SUI','SEI','PEPE','WIF','BONK','TON','TRX'];
+  for (const c of cryptoNames) {
+    if ((s.startsWith(c) && s.endsWith('USD')) || s === c || s === c + 'USDT') return 2;
+  }
+  const currencies = ['EUR','GBP','AUD','NZD','CAD','CHF','USD','JPY','TRY','ZAR','MXN','SEK','NOK','DKK','SGD','HKD','CNY','INR'];
+  const found = currencies.filter(c => s.includes(c));
+  if (found.length >= 2) return s.includes('JPY') ? 3 : 5;
+  return 2;
+}
+
 export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageProps) {
   const isAr = lang === 'ar';
   const [category, setCategory] = useState<string>('forex');
@@ -134,8 +148,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [trades, setTrades] = useState<PaperTrade[]>([]);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [qty, setQty] = useState<number>(getDefaultQty('forex'));
-  const [tpPercent, setTpPercent] = useState<string>('');
-  const [slPercent, setSlPercent] = useState<string>('');
+  const [tpPrice, setTpPrice] = useState<string>('');
+  const [slPrice, setSlPrice] = useState<string>('');
   const [tab, setTab] = useState<'positions' | 'history'>('positions');
   const [busy, setBusy] = useState(false);
   const [priceLoading, setPriceLoading] = useState(true);
@@ -160,20 +174,17 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     return signals.find((s) => s.symbol.toUpperCase() === symbol.toUpperCase()) || null;
   }, [symbol, signals]);
 
-  // Auto-fill SL/TP when symbol changes and matches a signal
+  // Auto-fill SL/TP price values ($) when symbol changes and matches a signal
   useEffect(() => {
     if (matchedSignal && matchedSignal.stopLoss && matchedSignal.takeProfit) {
-      const entry = matchedSignal.entryPrice || livePrice || 0;
-      if (entry <= 0) return;
-      const slDist = Math.abs(entry - matchedSignal.stopLoss) / entry * 100;
-      const tpDist = Math.abs(matchedSignal.takeProfit - entry) / entry * 100;
-      setSlPercent(slDist > 0 ? slDist.toFixed(2) : '');
-      setTpPercent(tpDist > 0 ? tpDist.toFixed(2) : '');
+      const dec = priceDecimals(matchedSignal.symbol || symbol);
+      setSlPrice(matchedSignal.stopLoss.toFixed(dec));
+      setTpPrice(matchedSignal.takeProfit.toFixed(dec));
     } else {
-      setSlPercent('');
-      setTpPercent('');
+      setSlPrice('');
+      setTpPrice('');
     }
-  }, [matchedSignal?.symbol, matchedSignal?.stopLoss, matchedSignal?.takeProfit, livePrice]);
+  }, [matchedSignal?.symbol, matchedSignal?.stopLoss, matchedSignal?.takeProfit, symbol]);
 
   const allSymbolsFor = (cat: string): string[] => {
     if (cat === 'custom') return customSymbols;
@@ -402,23 +413,11 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     if (!livePrice || busy || qty <= 0) return;
     setBusy(true);
 
-    // Use signal SL/TP if available, otherwise calculate from percentage
-    let tpVal: number | null = null;
-    let slVal: number | null = null;
-
-    if (matchedSignal && matchedSignal.stopLoss && matchedSignal.takeProfit) {
-      slVal = matchedSignal.stopLoss;
-      tpVal = matchedSignal.takeProfit;
-    } else {
-      tpVal = tpPercent ? (side === 'buy'
-        ? livePrice * (1 + parseFloat(tpPercent) / 100)
-        : livePrice * (1 - parseFloat(tpPercent) / 100)) : null;
-      slVal = slPercent ? (side === 'buy'
-        ? livePrice * (1 - parseFloat(slPercent) / 100)
-        : livePrice * (1 + parseFloat(slPercent) / 100)) : null;
-    }
+    // Use the dollar ($) TP/SL price values entered (auto-filled from signal or manually adjusted)
+    const tpVal = parseFloat(tpPrice) || (matchedSignal?.takeProfit || null);
+    const slVal = parseFloat(slPrice) || (matchedSignal?.stopLoss || null);
     const cat = detectCategory(symbol);
-    const tradeData = { symbol, category: cat, side, qty, entryPrice: livePrice, status: 'open' as const, tp: tpVal, sl: slVal, openedAt: Date.now() };
+    const tradeData = { symbol, category: cat, side, qty, entryPrice: livePrice, status: 'open' as const, tp: tpVal || null, sl: slVal || null, openedAt: Date.now() };
     let id: string;
     try {
       id = await store.addTrade(tradeData);
@@ -432,7 +431,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
       } catch {}
     }
     setTrades((prev) => [{ id, ...tradeData }, ...prev]);
-    setTpPercent(''); setSlPercent('');
+    setTpPrice(''); setSlPrice('');
     setBusy(false);
     playOpenSound();
   }
@@ -442,6 +441,17 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     if (!exit) return;
     await closeTradeInternal(t, exit, 'manual');
   }
+
+  // Manually adjust a TP/SL dollar value by one instrument step (up or down)
+  const adjustPrice = (kind: 'tp' | 'sl', dir: number) => {
+    const dec = priceDecimals(symbol);
+    const step = dec === 5 ? 0.0001 : 0.01;
+    const raw = kind === 'tp' ? tpPrice : slPrice;
+    const base = parseFloat(raw);
+    const val = isNaN(base) ? livePrice || 0 : base;
+    const next = +(val + dir * step).toFixed(dec);
+    if (kind === 'tp') setTpPrice(String(next)); else setSlPrice(String(next));
+  };
 
   async function adjustSl(tradeId: string, newSl: number) {
     await store.updateTrade(tradeId, { sl: newSl > 0 ? newSl : null });
@@ -785,35 +795,39 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             {/* TP/SL percent */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs font-black uppercase text-emerald-400/90 tracking-wider">TP %</label>
-                <input
-                  type="text" inputMode="decimal" lang="en" dir="ltr"
-                  placeholder={isAr ? 'اختياري' : 'optional'}
-                  value={tpPercent}
-                  onChange={(e) => setTpPercent(e.target.value.replace(/[^0-9.]/g, ''))}
-                  className="w-full h-11 mt-1 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-emerald-500 placeholder:text-brand-text/25 placeholder:text-sm"
-                  style={{ direction: 'ltr' }}
-                />
-                {matchedSignal?.takeProfit && livePrice && (
-                  <div className="text-[10px] font-bold text-emerald-400/70 text-center mt-0.5" dir="ltr">
-                    → ${matchedSignal.takeProfit.toFixed(matchedSignal.takeProfit > 100 ? 2 : 4)}
-                  </div>
+                <label className="text-xs font-black uppercase text-emerald-400/90 tracking-wider">{isAr ? 'جني الأرباح ($)' : 'Take Profit ($)'}</label>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <button onClick={() => adjustPrice('tp', -1)} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">−</button>
+                  <input
+                    type="text" inputMode="decimal" lang="en" dir="ltr"
+                    placeholder="$"
+                    value={tpPrice}
+                    onChange={(e) => setTpPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-emerald-500 placeholder:text-brand-text/25 placeholder:text-sm"
+                    style={{ direction: 'ltr' }}
+                  />
+                  <button onClick={() => adjustPrice('tp', 1)} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">+</button>
+                </div>
+                {tpPrice && (
+                  <div className="text-[10px] font-bold text-emerald-400/70 text-center mt-0.5" dir="ltr">$ {tpPrice}</div>
                 )}
               </div>
               <div>
-                <label className="text-xs font-black uppercase text-red-400/90 tracking-wider">SL %</label>
-                <input
-                  type="text" inputMode="decimal" lang="en" dir="ltr"
-                  placeholder={isAr ? 'اختياري' : 'optional'}
-                  value={slPercent}
-                  onChange={(e) => setSlPercent(e.target.value.replace(/[^0-9.]/g, ''))}
-                  className="w-full h-11 mt-1 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-red-500 placeholder:text-brand-text/25 placeholder:text-sm"
-                  style={{ direction: 'ltr' }}
-                />
-                {matchedSignal?.stopLoss && livePrice && (
-                  <div className="text-[10px] font-bold text-red-400/70 text-center mt-0.5" dir="ltr">
-                    → ${matchedSignal.stopLoss.toFixed(matchedSignal.stopLoss > 100 ? 2 : 4)}
-                  </div>
+                <label className="text-xs font-black uppercase text-red-400/90 tracking-wider">{isAr ? 'وقف الخسارة ($)' : 'Stop Loss ($)'}</label>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <button onClick={() => adjustPrice('sl', -1)} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">−</button>
+                  <input
+                    type="text" inputMode="decimal" lang="en" dir="ltr"
+                    placeholder="$"
+                    value={slPrice}
+                    onChange={(e) => setSlPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-red-500 placeholder:text-brand-text/25 placeholder:text-sm"
+                    style={{ direction: 'ltr' }}
+                  />
+                  <button onClick={() => adjustPrice('sl', 1)} className="w-11 h-11 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">+</button>
+                </div>
+                {slPrice && (
+                  <div className="text-[10px] font-bold text-red-400/70 text-center mt-0.5" dir="ltr">$ {slPrice}</div>
                 )}
               </div>
             </div>
