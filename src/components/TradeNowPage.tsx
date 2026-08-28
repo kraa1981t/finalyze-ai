@@ -150,8 +150,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [popId, setPopId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [platform, setPlatform] = useState<'chart' | 'mt5'>('chart');
-  const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
 
   const store = getTradeStore(user);
 
@@ -526,12 +524,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         </div>
       </div>
 
-      <div className="flex gap-2">
-        {/* Left: Symbol selector + Chart */}
-        <div className={`${rightCollapsed ? 'flex-1' : 'lg:w-2/3'} space-y-2 transition-all duration-300 min-w-0`}>
-          {/* Symbol Selector */}
-          {!leftCollapsed && (
-          <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-3 space-y-2">
+      <div className="space-y-2">
+        {/* Symbol Selector (full width) */}
+        <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-3 space-y-2">
             <div className="flex flex-wrap gap-2">
               {CATEGORY_TABS.map((tabC) => (
                 <button
@@ -666,91 +661,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               </button>
             )}
           </div>
-          )}
 
-          {/* Chart / MT5 Toggle */}
-          <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[calc(100vh-420px)] min-h-[380px] relative flex flex-col">
-            {/* Toggle bar */}
-            <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
-              <button
-                onClick={() => setPlatform('chart')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${
-                  platform === 'chart' ? 'bg-emerald-500 text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'
-                }`}
-              >
-                {isAr ? '📊 الشارت' : '📊 Chart'}
-              </button>
-              <button
-                onClick={() => setPlatform('mt5')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${
-                  platform === 'mt5' ? 'bg-sky-500 text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'
-                }`}
-              >
-                {isAr ? '📈 MT5 ويب' : '📈 MT5 Web'}
-              </button>
-              {platform === 'chart' && (
-                <div className="ml-auto flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs font-black text-white">{symbol}</span>
-                  {!priceLoading && <span className="text-xs font-bold text-emerald-400">{fmtPrice(livePrice)}</span>}
-                </div>
-              )}
-            </div>
-            {/* Content */}
-            <div className="flex-1 relative">
-              {platform === 'chart' ? (
-                <>
-                  {(() => {
-                    const activeTrade = openTrades.find(t => t.symbol === symbol);
-                    return (
-                      <TradingViewWidget
-                        key={symbol}
-                        symbol={toTvSymbol(symbol)}
-                        entryPrice={activeTrade?.entryPrice}
-                        sl={activeTrade?.sl}
-                        tp={activeTrade?.tp}
-                        side={activeTrade?.side}
-                        category={activeTrade?.category}
-                        qty={activeTrade?.qty}
-                        openedAt={activeTrade?.openedAt}
-                        onSlChange={activeTrade ? (p) => adjustSl(activeTrade.id, p) : undefined}
-                        onTpChange={activeTrade ? (p) => adjustTp(activeTrade.id, p) : undefined}
-                      />
-                    );
-                  })()}
-                </>
-              ) : (
-                <MT5Web symbol={symbol} />
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Collapse/Expand arrows */}
-        <div className="flex flex-col items-center justify-center gap-2 flex-shrink-0">
-          <button
-            onClick={() => setLeftCollapsed(!leftCollapsed)}
-            className="w-12 h-16 rounded-xl bg-sky-500/30 hover:bg-sky-500/50 flex items-center justify-center text-sky-300 hover:text-sky-100 transition-all border border-sky-500/30"
-            title={leftCollapsed ? (isAr ? 'توسيع الشارت' : 'Expand chart') : (isAr ? 'تصغير الشارت' : 'Collapse chart')}
-          >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${leftCollapsed ? 'rotate-180' : ''}`}>
-              <path d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <button
-            onClick={() => setRightCollapsed(!rightCollapsed)}
-            className="w-12 h-16 rounded-xl bg-sky-500/30 hover:bg-sky-500/50 flex items-center justify-center text-sky-300 hover:text-sky-100 transition-all border border-sky-500/30"
-            title={rightCollapsed ? (isAr ? 'توسيع لوحة الطلب' : 'Expand order panel') : (isAr ? 'تصغير لوحة الطلب' : 'Collapse order panel')}
-          >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${rightCollapsed ? '' : 'rotate-180'}`}>
-              <path d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Right: Order ticket */}
-        {!rightCollapsed && (
-        <div className={`${leftCollapsed ? 'flex-1' : 'lg:w-1/3'} space-y-2 transition-all duration-300 flex-shrink-0`}>
+          {/* Order Ticket (full width) */}
           <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-sm p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xl font-black text-brand-text uppercase tracking-wide">{symbol || '—'}</span>
@@ -874,8 +786,63 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               </div>
             </div>
           </div>
-        </div>
-        )}
+
+          {/* Chart / MT5 (full width, below order ticket) */}
+          <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[60vh] min-h-[400px] relative flex flex-col">
+            {/* Toggle bar */}
+            <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
+              <button
+                onClick={() => setPlatform('chart')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${
+                  platform === 'chart' ? 'bg-emerald-500 text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'
+                }`}
+              >
+                {isAr ? '📊 الشارت' : '📊 Chart'}
+              </button>
+              <button
+                onClick={() => setPlatform('mt5')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${
+                  platform === 'mt5' ? 'bg-sky-500 text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'
+                }`}
+              >
+                {isAr ? '📈 MT5 ويب' : '📈 MT5 Web'}
+              </button>
+              {platform === 'chart' && (
+                <div className="ml-auto flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-black text-white">{symbol}</span>
+                  {!priceLoading && <span className="text-xs font-bold text-emerald-400">{fmtPrice(livePrice)}</span>}
+                </div>
+              )}
+            </div>
+            {/* Content */}
+            <div className="flex-1 relative">
+              {platform === 'chart' ? (
+                <>
+                  {(() => {
+                    const activeTrade = openTrades.find(t => t.symbol === symbol);
+                    return (
+                      <TradingViewWidget
+                        key={symbol}
+                        symbol={toTvSymbol(symbol)}
+                        entryPrice={activeTrade?.entryPrice}
+                        sl={activeTrade?.sl}
+                        tp={activeTrade?.tp}
+                        side={activeTrade?.side}
+                        category={activeTrade?.category}
+                        qty={activeTrade?.qty}
+                        openedAt={activeTrade?.openedAt}
+                        onSlChange={activeTrade ? (p) => adjustSl(activeTrade.id, p) : undefined}
+                        onTpChange={activeTrade ? (p) => adjustTp(activeTrade.id, p) : undefined}
+                      />
+                    );
+                  })()}
+                </>
+              ) : (
+                <MT5Web symbol={symbol} />
+              )}
+            </div>
+          </div>
       </div>
 
       {/* Positions / History */}
