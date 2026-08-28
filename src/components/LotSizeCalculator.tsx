@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Minus, Plus, TrendingUp, TrendingDown, Shield, Zap } from 'lucide-react';
+import { getInstrumentConfig } from '../lib/positionMath';
 
 interface LotSizeCalculatorProps {
   symbol: string;
@@ -10,47 +11,8 @@ interface LotSizeCalculatorProps {
   lang: 'ar' | 'en';
 }
 
-function detectInstrumentType(symbol: string): 'forex_jpy' | 'forex' | 'crypto' | 'stock' {
-  const s = symbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-  // Crypto names (BTC, ETH, SOL, etc.) - NOT forex pairs like BTCUSD
-  const cryptoNames = ['BTC', 'ETH', 'DOGE', 'SOL', 'XRP', 'ADA', 'DOT', 'SHIB', 'AVAX', 'MATIC', 'LINK', 'UNI', 'ATOM', 'LTC', 'BCH', 'NEAR', 'FIL', 'APT', 'ARB', 'OP', 'SUI', 'SEI', 'PEPE', 'WIF', 'BONK', 'TON', 'TRX', 'RENDER', 'FET', 'INJ'];
-  // Pure crypto if symbol contains a crypto name (not as part of a forex pair)
-  for (const c of cryptoNames) {
-    if (s.startsWith(c) && s.endsWith('USD')) return 'crypto';
-  }
-  // If it's just a crypto ticker with no forex context
-  if (cryptoNames.some(c => s === c || s === c + 'USD' || s === c + 'USDT')) return 'crypto';
-
-  // All forex currency codes
-  const currencies = ['EUR', 'GBP', 'AUD', 'NZD', 'CAD', 'CHF', 'USD', 'JPY', 'TRY', 'ZAR', 'MXN', 'SEK', 'NOK', 'DKK', 'SGD', 'HKD', 'CNY', 'INR', 'THB', 'PLN', 'HUF', 'CZK', 'ILS', 'PHP', 'IDR', 'MYR', 'KRW', 'TWD'];
-
-  // Count how many currency codes appear in the symbol
-  const found = currencies.filter(c => s.includes(c));
-  // If 2+ currency codes -> it's forex
-  if (found.length >= 2) {
-    if (s.includes('JPY')) return 'forex_jpy';
-    return 'forex';
-  }
-
-  // Default to stock (AAPL, TSLA, MSFT, etc.)
-  return 'stock';
-}
-
-function getInstrumentConfig(type: ReturnType<typeof detectInstrumentType>) {
-  switch (type) {
-    case 'forex': return { decimals: 5, pipSize: 0.0001, pipLabel: 'pip', contractSize: 100000, quoteIsUSD: true };
-    case 'forex_jpy': return { decimals: 3, pipSize: 0.01, pipLabel: 'pip', contractSize: 100000, quoteIsUSD: false };
-    case 'crypto': return { decimals: 2, pipSize: 0.01, pipLabel: 'point', contractSize: 100, quoteIsUSD: true };
-    case 'stock': return { decimals: 2, pipSize: 0.01, pipLabel: 'point', contractSize: 100, quoteIsUSD: true };
-  }
-}
-
-const USDJPY_APPROX = 150;
-
 export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryPrice, signal, lang }: LotSizeCalculatorProps) {
   const isAr = lang === 'ar';
-  const isBuy = signal === 'strong_buy' || signal === 'buy';
   const isStrongSignal = signal === 'strong_buy' || signal === 'strong_sell';
 
   // Signal type display with colors
@@ -65,16 +27,14 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
     }
   }, [signal, isAr]);
 
-  const instType = detectInstrumentType(symbol);
-  const instConfig = getInstrumentConfig(instType);
-  const { decimals, pipSize, contractSize } = instConfig;
+  const instConfig = getInstrumentConfig(symbol);
+  const { decimals, pipSize, pipLabel, pipValuePerLotUSD } = instConfig;
 
   const entry = entryPrice || (stopLoss + takeProfit) / 2;
 
   const [lotSize, setLotSize] = useState(0.01);
   const [accountBalance, setAccountBalance] = useState(1000);
   const [balanceInput, setBalanceInput] = useState('1000');
-  const [rrRatio, setRrRatio] = useState(2);
 
   const formatNum = (n: number, dec: number = 2): string => n.toFixed(dec);
 
@@ -106,36 +66,20 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
   };
 
   const calculations = useMemo(() => {
-    // TP is always the signal's actual take-profit price (shown in the green box).
-    // Pips/percent derive from the REAL distance to that price, so the number
-    // shown always matches the price shown (no R:R-dependent "jumping" values).
     const slDistance = Math.abs(entry - stopLoss);
     const tpDistance = Math.abs(entry - takeProfit);
 
-    const slPips = Math.round(slDistance / pipSize);
-    const tpPips = Math.round(tpDistance / pipSize);
+    const slPips = slDistance / pipSize;
+    const tpPips = tpDistance / pipSize;
 
-    // Percentage distances
-    const slPercent = entry > 0 ? (slDistance / entry * 100) : 0;
-    const tpPercent = entry > 0 ? (tpDistance / entry * 100) : 0;
+    // USD amounts for the current lot size: pips * pip value of the whole lot
+    const pipValue = pipValuePerLotUSD * lotSize;
+    const slUsd = slPips * pipValue;
+    const tpUsd = tpPips * pipValue;
 
-    // R:R still drives the risk-of-balance projection (risk per 1R), independent
-    // of the displayed SL/TP which reflect the real signal.
-    const adjustedTpDistance = slDistance * rrRatio;
-    const adjustedTpPrice = isBuy ? entry + adjustedTpDistance : entry - adjustedTpDistance;
-
-    // Pip value in USD per 1 lot
-    const pipValuePerLotUSD = instConfig.quoteIsUSD
-      ? (contractSize * pipSize)
-      : (contractSize * pipSize) / USDJPY_APPROX;
-
-    // Pip value in USD for current lot size
-    const pipValue = lotSize * pipValuePerLotUSD;
-
-    // Risk/Reward in USD = pips * pipValue
-    const riskDollars = slPips * pipValue;
-    const rewardDollars = tpPips * pipValue;
-    const riskOfBalance = accountBalance > 0 ? (riskDollars / accountBalance * 100) : 0;
+    // Risk/Reward of balance
+    const riskOfBalance = accountBalance > 0 ? (slUsd / accountBalance * 100) : 0;
+    const rewardOfBalance = accountBalance > 0 ? (tpUsd / accountBalance * 100) : 0;
 
     const riskLevel = riskOfBalance <= 1 ? 'safe' : riskOfBalance <= 3 ? 'ok' : riskOfBalance <= 5 ? 'warn' : 'danger';
 
@@ -143,21 +87,20 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
       slPips,
       tpPips,
       slDistance,
-      adjustedTpDistance,
-      adjustedTpPrice,
-      slPercent,
-      tpPercent,
+      tpDistance,
       pipValue,
-      riskDollars,
-      rewardDollars,
+      slUsd,
+      tpUsd,
       riskOfBalance,
+      rewardOfBalance,
       riskLevel,
+      effectiveRR: tpUsd > 0 && slUsd > 0 ? tpUsd / slUsd : 0,
     };
-  }, [entry, stopLoss, rrRatio, lotSize, accountBalance, pipSize, contractSize, isBuy, instConfig]);
+  }, [entry, stopLoss, takeProfit, lotSize, accountBalance, pipSize, pipValuePerLotUSD]);
+
 
   const lotPresets = [0.01, 0.05, 0.1, 0.5, 1.0];
   const balancePresets = [500, 1000, 5000, 10000];
-  const rrPresets = [1, 2, 3];
 
   const riskColors: Record<string, string> = {
     safe: 'text-emerald-400',
@@ -183,10 +126,10 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
             <span className="text-[10px] text-red-400 font-bold uppercase">{isAr ? 'وقف الخسارة' : 'SL'}</span>
           </div>
           <span className="text-lg font-extrabold text-red-500 font-mono block">
-            {formatNum(stopLoss, decimals)}
+            ${formatNum(calculations.slUsd, 2)}
           </span>
-          <div className="text-xs font-black text-red-400 font-mono mt-0.5">
-            {calculations.slPips} {instConfig.pipLabel} ({calculations.slPercent.toFixed(1)}%)
+          <div className="text-[10px] font-black text-red-400/80 font-mono mt-0.5 leading-tight">
+            {formatNum(calculations.slPips, 0)} {pipLabel} · {formatNum(stopLoss, decimals)}
           </div>
         </div>
 
@@ -201,34 +144,15 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
             <span className="text-[10px] text-emerald-400 font-bold uppercase">{isAr ? 'جني الأرباح' : 'TP'}</span>
           </div>
           <span className="text-lg font-extrabold text-emerald-500 font-mono block">
-            {formatNum(takeProfit, decimals)}
+            ${formatNum(calculations.tpUsd, 2)}
           </span>
-          <div className="text-xs font-black text-emerald-400 font-mono mt-0.5">
-            {calculations.tpPips} {instConfig.pipLabel} ({calculations.tpPercent.toFixed(1)}%)
+          <div className="text-[10px] font-black text-emerald-400/80 font-mono mt-0.5 leading-tight">
+            {formatNum(calculations.tpPips, 0)} {pipLabel} · {formatNum(takeProfit, decimals)}
           </div>
         </div>
       </div>
 
-      {/* R:R Ratio Selector */}
-      <div className="flex items-center justify-center gap-2">
-        <span className="text-xs text-white/60 font-bold uppercase">{isAr ? 'العائد' : 'R:R'}</span>
-        <div className="flex gap-1">
-          {rrPresets.map(r => (
-            <button
-              key={r}
-              onClick={() => setRrRatio(r)}
-              className={`text-xs font-black px-3 py-1 rounded-lg transition-all ${
-                rrRatio === r
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                  : 'bg-white/5 text-white/40 hover:bg-white/10'
-              }`}
-            >
-              1:{r}
-            </button>
-          ))}
-        </div>
-      </div>
-
+      {/* Risk exposure summary (from real SL/TP amounts) */}
       <div className="flex items-center justify-center gap-1.5 py-0.5">
         <Zap size={12} className={isStrongSignal ? 'text-amber-400' : 'text-blue-400'} />
         <span className={`text-xs font-bold ${isStrongSignal ? 'text-amber-400' : 'text-blue-400'}`}>
@@ -294,7 +218,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
           </button>
         </div>
         <div className="text-[10px] text-primary font-mono">
-          ${formatNum(calculations.pipValue)}/{instConfig.pipLabel}
+          ${formatNum(calculations.pipValue)}/{pipLabel}
         </div>
       </div>
 
@@ -322,8 +246,8 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
           </span>
         </div>
         <span className="text-white/30">|</span>
-        <span className="text-white/60">
-          1:{rrRatio} {isAr ? 'عائد' : 'R:R'}
+        <span className="text-white/60 font-mono">
+          1:{formatNum(Math.max(0.5, calculations.effectiveRR), 1)} {isAr ? 'عائد' : 'R:R'}
         </span>
       </div>
     </div>

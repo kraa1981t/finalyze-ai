@@ -12,6 +12,7 @@ import {
 } from '../services/paperTradingService';
 import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
 import { playOpenSound, playCloseSound } from '../lib/tradeSounds';
+import { pricesToUsd, usdToPrice } from '../lib/positionMath';
 
 interface TradeNowPageProps {
   lang: Language;
@@ -116,20 +117,6 @@ const fmtMoney = (v: number) =>
 const fmtPrice = (v: number | null | undefined) =>
   v == null ? '—' : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 });
 
-// Mirror the calculator's decimal precision per instrument for TP/SL dollar values
-function priceDecimals(symbol: string): number {
-  const s = symbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (/[^.]*\.T$/.test(symbol) || /[^.]*\.(AS|PA|DE|L|SW|CO)$/.test(symbol)) return 2; // stocks
-  const cryptoNames = ['BTC','ETH','DOGE','SOL','XRP','ADA','DOT','SHIB','AVAX','MATIC','LINK','UNI','ATOM','LTC','BCH','NEAR','FIL','APT','ARB','OP','SUI','SEI','PEPE','WIF','BONK','TON','TRX'];
-  for (const c of cryptoNames) {
-    if ((s.startsWith(c) && s.endsWith('USD')) || s === c || s === c + 'USDT') return 2;
-  }
-  const currencies = ['EUR','GBP','AUD','NZD','CAD','CHF','USD','JPY','TRY','ZAR','MXN','SEK','NOK','DKK','SGD','HKD','CNY','INR'];
-  const found = currencies.filter(c => s.includes(c));
-  if (found.length >= 2) return s.includes('JPY') ? 3 : 5;
-  return 2;
-}
-
 export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageProps) {
   const isAr = lang === 'ar';
   const [category, setCategory] = useState<string>('forex');
@@ -174,17 +161,28 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     return signals.find((s) => s.symbol.toUpperCase() === symbol.toUpperCase()) || null;
   }, [symbol, signals]);
 
-  // Auto-fill SL/TP price values ($) when symbol changes and matches a signal
+  // Auto-fill SL/TP as USD amounts ($) when symbol changes and matches a signal.
+  // Computed from the real SL/TP prices, pip value and current qty, so a 0.01-lot
+  // EURJPY order shows a small logical dollar amount instead of an absolute price.
   useEffect(() => {
     if (matchedSignal && matchedSignal.stopLoss && matchedSignal.takeProfit) {
-      const dec = priceDecimals(matchedSignal.symbol || symbol);
-      setSlPrice(matchedSignal.stopLoss.toFixed(dec));
-      setTpPrice(matchedSignal.takeProfit.toFixed(dec));
+      const entry = matchedSignal.entryPrice || livePrice || 0;
+      const cat = detectCategory(matchedSignal.symbol || symbol);
+      const usd = pricesToUsd(matchedSignal.symbol || symbol, matchedSignal.stopLoss, matchedSignal.takeProfit, entry, qty, cat);
+      if (usd) {
+        setSlPrice(usd.slUsd.toFixed(2));
+        setTpPrice(usd.tpUsd.toFixed(2));
+      } else {
+        setSlPrice('');
+        setTpPrice('');
+      }
     } else {
       setSlPrice('');
       setTpPrice('');
     }
-  }, [matchedSignal?.symbol, matchedSignal?.stopLoss, matchedSignal?.takeProfit, symbol]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchedSignal?.symbol, matchedSignal?.stopLoss, matchedSignal?.takeProfit, symbol, qty, livePrice]);
+
 
   const allSymbolsFor = (cat: string): string[] => {
     if (cat === 'custom') return customSymbols;
@@ -413,11 +411,18 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     if (!livePrice || busy || qty <= 0) return;
     setBusy(true);
 
-    // Use the dollar ($) TP/SL price values entered (auto-filled from signal or manually adjusted)
-    const tpVal = parseFloat(tpPrice) || (matchedSignal?.takeProfit || null);
-    const slVal = parseFloat(slPrice) || (matchedSignal?.stopLoss || null);
+    // SL/TP fields hold USD amounts; convert back to limit prices for execution.
     const cat = detectCategory(symbol);
-    const tradeData = { symbol, category: cat, side, qty, entryPrice: livePrice, status: 'open' as const, tp: tpVal || null, sl: slVal || null, openedAt: Date.now() };
+    const isBuy = side === 'buy';
+    const tpAmount = parseFloat(tpPrice);
+    const slAmount = parseFloat(slPrice);
+    let tpVal: number | null = null;
+    let slVal: number | null = null;
+    if (tpAmount > 0) tpVal = usdToPrice(symbol, tpAmount, livePrice, isBuy, qty, cat);
+    else tpVal = matchedSignal?.takeProfit || null;
+    if (slAmount > 0) slVal = usdToPrice(symbol, slAmount, livePrice, isBuy, qty, cat);
+    else slVal = matchedSignal?.stopLoss || null;
+    const tradeData = { symbol, category: cat, side, qty, entryPrice: livePrice, status: 'open' as const, tp: tpVal, sl: slVal, openedAt: Date.now() };
     let id: string;
     try {
       id = await store.addTrade(tradeData);
@@ -442,14 +447,12 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     await closeTradeInternal(t, exit, 'manual');
   }
 
-  // Manually adjust a TP/SL dollar value by one instrument step (up or down)
+  // Manually adjust a TP/SL USD amount by $0.50 steps (up or down)
   const adjustPrice = (kind: 'tp' | 'sl', dir: number) => {
-    const dec = priceDecimals(symbol);
-    const step = dec === 5 ? 0.0001 : 0.01;
     const raw = kind === 'tp' ? tpPrice : slPrice;
     const base = parseFloat(raw);
-    const val = isNaN(base) ? livePrice || 0 : base;
-    const next = +(val + dir * step).toFixed(dec);
+    const val = isNaN(base) ? 0 : base;
+    const next = Math.max(0, +(val + dir * 0.5).toFixed(2));
     if (kind === 'tp') setTpPrice(String(next)); else setSlPrice(String(next));
   };
 
