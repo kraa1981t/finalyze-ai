@@ -106,18 +106,23 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
   };
 
   const calculations = useMemo(() => {
+    // TP is always the signal's actual take-profit price (shown in the green box).
+    // Pips/percent derive from the REAL distance to that price, so the number
+    // shown always matches the price shown (no R:R-dependent "jumping" values).
     const slDistance = Math.abs(entry - stopLoss);
-
-    // Adjust TP based on R:R ratio
-    const adjustedTpDistance = slDistance * rrRatio;
-    const adjustedTpPrice = isBuy ? entry + adjustedTpDistance : entry - adjustedTpDistance;
+    const tpDistance = Math.abs(entry - takeProfit);
 
     const slPips = Math.round(slDistance / pipSize);
-    const tpPips = Math.round(adjustedTpDistance / pipSize);
+    const tpPips = Math.round(tpDistance / pipSize);
 
     // Percentage distances
     const slPercent = entry > 0 ? (slDistance / entry * 100) : 0;
-    const tpPercent = entry > 0 ? (adjustedTpDistance / entry * 100) : 0;
+    const tpPercent = entry > 0 ? (tpDistance / entry * 100) : 0;
+
+    // R:R still drives the risk-of-balance projection (risk per 1R), independent
+    // of the displayed SL/TP which reflect the real signal.
+    const adjustedTpDistance = slDistance * rrRatio;
+    const adjustedTpPrice = isBuy ? entry + adjustedTpDistance : entry - adjustedTpDistance;
 
     // Pip value in USD per 1 lot
     const pipValuePerLotUSD = instConfig.quoteIsUSD
