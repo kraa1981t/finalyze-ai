@@ -836,30 +836,52 @@ export async function analyzeMarket(params: {
     return cached.result;
   }
 
-  // Block stock/ETF analysis when US market is closed
+  // Block stock/ETF analysis when the exchange is closed
   if (type === MarketType.STOCKS || type === MarketType.METALS) {
     const now = new Date();
-    const etHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }));
-    const etMin = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', minute: 'numeric' }));
-    const etDay = now.toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short' });
-    const etMinutes = etHour * 60 + etMin;
-    const isWeekday = etDay !== 'Sat' && etDay !== 'Sun';
-    const marketOpen = 9 * 60 + 30; // 9:30 AM ET
-    const marketClose = 16 * 60; // 4:00 PM ET
-    const isMarketOpen = isWeekday && etMinutes >= marketOpen && etMinutes < marketClose;
+    
+    // Detect exchange from symbol suffix
+    let timezone = 'America/New_York'; // default: US
+    let exchangeName = 'US';
+    let openMin = 9 * 60 + 30;  // 9:30 AM
+    let closeMin = 16 * 60;     // 4:00 PM
+    
+    if (/\.T$/.test(symbol)) {
+      // Japan: TSE opens 9:00-15:00 JST (UTC+9)
+      timezone = 'Asia/Tokyo';
+      exchangeName = 'Japan (TSE)';
+      openMin = 9 * 60;       // 9:00 AM JST
+      closeMin = 15 * 60;     // 3:00 PM JST
+    } else if (/\.(AS|PA|DE|L|SW|CO|MI|STO|HEL|OSL|WSE|MCX|COP)$/i.test(symbol)) {
+      // Europe: XETRA/LSE/Euronext opens 9:00-17:30 CET
+      timezone = 'Europe/Berlin';
+      exchangeName = 'Europe';
+      openMin = 9 * 60;       // 9:00 AM CET
+      closeMin = 17 * 60 + 30; // 5:30 PM CET
+    } else {
+      // US: NYSE/NASDAQ 9:30-16:00 ET
+      exchangeName = 'US (NYSE/NASDAQ)';
+    }
+    
+    const localHour = parseInt(now.toLocaleString('en-US', { timeZone: timezone, hour: 'numeric', hour12: false }));
+    const localMin = parseInt(now.toLocaleString('en-US', { timeZone: timezone, minute: 'numeric' }));
+    const localDay = now.toLocaleString('en-US', { timeZone: timezone, weekday: 'short' });
+    const localMinutes = localHour * 60 + localMin;
+    const isWeekday = localDay !== 'Sat' && localDay !== 'Sun';
+    const isMarketOpen = isWeekday && localMinutes >= openMin && localMinutes < closeMin;
 
     if (!isMarketOpen) {
-      const etTimeStr = now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: true });
+      const timeStr = now.toLocaleString('en-US', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: true });
       const blockedResult: AnalysisResult = {
         symbol, type, timeframe,
         signal: 'no_entry' as any,
         confidence: 0,
-        summary: `${symbol} — market closed (${etTimeStr} ET)`,
+        summary: `${symbol} — ${exchangeName} market closed (${timeStr})`,
         detailedReasons: [{
           check: 'Market Hours',
-          value: `${etDay} ${etTimeStr} ET`,
+          value: `${localDay} ${timeStr} (${exchangeName})`,
           status: 'negative',
-          impact: `BLOCKED: ${type === MarketType.STOCKS ? 'Stock' : 'Metal'} market is closed — US exchanges open Mon-Fri 9:30AM-4:00PM ET`
+          impact: `BLOCKED: ${exchangeName} exchange is closed — opens Mon-Fri ${String(openMin/60).padStart(2,'0')}:${String(openMin%60).padStart(2,'0')}-${String(closeMin/60).padStart(2,'0')}:${String(closeMin%60).padStart(2,'0')}`
         }],
         technicalScore: 0, sentimentScore: 0,
         timestamp: new Date().toISOString(), userId: '',
