@@ -503,6 +503,24 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
           <span className="text-lg font-black text-brand-text">{isAr ? 'تداول الآن' : 'Trade Now'}</span>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPlatform('chart')}
+            className={`px-6 py-2 rounded-2xl text-3xl font-black uppercase transition-all leading-none ${
+              platform === 'chart' ? 'bg-emerald-500 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'
+            }`}
+          >
+            📊 {isAr ? 'الشارت' : 'Chart'}
+          </button>
+          <button
+            onClick={() => setPlatform('mt5')}
+            className={`px-6 py-2 rounded-2xl text-3xl font-black uppercase transition-all leading-none ${
+              platform === 'mt5' ? 'bg-sky-500 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'
+            }`}
+          >
+            📈 {isAr ? 'MT5 ويب' : 'MT5 Web'}
+          </button>
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
             <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'الرصيد' : 'Balance'}</div>
@@ -672,10 +690,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           <div className="flex justify-center">
             <button
               onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
-              className="w-16 h-16 rounded-2xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
+              className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
               title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
             >
-              <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${symbolsCollapsed ? '' : 'rotate-180'}`}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${symbolsCollapsed ? '' : 'rotate-180'}`}>
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </button>
@@ -811,10 +829,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           <div className="flex justify-center">
             <button
               onClick={() => setTicketCollapsed(!ticketCollapsed)}
-              className="w-16 h-16 rounded-2xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
+              className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
               title={ticketCollapsed ? (isAr ? 'توسيع فتح الصفقات' : 'Expand order ticket') : (isAr ? 'طي فتح الصفقات' : 'Collapse order ticket')}
             >
-              <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${ticketCollapsed ? '' : 'rotate-180'}`}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${ticketCollapsed ? '' : 'rotate-180'}`}>
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </button>
@@ -825,22 +843,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[60vh] min-h-[400px] relative flex flex-col">
             {/* Toggle bar */}
             <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
-              <button
-                onClick={() => setPlatform('chart')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${
-                  platform === 'chart' ? 'bg-emerald-500 text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'
-                }`}
-              >
-                {isAr ? '📊 الشارت' : '📊 Chart'}
-              </button>
-              <button
-                onClick={() => setPlatform('mt5')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${
-                  platform === 'mt5' ? 'bg-sky-500 text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'
-                }`}
-              >
-                {isAr ? '📈 MT5 ويب' : '📈 MT5 Web'}
-              </button>
               {platform === 'chart' && (
                 <div className="ml-auto flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
