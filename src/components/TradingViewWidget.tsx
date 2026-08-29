@@ -36,12 +36,11 @@ function stepFor(price: number): number {
 
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const dotRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
+  const dataRef = useRef<any[]>([]);
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
-  const hoveredRef = useRef<LineKey | null>(null);
   const lastSyncRef = useRef(0);
   const [tf, setTf] = useState('1h');
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
@@ -60,40 +59,29 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const updateLines = () => {
     const series = seriesRef.current;
     if (!series) return;
+    const pl = priceLinesRef.current;
     for (const def of lineDefs()) {
-      const key = def.key;
-      const existing = priceLinesRef.current[key];
-      if (def.price == null) {
-        if (existing) {
-          try { series.removePriceLine(existing); } catch {}
-          priceLinesRef.current[key] = undefined;
-        }
-        continue;
+      const existing = pl[def.key];
+      if (def.price != null) {
+        try {
+          if (!existing) {
+            pl[def.key] = series.createPriceLine({
+              price: def.price,
+              color: def.color,
+              lineWidth: 2,
+              lineStyle: LineStyle.Dashed,
+              axisLabelVisible: true,
+              title: def.title,
+            });
+          } else {
+            existing.applyOptions({ price: def.price });
+          }
+        } catch {}
+      } else if (existing) {
+        try { series.removePriceLine(existing); } catch {}
+        pl[def.key] = undefined;
       }
-      try {
-        if (!existing) {
-          priceLinesRef.current[key] = series.createPriceLine({
-            price: def.price,
-            color: def.color,
-            lineWidth: 2,
-            lineStyle: LineStyle.Dashed,
-            axisLabelVisible: true,
-            title: def.title,
-          });
-        } else {
-          existing.applyOptions({ price: def.price });
-        }
-      } catch {}
     }
-  };
-
-  const fitToLevels = () => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    try {
-      chart.priceScale('right')?.applyOptions?.({ autoScale: true });
-      chart.timeScale()?.fitContent?.();
-    } catch {}
   };
 
   // create the chart once
@@ -101,22 +89,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const el = containerRef.current;
     if (!el) return;
     let chart: any;
-    let raf = 0;
-    const placeDot = () => {
-      const dot = dotRef.current;
-      const chartEl = chartRef.current;
-      if (!dot || !chartEl) return;
-      const p = allPropsRef.current;
-      if (p.entryPrice == null) { dot.style.display = 'none'; return; }
-      const y = chartEl.priceToCoordinate(p.entryPrice);
-      const box = el.getBoundingClientRect();
-      if (y == null || !box.width) { raf = requestAnimationFrame(placeDot); return; }
-      const x = box.width - 46;
-      dot.style.display = 'block';
-      dot.style.left = `${x}px`;
-      dot.style.top = `${y}px`;
-      raf = requestAnimationFrame(placeDot);
-    };
     try {
       chart = createChart(el, {
         autoSize: true,
@@ -129,7 +101,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           vertLines: { color: 'rgba(255,255,255,0.04)' },
           horzLines: { color: 'rgba(255,255,255,0.04)' },
         },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)', autoScale: true },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
         timeScale: { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true, secondsVisible: false },
         crosshair: { mode: CrosshairMode.Normal },
       });
@@ -144,12 +116,10 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       chartRef.current = chart;
       seriesRef.current = series;
       updateLines();
-      raf = requestAnimationFrame(placeDot);
     } catch {
       return;
     }
     return () => {
-      cancelAnimationFrame(raf);
       try { chart?.remove(); } catch {}
       chartRef.current = null;
       seriesRef.current = null;
@@ -182,29 +152,34 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           if (o == null || h == null || l == null || c == null) continue;
           candles.push({ time: Math.floor(ts[i]), open: o, high: h, low: l, close: c });
         }
-        if (!candles.length) { setStatus('empty'); return; }
+        if (!candles.length) {
+          setStatus('empty');
+          return;
+        }
         dataRef.current = candles;
         try {
           seriesRef.current?.setData(candles);
           chartRef.current?.timeScale()?.fitContent?.();
         } catch {}
         updateLines();
-        setTimeout(fitToLevels, 60);
         setStatus('ok');
       })
-      .catch(() => { if (!cancelled) setStatus('empty'); });
-    return () => { cancelled = true; };
+      .catch(() => {
+        if (!cancelled) setStatus('empty');
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, tf]);
 
-  // redraw lines + refit when entry/sl/tp change
+  // redraw lines when entry/sl/tp change
   useEffect(() => {
     updateLines();
-    setTimeout(fitToLevels, 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryPrice, sl, tp]);
 
-  // adjust helper via stepper buttons (calls parent adjust)
+  // adjust helpers via on-chart stepper buttons
   const stepSl = (dir: number) => {
     const p = allPropsRef.current;
     if (p.sl == null || !p.onSlChange) return;
@@ -216,7 +191,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     p.onTpChange(p.tp + stepFor(p.tp) * dir);
   };
 
-  // drag SL/TP lines + hover cursor
+  // drag SL/TP lines
   useEffect(() => {
     const el = containerRef.current;
     const chart = chartRef.current;
@@ -226,41 +201,30 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       for (const def of lineDefs()) {
         if (!def.editable || def.price == null) continue;
         const lineY = chart.priceToCoordinate(def.price);
-        if (lineY != null && Math.abs(lineY - y) <= 14) return def.key as LineKey;
+        if (lineY != null && Math.abs(lineY - y) <= 9) return def.key as LineKey;
       }
       return null;
     };
-    const onMove = (e: PointerEvent | MouseEvent) => {
-      const y = posY(e);
-      const key = draggingRef.current || hitTest(y);
-      if (key && key !== hoveredRef.current) { hoveredRef.current = key; el.style.cursor = 'ns-resize'; }
-      else if (!key && hoveredRef.current) { hoveredRef.current = null; el.style.cursor = 'crosshair'; }
-      if (!draggingRef.current) return;
-      const price = chart.coordinateToPrice(y);
-      if (price == null) return;
-      const k = draggingRef.current;
-      const p = allPropsRef.current;
-      try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
-      const now = performance.now();
-      if (now - lastSyncRef.current >= 120) {
-        lastSyncRef.current = now;
-        if (k === 'sl' && p.onSlChange) p.onSlChange(price);
-        else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
-      }
-    };
     const onDown = (e: PointerEvent) => {
-      if (e.button !== 0) return;
       const key = hitTest(posY(e));
       if (key) {
         draggingRef.current = key;
-        hoveredRef.current = key;
-        el.style.cursor = 'ns-resize';
         try { el.setPointerCapture?.(e.pointerId); } catch {}
-        e.preventDefault();
-        e.stopPropagation();
       }
     };
-    const onUp = () => { draggingRef.current = null; el.style.cursor = 'crosshair'; };
+    const onMove = (e: PointerEvent) => {
+      const key = draggingRef.current;
+      if (!key) return;
+      const price = chart.coordinateToPrice(posY(e));
+      if (price == null) return;
+      const now = Date.now();
+      if (now - lastSyncRef.current < 90) return;
+      lastSyncRef.current = now;
+      const p = allPropsRef.current;
+      if (key === 'sl' && p.onSlChange) p.onSlChange(price);
+      else if (key === 'tp' && p.onTpChange) p.onTpChange(price);
+    };
+    const onUp = () => { draggingRef.current = null; };
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
@@ -302,7 +266,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         ))}
       </div>
 
-      {/* On-chart level control panel */}
       {hasLevels && (
         <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 bg-black/60 backdrop-blur rounded-lg border border-white/10 p-1.5 text-[11px]">
           <div className="flex items-center gap-2 text-white">
@@ -316,8 +279,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             <span className="font-black tabular-nums">{fmt(sl)}</span>
             {sl != null && (
               <div className="flex items-center gap-0.5">
-                <button onClick={() => stepSl(-1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none" title="−">−</button>
-                <button onClick={() => stepSl(1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none" title="+">+</button>
+                <button onClick={() => stepSl(-1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none">−</button>
+                <button onClick={() => stepSl(1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none">+</button>
               </div>
             )}
           </div>
@@ -327,8 +290,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             <span className="font-black tabular-nums">{fmt(tp)}</span>
             {tp != null && (
               <div className="flex items-center gap-0.5">
-                <button onClick={() => stepTp(-1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none" title="−">−</button>
-                <button onClick={() => stepTp(1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none" title="+">+</button>
+                <button onClick={() => stepTp(-1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none">−</button>
+                <button onClick={() => stepTp(1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none">+</button>
               </div>
             )}
           </div>
@@ -336,13 +299,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       )}
 
       <div ref={containerRef} className="h-full w-full" />
-      <div
-        ref={dotRef}
-        style={{ display: 'none', position: 'absolute', width: 12, height: 12, marginLeft: -6, marginTop: -6, pointerEvents: 'none', zIndex: 5 }}
-      >
-        <span className="absolute inline-flex h-3.5 w-3.5 rounded-full bg-yellow-400 opacity-75 animate-ping" />
-        <span className="absolute inline-flex h-2 w-2 rounded-full bg-yellow-400" />
-      </div>
     </div>
   );
 }
