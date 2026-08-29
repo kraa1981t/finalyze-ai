@@ -8,7 +8,7 @@ import TradingViewWidget from './TradingViewWidget';
 import MT5Web from './MT5Web';
 import {
   PaperTrade, getTradeStore, getLivePrice, subscribePrices,
-  calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE, DEFAULT_LEVERAGE, LEVERAGE_OPTIONS,
+  calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE, DEFAULT_LEVERAGE, LEVERAGE_OPTIONS, isMarketOpen,
 } from '../services/paperTradingService';
 import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
 import { playOpenSound, playCloseSound } from '../lib/tradeSounds';
@@ -431,10 +431,19 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
 
   async function openTrade(side: 'buy' | 'sell') {
     if (!livePrice || busy || qty <= 0) return;
+    const pendingCat = detectCategory(symbol);
+    // Block opening when the market for this asset is closed (weekend/hours).
+    // Crypto trades 24/7 and is always allowed.
+    if (!isMarketOpen(pendingCat)) {
+      setToast(isAr
+        ? 'السوق مغلق لهذا الأصل، لا يمكن فتح صفقة. التداول متاح حالياً للكريبتو فقط (24/7).'
+        : 'Market is closed for this asset — cannot open a trade. Trading is currently available for crypto only (24/7).');
+      setTimeout(() => setToast(null), 3500);
+      return;
+    }
     setBusy(true);
 
     // Check that the resulting trade's margin fits within the account balance
-    const pendingCat = detectCategory(symbol);
     const notional = livePrice * qty * (pendingCat === 'forex' ? 100000 : pendingCat === 'metals' ? 100 : 1);
     const requiredMargin = notional / leverage;
     if (requiredMargin > balance) {
@@ -479,6 +488,13 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   async function closeTrade(t: PaperTrade) {
     const exit = priceOf(t);
     if (!exit) return;
+    if (!isMarketOpen(t.category)) {
+      setToast(isAr
+        ? 'السوق مغلق لهذا الأصل، لا يمكن إغلاق الصفقة حالياً. الكريبتو يعمل 24/7.'
+        : 'Market is closed for this asset — cannot close the trade now. Crypto trades 24/7.');
+      setTimeout(() => setToast(null), 3500);
+      return;
+    }
     await closeTradeInternal(t, exit, 'manual');
   }
 

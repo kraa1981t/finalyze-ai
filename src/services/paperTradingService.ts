@@ -25,6 +25,29 @@ export const MIN_BALANCE = 500;
 export const DEFAULT_LEVERAGE = 100; // 1:100
 export const LEVERAGE_OPTIONS = [50, 100, 200, 400, 500];
 
+// Market opening hours by asset category.
+// Crypto trades 24/7; forex/metals trade Mon-Fri with the weekly break
+// (Fri 21:00 UTC -> Sun 21:00 UTC); stocks/indices follow US session hours.
+export function isMarketOpen(category: string, now: Date = new Date()): boolean {
+  if (category === 'crypto') return true; // 24/7
+
+  const u = new Date(now.toUTCString());
+  const day = u.getUTCDay(); // 0 Sun .. 6 Sat
+  const hour = u.getUTCHours() + u.getUTCMinutes() / 60 + u.getUTCSeconds() / 3600;
+
+  if (category === 'forex' || category === 'metals') {
+    if (day === 6) return false;               // Saturday closed
+    if (day === 5 && hour >= 21) return false; // Friday closes 21:00 UTC
+    if (day === 0) return hour >= 21;          // Sunday opens 21:00 UTC
+    return true;                               // Monday-Thursday
+  }
+
+  // stocks & indices: US market session (approx ET = UTC-5)
+  const et = (((hour - 5) % 24) + 24) % 24;
+  if (day === 0 || day === 6) return false;    // closed weekends
+  return et >= 9.5 && et <= 16;                // 09:30 - 16:00 ET
+}
+
 // ---------- Contract specs (TradingView-style) ----------
 // Default lot follows total balance: baseline $500 -> 0.01 lot,
 // every extra $1000 adds 0.01 (e.g. $7000 -> 0.08).
