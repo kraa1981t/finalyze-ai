@@ -569,7 +569,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         <div className="flex items-center gap-2">
           <button
             onClick={() => setPlatform('chart')}
-            className={`px-6 py-2 rounded-2xl text-[25px] font-black uppercase transition-all leading-none ${
+            className={`px-6 py-2 rounded-2xl text-[20px] font-black uppercase transition-all leading-none ${
               platform === 'chart' ? 'bg-emerald-500 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'
             }`}
           >
@@ -577,7 +577,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </button>
           <button
             onClick={() => window.open('https://metatraderweb.app', '_blank', 'noopener,noreferrer')}
-            className="px-6 py-2 rounded-2xl text-[25px] font-black uppercase transition-all leading-none bg-sky-500 text-black hover:bg-sky-400 cursor-pointer active:scale-95"
+            className="px-6 py-2 rounded-2xl text-[20px] font-black uppercase transition-all leading-none bg-sky-500 text-black hover:bg-sky-400 cursor-pointer active:scale-95"
             title={isAr ? 'افتح منصة MT5 الحقيقية في تبويب جديد لتسجيل الدخول والتداول' : 'Open the live MT5 platform in a new tab to log in and trade'}
           >
             📈 {isAr ? 'MT5 ويب' : 'MT5 Web'} ↗
