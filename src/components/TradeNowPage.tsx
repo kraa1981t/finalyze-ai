@@ -117,6 +117,15 @@ const fmtMoney = (v: number) =>
 const fmtPrice = (v: number | null | undefined) =>
   v == null ? '—' : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 });
 
+// Normalize Eastern Arabic / Persian digits to Western (Latin) digits so the
+// SL/TP edit inputs always show standard 0-9 numerals regardless of locale.
+const normalizeDecimal = (raw: string): string =>
+  raw
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/[^0-9.]/g, '')
+    .replace(/(\..*)\./g, '$1');
+
 export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageProps) {
   const isAr = lang === 'ar';
   const [category, setCategory] = useState<string>('forex');
@@ -943,7 +952,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </button>
         </div>
 
-        <div className="max-h-[400px] overflow-y-auto">
+        <div className="max-h-[400px] overflow-y-auto overflow-x-auto">
           {tab === 'positions' ? (
             openTrades.length === 0 ? (
               <div className="py-8 text-center text-lg font-bold text-brand-text/40">
@@ -986,7 +995,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                               setTimeout(() => setToast(null), 2000);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
-                            className="relative px-3 py-1.5 rounded-lg text-base font-black text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-400/50 cursor-pointer transition-all active:scale-95"
+                            className="relative px-3 py-1.5 rounded-lg text-2xl font-black text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-400/50 cursor-pointer transition-all active:scale-95"
                           >
                             {popId === t.id && (
                               <span className="absolute inset-0 rounded-lg animate-ping bg-sky-400/30 pointer-events-none" />
@@ -995,66 +1004,68 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                           </button>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`px-3 py-1.5 rounded-lg text-sm font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                          <span className={`px-3 py-1.5 rounded-lg text-2xl font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                             {t.side === 'buy' ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{t.qty}</td>
-                        <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
-                        <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{cur ? fmtPrice(cur) : '—'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-sky-400" dir="ltr">${margin.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                        <td className="px-4 py-3 text-3xl font-bold text-brand-text/80" dir="ltr">{t.qty}</td>
+                        <td className="px-4 py-3 text-3xl font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
+                        <td className="px-4 py-3 text-3xl font-bold text-brand-text/80" dir="ltr">{cur ? fmtPrice(cur) : '—'}</td>
+                        <td className="px-4 py-3 text-2xl font-bold text-sky-400" dir="ltr">${margin.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                         <td className="px-4 py-3">
                           {editId === t.id ? (
-                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="decimal"
                                 value={editSl}
-                                onChange={(e) => setEditSl(e.target.value)}
+                                onChange={(e) => setEditSl(normalizeDecimal(e.target.value))}
                                 placeholder="SL"
-                                className="w-20 px-2 py-1 rounded-md bg-black/40 border border-red-500/40 text-red-400 text-xs font-bold focus:outline-none focus:border-red-400"
+                                className="w-28 px-2 py-1 rounded-md bg-black/40 border border-red-500/40 text-red-400 text-xl font-bold focus:outline-none focus:border-red-400"
                                 dir="ltr"
                               />
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="decimal"
                                 value={editTp}
-                                onChange={(e) => setEditTp(e.target.value)}
+                                onChange={(e) => setEditTp(normalizeDecimal(e.target.value))}
                                 placeholder="TP"
-                                className="w-20 px-2 py-1 rounded-md bg-black/40 border border-emerald-500/40 text-emerald-400 text-xs font-bold focus:outline-none focus:border-emerald-400"
+                                className="w-28 px-2 py-1 rounded-md bg-black/40 border border-emerald-500/40 text-emerald-400 text-xl font-bold focus:outline-none focus:border-emerald-400"
                                 dir="ltr"
                               />
                               <button
                                 onClick={() => saveEditLevels(t)}
-                                className="w-7 h-7 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 flex items-center justify-center transition-colors"
+                                className="w-9 h-9 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 flex items-center justify-center transition-colors"
                                 title={isAr ? 'حفظ' : 'Save'}
                               >
-                                <Check size={15} />
+                                <Check size={18} />
                               </button>
                               <button
                                 onClick={() => setEditId(null)}
-                                className="w-7 h-7 rounded-md bg-white/10 text-brand-text/70 hover:bg-white/20 flex items-center justify-center transition-colors"
+                                className="w-9 h-9 rounded-md bg-white/10 text-brand-text/70 hover:bg-white/20 flex items-center justify-center transition-colors"
                                 title={isAr ? 'إلغاء' : 'Cancel'}
                               >
-                                <X size={15} />
+                                <X size={18} />
                               </button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <div className="text-xs font-bold" dir="ltr">
+                              <div className="text-xl font-bold" dir="ltr">
                                 <span className={`${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`}>{t.sl != null ? fmtPrice(t.sl) : '—'}</span>
                                 <span className="text-brand-text/30"> / </span>
                                 <span className={`${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`}>{t.tp != null ? fmtPrice(t.tp) : '—'}</span>
                               </div>
                               <button
                                 onClick={() => startEditLevels(t)}
-                                className="w-6 h-6 rounded-md bg-white/10 text-brand-text/60 hover:text-sky-300 hover:bg-sky-500/20 flex items-center justify-center transition-colors"
+                                className="w-8 h-8 rounded-md bg-white/10 text-brand-text/60 hover:text-sky-300 hover:bg-sky-500/20 flex items-center justify-center transition-colors"
                                 title={isAr ? 'تعديل الوقف/الهدف' : 'Edit SL / TP'}
                               >
-                                <Pencil size={13} />
+                                <Pencil size={18} />
                               </button>
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm font-bold text-brand-text/60" dir="ltr">
+                        <td className="px-4 py-3 text-2xl font-bold text-brand-text/60" dir="ltr">
                           {(() => {
                             const d = new Date(t.openedAt);
                             const y = d.getFullYear();
@@ -1065,12 +1076,12 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                             return `${y}-${mo}-${day} ${hh}:${mm}`;
                           })()}
                         </td>
-                        <td className={`px-4 py-3 text-base font-black ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{cur ? fmtMoney(pnl) : '—'}</td>
+                        <td className={`px-4 py-3 text-3xl font-black ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{cur ? fmtMoney(pnl) : '—'}</td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() => closeTrade(t)}
                             disabled={!cur}
-                            className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/40 disabled:opacity-40 text-sm font-black uppercase transition-colors"
+                            className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/40 disabled:opacity-40 text-2xl font-black uppercase transition-colors"
                           >
                             {isAr ? 'إغلاق' : 'Close'}
                           </button>
