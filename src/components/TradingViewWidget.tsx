@@ -25,12 +25,20 @@ type LineKey = 'entry' | 'sl' | 'tp';
 
 const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
+function stepFor(price: number): number {
+  if (!isFinite(price) || price <= 0) return 0.01;
+  const a = Math.abs(price);
+  if (a < 10) return 0.0001;
+  if (a < 100) return 0.01;
+  if (a < 1000) return 0.1;
+  return 1;
+}
+
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
-  const dataRef = useRef<any[]>([]);
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
   const hoveredRef = useRef<LineKey | null>(null);
@@ -44,61 +52,64 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const lineDefs = (p = allPropsRef.current) => {
     return [
       { key: 'entry' as LineKey, price: p.entryPrice, color: '#eab308', title: 'Entry', editable: false },
-      { key: 'sl' as LineKey, price: p.sl, color: '#f23645', title: 'Stop Loss', editable: true },
-      { key: 'tp' as LineKey, price: p.tp, color: '#089981', title: 'Take Profit', editable: true },
+      { key: 'sl' as LineKey, price: p.sl, color: '#f23645', title: 'SL', editable: true },
+      { key: 'tp' as LineKey, price: p.tp, color: '#089981', title: 'TP', editable: true },
     ];
   };
 
-  const ensureLine = (key: LineKey) => {
+  const updateLines = () => {
     const series = seriesRef.current;
     if (!series) return;
-    const def = lineDefs().find((d) => d.key === key);
-    if (!def || def.price == null) return;
-    const existing = priceLinesRef.current[key];
-    try {
-      if (!existing) {
-        priceLinesRef.current[key] = series.createPriceLine({
-          price: def.price,
-          color: def.color,
-          lineWidth: 2,
-          lineStyle: LineStyle.Dashed,
-          axisLabelVisible: true,
-          title: def.title,
-        });
-      } else {
-        existing.applyOptions({ price: def.price });
-      }
-    } catch {}
-  };
-
-  const updateLines = () => {
-    for (const key of ['sl', 'tp'] as LineKey[]) {
-      const series = seriesRef.current;
-      const def = lineDefs().find((d) => d.key === key);
+    for (const def of lineDefs()) {
+      const key = def.key;
       const existing = priceLinesRef.current[key];
-      if (!def || def.price == null) {
+      if (def.price == null) {
         if (existing) {
-          try { series?.removePriceLine(existing); } catch {}
+          try { series.removePriceLine(existing); } catch {}
           priceLinesRef.current[key] = undefined;
         }
-      } else {
-        try {
-          if (!existing) {
-            priceLinesRef.current[key] = series!.createPriceLine({
-              price: def.price,
-              color: def.color,
-              lineWidth: 2,
-              lineStyle: LineStyle.Dashed,
-              axisLabelVisible: true,
-              title: def.title,
-            });
-          } else {
-            existing.applyOptions({ price: def.price });
-          }
-        } catch {}
+        continue;
       }
+      try {
+        if (!existing) {
+          priceLinesRef.current[key] = series.createPriceLine({
+            price: def.price,
+            color: def.color,
+            lineWidth: 2,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: def.title,
+          });
+        } else {
+          existing.applyOptions({ price: def.price });
+        }
+      } catch {}
     }
-    ensureLine('entry');
+  };
+
+  const fitToLevels = () => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    try {
+      const pts = lineDefs().map((d) => d.price).filter((p): p is number => p != null && isFinite(p));
+      if (!pts.length) return;
+      const data = dataRef.current;
+      if (data.length) {
+        const hi = data.reduce((m, c) => Math.max(m, c.high), -Infinity);
+        const lo = data.reduce((m, c) => Math.min(m, c.low), Infinity);
+        pts.push(hi, lo);
+      }
+      const min = Math.min(...pts);
+      const max = Math.max(...pts);
+      let pad = (max - min) * 0.12;
+      if (!isFinite(pad) || pad <= 0) pad = max * 0.005;
+      chart.timeScale()?.fitContent?.();
+      chart.priceScale('right')?.applyOptions?.({ autoScale: false });
+      // expand right scale to include levels
+      if (chart.priceScale('right')?.setVisibleRange) {
+        chart.priceScale('right').setVisibleRange({ from: min - pad, to: max + pad });
+      }
+    } catch {}
   };
 
   // create the chart once
@@ -112,10 +123,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       const chartEl = chartRef.current;
       if (!dot || !chartEl) return;
       const p = allPropsRef.current;
-      if (p.entryPrice == null) {
-        dot.style.display = 'none';
-        return;
-      }
+      if (p.entryPrice == null) { dot.style.display = 'none'; return; }
       const y = chartEl.priceToCoordinate(p.entryPrice);
       const box = el.getBoundingClientRect();
       if (y == null || !box.width) { raf = requestAnimationFrame(placeDot); return; }
@@ -137,7 +145,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           vertLines: { color: 'rgba(255,255,255,0.04)' },
           horzLines: { color: 'rgba(255,255,255,0.04)' },
         },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)', autoScale: true },
         timeScale: { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true, secondsVisible: false },
         crosshair: { mode: CrosshairMode.Normal },
       });
@@ -190,32 +198,39 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           if (o == null || h == null || l == null || c == null) continue;
           candles.push({ time: Math.floor(ts[i]), open: o, high: h, low: l, close: c });
         }
-        if (!candles.length) {
-          setStatus('empty');
-          return;
-        }
+        if (!candles.length) { setStatus('empty'); return; }
         dataRef.current = candles;
         try {
           seriesRef.current?.setData(candles);
           chartRef.current?.timeScale()?.fitContent?.();
         } catch {}
         updateLines();
+        setTimeout(fitToLevels, 60);
         setStatus('ok');
       })
-      .catch(() => {
-        if (!cancelled) setStatus('empty');
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => { if (!cancelled) setStatus('empty'); });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, tf]);
 
-  // redraw lines when entry/sl/tp change
+  // redraw lines + refit when entry/sl/tp change
   useEffect(() => {
     updateLines();
+    setTimeout(fitToLevels, 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryPrice, sl, tp]);
+
+  // adjust helper via stepper buttons (calls parent adjust)
+  const stepSl = (dir: number) => {
+    const p = allPropsRef.current;
+    if (p.sl == null || !p.onSlChange) return;
+    p.onSlChange(p.sl + stepFor(p.sl) * dir);
+  };
+  const stepTp = (dir: number) => {
+    const p = allPropsRef.current;
+    if (p.tp == null || !p.onTpChange) return;
+    p.onTpChange(p.tp + stepFor(p.tp) * dir);
+  };
 
   // drag SL/TP lines + hover cursor
   useEffect(() => {
@@ -227,7 +242,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       for (const def of lineDefs()) {
         if (!def.editable || def.price == null) continue;
         const lineY = chart.priceToCoordinate(def.price);
-        if (lineY != null && Math.abs(lineY - y) <= 12) return def.key as LineKey;
+        if (lineY != null && Math.abs(lineY - y) <= 14) return def.key as LineKey;
       }
       return null;
     };
@@ -236,23 +251,21 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       const key = draggingRef.current || hitTest(y);
       if (key && key !== hoveredRef.current) { hoveredRef.current = key; el.style.cursor = 'ns-resize'; }
       else if (!key && hoveredRef.current) { hoveredRef.current = null; el.style.cursor = 'crosshair'; }
-      if (draggingRef.current) {
-        const price = chart.coordinateToPrice(y);
-        if (price == null) return;
-        const k = draggingRef.current;
-        const p = allPropsRef.current;
-        ensureLine(k);
-        priceLinesRef.current[k]?.applyOptions({ price });
-        const now = performance.now();
-        if (now - lastSyncRef.current >= 120) {
-          lastSyncRef.current = now;
-          if (k === 'sl' && p.onSlChange) p.onSlChange(price);
-          else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
-        }
-        updateLines();
+      if (!draggingRef.current) return;
+      const price = chart.coordinateToPrice(y);
+      if (price == null) return;
+      const k = draggingRef.current;
+      const p = allPropsRef.current;
+      try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
+      const now = performance.now();
+      if (now - lastSyncRef.current >= 120) {
+        lastSyncRef.current = now;
+        if (k === 'sl' && p.onSlChange) p.onSlChange(price);
+        else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
       }
     };
     const onDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
       const key = hitTest(posY(e));
       if (key) {
         draggingRef.current = key;
@@ -276,6 +289,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const hasLevels = (sl != null || tp != null) && entryPrice != null;
+  const fmt = (n: number | null | undefined) => (n == null ? '—' : Number(n).toPrecision(6));
 
   return (
     <div className="relative h-full w-full">
@@ -301,11 +317,44 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           </button>
         ))}
       </div>
-      <div ref={containerRef} className="h-full w-full" />
+
+      {/* On-chart level control panel */}
+      {hasLevels && (
+        <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 bg-black/60 backdrop-blur rounded-lg border border-white/10 p-1.5 text-[11px]">
+          <div className="flex items-center gap-2 text-white">
+            <span className="w-3 h-3 rounded-full bg-yellow-400 inline-block" />
+            <span className="text-white/60 font-bold">Entry</span>
+            <span className="font-black tabular-nums">{fmt(entryPrice)}</span>
+          </div>
+          <div className="flex items-center gap-2 text-red-400">
+            <span className="w-2 h-0.5 bg-red-500 inline-block" />
+            <span className="text-white/60 font-bold">SL</span>
+            <span className="font-black tabular-nums">{fmt(sl)}</span>
+            {sl != null && (
+              <div className="flex items-center gap-0.5">
+                <button onClick={() => stepSl(-1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none" title="−">−</button>
+                <button onClick={() => stepSl(1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none" title="+">+</button>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-emerald-400">
+            <span className="w-2 h-0.5 bg-emerald-500 inline-block" />
+            <span className="text-white/60 font-bold">TP</span>
+            <span className="font-black tabular-nums">{fmt(tp)}</span>
+            {tp != null && (
+              <div className="flex items-center gap-0.5">
+                <button onClick={() => stepTp(-1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none" title="−">−</button>
+                <button onClick={() => stepTp(1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none" title="+">+</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div ref={containerRef} className="absolute inset-0" />
       <div
         ref={dotRef}
         style={{ display: 'none', position: 'absolute', width: 12, height: 12, marginLeft: -6, marginTop: -6, pointerEvents: 'none', zIndex: 5 }}
-        className="flex items-center justify-center"
       >
         <span className="absolute inline-flex h-3.5 w-3.5 rounded-full bg-yellow-400 opacity-75 animate-ping" />
         <span className="absolute inline-flex h-2 w-2 rounded-full bg-yellow-400" />
