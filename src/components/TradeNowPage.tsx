@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw } from 'lucide-react';
+import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw, Pencil, Check } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { AnalysisResult } from '../types';
 import { SYMBOL_CATEGORIES } from '../constants';
@@ -138,6 +138,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [tpPrice, setTpPrice] = useState<string>('');
   const [slPrice, setSlPrice] = useState<string>('');
   const [tab, setTab] = useState<'positions' | 'history'>('positions');
+  // Inline SL/TP editing for an open trade
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editSl, setEditSl] = useState<string>('');
+  const [editTp, setEditTp] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [priceLoading, setPriceLoading] = useState(true);
   const [priceTick, setPriceTick] = useState(0); // triggers re-render for open trades P&L
@@ -478,6 +482,34 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   async function adjustTp(tradeId: string, newTp: number) {
     await store.updateTrade(tradeId, { tp: newTp > 0 ? newTp : null });
     setPriceTick(p => p + 1);
+  }
+
+  // Start inline editing of an open trade's SL/TP levels (in price units)
+  function startEditLevels(t: PaperTrade) {
+    setEditSl(t.sl != null ? t.sl.toFixed(5) : '');
+    setEditTp(t.tp != null ? t.tp.toFixed(5) : '');
+    setEditId(t.id);
+  }
+
+  // Save the edited SL/TP levels and persist to the store
+  async function saveEditLevels(t: PaperTrade) {
+    const sl = parseFloat(editSl);
+    const tp = parseFloat(editTp);
+    const nextSl = isFinite(sl) && sl > 0 ? sl : null;
+    const nextTp = isFinite(tp) && tp > 0 ? tp : null;
+    try {
+      await store.updateTrade(t.id, { sl: nextSl, tp: nextTp });
+    } catch {
+      try {
+        const raw = JSON.parse(localStorage.getItem('paper_trading_data') || '{"balance":10000,"trades":[]}');
+        raw.trades = (raw.trades || []).map((x: any) => x.id === t.id ? { ...x, sl: nextSl, tp: nextTp } : x);
+        localStorage.setItem('paper_trading_data', JSON.stringify(raw));
+      } catch {}
+    }
+    setTrades((prev) => prev.map((x) => x.id === t.id ? { ...x, sl: nextSl, tp: nextTp } : x));
+    setEditId(null);
+    setToast(isAr ? 'تم تحديث الوقف/الهدف' : 'SL/TP updated');
+    setTimeout(() => setToast(null), 2000);
   }
 
   async function doReset(newBalance: number) {
@@ -972,11 +1004,55 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{cur ? fmtPrice(cur) : '—'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-sky-400" dir="ltr">${margin.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                         <td className="px-4 py-3">
-                          <div className="text-xs font-bold" dir="ltr">
-                            <span className={`${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`}>{t.sl != null ? fmtPrice(t.sl) : '—'}</span>
-                            <span className="text-brand-text/30"> / </span>
-                            <span className={`${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`}>{t.tp != null ? fmtPrice(t.tp) : '—'}</span>
-                          </div>
+                          {editId === t.id ? (
+                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="number"
+                                value={editSl}
+                                onChange={(e) => setEditSl(e.target.value)}
+                                placeholder="SL"
+                                className="w-20 px-2 py-1 rounded-md bg-black/40 border border-red-500/40 text-red-400 text-xs font-bold focus:outline-none focus:border-red-400"
+                                dir="ltr"
+                              />
+                              <input
+                                type="number"
+                                value={editTp}
+                                onChange={(e) => setEditTp(e.target.value)}
+                                placeholder="TP"
+                                className="w-20 px-2 py-1 rounded-md bg-black/40 border border-emerald-500/40 text-emerald-400 text-xs font-bold focus:outline-none focus:border-emerald-400"
+                                dir="ltr"
+                              />
+                              <button
+                                onClick={() => saveEditLevels(t)}
+                                className="w-7 h-7 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 flex items-center justify-center transition-colors"
+                                title={isAr ? 'حفظ' : 'Save'}
+                              >
+                                <Check size={15} />
+                              </button>
+                              <button
+                                onClick={() => setEditId(null)}
+                                className="w-7 h-7 rounded-md bg-white/10 text-brand-text/70 hover:bg-white/20 flex items-center justify-center transition-colors"
+                                title={isAr ? 'إلغاء' : 'Cancel'}
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <div className="text-xs font-bold" dir="ltr">
+                                <span className={`${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`}>{t.sl != null ? fmtPrice(t.sl) : '—'}</span>
+                                <span className="text-brand-text/30"> / </span>
+                                <span className={`${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`}>{t.tp != null ? fmtPrice(t.tp) : '—'}</span>
+                              </div>
+                              <button
+                                onClick={() => startEditLevels(t)}
+                                className="w-6 h-6 rounded-md bg-white/10 text-brand-text/60 hover:text-sky-300 hover:bg-sky-500/20 flex items-center justify-center transition-colors"
+                                title={isAr ? 'تعديل الوقف/الهدف' : 'Edit SL / TP'}
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm font-bold text-brand-text/60" dir="ltr">
                           {(() => {
