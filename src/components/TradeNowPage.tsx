@@ -411,6 +411,20 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     if (!livePrice || busy || qty <= 0) return;
     setBusy(true);
 
+    // Check that the resulting trade's margin fits within the account balance
+    const pendingCat = detectCategory(symbol);
+    const notional = livePrice * qty * (pendingCat === 'forex' ? 100000 : pendingCat === 'metals' ? 100 : 1);
+    const leverage = pendingCat === 'forex' || pendingCat === 'metals' ? 100 : pendingCat === 'crypto' ? 10 : 20;
+    const requiredMargin = notional / leverage;
+    if (requiredMargin > balance) {
+      setToast(isAr
+        ? `هامش غير كافٍ (مطلوب $${requiredMargin.toFixed(0)} / الرصيد $${balance.toFixed(0)})`
+        : `Insufficient margin (need $${requiredMargin.toFixed(0)} / balance $${balance.toFixed(0)})`);
+      setTimeout(() => setToast(null), 3000);
+      setBusy(false);
+      return;
+    }
+
     // SL/TP fields hold USD amounts; convert back to limit prices for execution.
     const cat = detectCategory(symbol);
     const isBuy = side === 'buy';
@@ -914,6 +928,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                     <th className="px-4 py-3">{isAr ? 'الدخول' : 'Entry'}</th>
                     <th className="px-4 py-3">{isAr ? 'الحالي' : 'Current'}</th>
                     <th className="px-4 py-3">{isAr ? 'الهامش' : 'Margin'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الوقف/الهدف' : 'SL / TP'}</th>
                     <th className="px-4 py-3">{isAr ? 'الوقت' : 'Time'}</th>
                     <th className="px-4 py-3">{isAr ? 'الربح/الخسارة' : 'P&L'}</th>
                     <th className="px-4 py-3"></th>
@@ -957,6 +972,13 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
                         <td className="px-4 py-3 text-base font-bold text-brand-text/80" dir="ltr">{cur ? fmtPrice(cur) : '—'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-sky-400" dir="ltr">${margin.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                        <td className="px-4 py-3">
+                          <div className="text-xs font-bold" dir="ltr">
+                            <span className={`${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`}>{t.sl != null ? fmtPrice(t.sl) : '—'}</span>
+                            <span className="text-brand-text/30"> / </span>
+                            <span className={`${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`}>{t.tp != null ? fmtPrice(t.tp) : '—'}</span>
+                          </div>
+                        </td>
                         <td className="px-4 py-3 text-sm font-bold text-brand-text/60" dir="ltr">
                           {(() => {
                             const d = new Date(t.openedAt);
