@@ -168,6 +168,13 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
 
   const store = getTradeStore(user);
 
+  // Refs that always hold the latest trades/balance so the price subscription's
+  // auto-close callback never reads stale SL/TP or balance (avoid closure bugs).
+  const tradesRef = React.useRef<PaperTrade[]>(trades);
+  tradesRef.current = trades;
+  const balanceRef = React.useRef(balance);
+  balanceRef.current = balance;
+
   // Find matching signal for current symbol
   const matchedSignal = React.useMemo(() => {
     if (!symbol || signals.length === 0) return null;
@@ -267,17 +274,18 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   }, [symbol, openTrades.length]);
 
   const checkAutoClose = useCallback(async (sym: string, price: number) => {
-    const targets = trades.filter((t) => t.status === 'open' && t.symbol === sym);
+    const currentTrades = tradesRef.current;
+    const targets = currentTrades.filter((t) => t.status === 'open' && t.symbol === sym);
     for (const t of targets) {
       const hitTp = t.tp != null && ((t.side === 'buy' && price >= t.tp) || (t.side === 'sell' && price <= t.tp));
       const hitSl = t.sl != null && ((t.side === 'buy' && price <= t.sl) || (t.side === 'sell' && price >= t.sl));
       if (hitTp || hitSl) await closeTradeInternal(t, price, hitTp ? 'tp' : 'sl');
     }
-  }, [trades, balance]);
+  }, []);
 
   async function closeTradeInternal(t: PaperTrade, exitPrice: number, reason: 'manual' | 'tp' | 'sl') {
     const pnl = calcPnl(t, exitPrice);
-    const newBalance = balance + pnl;
+    const newBalance = balanceRef.current + pnl;
     try {
       await store.updateTrade(t.id, { status: 'closed', exitPrice, pnl, closeReason: reason, closedAt: Date.now() });
       await store.saveBalance(newBalance);
@@ -995,7 +1003,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                               setTimeout(() => setToast(null), 2000);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
-                            className="relative px-3 py-1.5 rounded-lg text-2xl font-black text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-400/50 cursor-pointer transition-all active:scale-95"
+                            className="relative px-3 py-1.5 rounded-lg text-lg font-black text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-400/50 cursor-pointer transition-all active:scale-95"
                           >
                             {popId === t.id && (
                               <span className="absolute inset-0 rounded-lg animate-ping bg-sky-400/30 pointer-events-none" />
@@ -1004,14 +1012,14 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                           </button>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`px-3 py-1.5 rounded-lg text-2xl font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                          <span className={`px-3 py-1.5 rounded-lg text-lg font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                             {t.side === 'buy' ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-3xl font-bold text-brand-text/80" dir="ltr">{t.qty}</td>
-                        <td className="px-4 py-3 text-3xl font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
-                        <td className="px-4 py-3 text-3xl font-bold text-brand-text/80" dir="ltr">{cur ? fmtPrice(cur) : '—'}</td>
-                        <td className="px-4 py-3 text-2xl font-bold text-sky-400" dir="ltr">${margin.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                        <td className="px-4 py-3 text-xl font-bold text-brand-text/80" dir="ltr">{t.qty}</td>
+                        <td className="px-4 py-3 text-xl font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
+                        <td className="px-4 py-3 text-xl font-bold text-brand-text/80" dir="ltr">{cur ? fmtPrice(cur) : '—'}</td>
+                        <td className="px-4 py-3 text-lg font-bold text-sky-400" dir="ltr">${margin.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                         <td className="px-4 py-3">
                           {editId === t.id ? (
                             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -1021,7 +1029,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                                 value={editSl}
                                 onChange={(e) => setEditSl(normalizeDecimal(e.target.value))}
                                 placeholder="SL"
-                                className="w-28 px-2 py-1 rounded-md bg-black/40 border border-red-500/40 text-red-400 text-xl font-bold focus:outline-none focus:border-red-400"
+                                className="w-24 px-2 py-1 rounded-md bg-black/40 border border-red-500/40 text-red-400 text-base font-bold focus:outline-none focus:border-red-400"
                                 dir="ltr"
                               />
                               <input
@@ -1030,42 +1038,42 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                                 value={editTp}
                                 onChange={(e) => setEditTp(normalizeDecimal(e.target.value))}
                                 placeholder="TP"
-                                className="w-28 px-2 py-1 rounded-md bg-black/40 border border-emerald-500/40 text-emerald-400 text-xl font-bold focus:outline-none focus:border-emerald-400"
+                                className="w-24 px-2 py-1 rounded-md bg-black/40 border border-emerald-500/40 text-emerald-400 text-base font-bold focus:outline-none focus:border-emerald-400"
                                 dir="ltr"
                               />
                               <button
                                 onClick={() => saveEditLevels(t)}
-                                className="w-9 h-9 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 flex items-center justify-center transition-colors"
+                                className="w-8 h-8 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 flex items-center justify-center transition-colors"
                                 title={isAr ? 'حفظ' : 'Save'}
                               >
-                                <Check size={18} />
+                                <Check size={17} />
                               </button>
                               <button
                                 onClick={() => setEditId(null)}
-                                className="w-9 h-9 rounded-md bg-white/10 text-brand-text/70 hover:bg-white/20 flex items-center justify-center transition-colors"
+                                className="w-8 h-8 rounded-md bg-white/10 text-brand-text/70 hover:bg-white/20 flex items-center justify-center transition-colors"
                                 title={isAr ? 'إلغاء' : 'Cancel'}
                               >
-                                <X size={18} />
+                                <X size={17} />
                               </button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <div className="text-xl font-bold" dir="ltr">
+                              <div className="text-base font-bold" dir="ltr">
                                 <span className={`${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`}>{t.sl != null ? fmtPrice(t.sl) : '—'}</span>
                                 <span className="text-brand-text/30"> / </span>
                                 <span className={`${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`}>{t.tp != null ? fmtPrice(t.tp) : '—'}</span>
                               </div>
                               <button
                                 onClick={() => startEditLevels(t)}
-                                className="w-8 h-8 rounded-md bg-white/10 text-brand-text/60 hover:text-sky-300 hover:bg-sky-500/20 flex items-center justify-center transition-colors"
+                                className="w-7 h-7 rounded-md bg-white/10 text-brand-text/60 hover:text-sky-300 hover:bg-sky-500/20 flex items-center justify-center transition-colors"
                                 title={isAr ? 'تعديل الوقف/الهدف' : 'Edit SL / TP'}
                               >
-                                <Pencil size={18} />
+                                <Pencil size={16} />
                               </button>
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-2xl font-bold text-brand-text/60" dir="ltr">
+                        <td className="px-4 py-3 text-lg font-bold text-brand-text/60" dir="ltr">
                           {(() => {
                             const d = new Date(t.openedAt);
                             const y = d.getFullYear();
@@ -1076,12 +1084,12 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                             return `${y}-${mo}-${day} ${hh}:${mm}`;
                           })()}
                         </td>
-                        <td className={`px-4 py-3 text-3xl font-black ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{cur ? fmtMoney(pnl) : '—'}</td>
+                        <td className={`px-4 py-3 text-xl font-black ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{cur ? fmtMoney(pnl) : '—'}</td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() => closeTrade(t)}
                             disabled={!cur}
-                            className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/40 disabled:opacity-40 text-2xl font-black uppercase transition-colors"
+                            className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/40 disabled:opacity-40 text-lg font-black uppercase transition-colors"
                           >
                             {isAr ? 'إغلاق' : 'Close'}
                           </button>
