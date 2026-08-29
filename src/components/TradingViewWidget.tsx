@@ -91,24 +91,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const chart = chartRef.current;
     if (!chart) return;
     try {
-      const pts = lineDefs().map((d) => d.price).filter((p): p is number => p != null && isFinite(p));
-      if (!pts.length) return;
-      const data = dataRef.current;
-      if (data.length) {
-        const hi = data.reduce((m, c) => Math.max(m, c.high), -Infinity);
-        const lo = data.reduce((m, c) => Math.min(m, c.low), Infinity);
-        pts.push(hi, lo);
-      }
-      const min = Math.min(...pts);
-      const max = Math.max(...pts);
-      let pad = (max - min) * 0.12;
-      if (!isFinite(pad) || pad <= 0) pad = max * 0.005;
+      chart.priceScale('right')?.applyOptions?.({ autoScale: true });
       chart.timeScale()?.fitContent?.();
-      chart.priceScale('right')?.applyOptions?.({ autoScale: false });
-      // expand right scale to include levels
-      if (chart.priceScale('right')?.setVisibleRange) {
-        chart.priceScale('right').setVisibleRange({ from: min - pad, to: max + pad });
-      }
     } catch {}
   };
 
@@ -351,7 +335,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         </div>
       )}
 
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="h-full w-full" />
       <div
         ref={dotRef}
         style={{ display: 'none', position: 'absolute', width: 12, height: 12, marginLeft: -6, marginTop: -6, pointerEvents: 'none', zIndex: 5 }}
