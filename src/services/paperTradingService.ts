@@ -49,20 +49,14 @@ export function isMarketOpen(category: string, now: Date = new Date()): boolean 
 }
 
 // ---------- Contract specs (TradingView-style) ----------
-// Default lot follows total balance: baseline $500 -> 0.01 lot,
-// every extra $1000 adds 0.01 (e.g. $7000 -> 0.08).
-export function lotMultiplierForBalance(balance: number): number {
-  return Math.floor(Math.max(balance, MIN_BALANCE) / 1000) + 1;
-}
-
+// Fixed default quantity per category.
 export function getDefaultQty(category: string, balance: number = START_BALANCE): number {
-  const m = lotMultiplierForBalance(balance);
   switch (category) {
-    case 'forex': return +(0.01 * m).toFixed(2);   // lots (1 lot = 100,000 units)
-    case 'crypto': return +(0.1 * m).toFixed(2);   // units of coin
-    case 'stocks': return Math.max(1, m);          // shares
-    case 'metals': return +(0.01 * m).toFixed(2);  // lots (1 lot = 100 oz)
-    default: return 1;
+    case 'crypto': return 0.1;   // always 0.1 units of coin
+    case 'forex': return 0.01;   // always 0.01 lots (1 lot = 100,000 units)
+    case 'metals': return 0.01;  // always 0.01 lots (1 lot = 100 oz)
+    case 'stocks': return 0.01;  // always 0.01 shares
+    default: return 0.01;
   }
 }
 
