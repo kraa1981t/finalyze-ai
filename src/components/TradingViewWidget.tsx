@@ -44,7 +44,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const entry = entryRef.current;
     const slv = slRef.current;
     const tpv = tpRef.current;
-    const anchor = Math.floor(Date.now() / 1000);
+    // Anchor each line to the current bar's open time so it isn't cut off.
+    const anchor = Math.floor(Date.now() / 1000 / 86400) * 86400;
     const lines = [
       entry != null ? { text: 'Entry', price: entry, color: '#e2e8f0' } : null,
       slv != null ? { text: 'Stop Loss', price: slv, color: '#ef4444' } : null,
@@ -62,6 +63,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             disableUndo: true,
             disableSelection: false,
             text: l.text,
+            zOrder: 'top',
             overrides: {
               linestyle: 2,
               linewidth: 2,
@@ -140,13 +142,19 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         enable_publishing: false,
         allow_symbol_change: true,
         autosize: true,
-        onchartready: () => {
+      });
+      // Use the documented onChartReady method so chart() is available.
+      widget.onChartReady(() => {
+        if (!widget.chart) return;
+        try {
           chartRef.current = widget.chart();
-          try {
-            chartRef.current.onDrawingLineEvent(handleDrawing);
-          } catch {}
-          refreshLines();
-        },
+        } catch {
+          return;
+        }
+        try {
+          chartRef.current.onDrawingLineEvent(handleDrawing);
+        } catch {}
+        refreshLines();
       });
     };
 
