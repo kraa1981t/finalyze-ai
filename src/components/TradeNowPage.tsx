@@ -175,6 +175,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const balanceRef = React.useRef(balance);
   balanceRef.current = balance;
 
+  // Cooldown: when a user edits SL/TP on an open trade, briefly ignore auto-close
+  // for that trade so it does NOT instantly close on the current parked price.
+  const levelCooldownRef = React.useRef<Record<string, number>>({});
+
   // Find matching signal for current symbol
   const matchedSignal = React.useMemo(() => {
     if (!symbol || signals.length === 0) return null;
@@ -277,7 +281,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const checkAutoClose = useCallback(async (sym: string, price: number) => {
     const currentTrades = tradesRef.current;
     const targets = currentTrades.filter((t) => t.status === 'open' && t.symbol === sym);
+    const now = Date.now();
     for (const t of targets) {
+      // Skip auto-close right after the user sets SL/TP (cooldown window).
+      if ((levelCooldownRef.current[t.id] || 0) > now) continue;
       const hitTp = t.tp != null && ((t.side === 'buy' && price >= t.tp) || (t.side === 'sell' && price <= t.tp));
       const hitSl = t.sl != null && ((t.side === 'buy' && price <= t.sl) || (t.side === 'sell' && price >= t.sl));
       if (hitTp || hitSl) await closeTradeInternal(t, price, hitTp ? 'tp' : 'sl');
@@ -540,6 +547,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
       } catch {}
     }
     setTrades((prev) => prev.map((x) => x.id === t.id ? { ...x, sl: nextSl, tp: nextTp } : x));
+    // Ignore auto-close for ~10s so the trade is never closed instantly on the
+    // current price right after setting the levels.
+    levelCooldownRef.current[t.id] = Date.now() + 10000;
     setEditId(null);
     setToast(isAr ? 'تم تحديث الوقف/الهدف' : 'SL/TP updated');
     setTimeout(() => setToast(null), 2000);
@@ -634,7 +644,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           >
             <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'مستوى الهامش' : 'Margin Level'}</div>
             <div className={`text-base font-black ${stats.marginLevel >= 100 ? 'text-emerald-400' : stats.marginLevel > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
-              {stats.marginLevel > 0 ? `${stats.marginLevel}%` : '—'}
+              {stats.marginLevel > 0 ? `${stats.marginLevel.toLocaleString('en-US')}%` : '—'}
             </div>
           </div>
           <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
