@@ -120,7 +120,12 @@ export default function MT5Web({ symbol }: MT5WebProps) {
     setActiveId(null);
   };
 
-  const iframeUrl = active ? active.brokerUrl : '';
+  const launchTerminal = (c: Mt5Connection) => {
+    let url = c.brokerUrl;
+    const query = `login=${encodeURIComponent(c.login)}&server=${encodeURIComponent(c.server)}`;
+    url += (url.includes('?') ? '&' : '?') + query;
+    window.open(url, '_blank', 'noopener,noreferrer,width=1200,height=800');
+  };
 
   if (active) {
     const liveSymbol = symbol || '';
@@ -153,6 +158,12 @@ export default function MT5Web({ symbol }: MT5WebProps) {
               </div>
             )}
             <button
+              onClick={() => launchTerminal(active)}
+              className="px-3 py-1.5 rounded-lg bg-sky-500 text-black text-[11px] font-black hover:bg-sky-400 transition-colors"
+            >
+              Open Terminal ↗
+            </button>
+            <button
               onClick={logoutActive}
               className="px-3 py-1 rounded-lg bg-red-500/20 text-red-400 text-[10px] font-black hover:bg-red-500/30 transition-colors"
             >
@@ -160,20 +171,32 @@ export default function MT5Web({ symbol }: MT5WebProps) {
             </button>
           </div>
         </div>
-        <div className="flex-1 w-full relative bg-black">
-          <iframe
-            key={active.id}
-            src={iframeUrl}
-            className="absolute inset-0 w-full h-full border-0 bg-black"
-            title="MT5 Web Terminal"
-            allow="clipboard-write; clipboard-read; camera; microphone; fullscreen"
-            referrerPolicy="no-referrer-when-downgrade"
-          />
-        </div>
-        <div className="px-3 py-1.5 bg-[#0a0f1a] border-t border-white/10 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-[10px] font-bold text-emerald-400/80">Connected · Demo account (no real funds)</span>
-          <span className="ml-auto text-[10px] font-bold text-white/25">data encrypted &amp; stored only on this device</span>
+        <div className="flex-1 w-full flex items-center justify-center p-6 bg-[#0a0f1a]">
+          <div className="w-full max-w-md text-center space-y-4">
+            <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-sky-500/30 to-emerald-500/20 flex items-center justify-center">
+              <span className="text-4xl">📈</span>
+            </div>
+            <div>
+              <div className="text-xl font-black text-white">{active.brokerName}</div>
+              <div className="text-sm font-bold text-emerald-400" dir="ltr">{active.login} · {active.server}</div>
+            </div>
+            <p className="text-sm text-white/50 leading-relaxed">
+              The terminal opens in a <span className="text-sky-400 font-black">new browser tab</span>.
+              Enter your MT5 account credentials there and trade freely.
+            </p>
+            <button
+              onClick={() => launchTerminal(active)}
+              className="w-full py-3.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-black uppercase tracking-wider shadow-lg shadow-sky-500/25 active:scale-[0.98] transition-all"
+            >
+              Open MT5 Terminal in new tab ↗
+            </button>
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <div className="text-[11px] font-black text-emerald-400">🔒 Demo only · no real funds</div>
+              <p className="text-[10px] text-white/40 mt-1">
+                Credentials are saved only in your own browser and never shared with other users.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     );
