@@ -12,7 +12,7 @@ import {
 } from '../services/paperTradingService';
 import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
 import { playOpenSound, playCloseSound } from '../lib/tradeSounds';
-import { pricesToUsd, usdToPrice } from '../lib/positionMath';
+import { pricesToUsd, usdToPrice, slAmountUSD } from '../lib/positionMath';
 
 interface TradeNowPageProps {
   lang: Language;
@@ -529,19 +529,24 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     setPriceTick(p => p + 1);
   }
 
-  // Start inline editing of an open trade's SL/TP levels (in price units)
+  // Start inline editing of an open trade's SL/TP levels.
+  // Values are shown/edited in USD amount (consistent with the open ticket).
   function startEditLevels(t: PaperTrade) {
-    setEditSl(t.sl != null ? t.sl.toFixed(5) : '');
-    setEditTp(t.tp != null ? t.tp.toFixed(5) : '');
+    setEditSl(t.sl != null ? slAmountUSD(t.symbol, Math.abs(t.entryPrice - t.sl), t.qty, t.category).toFixed(2) : '');
+    setEditTp(t.tp != null ? slAmountUSD(t.symbol, Math.abs(t.entryPrice - t.tp), t.qty, t.category).toFixed(2) : '');
     setEditId(t.id);
   }
 
-  // Save the edited SL/TP levels and persist to the store
+  // Save the edited SL/TP levels and persist to the store.
+  // The entered USD amounts are converted back to target prices using the
+  // position side (TP on profit side, SL on loss side).
   async function saveEditLevels(t: PaperTrade) {
     const sl = parseFloat(editSl);
     const tp = parseFloat(editTp);
-    const nextSl = isFinite(sl) && sl > 0 ? sl : null;
-    const nextTp = isFinite(tp) && tp > 0 ? tp : null;
+    let nextSl: number | null = null;
+    let nextTp: number | null = null;
+    if (isFinite(tp) && tp > 0) nextTp = usdToPrice(t.symbol, tp, t.entryPrice, t.side === 'buy', t.qty, t.category);
+    if (isFinite(sl) && sl > 0) nextSl = usdToPrice(t.symbol, sl, t.entryPrice, t.side !== 'buy', t.qty, t.category);
     try {
       await store.updateTrade(t.id, { sl: nextSl, tp: nextTp });
     } catch {
@@ -1056,6 +1061,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                     const cur = priceOf(t);
                     const pnl = cur != null ? calcPnl(t, cur) : 0;
                     const margin = calcMargin(t, leverage);
+                    const slUsd = t.sl != null ? slAmountUSD(t.symbol, Math.abs(t.entryPrice - t.sl), t.qty, t.category) : null;
+                    const tpUsd = t.tp != null ? slAmountUSD(t.symbol, Math.abs(t.entryPrice - t.tp), t.qty, t.category) : null;
                     return (
                       <tr key={t.id} className="border-b border-white/5 hover:bg-white/5 relative">
                         <td className="px-4 py-3">
@@ -1097,7 +1104,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                                 inputMode="decimal"
                                 value={editSl}
                                 onChange={(e) => setEditSl(normalizeDecimal(e.target.value))}
-                                placeholder="SL"
+                                placeholder="SL $"
                                 className="w-24 px-2 py-1 rounded-md bg-black/40 border border-red-500/40 text-red-400 text-base font-bold focus:outline-none focus:border-red-400"
                                 dir="ltr"
                               />
@@ -1106,7 +1113,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                                 inputMode="decimal"
                                 value={editTp}
                                 onChange={(e) => setEditTp(normalizeDecimal(e.target.value))}
-                                placeholder="TP"
+                                placeholder="TP $"
                                 className="w-24 px-2 py-1 rounded-md bg-black/40 border border-emerald-500/40 text-emerald-400 text-base font-bold focus:outline-none focus:border-emerald-400"
                                 dir="ltr"
                               />
@@ -1128,14 +1135,14 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                           ) : (
                             <div className="flex items-center gap-2">
                               <div className="text-base font-bold" dir="ltr">
-                                <span className={`${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`}>{t.sl != null ? fmtPrice(t.sl) : '—'}</span>
+                                <span className={`${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`}>{slUsd != null ? `$${slUsd.toFixed(2)}` : '—'}</span>
                                 <span className="text-brand-text/30"> / </span>
-                                <span className={`${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`}>{t.tp != null ? fmtPrice(t.tp) : '—'}</span>
+                                <span className={`${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`}>{tpUsd != null ? `$${tpUsd.toFixed(2)}` : '—'}</span>
                               </div>
                               <button
                                 onClick={() => startEditLevels(t)}
                                 className="w-7 h-7 rounded-md bg-white/10 text-brand-text/60 hover:text-sky-300 hover:bg-sky-500/20 flex items-center justify-center transition-colors"
-                                title={isAr ? 'تعديل الوقف/الهدف' : 'Edit SL / TP'}
+                                title={isAr ? 'تعديل الوقف/الهدف (بالدولار)' : 'Edit SL / TP (USD)'}
                               >
                                 <Pencil size={16} />
                               </button>
