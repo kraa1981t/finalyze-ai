@@ -22,10 +22,18 @@ declare global {
 
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange }: TradingViewWidgetProps) {
   const container = useRef<HTMLDivElement>(null);
-  const widgetRef = useRef<any>(null);
   const chartRef = useRef<any>(null);
   const lastSyncRef = useRef(0);
   const lastEmitRef = useRef<{ kind: 'sl' | 'tp'; price: number } | null>(null);
+
+  // Always read the latest prop values via refs (closure-safe), so drawing
+  // after the chart becomes ready uses the current trade data.
+  const entryRef = useRef<number | null | undefined>(entryPrice);
+  const slRef = useRef<number | null | undefined>(sl);
+  const tpRef = useRef<number | null | undefined>(tp);
+  entryRef.current = entryPrice;
+  slRef.current = sl;
+  tpRef.current = tp;
 
   const refreshLines = () => {
     const chart = chartRef.current;
@@ -33,11 +41,14 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     try {
       chart.removeAllShapes();
     } catch {}
+    const entry = entryRef.current;
+    const slv = slRef.current;
+    const tpv = tpRef.current;
     const anchor = Math.floor(Date.now() / 1000);
     const lines = [
-      entryPrice != null ? { text: 'Entry', price: entryPrice, color: '#e2e8f0' } : null,
-      sl != null ? { text: 'Stop Loss', price: sl, color: '#ef4444' } : null,
-      tp != null ? { text: 'Take Profit', price: tp, color: '#10b981' } : null,
+      entry != null ? { text: 'Entry', price: entry, color: '#e2e8f0' } : null,
+      slv != null ? { text: 'Stop Loss', price: slv, color: '#ef4444' } : null,
+      tpv != null ? { text: 'Take Profit', price: tpv, color: '#10b981' } : null,
     ];
     for (const l of lines) {
       if (!l) continue;
@@ -53,7 +64,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             text: l.text,
             overrides: {
               linestyle: 2,
-              linewidth: 1,
+              linewidth: 2,
               linecolor: l.color,
               showPriceRange: true,
               extendLeft: true,
@@ -62,6 +73,17 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           }
         );
       } catch {}
+    }
+  };
+
+  // Retry drawing until the chart is ready (cover race with onchartready).
+  const tryDraw = (attempt = 0) => {
+    if (chartRef.current) {
+      refreshLines();
+      return;
+    }
+    if (attempt < 20) {
+      setTimeout(() => tryDraw(attempt + 1), 250);
     }
   };
 
@@ -83,7 +105,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     } catch {}
 
     const now = Date.now();
-    if (now - lastSyncRef.current < 250) return; // throttle rapid drag events
+    if (now - lastSyncRef.current < 250) return;
     lastSyncRef.current = now;
 
     const changed = lastEmitRef.current;
@@ -120,13 +142,12 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         autosize: true,
         onchartready: () => {
           chartRef.current = widget.chart();
-          refreshLines();
           try {
             chartRef.current.onDrawingLineEvent(handleDrawing);
           } catch {}
+          refreshLines();
         },
       });
-      widgetRef.current = widget;
     };
 
     if (window.TradingView) {
@@ -139,18 +160,20 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       document.head.appendChild(script);
     }
 
+    // Cover the case where the trade is opened before the chart finished loading.
+    const retry = setTimeout(() => tryDraw(0), 800);
+
     return () => {
+      clearTimeout(retry);
       try {
         widget?.remove();
       } catch {}
       chartRef.current = null;
-      widgetRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol]);
 
-  // Refresh lines when SL/TP values change externally (table edit, auto-sync),
-  // but skip while a drag just emitted a change to avoid deleting the line mid-drag.
+  // Redraw when SL/TP values change externally, but skip briefly after a drag.
   useEffect(() => {
     if (!chartRef.current) return;
     if (Date.now() - lastSyncRef.current < 600) return;
