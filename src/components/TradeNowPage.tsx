@@ -1282,34 +1282,38 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             ) : (
               <table className="w-full text-left">
                 <thead>
-                  <tr className="text-xs font-black uppercase text-brand-text/40 tracking-wider border-b border-white/10">
-                    <th className="px-4 py-2">{isAr ? 'الرمز' : 'Symbol'}</th>
-                    <th className="px-4 py-2">{isAr ? 'الاتجاه' : 'Side'}</th>
-                    <th className="px-4 py-2">{isAr ? 'الدخول' : 'Entry'}</th>
-                    <th className="px-4 py-2">{isAr ? 'الخروج' : 'Exit'}</th>
-                    <th className="px-4 py-2">{isAr ? 'الفتح' : 'Opened'}</th>
-                    <th className="px-4 py-2">{isAr ? 'الإغلاق' : 'Closed'}</th>
-                    <th className="px-4 py-2">{isAr ? 'السبب' : 'Reason'}</th>
-                    <th className="px-4 py-2">{isAr ? 'النتيجة' : 'Result'}</th>
+                  <tr className="text-sm font-black uppercase text-brand-text/40 tracking-wider border-b border-white/10">
+                    <th className="px-4 py-3">{isAr ? 'الرمز' : 'Symbol'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الاتجاه' : 'Side'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الدخول' : 'Entry'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الخروج' : 'Exit'}</th>
+                    <th className="px-4 py-3">{isAr ? 'وقت الفتح' : 'Opened'}</th>
+                    <th className="px-4 py-3">{isAr ? 'وقت الإغلاق' : 'Closed'}</th>
+                    <th className="px-4 py-3">{isAr ? 'السبب' : 'Reason'}</th>
+                    <th className="px-4 py-3">{isAr ? 'النتيجة' : 'Result'}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {closedTrades.map((t) => (
                     <tr key={t.id} className="border-b border-white/5 hover:bg-white/5">
-                      <td className="px-4 py-2.5 text-sm font-black text-brand-text">{t.symbol}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`px-2.5 py-1 rounded-md text-xs font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                      <td className="px-4 py-3">
+                        <span className="inline-block px-3 py-1.5 rounded-lg text-lg font-black text-brand-text">
+                          {t.symbol}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-3 py-1.5 rounded-lg text-lg font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                           {t.side === 'buy' ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-sm font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
-                      <td className="px-4 py-2.5 text-sm font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.exitPrice)}</td>
-                      <td className="px-4 py-2.5 text-xs font-bold text-brand-text/60" dir="ltr">{(() => { const d = new Date(t.openedAt); const y = d.getFullYear(); const mo = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); const hh = String(d.getHours()).padStart(2, '0'); const mm = String(d.getMinutes()).padStart(2, '0'); const ss = String(d.getSeconds()).padStart(2, '0'); return `${y}-${mo}-${day} ${hh}:${mm}:${ss}`; })()}</td>
-                      <td className="px-4 py-2.5 text-xs font-bold text-brand-text/60" dir="ltr">{t.closedAt ? (() => { const d = new Date(t.closedAt); const y = d.getFullYear(); const mo = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); const hh = String(d.getHours()).padStart(2, '0'); const mm = String(d.getMinutes()).padStart(2, '0'); const ss = String(d.getSeconds()).padStart(2, '0'); return `${y}-${mo}-${day} ${hh}:${mm}:${ss}`; })() : '—'}</td>
-                      <td className="px-4 py-2.5 text-xs font-black uppercase text-brand-text/50">
+                      <td className="px-4 py-3 text-xl font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
+                      <td className="px-4 py-3 text-xl font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.exitPrice)}</td>
+                      <td className="px-4 py-3 text-lg font-bold text-brand-text/60" dir="ltr">{(() => { const d = new Date(t.openedAt); const y = d.getFullYear(); const mo = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); const hh = String(d.getHours()).padStart(2, '0'); const mm = String(d.getMinutes()).padStart(2, '0'); const ss = String(d.getSeconds()).padStart(2, '0'); return `${y}-${mo}-${day} ${hh}:${mm}:${ss}`; })()}</td>
+                      <td className="px-4 py-3 text-lg font-bold text-brand-text/60" dir="ltr">{t.closedAt ? (() => { const d = new Date(t.closedAt); const y = d.getFullYear(); const mo = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); const hh = String(d.getHours()).padStart(2, '0'); const mm = String(d.getMinutes()).padStart(2, '0'); const ss = String(d.getSeconds()).padStart(2, '0'); return `${y}-${mo}-${day} ${hh}:${mm}:${ss}`; })() : '—'}</td>
+                      <td className="px-4 py-3 text-lg font-black uppercase text-brand-text/50">
                         {t.closeReason === 'tp' ? 'TP' : t.closeReason === 'sl' ? 'SL' : (isAr ? 'يدوي' : 'Manual')}
                       </td>
-                      <td className={`px-4 py-2.5 text-sm font-black ${(t.pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{fmtMoney(t.pnl ?? 0)}</td>
+                      <td className={`px-4 py-3 text-xl font-black ${(t.pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{fmtMoney(t.pnl ?? 0)}</td>
                     </tr>
                   ))}
                 </tbody>
