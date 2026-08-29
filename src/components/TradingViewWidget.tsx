@@ -75,34 +75,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     }
   };
 
-  const applyView = () => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    const data = dataRef.current;
-    try {
-      const ts = chart.timeScale();
-      if (data.length) {
-        const last = data[data.length - 1];
-        const fromIdx = Math.max(0, data.length - 80);
-        ts.setVisibleRange({ from: data[fromIdx].time, to: last.time });
-      }
-      const vp = allPropsRef.current;
-      const linePrices = [vp.entryPrice, vp.sl, vp.tp].filter((p) => p != null) as number[];
-      const vr = ts.getVisibleRange();
-      const visible = data.filter((c) => (vr?.from == null || c.time >= vr.from) && (vr?.to == null || c.time <= vr.to));
-      let lo = visible.length ? Math.min(...visible.map((c: any) => c.low)) : Infinity;
-      let hi = visible.length ? Math.max(...visible.map((c: any) => c.high)) : -Infinity;
-      for (const p of linePrices) {
-        lo = Math.min(lo, p);
-        hi = Math.max(hi, p);
-      }
-      if (isFinite(lo) && isFinite(hi) && lo < hi) {
-        const pad = (hi - lo) * 0.12 || 1;
-        chart.priceScale('right').setVisibleRange({ minValue: lo - pad, maxValue: hi + pad });
-      }
-    } catch {}
-  };
-
   // create the chart once
   useEffect(() => {
     const el = containerRef.current;
@@ -120,7 +92,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           vertLines: { color: 'rgba(255,255,255,0.04)' },
           horzLines: { color: 'rgba(255,255,255,0.04)' },
         },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)', scaleMargins: { top: 0.1, bottom: 0.1 } },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
         timeScale: { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true, secondsVisible: false },
         crosshair: { mode: CrosshairMode.Normal },
       });
@@ -135,9 +107,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       chartRef.current = chart;
       seriesRef.current = series;
       updateLines();
-    } catch (e) {
-      chartRef.current = null;
-      seriesRef.current = null;
+    } catch {
       return;
     }
     return () => {
@@ -149,66 +119,52 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // fetch OHLC data when symbol or timeframe changes (retry until chart ready)
+  // fetch OHLC data when symbol or timeframe changes
   useEffect(() => {
     let cancelled = false;
     const raw = symbol.includes(':') ? symbol.split(':')[1] : symbol;
-
-    const load = (attempt = 0) => {
-      if (cancelled) return;
-      const chart = chartRef.current;
-      const series = seriesRef.current;
-      if (!chart || !series) {
-        if (attempt < 15) setTimeout(() => load(attempt + 1), 300);
-        return;
-      }
-      fetch(`/api/market-data?symbol=${encodeURIComponent(raw)}&timeframe=${tf}`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (cancelled) return;
-          const result = d?.chart?.result?.[0];
-          const ts: number[] | undefined = result?.timestamp;
-          const q = result?.indicators?.quote?.[0];
-          if (!ts || !q || !q.close) {
-            setStatus('empty');
-            return;
-          }
-          const candles: any[] = [];
-          for (let i = 0; i < ts.length; i++) {
-            const o = q.open?.[i];
-            const h = q.high?.[i];
-            const l = q.low?.[i];
-            const c = q.close?.[i];
-            if (o == null || h == null || l == null || c == null) continue;
-            candles.push({ time: Math.floor(ts[i]), open: o, high: h, low: l, close: c });
-          }
-          if (!candles.length) {
-            setStatus('empty');
-            return;
-          }
-          dataRef.current = candles;
-          try {
-            series.setData(candles);
-          } catch {}
-          updateLines();
-          applyView();
-          setStatus('ok');
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setStatus('empty');
-          }
-        });
-    };
-
-    load(0);
+    fetch(`/api/market-data?symbol=${encodeURIComponent(raw)}&timeframe=${tf}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        const result = d?.chart?.result?.[0];
+        const ts: number[] | undefined = result?.timestamp;
+        const q = result?.indicators?.quote?.[0];
+        if (!ts || !q || !q.close) {
+          setStatus('empty');
+          return;
+        }
+        const candles: any[] = [];
+        for (let i = 0; i < ts.length; i++) {
+          const o = q.open?.[i];
+          const h = q.high?.[i];
+          const l = q.low?.[i];
+          const c = q.close?.[i];
+          if (o == null || h == null || l == null || c == null) continue;
+          candles.push({ time: Math.floor(ts[i]), open: o, high: h, low: l, close: c });
+        }
+        if (!candles.length) {
+          setStatus('empty');
+          return;
+        }
+        dataRef.current = candles;
+        try {
+          seriesRef.current?.setData(candles);
+          chartRef.current?.timeScale()?.fitContent?.();
+        } catch {}
+        updateLines();
+        setStatus('ok');
+      })
+      .catch(() => {
+        if (!cancelled) setStatus('empty');
+      });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, tf]);
 
-  // redraw lines when entry/sl/tp change (without re-fitting the user's zoom)
+  // redraw lines when entry/sl/tp change
   useEffect(() => {
     updateLines();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,9 +220,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   return (
     <div className="relative h-full w-full">
       {status === 'empty' && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center">
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <span className="text-sm font-bold text-brand-text/40 bg-black/60 px-4 py-2 rounded-lg">
-            {symbol} — لا توجد بيانات للسوق / no market data
+            {symbol} — لا توجد بيانات / no data
           </span>
         </div>
       )}
