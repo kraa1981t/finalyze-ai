@@ -172,17 +172,16 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   // drag SL/TP lines with mouse (window-based for reliable pointer tracking)
   useEffect(() => {
     const el = containerRef.current;
-    const chart = chartRef.current;
-    if (!el || !chart) return;
-    let captureId: number | null = null;
+    const series = seriesRef.current;
+    if (!el || !series) return;
     const posY = (e: MouseEvent | PointerEvent) => e.clientY - el.getBoundingClientRect().top;
     const hitTest = (y: number) => {
       let best: LineKey | null = null;
-      let bestDist = 16;
+      let bestDist = 18;
       for (const def of lineDefs()) {
         if (!def.editable || def.price == null) continue;
         let lineY: number | null = null;
-        try { lineY = chart.priceToCoordinate(def.price); } catch {}
+        try { lineY = series.priceToCoordinate(def.price) as number | null; } catch {}
         if (lineY != null) {
           const d = Math.abs(lineY - y);
           if (d < bestDist) { bestDist = d; best = def.key; }
@@ -194,8 +193,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       for (const def of lineDefs()) {
         if (!def.editable || def.price == null) continue;
         let lineY: number | null = null;
-        try { lineY = chart.priceToCoordinate(def.price); } catch {}
-        if (lineY != null && Math.abs(lineY - y) <= 8) return true;
+        try { lineY = series.priceToCoordinate(def.price) as number | null; } catch {}
+        if (lineY != null && Math.abs(lineY - y) <= 10) return true;
       }
       return false;
     };
@@ -204,20 +203,18 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       const key = hitTest(posY(e));
       if (key) {
         draggingRef.current = key;
-        captureId = e.pointerId;
         el.style.cursor = 'ns-resize';
         try { el.setPointerCapture?.(e.pointerId); } catch {}
         e.preventDefault();
-        if (e.stopPropagation) e.stopPropagation();
       }
     };
     const onMove = (e: PointerEvent | MouseEvent) => {
       const y = posY(e);
       if (draggingRef.current) {
-        const price = chart.coordinateToPrice(y);
+        let price: number | null = null;
+        try { price = series.coordinateToPrice(y) as number | null; } catch {}
         if (price == null || !isFinite(price)) return;
         const k = draggingRef.current;
-        // live visual update
         try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
         const p = allPropsRef.current;
         if (k === 'sl' && p.onSlChange) p.onSlChange(price);
@@ -226,9 +223,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         try { el.style.cursor = nearestForCursor(y) ? 'ns-resize' : 'crosshair'; } catch {}
       }
     };
-    const onUp = () => { draggingRef.current = null; captureId = null; el.style.cursor = 'crosshair'; };
+    const onUp = () => { draggingRef.current = null; el.style.cursor = 'crosshair'; };
     el.addEventListener('pointerdown', onDown);
-    // listen to window for reliable move/up during drag
     window.addEventListener('pointermove', onMove, true);
     window.addEventListener('pointerup', onUp, true);
     window.addEventListener('pointercancel', onUp, true);
