@@ -32,6 +32,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const dataRef = useRef<any[]>([]);
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
+  const lineCoordCache = useRef<Partial<Record<LineKey, number>>>({});
   const [tf, setTf] = useState('1h');
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
 
@@ -66,6 +67,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           } else {
             existing.applyOptions({ price: def.price });
           }
+          const y = series.priceToCoordinate(def.price);
+          if (y != null) lineCoordCache.current[def.key] = y;
         } catch {}
       } else if (existing) {
         try { series.removePriceLine(existing); } catch {}
@@ -175,13 +178,20 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const series = seriesRef.current;
     if (!el || !series) return;
     const posY = (e: MouseEvent | PointerEvent) => e.clientY - el.getBoundingClientRect().top;
+    const lineYFor = (def: { key: LineKey; price?: number | null }): number | null => {
+      if (def.price == null) return null;
+      try {
+        const y = series.priceToCoordinate(def.price);
+        if (typeof y === 'number') { lineCoordCache.current[def.key] = y; return y; }
+      } catch {}
+      return lineCoordCache.current[def.key] ?? null;
+    };
     const hitTest = (y: number) => {
       let best: LineKey | null = null;
-      let bestDist = 18;
+      let bestDist = 24;
       for (const def of lineDefs()) {
-        if (!def.editable || def.price == null) continue;
-        let lineY: number | null = null;
-        try { lineY = series.priceToCoordinate(def.price) as number | null; } catch {}
+        if (!def.editable) continue;
+        const lineY = lineYFor(def);
         if (lineY != null) {
           const d = Math.abs(lineY - y);
           if (d < bestDist) { bestDist = d; best = def.key; }
@@ -191,10 +201,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     };
     const nearestForCursor = (y: number) => {
       for (const def of lineDefs()) {
-        if (!def.editable || def.price == null) continue;
-        let lineY: number | null = null;
-        try { lineY = series.priceToCoordinate(def.price) as number | null; } catch {}
-        if (lineY != null && Math.abs(lineY - y) <= 10) return true;
+        if (!def.editable) continue;
+        const lineY = lineYFor(def);
+        if (lineY != null && Math.abs(lineY - y) <= 12) return true;
       }
       return false;
     };
@@ -210,12 +219,13 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     };
     const onMove = (e: PointerEvent | MouseEvent) => {
       const y = posY(e);
-      if (draggingRef.current) {
+      const k = draggingRef.current;
+      if (k) {
         let price: number | null = null;
         try { price = series.coordinateToPrice(y) as number | null; } catch {}
         if (price == null || !isFinite(price)) return;
-        const k = draggingRef.current;
         try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
+        lineCoordCache.current[k] = y;
         const p = allPropsRef.current;
         if (k === 'sl' && p.onSlChange) p.onSlChange(price);
         else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
