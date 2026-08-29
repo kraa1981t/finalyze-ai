@@ -58,17 +58,19 @@ export function slAmountUSD(symbol: string, slDistance: number, qty: number, cat
   return slDistance * qty;
 }
 
-// Convert a USD amount back to a limit price given entry, side, qty and category.
-export function usdToPrice(symbol: string, amountUSD: number, entryPrice: number, isBuy: boolean, qty: number, category: string): number {
+// Convert a USD amount back to a limit price given entry, side of the level,
+// qty and category. `above` = true places the level above entry (profit-side
+// for a buy / loss-side for a sell), `above` = false places it below entry.
+export function usdToPrice(symbol: string, amountUSD: number, entryPrice: number, above: boolean, qty: number, category: string): number {
   if (category === 'forex' || category === 'metals') {
     const cfg = getInstrumentConfig(symbol);
     const pips = amountUSD / (cfg.pipValuePerLotUSD * qty);
     const distance = pips * cfg.pipSize;
-    return isBuy ? entryPrice + distance : entryPrice - distance;
+    return above ? entryPrice + distance : entryPrice - distance;
   }
   if (amountUSD > 0 && qty > 0) {
     const distance = amountUSD / qty;
-    return isBuy ? entryPrice + distance : entryPrice - distance;
+    return above ? entryPrice + distance : entryPrice - distance;
   }
   return entryPrice;
 }

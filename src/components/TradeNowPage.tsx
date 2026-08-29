@@ -466,6 +466,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     }
 
     // SL/TP fields hold USD amounts; convert back to limit prices for execution.
+    // TP goes on the profit side (above for buy / below for sell), SL on the
+    // loss side (below for buy / above for sell).
     const cat = detectCategory(symbol);
     const isBuy = side === 'buy';
     const tpAmount = parseFloat(tpPrice);
@@ -474,7 +476,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     let slVal: number | null = null;
     if (tpAmount > 0) tpVal = usdToPrice(symbol, tpAmount, livePrice, isBuy, qty, cat);
     else tpVal = matchedSignal?.takeProfit || null;
-    if (slAmount > 0) slVal = usdToPrice(symbol, slAmount, livePrice, isBuy, qty, cat);
+    if (slAmount > 0) slVal = usdToPrice(symbol, slAmount, livePrice, !isBuy, qty, cat);
     else slVal = matchedSignal?.stopLoss || null;
     const tradeData = { symbol, category: cat, side, qty, entryPrice: livePrice, status: 'open' as const, tp: tpVal, sl: slVal, openedAt: Date.now() };
     let id: string;
