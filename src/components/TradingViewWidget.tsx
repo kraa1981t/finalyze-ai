@@ -27,11 +27,13 @@ const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const dotRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
   const dataRef = useRef<any[]>([]);
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
+  const hoveredRef = useRef<LineKey | null>(null);
   const lastSyncRef = useRef(0);
   const [tf, setTf] = useState('1h');
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
@@ -41,22 +43,48 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
 
   const lineDefs = (p = allPropsRef.current) => {
     return [
-      { key: 'entry' as LineKey, price: p.entryPrice, color: '#e2e8f0', title: 'Entry', editable: false },
+      { key: 'entry' as LineKey, price: p.entryPrice, color: '#eab308', title: 'Entry', editable: false },
       { key: 'sl' as LineKey, price: p.sl, color: '#f23645', title: 'Stop Loss', editable: true },
       { key: 'tp' as LineKey, price: p.tp, color: '#089981', title: 'Take Profit', editable: true },
     ];
   };
 
-  const updateLines = () => {
+  const ensureLine = (key: LineKey) => {
     const series = seriesRef.current;
     if (!series) return;
-    const pl = priceLinesRef.current;
-    for (const def of lineDefs()) {
-      const existing = pl[def.key];
-      if (def.price != null) {
+    const def = lineDefs().find((d) => d.key === key);
+    if (!def || def.price == null) return;
+    const existing = priceLinesRef.current[key];
+    try {
+      if (!existing) {
+        priceLinesRef.current[key] = series.createPriceLine({
+          price: def.price,
+          color: def.color,
+          lineWidth: 2,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: def.title,
+        });
+      } else {
+        existing.applyOptions({ price: def.price });
+      }
+    } catch {}
+  };
+
+  const updateLines = () => {
+    for (const key of ['sl', 'tp'] as LineKey[]) {
+      const series = seriesRef.current;
+      const def = lineDefs().find((d) => d.key === key);
+      const existing = priceLinesRef.current[key];
+      if (!def || def.price == null) {
+        if (existing) {
+          try { series?.removePriceLine(existing); } catch {}
+          priceLinesRef.current[key] = undefined;
+        }
+      } else {
         try {
           if (!existing) {
-            pl[def.key] = series.createPriceLine({
+            priceLinesRef.current[key] = series!.createPriceLine({
               price: def.price,
               color: def.color,
               lineWidth: 2,
@@ -68,11 +96,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             existing.applyOptions({ price: def.price });
           }
         } catch {}
-      } else if (existing) {
-        try { series.removePriceLine(existing); } catch {}
-        pl[def.key] = undefined;
       }
     }
+    ensureLine('entry');
   };
 
   // create the chart once
@@ -80,6 +106,25 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const el = containerRef.current;
     if (!el) return;
     let chart: any;
+    let raf = 0;
+    const placeDot = () => {
+      const dot = dotRef.current;
+      const chartEl = chartRef.current;
+      if (!dot || !chartEl) return;
+      const p = allPropsRef.current;
+      if (p.entryPrice == null) {
+        dot.style.display = 'none';
+        return;
+      }
+      const y = chartEl.priceToCoordinate(p.entryPrice);
+      const box = el.getBoundingClientRect();
+      if (y == null || !box.width) { raf = requestAnimationFrame(placeDot); return; }
+      const x = box.width - 46;
+      dot.style.display = 'block';
+      dot.style.left = `${x}px`;
+      dot.style.top = `${y}px`;
+      raf = requestAnimationFrame(placeDot);
+    };
     try {
       chart = createChart(el, {
         autoSize: true,
@@ -107,10 +152,12 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       chartRef.current = chart;
       seriesRef.current = series;
       updateLines();
+      raf = requestAnimationFrame(placeDot);
     } catch {
       return;
     }
     return () => {
+      cancelAnimationFrame(raf);
       try { chart?.remove(); } catch {}
       chartRef.current = null;
       seriesRef.current = null;
@@ -170,7 +217,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryPrice, sl, tp]);
 
-  // drag SL/TP lines
+  // drag SL/TP lines + hover cursor
   useEffect(() => {
     const el = containerRef.current;
     const chart = chartRef.current;
@@ -180,30 +227,43 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       for (const def of lineDefs()) {
         if (!def.editable || def.price == null) continue;
         const lineY = chart.priceToCoordinate(def.price);
-        if (lineY != null && Math.abs(lineY - y) <= 9) return def.key as LineKey;
+        if (lineY != null && Math.abs(lineY - y) <= 12) return def.key as LineKey;
       }
       return null;
+    };
+    const onMove = (e: PointerEvent | MouseEvent) => {
+      const y = posY(e);
+      const key = draggingRef.current || hitTest(y);
+      if (key && key !== hoveredRef.current) { hoveredRef.current = key; el.style.cursor = 'ns-resize'; }
+      else if (!key && hoveredRef.current) { hoveredRef.current = null; el.style.cursor = 'crosshair'; }
+      if (draggingRef.current) {
+        const price = chart.coordinateToPrice(y);
+        if (price == null) return;
+        const k = draggingRef.current;
+        const p = allPropsRef.current;
+        ensureLine(k);
+        priceLinesRef.current[k]?.applyOptions({ price });
+        const now = performance.now();
+        if (now - lastSyncRef.current >= 120) {
+          lastSyncRef.current = now;
+          if (k === 'sl' && p.onSlChange) p.onSlChange(price);
+          else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
+        }
+        updateLines();
+      }
     };
     const onDown = (e: PointerEvent) => {
       const key = hitTest(posY(e));
       if (key) {
         draggingRef.current = key;
+        hoveredRef.current = key;
+        el.style.cursor = 'ns-resize';
         try { el.setPointerCapture?.(e.pointerId); } catch {}
+        e.preventDefault();
+        e.stopPropagation();
       }
     };
-    const onMove = (e: PointerEvent) => {
-      const key = draggingRef.current;
-      if (!key) return;
-      const price = chart.coordinateToPrice(posY(e));
-      if (price == null) return;
-      const now = Date.now();
-      if (now - lastSyncRef.current < 90) return;
-      lastSyncRef.current = now;
-      const p = allPropsRef.current;
-      if (key === 'sl' && p.onSlChange) p.onSlChange(price);
-      else if (key === 'tp' && p.onTpChange) p.onTpChange(price);
-    };
-    const onUp = () => { draggingRef.current = null; };
+    const onUp = () => { draggingRef.current = null; el.style.cursor = 'crosshair'; };
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
@@ -242,6 +302,14 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         ))}
       </div>
       <div ref={containerRef} className="h-full w-full" />
+      <div
+        ref={dotRef}
+        style={{ display: 'none', position: 'absolute', width: 12, height: 12, marginLeft: -6, marginTop: -6, pointerEvents: 'none', zIndex: 5 }}
+        className="flex items-center justify-center"
+      >
+        <span className="absolute inline-flex h-3.5 w-3.5 rounded-full bg-yellow-400 opacity-75 animate-ping" />
+        <span className="absolute inline-flex h-2 w-2 rounded-full bg-yellow-400" />
+      </div>
     </div>
   );
 }
