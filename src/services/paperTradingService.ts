@@ -22,6 +22,8 @@ export interface PaperTrade {
 
 export const START_BALANCE = 10000;
 export const MIN_BALANCE = 500;
+export const DEFAULT_LEVERAGE = 100; // 1:100
+export const LEVERAGE_OPTIONS = [50, 100, 200, 400, 500];
 
 // ---------- Contract specs (TradingView-style) ----------
 // Default lot follows total balance: baseline $500 -> 0.01 lot,
@@ -123,8 +125,9 @@ export function subscribePrices(symbols: string[], listener: (symbol: string, pr
 
 // ---------- Storage adapters ----------
 interface TradeStore {
-  getAccount(): Promise<{ balance: number }>;
+  getAccount(): Promise<{ balance: number; leverage: number }>;
   saveBalance(balance: number): Promise<void>;
+  saveLeverage(leverage: number): Promise<void>;
   listTrades(): Promise<PaperTrade[]>;
   addTrade(t: Omit<PaperTrade, 'id'>): Promise<string>;
   updateTrade(id: string, patch: Partial<PaperTrade>): Promise<void>;
@@ -133,16 +136,18 @@ interface TradeStore {
 
 class LocalStore implements TradeStore {
   private key = 'paper_trading_data';
-  private read(): { balance: number; trades: PaperTrade[] } {
+  private read(): { balance: number; leverage: number; trades: PaperTrade[] } {
     try {
-      return JSON.parse(localStorage.getItem(this.key) || '') || { balance: START_BALANCE, trades: [] };
-    } catch { return { balance: START_BALANCE, trades: [] }; }
+      const d = JSON.parse(localStorage.getItem(this.key) || '') || { balance: START_BALANCE, trades: [] };
+      return { leverage: d.leverage ?? DEFAULT_LEVERAGE, balance: d.balance, trades: d.trades };
+    } catch { return { balance: START_BALANCE, leverage: DEFAULT_LEVERAGE, trades: [] }; }
   }
-  private write(data: { balance: number; trades: PaperTrade[] }) {
+  private write(data: { balance: number; leverage: number; trades: PaperTrade[] }) {
     localStorage.setItem(this.key, JSON.stringify(data));
   }
-  async getAccount() { return { balance: this.read().balance }; }
+  async getAccount() { const d = this.read(); return { balance: d.balance, leverage: d.leverage }; }
   async saveBalance(balance: number) { const d = this.read(); d.balance = balance; this.write(d); }
+  async saveLeverage(leverage: number) { const d = this.read(); d.leverage = leverage; this.write(d); }
   async listTrades() { return this.read().trades; }
   async addTrade(t: Omit<PaperTrade, 'id'>) {
     const d = this.read();
@@ -157,7 +162,7 @@ class LocalStore implements TradeStore {
     if (idx >= 0) { d.trades[idx] = { ...d.trades[idx], ...patch }; this.write(d); }
   }
   async resetAccount(newBalance: number) {
-    this.write({ balance: newBalance, trades: [] });
+    this.write({ balance: newBalance, leverage: DEFAULT_LEVERAGE, trades: [] });
   }
 }
 
@@ -166,13 +171,16 @@ class FirestoreStore implements TradeStore {
   async getAccount() {
     const snap = await getDoc(doc(db, 'paper_accounts', this.uid));
     if (!snap.exists()) {
-      await setDoc(doc(db, 'paper_accounts', this.uid), { balance: START_BALANCE, createdAt: Timestamp.now() });
-      return { balance: START_BALANCE };
+      await setDoc(doc(db, 'paper_accounts', this.uid), { balance: START_BALANCE, leverage: DEFAULT_LEVERAGE, createdAt: Timestamp.now() });
+      return { balance: START_BALANCE, leverage: DEFAULT_LEVERAGE };
     }
-    return { balance: snap.data().balance ?? START_BALANCE };
+    return { balance: snap.data().balance ?? START_BALANCE, leverage: snap.data().leverage ?? DEFAULT_LEVERAGE };
   }
   async saveBalance(balance: number) {
     await setDoc(doc(db, 'paper_accounts', this.uid), { balance, updatedAt: Timestamp.now() }, { merge: true });
+  }
+  async saveLeverage(leverage: number) {
+    await setDoc(doc(db, 'paper_accounts', this.uid), { leverage, updatedAt: Timestamp.now() }, { merge: true });
   }
   async listTrades(): Promise<PaperTrade[]> {
     const q = query(collection(db, 'paper_trades'), where('uid', '==', this.uid));
@@ -187,7 +195,7 @@ class FirestoreStore implements TradeStore {
     await updateDoc(doc(db, 'paper_trades', id), patch as any);
   }
   async resetAccount(newBalance: number) {
-    await setDoc(doc(db, 'paper_accounts', this.uid), { balance: newBalance, startBalance: newBalance, updatedAt: Timestamp.now() }, { merge: true });
+    await setDoc(doc(db, 'paper_accounts', this.uid), { balance: newBalance, startBalance: newBalance, leverage: DEFAULT_LEVERAGE, updatedAt: Timestamp.now() }, { merge: true });
     const snap = await getDocs(query(collection(db, 'paper_trades'), where('uid', '==', this.uid)));
     const batch = writeBatch(db);
     snap.docs.forEach((d) => batch.delete(d.ref));

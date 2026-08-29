@@ -8,7 +8,7 @@ import TradingViewWidget from './TradingViewWidget';
 import MT5Web from './MT5Web';
 import {
   PaperTrade, getTradeStore, getLivePrice, subscribePrices,
-  calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE,
+  calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE, DEFAULT_LEVERAGE, LEVERAGE_OPTIONS,
 } from '../services/paperTradingService';
 import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
 import { playOpenSound, playCloseSound } from '../lib/tradeSounds';
@@ -105,9 +105,8 @@ function detectCategory(sym: string): string {
 
 const ORIGINAL_SYMBOLS = new Set<string>(Object.values(SYMBOL_CATEGORIES).flat() as string[]);
 
-function calcMargin(t: Pick<PaperTrade, 'category' | 'symbol' | 'qty' | 'entryPrice'>): number {
+function calcMargin(t: Pick<PaperTrade, 'category' | 'symbol' | 'qty' | 'entryPrice'>, leverage: number = DEFAULT_LEVERAGE): number {
   const notional = t.entryPrice * t.qty * (t.category === 'forex' ? 100000 : t.category === 'metals' ? 100 : 1);
-  const leverage = t.category === 'forex' || t.category === 'metals' ? 100 : t.category === 'crypto' ? 10 : 20;
   return notional / leverage;
 }
 
@@ -141,6 +140,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
 
   // Trading state
   const [balance, setBalance] = useState<number>(START_BALANCE);
+  const [leverage, setLeverage] = useState<number>(DEFAULT_LEVERAGE);
   const [trades, setTrades] = useState<PaperTrade[]>([]);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [qty, setQty] = useState<number>(getDefaultQty('forex'));
@@ -233,6 +233,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         const list = await store.listTrades();
         if (!alive) return;
         setBalance(acc.balance);
+        setLeverage(acc.leverage);
         setTrades(list.sort((a, b) => b.openedAt - a.openedAt));
       } catch {
         // Fallback: load from localStorage
@@ -435,7 +436,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     // Check that the resulting trade's margin fits within the account balance
     const pendingCat = detectCategory(symbol);
     const notional = livePrice * qty * (pendingCat === 'forex' ? 100000 : pendingCat === 'metals' ? 100 : 1);
-    const leverage = pendingCat === 'forex' || pendingCat === 'metals' ? 100 : pendingCat === 'crypto' ? 10 : 20;
     const requiredMargin = notional / leverage;
     if (requiredMargin > balance) {
       setToast(isAr
@@ -529,6 +529,21 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     setTimeout(() => setToast(null), 2000);
   }
 
+  async function changeLeverage(newLev: number) {
+    setLeverage(newLev);
+    try {
+      await store.saveLeverage(newLev);
+    } catch {
+      try {
+        const raw = JSON.parse(localStorage.getItem('paper_trading_data') || '{"balance":10000,"trades":[]}');
+        raw.leverage = newLev;
+        localStorage.setItem('paper_trading_data', JSON.stringify(raw));
+      } catch {}
+    }
+    setToast(isAr ? `تم تغيير الرافعة إلى 1:${newLev}` : `Leverage set to 1:${newLev}`);
+    setTimeout(() => setToast(null), 2000);
+  }
+
   async function doReset(newBalance: number) {
     const val = Math.max(MIN_BALANCE, Math.floor(newBalance));
     setBusy(true);
@@ -537,10 +552,11 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     } catch (e) {
       // Fallback: always save locally if Firestore fails
       try {
-        localStorage.setItem('paper_trading_data', JSON.stringify({ balance: val, trades: [] }));
+        localStorage.setItem('paper_trading_data', JSON.stringify({ balance: val, leverage: DEFAULT_LEVERAGE, trades: [] }));
       } catch {}
     }
     setBalance(val);
+    setLeverage(DEFAULT_LEVERAGE);
     setTrades([]);
     setShowReset(false);
     setResetInput('');
@@ -551,10 +567,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const stats = React.useMemo(() => {
     const wins = closedTrades.filter((t) => (t.pnl ?? 0) > 0).length;
     const totalPnl = closedTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
-    const totalMargin = openTrades.reduce((s, t) => s + calcMargin(t), 0);
+    const totalMargin = openTrades.reduce((s, t) => s + calcMargin(t, leverage), 0);
     const marginLevel = totalMargin > 0 ? Math.round((equity / totalMargin) * 100) : 0;
     return { total: closedTrades.length, winRate: closedTrades.length ? Math.round((wins / closedTrades.length) * 100) : 0, totalPnl, totalMargin, marginLevel };
-  }, [closedTrades, openTrades.length, equity]);
+  }, [closedTrades, openTrades.length, equity, leverage]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 pt-2 pb-3 space-y-3">
@@ -595,6 +611,28 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
             <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'ربح مفتوح' : 'Open P&L'}</div>
             <div className={`text-base font-black ${unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtMoney(unrealizedPnl)}</div>
+          </div>
+          <div
+            className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[120px]"
+            title={isAr ? 'مستوى الهامش = الإجمالي ÷ الهامش المستخدم × 100' : 'Margin Level = Equity ÷ Used Margin × 100'}
+          >
+            <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'مستوى الهامش' : 'Margin Level'}</div>
+            <div className={`text-base font-black ${stats.marginLevel >= 100 ? 'text-emerald-400' : stats.marginLevel > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+              {stats.marginLevel > 0 ? `${stats.marginLevel}%` : '—'}
+            </div>
+          </div>
+          <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
+            <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'الرافعة' : 'Leverage'}</div>
+            <select
+              value={leverage}
+              onChange={(e) => changeLeverage(Number(e.target.value))}
+              className="bg-transparent text-base font-black text-sky-300 focus:outline-none cursor-pointer text-center w-full"
+              title={isAr ? 'الرافعة المالية' : 'Financial leverage'}
+            >
+              {LEVERAGE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt} className="bg-[#0a0f1a] text-white">1:{opt}</option>
+              ))}
+            </select>
           </div>
           <button
             onClick={() => { setResetInput(''); setShowReset(true); }}
@@ -986,7 +1024,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   {openTrades.map((t) => {
                     const cur = priceOf(t);
                     const pnl = cur != null ? calcPnl(t, cur) : 0;
-                    const margin = calcMargin(t);
+                    const margin = calcMargin(t, leverage);
                     return (
                       <tr key={t.id} className="border-b border-white/5 hover:bg-white/5 relative">
                         <td className="px-4 py-3">
