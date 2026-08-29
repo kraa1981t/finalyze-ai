@@ -9,6 +9,8 @@ interface TradingViewWidgetProps {
   category?: string | null;
   qty?: number | null;
   openedAt?: number | null;
+  onSlChange?: (price: number) => void;
+  onTpChange?: (price: number) => void;
   [key: string]: any;
 }
 
@@ -18,12 +20,16 @@ declare global {
   }
 }
 
-export default function TradingViewWidget({ symbol, entryPrice, sl, tp }: TradingViewWidgetProps) {
+export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange }: TradingViewWidgetProps) {
   const container = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<any>(null);
   const chartRef = useRef<any>(null);
+  const lastSyncRef = useRef(0);
+  const lastEmitRef = useRef<{ kind: 'sl' | 'tp'; price: number } | null>(null);
 
-  const drawLines = (chart: any) => {
+  const refreshLines = () => {
+    const chart = chartRef.current;
+    if (!chart) return;
     try {
       chart.removeAllShapes();
     } catch {}
@@ -40,10 +46,10 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp }: Tradin
           [{ time: anchor, price: l.price }],
           {
             shape: 'horizontal_line',
-            lock: true,
+            lock: false,
             disableSave: true,
             disableUndo: true,
-            disableSelection: true,
+            disableSelection: false,
             text: l.text,
             overrides: {
               linestyle: 2,
@@ -56,6 +62,37 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp }: Tradin
           }
         );
       } catch {}
+    }
+  };
+
+  // Handle a drawing (line) being moved on the chart and sync it to the trade.
+  const handleDrawing = (sourceOrEvent: any, maybeEvent?: any) => {
+    const source = sourceOrEvent?.source ?? sourceOrEvent;
+    if (!source || typeof source.getPoints !== 'function') return;
+    let points: any;
+    try {
+      points = source.getPoints();
+    } catch {
+      return;
+    }
+    const price = Array.isArray(points) && points.length ? points[0]?.price : undefined;
+    if (price == null) return;
+    let text = '';
+    try {
+      text = typeof source.getText === 'function' ? source.getText() : '';
+    } catch {}
+
+    const now = Date.now();
+    if (now - lastSyncRef.current < 250) return; // throttle rapid drag events
+    lastSyncRef.current = now;
+
+    const changed = lastEmitRef.current;
+    if (text === 'Stop Loss' && onSlChange && (!changed || changed.kind !== 'sl' || Math.abs(changed.price - price) > 0.000001)) {
+      lastEmitRef.current = { kind: 'sl', price };
+      onSlChange(price);
+    } else if (text === 'Take Profit' && onTpChange && (!changed || changed.kind !== 'tp' || Math.abs(changed.price - price) > 0.000001)) {
+      lastEmitRef.current = { kind: 'tp', price };
+      onTpChange(price);
     }
   };
 
@@ -83,7 +120,10 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp }: Tradin
         autosize: true,
         onchartready: () => {
           chartRef.current = widget.chart();
-          drawLines(chartRef.current);
+          refreshLines();
+          try {
+            chartRef.current.onDrawingLineEvent(handleDrawing);
+          } catch {}
         },
       });
       widgetRef.current = widget;
@@ -109,8 +149,12 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp }: Tradin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol]);
 
+  // Refresh lines when SL/TP values change externally (table edit, auto-sync),
+  // but skip while a drag just emitted a change to avoid deleting the line mid-drag.
   useEffect(() => {
-    if (chartRef.current) drawLines(chartRef.current);
+    if (!chartRef.current) return;
+    if (Date.now() - lastSyncRef.current < 600) return;
+    refreshLines();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sl, tp, entryPrice]);
 

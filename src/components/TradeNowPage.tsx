@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw, Pencil, Check, XCircle, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw, Pencil, Check, XCircle, Trash2, Maximize, Minimize } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { AnalysisResult } from '../types';
 import { SYMBOL_CATEGORIES } from '../constants';
@@ -150,6 +150,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   // Inline SL/TP editing for an open trade
   const [editId, setEditId] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const chartPanelRef = useRef<HTMLDivElement>(null);
+  const [chartFullscreen, setChartFullscreen] = useState(false);
   const [editSl, setEditSl] = useState<string>('');
   const [editTp, setEditTp] = useState<string>('');
   const [busy, setBusy] = useState(false);
@@ -573,6 +575,26 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     setToast(isAr ? 'تم مسح السجل' : 'History cleared');
     setTimeout(() => setToast(null), 2000);
   }
+
+  // Toggle the chart panel between normal and fullscreen (native browser fullscreen on the panel).
+  async function toggleChartFullscreen() {
+    const el = chartPanelRef.current;
+    if (!el) return;
+    try {
+      if (!document.fullscreenElement) {
+        await el.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {}
+    setChartFullscreen(!!document.fullscreenElement);
+  }
+
+  useEffect(() => {
+    const onFs = () => setChartFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
 
   // Manually adjust a TP/SL USD amount by $0.50 steps (up or down)
   const adjustPrice = (kind: 'tp' | 'sl', dir: number) => {
@@ -1040,15 +1062,25 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
 
           {/* Chart / MT5 (full width, below order ticket) */}
-          <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[60vh] min-h-[400px] relative flex flex-col">
+          <div ref={chartPanelRef} className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[60vh] min-h-[400px] relative flex flex-col">
             {/* Toggle bar */}
             <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
               {platform === 'chart' && (
-                <div className="ml-auto flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs font-black text-white">{symbol}</span>
-                  {!priceLoading && <span className="text-xs font-bold text-emerald-400">{fmtPrice(livePrice)}</span>}
-                </div>
+                <>
+                  <button
+                    onClick={toggleChartFullscreen}
+                    className="flex items-center gap-1 rounded-md bg-white/10 hover:bg-white/20 text-brand-text/70 hover:text-white px-2.5 py-1 text-xs font-black uppercase tracking-wider transition-colors"
+                    title={isAr ? (chartFullscreen ? 'خروج من ملء الشاشة' : 'ملء الشاشة') : (chartFullscreen ? 'Exit fullscreen' : 'Fullscreen')}
+                  >
+                    {chartFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+                    {isAr ? (chartFullscreen ? 'خروج' : 'ملء الشاشة') : (chartFullscreen ? 'Exit' : 'Fullscreen')}
+                  </button>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-black text-white">{symbol}</span>
+                    {!priceLoading && <span className="text-xs font-bold text-emerald-400">{fmtPrice(livePrice)}</span>}
+                  </div>
+                </>
               )}
             </div>
             {/* Content */}
