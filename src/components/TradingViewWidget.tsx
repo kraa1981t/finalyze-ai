@@ -25,15 +25,6 @@ type LineKey = 'entry' | 'sl' | 'tp';
 
 const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
-function stepFor(price: number): number {
-  if (!isFinite(price) || price <= 0) return 0.01;
-  const a = Math.abs(price);
-  if (a < 10) return 0.0001;
-  if (a < 100) return 0.01;
-  if (a < 1000) return 0.1;
-  return 1;
-}
-
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
@@ -41,7 +32,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const dataRef = useRef<any[]>([]);
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
-  const lastSyncRef = useRef(0);
   const [tf, setTf] = useState('1h');
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
 
@@ -179,67 +169,77 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryPrice, sl, tp]);
 
-  // adjust helpers via on-chart stepper buttons
-  const stepSl = (dir: number) => {
-    const p = allPropsRef.current;
-    if (p.sl == null || !p.onSlChange) return;
-    p.onSlChange(p.sl + stepFor(p.sl) * dir);
-  };
-  const stepTp = (dir: number) => {
-    const p = allPropsRef.current;
-    if (p.tp == null || !p.onTpChange) return;
-    p.onTpChange(p.tp + stepFor(p.tp) * dir);
-  };
-
-  // drag SL/TP lines
+  // drag SL/TP lines with mouse (window-based for reliable pointer tracking)
   useEffect(() => {
     const el = containerRef.current;
     const chart = chartRef.current;
     if (!el || !chart) return;
+    let captureId: number | null = null;
     const posY = (e: MouseEvent | PointerEvent) => e.clientY - el.getBoundingClientRect().top;
     const hitTest = (y: number) => {
+      let best: LineKey | null = null;
+      let bestDist = 16;
       for (const def of lineDefs()) {
         if (!def.editable || def.price == null) continue;
-        const lineY = chart.priceToCoordinate(def.price);
-        if (lineY != null && Math.abs(lineY - y) <= 9) return def.key as LineKey;
+        let lineY: number | null = null;
+        try { lineY = chart.priceToCoordinate(def.price); } catch {}
+        if (lineY != null) {
+          const d = Math.abs(lineY - y);
+          if (d < bestDist) { bestDist = d; best = def.key; }
+        }
       }
-      return null;
+      return best;
+    };
+    const nearestForCursor = (y: number) => {
+      for (const def of lineDefs()) {
+        if (!def.editable || def.price == null) continue;
+        let lineY: number | null = null;
+        try { lineY = chart.priceToCoordinate(def.price); } catch {}
+        if (lineY != null && Math.abs(lineY - y) <= 8) return true;
+      }
+      return false;
     };
     const onDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
       const key = hitTest(posY(e));
       if (key) {
         draggingRef.current = key;
+        captureId = e.pointerId;
+        el.style.cursor = 'ns-resize';
         try { el.setPointerCapture?.(e.pointerId); } catch {}
+        e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
       }
     };
-    const onMove = (e: PointerEvent) => {
-      const key = draggingRef.current;
-      if (!key) return;
-      const price = chart.coordinateToPrice(posY(e));
-      if (price == null) return;
-      const now = Date.now();
-      if (now - lastSyncRef.current < 90) return;
-      lastSyncRef.current = now;
-      const p = allPropsRef.current;
-      if (key === 'sl' && p.onSlChange) p.onSlChange(price);
-      else if (key === 'tp' && p.onTpChange) p.onTpChange(price);
+    const onMove = (e: PointerEvent | MouseEvent) => {
+      const y = posY(e);
+      if (draggingRef.current) {
+        const price = chart.coordinateToPrice(y);
+        if (price == null || !isFinite(price)) return;
+        const k = draggingRef.current;
+        // live visual update
+        try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
+        const p = allPropsRef.current;
+        if (k === 'sl' && p.onSlChange) p.onSlChange(price);
+        else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
+      } else {
+        try { el.style.cursor = nearestForCursor(y) ? 'ns-resize' : 'crosshair'; } catch {}
+      }
     };
-    const onUp = () => { draggingRef.current = null; };
+    const onUp = () => { draggingRef.current = null; captureId = null; el.style.cursor = 'crosshair'; };
     el.addEventListener('pointerdown', onDown);
-    el.addEventListener('pointermove', onMove);
-    el.addEventListener('pointerup', onUp);
-    el.addEventListener('pointercancel', onUp);
+    // listen to window for reliable move/up during drag
+    window.addEventListener('pointermove', onMove, true);
+    window.addEventListener('pointerup', onUp, true);
+    window.addEventListener('pointercancel', onUp, true);
     return () => {
       el.removeEventListener('pointerdown', onDown);
-      el.removeEventListener('pointermove', onMove);
-      el.removeEventListener('pointerup', onUp);
-      el.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onUp, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const hasLevels = (sl != null || tp != null) && entryPrice != null;
-  const fmt = (n: number | null | undefined) => (n == null ? '—' : Number(n).toPrecision(6));
 
   return (
     <div className="relative h-full w-full">
@@ -265,38 +265,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           </button>
         ))}
       </div>
-
-      {hasLevels && (
-        <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 bg-black/60 backdrop-blur rounded-lg border border-white/10 p-1.5 text-[11px]">
-          <div className="flex items-center gap-2 text-white">
-            <span className="w-3 h-3 rounded-full bg-yellow-400 inline-block" />
-            <span className="text-white/60 font-bold">Entry</span>
-            <span className="font-black tabular-nums">{fmt(entryPrice)}</span>
-          </div>
-          <div className="flex items-center gap-2 text-red-400">
-            <span className="w-2 h-0.5 bg-red-500 inline-block" />
-            <span className="text-white/60 font-bold">SL</span>
-            <span className="font-black tabular-nums">{fmt(sl)}</span>
-            {sl != null && (
-              <div className="flex items-center gap-0.5">
-                <button onClick={() => stepSl(-1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none">−</button>
-                <button onClick={() => stepSl(1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none">+</button>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-emerald-400">
-            <span className="w-2 h-0.5 bg-emerald-500 inline-block" />
-            <span className="text-white/60 font-bold">TP</span>
-            <span className="font-black tabular-nums">{fmt(tp)}</span>
-            {tp != null && (
-              <div className="flex items-center gap-0.5">
-                <button onClick={() => stepTp(-1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none">−</button>
-                <button onClick={() => stepTp(1)} className="w-5 h-5 rounded bg-white/10 hover:bg-white/25 text-white font-black leading-none">+</button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <div ref={containerRef} className="h-full w-full" />
     </div>
