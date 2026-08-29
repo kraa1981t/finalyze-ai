@@ -69,79 +69,22 @@ export function formatPnl(v: number): string {
 // ---------- Price engine ----------
 type PriceListener = (price: number) => void;
 
-const CRYPTO_MAP: Record<string, string> = {
-  BTCUSD: 'BTCUSDT', ETHUSD: 'ETHUSDT', SOLUSD: 'SOLUSDT', BNBUSD: 'BNBUSDT',
-  XRPUSD: 'XRPUSDT', ADAUSD: 'ADAUSDT', AVAXUSD: 'AVAXUSDT', DOGEUSD: 'DOGEUSDT',
-  SHIBUSD: 'SHIBUSDT', PEPEUSD: 'PEPEUSDT', DOTUSD: 'DOTUSDT', LINKUSD: 'LINKUSDT',
-  MATICUSD: 'MATICUSDT', UNIUSD: 'UNIUSDT', LTCUSD: 'LTCUSDT', BCHUSD: 'BCHUSDT',
-  TONUSD: 'TONUSDT', SUIUSD: 'SUIUSDT', NEARUSD: 'NEARUSDT', SEIUSD: 'SEIUSDT',
-  OPUSD: 'OPUSDT', ARBUSD: 'ARBUSDT', WIFUSD: 'WIFUSDT', BONKUSD: 'BONKUSDT',
-};
-
 const _priceCache = new Map<string, { price: number; ts: number }>();
 const PRICE_TTL = 2500;
 
-async function fetchBinancePrice(pair: string): Promise<number | null> {
+async function fetchServerLastPrice(symbol: string): Promise<number | null> {
   try {
-    const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`);
+    const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=5m`);
     if (!r.ok) return null;
     const d = await r.json();
-    const p = parseFloat(d.price);
-    return isFinite(p) && p > 0 ? p : null;
-  } catch { return null; }
-}
-
-function yahooSymbol(sym: string): string {
-  const s = sym.toUpperCase();
-  // Strip exchange prefix if present (e.g., NASDAQ:TSLA -> TSLA)
-  const base = s.includes(':') ? s.split(':')[1] : s;
-  if ((SYMBOL_CATEGORIES.forex as string[]).includes(base)) return `${base.slice(0,3)}${base.slice(3)}=X`;
-  if (s === 'XAUUSD') return 'GC=F';
-  if (s === 'XAGUSD') return 'SI=F';
-  if (s === 'XPTUSD') return 'PL=F';
-  if (s === 'XCUUSD') return 'HG=F';
-  if (s === 'XPDUSD') return 'PA=F';
-  if (s === 'US500') return '^GSPC';
-  if (s === 'US30') return '^DJI';
-  if (s === 'US100') return '^NDX';
-  // Generic 6-letter currency pair (e.g., USDMXN, USDTRY)
-  if (/^[A-Z]{6}$/.test(base)) return `${base}=X`;
-  return base;
-}
-
-async function fetchYahooLastPrice(symbol: string): Promise<number | null> {
-  const ysym = yahooSymbol(symbol);
-  // Try server proxy first
-  try {
-    const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(ysym)}&timeframe=5m`);
-    if (r.ok) {
-      const d = await r.json();
-      const closes = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
-      if (Array.isArray(closes)) {
-        for (let i = closes.length - 1; i >= 0; i--) {
-          const c = closes[i];
-          if (c != null && c > 0) return c;
-        }
+    const closes = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+    if (Array.isArray(closes)) {
+      for (let i = closes.length - 1; i >= 0; i--) {
+        const c = closes[i];
+        if (c != null && c > 0) return c;
       }
     }
   } catch {}
-  // Fallback: direct Yahoo via public CORS proxies
-  const proxies = ['https://corsproxy.io/?', 'https://api.allorigins.win/raw?url='];
-  for (const proxy of proxies) {
-    try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ysym)}?range=1d&interval=5m`;
-      const r = await fetch(`${proxy}${encodeURIComponent(url)}`);
-      if (!r.ok) continue;
-      const d = await r.json();
-      const closes = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
-      if (Array.isArray(closes)) {
-        for (let i = closes.length - 1; i >= 0; i--) {
-          const c = closes[i];
-          if (c != null && c > 0) return c;
-        }
-      }
-    } catch {}
-  }
   return null;
 }
 
@@ -149,14 +92,13 @@ export async function getLivePrice(symbol: string): Promise<number | null> {
   const cached = _priceCache.get(symbol);
   if (cached && Date.now() - cached.ts < PRICE_TTL) return cached.price;
 
-  let price: number | null = null;
-  const pair = CRYPTO_MAP[symbol.toUpperCase()];
-  if (pair) {
-    price = await fetchBinancePrice(pair);
-  }
-  if (price == null) {
-    price = await fetchYahooLastPrice(symbol);
-  }
+  // Route ALL assets (crypto, forex, metals, indices) through the backend
+  // server proxy /api/market-data. The server resolves crypto -> Binance and
+  // forex/metals -> Yahoo/TwelveData server-side, bypassing browser CORS.
+  // No browser-direct Binance calls (CORS-blocked) and no unreliable external
+  // CORS proxies (corsproxy.io/allorigins often fail with 403).
+  const price = await fetchServerLastPrice(symbol);
+
   if (price != null) {
     _priceCache.set(symbol, { price, ts: Date.now() });
   }
