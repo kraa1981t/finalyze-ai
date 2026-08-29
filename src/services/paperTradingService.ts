@@ -155,6 +155,7 @@ interface TradeStore {
   addTrade(t: Omit<PaperTrade, 'id'>): Promise<string>;
   updateTrade(id: string, patch: Partial<PaperTrade>): Promise<void>;
   resetAccount(newBalance: number): Promise<void>;
+  clearHistory(): Promise<void>;
 }
 
 class LocalStore implements TradeStore {
@@ -186,6 +187,11 @@ class LocalStore implements TradeStore {
   }
   async resetAccount(newBalance: number) {
     this.write({ balance: newBalance, leverage: DEFAULT_LEVERAGE, trades: [] });
+  }
+  async clearHistory() {
+    const d = this.read();
+    d.trades = d.trades.filter((t) => t.status === 'open');
+    this.write(d);
   }
 }
 
@@ -220,6 +226,12 @@ class FirestoreStore implements TradeStore {
   async resetAccount(newBalance: number) {
     await setDoc(doc(db, 'paper_accounts', this.uid), { balance: newBalance, startBalance: newBalance, leverage: DEFAULT_LEVERAGE, updatedAt: Timestamp.now() }, { merge: true });
     const snap = await getDocs(query(collection(db, 'paper_trades'), where('uid', '==', this.uid)));
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+  async clearHistory() {
+    const snap = await getDocs(query(collection(db, 'paper_trades'), where('uid', '==', this.uid), where('status', '==', 'closed')));
     const batch = writeBatch(db);
     snap.docs.forEach((d) => batch.delete(d.ref));
     await batch.commit();

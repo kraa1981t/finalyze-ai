@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw, Pencil, Check } from 'lucide-react';
+import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw, Pencil, Check, XCircle, Trash2 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { AnalysisResult } from '../types';
 import { SYMBOL_CATEGORIES } from '../constants';
@@ -149,6 +149,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [tab, setTab] = useState<'positions' | 'history'>('positions');
   // Inline SL/TP editing for an open trade
   const [editId, setEditId] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [editSl, setEditSl] = useState<string>('');
   const [editTp, setEditTp] = useState<string>('');
   const [busy, setBusy] = useState(false);
@@ -508,6 +509,69 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
       return;
     }
     await closeTradeInternal(t, exit, 'manual');
+  }
+
+  // Close all open trades at once at their current prices.
+  async function closeAllTrades() {
+    const open = tradesRef.current.filter((t) => t.status === 'open');
+    const closable = open.filter((t) => priceMapRef.current[t.symbol] != null);
+    if (closable.length === 0) {
+      setToast(isAr ? 'لا توجد صفقات يمكن إغلاقها (لا توجد أسعار حالية)' : 'No closable open trades (no current price)');
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+    setBusy(true);
+    const now = Date.now();
+    let totalPnl = 0;
+    const closedMap: Record<string, PaperTrade> = {};
+    let localWrite = false;
+    for (const t of closable) {
+      const exit = priceMapRef.current[t.symbol]!;
+      const pnl = calcPnl(t, exit);
+      totalPnl += pnl;
+      closedMap[t.id] = { ...t, status: 'closed' as const, exitPrice: exit, pnl, closeReason: 'manual' as const, closedAt: now };
+      try {
+        await store.updateTrade(t.id, { status: 'closed', exitPrice: exit, pnl, closeReason: 'manual' as const, closedAt: now });
+      } catch { localWrite = true; }
+    }
+    const newBalance = balanceRef.current + totalPnl;
+    try {
+      await store.saveBalance(newBalance);
+    } catch { localWrite = true; }
+    if (localWrite) {
+      try {
+        const raw = JSON.parse(localStorage.getItem('paper_trading_data') || '{"balance":10000,"trades":[]}');
+        raw.trades = (raw.trades || []).map((x: any) => closedMap[x.id] ? { ...closedMap[x.id] } : x);
+        raw.balance = newBalance;
+        localStorage.setItem('paper_trading_data', JSON.stringify(raw));
+      } catch {}
+    }
+    setBalance(newBalance);
+    setTrades((prev) => prev.map((x) => closedMap[x.id] ? { ...x, ...closedMap[x.id] } : x));
+    setBusy(false);
+    setToast(isAr ? `تم إغلاق ${closable.length} صفقة دفعة واحدة` : `Closed ${closable.length} trades at once`);
+    setTimeout(() => setToast(null), 2500);
+    playCloseSound();
+  }
+
+  // Clear the closed-trades history (keeps open trades and balance unchanged).
+  async function clearHistory() {
+    if (closedTrades.length === 0) return;
+    setBusy(true);
+    try {
+      await store.clearHistory();
+    } catch {
+      try {
+        const raw = JSON.parse(localStorage.getItem('paper_trading_data') || '{"balance":10000,"trades":[]}');
+        raw.trades = (raw.trades || []).filter((x: any) => x.status !== 'closed');
+        localStorage.setItem('paper_trading_data', JSON.stringify(raw));
+      } catch {}
+    }
+    setTrades((prev) => prev.filter((x) => x.status !== 'closed'));
+    setBusy(false);
+    setConfirmClear(false);
+    setToast(isAr ? 'تم مسح السجل' : 'History cleared');
+    setTimeout(() => setToast(null), 2000);
   }
 
   // Manually adjust a TP/SL USD amount by $0.50 steps (up or down)
@@ -1032,6 +1096,40 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           >
             {isAr ? 'السجل' : 'History'}
           </button>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-white/10">
+          <span className="text-sm font-bold text-brand-text/50">
+            {tab === 'positions'
+              ? (isAr ? `الصفقات المفتوحة: ${openTrades.length}` : `Open positions: ${openTrades.length}`)
+              : (isAr ? `إجمالي السجل: ${closedTrades.length}` : `History entries: ${closedTrades.length}`)}
+          </span>
+          {tab === 'positions' && openTrades.length > 0 ? (
+            <button
+              onClick={() => closeAllTrades()}
+              disabled={busy}
+              className="flex items-center gap-1.5 rounded-lg bg-red-500/80 hover:bg-red-500 px-3 py-1.5 text-xs font-black text-white uppercase tracking-wider transition-colors disabled:opacity-50"
+            >
+              <XCircle size={14} />
+              {isAr ? 'إغلاق الكل' : 'Close All'}
+            </button>
+          ) : tab === 'history' && closedTrades.length > 0 ? (
+            <button
+              onClick={() => {
+                if (!confirmClear) {
+                  setConfirmClear(true);
+                  setTimeout(() => setConfirmClear(false), 3000);
+                  return;
+                }
+                clearHistory();
+              }}
+              disabled={busy}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black text-white uppercase tracking-wider transition-colors disabled:opacity-50 ${confirmClear ? 'bg-red-500 hover:bg-red-600' : 'bg-white/10 hover:bg-white/20'}`}
+            >
+              <Trash2 size={14} />
+              {confirmClear ? (isAr ? 'تأكيد المسح' : 'Confirm') : (isAr ? 'مسح السجل' : 'Clear History')}
+            </button>
+          ) : null}
         </div>
 
         <div className="max-h-[400px] overflow-y-auto overflow-x-auto">
