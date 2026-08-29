@@ -188,6 +188,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   // Auto-fill SL/TP as USD amounts ($) when symbol changes and matches a signal.
   // Computed from the real SL/TP prices, pip value and current qty, so a 0.01-lot
   // EURJPY order shows a small logical dollar amount instead of an absolute price.
+  // Only runs on symbol change so typed SL/TP values are never wiped by price ticks.
+  const lastFillSymbol = React.useRef<string | null>(null);
   useEffect(() => {
     if (matchedSignal && matchedSignal.stopLoss && matchedSignal.takeProfit) {
       const entry = matchedSignal.entryPrice || livePrice || 0;
@@ -200,12 +202,13 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         setSlPrice('');
         setTpPrice('');
       }
-    } else {
+    } else if (lastFillSymbol.current !== symbol) {
       setSlPrice('');
       setTpPrice('');
     }
+    lastFillSymbol.current = symbol;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchedSignal?.symbol, matchedSignal?.stopLoss, matchedSignal?.takeProfit, symbol, qty, livePrice]);
+  }, [symbol]);
 
 
   const allSymbolsFor = (cat: string): string[] => {
