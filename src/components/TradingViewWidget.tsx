@@ -40,10 +40,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
 
   // live pixel positions of each price line, kept in sync on every render/data change
   const [positions, setPositions] = useState<{ entry?: number; sl?: number; tp?: number }>({});
-  const positionsRef = useRef<{ entry?: number; sl?: number; tp?: number }>({});
-  const positionsRefSetter = (p: { entry?: number; sl?: number; tp?: number }) => {
-    positionsRef.current = p;
-  };
 
   const lineDefs = (p = allPropsRef.current) => {
     return [
@@ -94,7 +90,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           }
         } catch {}
       }
-      positionsRefSetter(pos);
       setPositions(pos);
     });
   };
@@ -245,7 +240,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     zIndex: 15,
   });
 
-  const pos = positionsRef.current;
+  const pos = positions;
 
   return (
     <div className="relative h-full w-full" style={{ touchAction: 'none' }}>
