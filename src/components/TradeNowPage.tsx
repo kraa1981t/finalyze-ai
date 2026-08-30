@@ -770,9 +770,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {/* Symbol Selector (full width) */}
-        <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-3 space-y-2">
+        <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-2.5 space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-sm font-black uppercase tracking-wider text-brand-text/60">{isAr ? 'الرموز' : 'Symbols'}</span>
           </div>
@@ -913,20 +913,20 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             )}
           </>
           )}
-          <div className="flex justify-center">
-            <button
-              onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
-              className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
-              title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
-            >
-              <svg width="37" height="37" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${symbolsCollapsed ? '' : 'rotate-180'}`}>
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-          </div>
-          </div>
+          <div className="flex justify-center -mt-1">
+              <button
+                onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
+                title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${symbolsCollapsed ? '' : 'rotate-180'}`}>
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+            </div>
+            </div>
 
-          {/* Order Ticket (full width) */}
+            {/* Order Ticket (full width) */}
           <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-sm p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xl font-black text-brand-text uppercase tracking-wide">{symbol || '—'}</span>
@@ -1066,7 +1066,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
 
           {/* Chart / MT5 (full width, below order ticket) */}
-          <div ref={chartPanelRef} className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[60vh] min-h-[400px] relative flex flex-col">
+          <div ref={chartPanelRef} className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[62vh] min-h-[440px] pb-3 relative flex flex-col">
             {/* Toggle bar */}
             <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
               {platform === 'chart' && (
