@@ -125,24 +125,32 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         if (Object.keys(next).length === 0) return prev;
         return { ...prev, ...next };
       });
-      // star position - يتبع تاريخ الدخول الحقيقي، وإن كان خارج النطاق يظهر قرب ملصق Entry يميناً
+      // star position - مثبتة على هيكل الشمعة التي فُتحت فيها الصفقة تماماً
       const ep = allPropsRef.current.entryPrice;
       const at = allPropsRef.current.openedAt;
       if (ep != null && at != null && series) {
         try {
           const y = series.priceToCoordinate(ep);
-          const t = Math.floor(at / 1000) as any;
+          if (typeof y !== 'number' || !isFinite(y)) { setStarPos(null); return; }
+          const atSec = Math.floor(at / 1000);
+          // ابحث عن الشمعة الأقرب لتاريخ الفتح - لتثبيت النجمة على جسمها
+          let candleTime: any = null;
+          let bestDiff = Infinity;
+          for (const c of dataRef.current) {
+            const diff = Math.abs(c.time - atSec);
+            if (diff < bestDiff) { bestDiff = diff; candleTime = c.time; }
+          }
+          // إذا كانت المسافة كبيرة (> فريم ×2) اعتبرها غير موجودة ولا تظهر النجمة بعيداً
+          const tfSec: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+          const maxDiff = (tfSec[tf] || 3600) * 2;
           let x: number | null = null;
-          try { x = chart.timeScale().timeToCoordinate(t); } catch {}
-          const w = containerRef.current?.clientWidth || 600;
-          if (typeof y === 'number' && isFinite(y)) {
-            if (typeof x === 'number' && isFinite(x) && x > 10 && x < w - 10) setStarPos({ x, y });
-            else {
-              // خارج النطاق: ضع النجمة قرب ملصق Entry يميناً ليبقى مرئياً عند سعر الدخول الصحيح
-              const lx = Math.max(40, w - 90);
-              setStarPos({ x: lx, y });
-            }
-          } else setStarPos(null);
+          if (candleTime != null && bestDiff <= maxDiff) {
+            try { x = chart.timeScale().timeToCoordinate(candleTime as any); } catch {}
+          } else {
+            try { x = chart.timeScale().timeToCoordinate(Math.floor(atSec) as any); } catch {}
+          }
+          if (typeof x === 'number' && isFinite(x)) setStarPos({ x, y });
+          else setStarPos(null);
         } catch { setStarPos(null); }
       } else setStarPos(null);
     });
