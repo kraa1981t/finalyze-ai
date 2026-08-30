@@ -177,6 +177,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const el = containerRef.current;
     const series = seriesRef.current;
     if (!el || !series) return;
+    const lastPointerId = { current: -1 };
     const posY = (e: MouseEvent | PointerEvent) => e.clientY - el.getBoundingClientRect().top;
     const lineYFor = (def: { key: LineKey; price?: number | null }): number | null => {
       if (def.price == null) return null;
@@ -212,6 +213,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       const key = hitTest(posY(e));
       if (key) {
         draggingRef.current = key;
+        lastPointerId.current = e.pointerId;
         el.style.cursor = 'ns-resize';
         try { el.setPointerCapture?.(e.pointerId); } catch {}
         e.preventDefault();
@@ -233,7 +235,11 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         try { el.style.cursor = nearestForCursor(y) ? 'ns-resize' : 'crosshair'; } catch {}
       }
     };
-    const onUp = () => { draggingRef.current = null; el.style.cursor = 'crosshair'; };
+    const onUp = () => {
+      draggingRef.current = null;
+      el.style.cursor = 'crosshair';
+      try { el.releasePointerCapture?.(lastPointerId.current); } catch {}
+    };
     el.addEventListener('pointerdown', onDown);
     window.addEventListener('pointermove', onMove, true);
     window.addEventListener('pointerup', onUp, true);
@@ -243,9 +249,10 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       window.removeEventListener('pointermove', onMove, true);
       window.removeEventListener('pointerup', onUp, true);
       window.removeEventListener('pointercancel', onUp, true);
+      draggingRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [entryPrice, sl, tp]);
 
   return (
     <div className="relative h-full w-full">
