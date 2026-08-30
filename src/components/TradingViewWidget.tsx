@@ -420,14 +420,15 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     if (activeTool === 'hline' && price != null) {
       const id = Date.now().toString();
       try {
-        const pl = s.createPriceLine({ price, color: '#60a5fa', lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'H' });
+        const pl = s.createPriceLine({ price, color: '#60a5fa', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'H' });
         setDrawLines((prev) => [...prev, { id, type: 'hline', price, line: pl }]);
       } catch {}
     } else if (activeTool === 'vline') {
-      // vertical line simulated as price line with time marker - use overlay rect
       setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'vline', x }]);
     } else if (activeTool === 'arrow') {
       setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'arrow', x, y }]);
+    } else if (activeTool === 'trend' || activeTool === 'rect' || activeTool === 'fib') {
+      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: activeTool, x, y }]);
     }
   };
 
@@ -436,11 +437,23 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     drawLines.forEach((d) => { if (d.line) try { s.removePriceLine(d.line); } catch {} });
     setDrawLines([]);
   };
+  const deleteDrawing = (id: string) => {
+    const s = seriesRef.current;
+    const target = drawLines.find((d) => d.id === id);
+    if (target?.line) try { s.removePriceLine(target.line); } catch {}
+    setDrawLines((prev) => prev.filter((d) => d.id !== id));
+  };
 
   const scrollBy = (dir: number) => {
     try { const ts = chartRef.current?.timeScale(); const range = ts.getVisibleRange(); if (!range) return; const size = range.to - range.from; ts.setVisibleRange({ from: range.from + dir * size * 0.2, to: range.to + dir * size * 0.2 }); } catch {}
   };
-  const resetView = () => { try { chartRef.current?.timeScale()?.fitContent(); chartRef.current?.timeScale()?.scrollToRealTime(); syncPositions(); } catch {} };
+  const resetView = () => {
+    try {
+      // يرجع السعر لآخر نقطة دون تصغير الشموع (يحافظ على الزوم الحالي)
+      chartRef.current?.timeScale()?.scrollToRealTime();
+      syncPositions();
+    } catch {}
+  };
 
   return (
     <div className="relative h-full w-full flex flex-col">
@@ -451,7 +464,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             <button
               key={t}
               onClick={() => setTf(t)}
-              className={`px-4 py-1.5 rounded text-sm font-black uppercase tracking-wide transition-colors ${
+              className={`px-6 py-2.5 rounded-lg text-base font-black uppercase tracking-wide transition-colors ${
                 tf === t ? 'bg-[#F59E0B] text-black' : 'bg-white/5 text-brand-text/60 hover:bg-white/15 hover:text-white'
               }`}
             >
@@ -459,31 +472,31 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {DRAW_TOOLS.map((tl) => (
             <button
               key={tl.id}
               onClick={() => setActiveTool(tl.id)}
               title={tl.label}
-              className={`w-8 h-8 rounded flex items-center justify-center text-sm font-bold border ${activeTool === tl.id ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'}`}
+              className={`w-11 h-11 rounded-lg flex items-center justify-center text-lg font-bold border-2 ${activeTool === tl.id ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'}`}
             >
               {tl.icon}
             </button>
           ))}
-          <button onClick={clearDrawings} title="مسح الرسم" className="w-8 h-8 rounded flex items-center justify-center text-xs bg-white/5 border border-white/10 text-white/60 hover:bg-white/10">✕</button>
+          <button onClick={clearDrawings} title="مسح الكل" className="w-11 h-11 rounded-lg flex items-center justify-center text-sm font-black bg-white/5 border-2 border-white/10 text-white/60 hover:bg-white/10">✕</button>
         </div>
       </div>
 
       <div className="flex flex-1 min-h-0">
         {/* left indicators tab */}
-        <div className="w-10 bg-[#0b0e14] border-r border-white/5 flex flex-col items-center py-2 gap-1">
-          <div className="text-[8px] font-black text-white/40 tracking-widest mb-1">المؤشرات</div>
+        <div className="w-14 bg-[#0b0e14] border-r border-white/5 flex flex-col items-center py-2 gap-1.5">
+          <div className="text-[9px] font-black text-white/40 tracking-widest mb-1">المؤشرات</div>
           {INDICATORS.map((ind) => (
             <button
               key={ind.id}
               onClick={() => setActiveIndicators((p) => ({ ...p, [ind.id]: !p[ind.id] }))}
               title={ind.label}
-              className={`w-8 h-8 rounded text-[8px] font-black leading-tight flex items-center justify-center border ${activeIndicators[ind.id] ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'}`}
+              className={`w-10 h-10 rounded-lg text-[10px] font-black leading-tight flex items-center justify-center border-2 ${activeIndicators[ind.id] ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'}`}
             >
               {ind.label}
             </button>
@@ -507,19 +520,35 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             {typeof positions.tp === 'number' && tp != null && (
               <div onPointerDown={onHandleDown('tp')} onPointerUp={onHandleUp('tp')} onPointerCancel={onHandleUp('tp')} title="اسحب TP" style={{ position: 'absolute', left: 0, right: 36, top: positions.tp - 20, height: 40, pointerEvents: 'auto', cursor: 'ns-resize', background: 'transparent' }} />
             )}
-            {/* vertical line drawings */}
+            {/* drawings with per-object delete */}
             {drawLines.filter((d) => d.type === 'vline').map((d) => (
-              <div key={d.id} style={{ position: 'absolute', left: d.x, top: 0, bottom: 0, width: 1, background: '#60a5fa', opacity: 0.8, pointerEvents: 'none' }} />
+              <div key={d.id} style={{ position: 'absolute', left: d.x, top: 0, bottom: 0, width: 2, background: '#60a5fa', opacity: 0.9, pointerEvents: 'none' }}>
+                <button onClick={() => deleteDrawing(d.id)} title="حذف" style={{ position: 'absolute', top: 4, left: -10, pointerEvents: 'auto', background: '#1f2937', color: 'white', border: '1px solid #60a5fa', borderRadius: 6, width: 20, height: 20, fontSize: 10, lineHeight: '18px' }}>✕</button>
+              </div>
             ))}
             {drawLines.filter((d) => d.type === 'arrow').map((d) => (
-              <div key={d.id} style={{ position: 'absolute', left: d.x - 10, top: d.y - 10, pointerEvents: 'none', color: '#f59e0b', fontSize: 20 }}>➤</div>
+              <div key={d.id} style={{ position: 'absolute', left: d.x - 14, top: d.y - 14, pointerEvents: 'none', color: '#f59e0b', fontSize: 28 }}>
+                ➤
+                <button onClick={() => deleteDrawing(d.id)} title="حذف" style={{ position: 'absolute', top: -8, right: -12, pointerEvents: 'auto', background: '#1f2937', color: 'white', border: '1px solid #f59e0b', borderRadius: 6, width: 18, height: 18, fontSize: 9 }}>✕</button>
+              </div>
+            ))}
+            {drawLines.filter((d) => d.type === 'trend' || d.type === 'rect' || d.type === 'fib').map((d) => (
+              <div key={d.id} style={{ position: 'absolute', left: d.x - 12, top: d.y - 12, pointerEvents: 'none', color: '#a78bfa', fontSize: 26 }}>
+                {d.type === 'trend' ? '╱' : d.type === 'rect' ? '▭' : '≋'}
+                <button onClick={() => deleteDrawing(d.id)} title="حذف" style={{ position: 'absolute', top: -8, right: -10, pointerEvents: 'auto', background: '#1f2937', color: 'white', border: '1px solid #a78bfa', borderRadius: 6, width: 18, height: 18, fontSize: 9 }}>✕</button>
+              </div>
+            ))}
+            {drawLines.filter((d) => d.type === 'hline').map((d, idx) => (
+              <div key={d.id} style={{ position: 'absolute', right: 6, top: 4 + idx * 22, pointerEvents: 'none' }}>
+                <button onClick={() => deleteDrawing(d.id)} title={`حذف خط ${d.price?.toFixed(2) || ''}`} style={{ pointerEvents: 'auto', background: '#1f2937', color: '#60a5fa', border: '1px solid #60a5fa', borderRadius: 6, padding: '2px 6px', fontSize: 10 }}>حذف H ✕</button>
+              </div>
             ))}
             {/* yellow flashing star at entry */}
             {starPos && entryPrice != null && (
-              <div style={{ position: 'absolute', left: starPos.x - 14, top: starPos.y - 14, pointerEvents: 'none', zIndex: 25 }}>
-                <div className="relative w-7 h-7 flex items-center justify-center">
+              <div style={{ position: 'absolute', left: starPos.x - 16, top: starPos.y - 16, pointerEvents: 'none', zIndex: 25 }}>
+                <div className="relative w-8 h-8 flex items-center justify-center">
                   <span className="absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75 animate-ping" />
-                  <span className="relative text-yellow-400 text-xl leading-none drop-shadow-[0_0_6px_rgba(250,204,21,0.9)]">★</span>
+                  <span className="relative text-yellow-400 text-2xl leading-none drop-shadow-[0_0_8px_rgba(250,204,21,0.95)]">★</span>
                 </div>
               </div>
             )}
@@ -528,10 +557,10 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       </div>
 
       {/* bottom nav: scroll back/forward/reset */}
-      <div className="flex items-center justify-center gap-3 py-1.5 bg-[#0b0e14] border-t border-white/5">
-        <button onClick={() => scrollBy(-1)} title="للخلف" className="w-10 h-8 rounded bg-white/5 border border-white/10 text-white hover:bg-white/10 flex items-center justify-center text-lg">←</button>
-        <button onClick={() => scrollBy(1)} title="للأمام" className="w-10 h-8 rounded bg-white/5 border border-white/10 text-white hover:bg-white/10 flex items-center justify-center text-lg">→</button>
-        <button onClick={resetView} title="إعادة الضبط" className="w-10 h-8 rounded bg-[#F59E0B] text-black font-black flex items-center justify-center text-lg">↻</button>
+      <div className="flex items-center justify-center gap-4 py-2 bg-[#0b0e14] border-t border-white/5">
+        <button onClick={() => scrollBy(-1)} title="للخلف" className="w-14 h-10 rounded-lg bg-white/5 border-2 border-white/10 text-white hover:bg-white/10 flex items-center justify-center text-xl">←</button>
+        <button onClick={() => scrollBy(1)} title="للأمام" className="w-14 h-10 rounded-lg bg-white/5 border-2 border-white/10 text-white hover:bg-white/10 flex items-center justify-center text-xl">→</button>
+        <button onClick={resetView} title="العودة لآخر سعر (مع الحفاظ على الحجم)" className="w-14 h-10 rounded-lg bg-[#F59E0B] text-black font-black flex items-center justify-center text-xl border-2 border-[#F59E0B]">↻</button>
       </div>
     </div>
   );
