@@ -25,7 +25,7 @@ interface TradingViewWidgetProps {
 
 type LineKey = 'entry' | 'sl' | 'tp';
 
-const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
+const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d', '1W', '1M'];
 
 const DRAW_TOOLS = [
   { id: 'cursor', label: 'مؤشر', icon: '↖' },
@@ -145,28 +145,33 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       } catch {}
     }
     if (Object.keys(next).length) setPositions((prev) => ({ ...prev, ...next }));
-    // star position - مسمّرة على شمعة الدخول حسب الفريم الحالي (يُعاد حسابها عند كل تغيير فريم)
+    // star position - لا تختفي عند تغيير الفريم، تُعاد حسابها فوراً حسب الفريم الحالي
     const ep = allPropsRef.current.entryPrice;
     const at = allPropsRef.current.openedAt;
-    if (ep != null && at != null && series && dataRef.current.length) {
+    if (ep != null && at != null && series) {
       try {
         const y = series.priceToCoordinate(ep);
-        if (typeof y !== 'number' || !isFinite(y)) { setStarPos(null); return; }
+        if (typeof y !== 'number' || !isFinite(y)) return; // احتفظ بالموضع السابق أثناء التحول
         const atSec = Math.floor(at / 1000);
         let best: any = null, bestDiff = Infinity;
-        for (const c of dataRef.current) {
-          const diff = Math.abs(c.time - atSec);
-          if (diff < bestDiff) { bestDiff = diff; best = c.time; }
+        if (dataRef.current.length) {
+          for (const c of dataRef.current) {
+            const diff = Math.abs(c.time - atSec);
+            if (diff < bestDiff) { bestDiff = diff; best = c.time; }
+          }
         }
-        const tfSec: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+        const tfSec: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400, '1W': 604800, '1M': 2592000 };
         let x: number | null = null;
-        if (best != null && bestDiff <= (tfSec[tf] || 3600) * 3) {
+        if (best != null && bestDiff <= (tfSec[tf] || 3600) * 4) {
           try { x = chart.timeScale().timeToCoordinate(best as any); } catch {}
         }
-        if (typeof x === 'number' && isFinite(x) && x >= -20) setStarPos({ x, y });
-        else setStarPos(null);
-      } catch { setStarPos(null); }
-    } else setStarPos(null);
+        if (x == null || !isFinite(x) || x < -20) {
+          try { x = chart.timeScale().timeToCoordinate(atSec as any); } catch {}
+        }
+        if (typeof x === 'number' && isFinite(x)) setStarPos({ x, y });
+        // إن فشل التحويل احتفظ بالموضع السابق ولا تخفِ النجمة أثناء تحميل الفريم الجديد
+      } catch {}
+    } else if (ep == null || at == null) setStarPos(null);
   };
 
   // حافظ على تثبيت النجمة أثناء أي حركة يدوية (pan/zoom) عبر تحديث دوري سريع
