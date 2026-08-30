@@ -131,12 +131,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       });
       chartRef.current = chart;
       seriesRef.current = series;
-
-      // Recompute overlay positions whenever the chart redraws (pan/zoom/resize)
-      chart.subscribeCrosshairMove(() => syncLines());
-      chart.timeScale().subscribeVisibleTimeRangeChange(() => syncLines());
-      chart.priceScale('right').subscribeSizeInvalidated(() => syncLines());
-
       syncLines();
     } catch {
       return;
@@ -201,6 +195,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const stripPointerId = useRef<number>(-1);
 
   const onStripDown = (key: LineKey) => (e: React.PointerEvent<HTMLDivElement>) => {
+    console.log('[STRIP] down', key, 'y=', Math.round(e.clientY));
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
@@ -225,6 +220,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   };
 
   const onStripUp = (key: LineKey) => (e: React.PointerEvent<HTMLDivElement>) => {
+    console.log('[STRIP] up', key);
     if (stripDrag.current === key) {
       stripDrag.current = null;
       try { (e.currentTarget as HTMLElement).releasePointerCapture?.(stripPointerId.current); } catch {}
