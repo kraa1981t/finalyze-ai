@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   createChart,
   CandlestickSeries,
+  LineSeries,
   ColorType,
   LineStyle,
   CrosshairMode,
@@ -25,7 +26,26 @@ type LineKey = 'entry' | 'sl' | 'tp';
 
 const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
-export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange }: TradingViewWidgetProps) {
+const DRAW_TOOLS = [
+  { id: 'cursor', label: 'مؤشر', icon: '↖' },
+  { id: 'hline', label: 'أفقي', icon: '─' },
+  { id: 'vline', label: 'عمودي', icon: '│' },
+  { id: 'trend', label: 'اتجاه', icon: '╱' },
+  { id: 'arrow', label: 'سهم', icon: '➤' },
+  { id: 'rect', label: 'مستطيل', icon: '▭' },
+  { id: 'fib', label: 'فيبو', icon: '≋' },
+];
+
+const INDICATORS = [
+  { id: 'sma20', label: 'SMA 20' },
+  { id: 'sma50', label: 'SMA 50' },
+  { id: 'ema20', label: 'EMA 20' },
+  { id: 'rsi', label: 'RSI' },
+  { id: 'bb', label: 'Bollinger' },
+  { id: 'vol', label: 'Volume' },
+];
+
+export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange, openedAt }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
@@ -37,8 +57,17 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const [positions, setPositions] = useState<{ sl?: number; tp?: number }>({});
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
 
-  const allPropsRef = useRef({ entryPrice, sl, tp, onSlChange, onTpChange });
-  allPropsRef.current = { entryPrice, sl, tp, onSlChange, onTpChange };
+  // new UI states
+  const [activeTool, setActiveTool] = useState('cursor');
+  const [drawLines, setDrawLines] = useState<any[]>([]);
+  const drawLinesRef = useRef<any[]>([]);
+  drawLinesRef.current = drawLines;
+  const [activeIndicators, setActiveIndicators] = useState<Record<string, boolean>>({});
+  const [starPos, setStarPos] = useState<{ x: number; y: number } | null>(null);
+  const indicatorSeriesRef = useRef<Record<string, any>>({});
+
+  const allPropsRef = useRef({ entryPrice, sl, tp, onSlChange, onTpChange, openedAt });
+  allPropsRef.current = { entryPrice, sl, tp, onSlChange, onTpChange, openedAt };
 
   const lineDefs = (p = allPropsRef.current) => {
     return [
@@ -78,7 +107,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
 
   const syncPositions = () => {
     const series = seriesRef.current;
-    if (!series) return;
+    const chart = chartRef.current;
+    if (!series || !chart) return;
     requestAnimationFrame(() => {
       const next: { sl?: number; tp?: number } = {};
       for (const k of ['sl', 'tp'] as const) {
@@ -90,16 +120,62 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         } catch {}
       }
       setPositions((prev) => {
-        const merged: { sl?: number; tp?: number } = { ...prev };
-        if (next.sl !== undefined) merged.sl = next.sl;
-        else if (merged.sl === undefined && next.sl === undefined) {}
-        if (next.tp !== undefined) merged.tp = next.tp;
-        // keep previous if new is missing (handle stays draggable even if price leaves viewport)
         if (Object.keys(next).length === 0) return prev;
-        return { ...merged, ...next };
+        return { ...prev, ...next };
       });
+      // star position
+      const ep = allPropsRef.current.entryPrice;
+      const at = allPropsRef.current.openedAt;
+      if (ep != null && at != null && series) {
+        try {
+          const y = series.priceToCoordinate(ep);
+          const t = Math.floor(at / 1000) as any;
+          const x = chart.timeScale().timeToCoordinate(t);
+          if (typeof y === 'number' && typeof x === 'number' && isFinite(y) && isFinite(x) && x > 0) {
+            setStarPos({ x, y });
+          } else if (typeof y === 'number' && isFinite(y)) {
+            // fallback: if time out of range, place near left side at entry price level
+            setStarPos({ x: 80, y });
+          } else setStarPos(null);
+        } catch { setStarPos(null); }
+      } else setStarPos(null);
     });
   };
+
+  // indicator helpers
+  const calcSMA = (data: any[], len: number) => {
+    const out: any[] = [];
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) {
+      sum += data[i].close;
+      if (i >= len) sum -= data[i - len].close;
+      if (i >= len - 1) out.push({ time: data[i].time, value: sum / len });
+    }
+    return out;
+  };
+  const applyIndicators = () => {
+    const chart = chartRef.current;
+    const data = dataRef.current;
+    if (!chart || !data.length) return;
+    // remove old
+    Object.values(indicatorSeriesRef.current).forEach((s: any) => { try { chart.removeSeries(s); } catch {} });
+    indicatorSeriesRef.current = {};
+    if (activeIndicators['sma20']) {
+      const s = chart.addSeries(LineSeries, { color: '#3b82f6', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+      s.setData(calcSMA(data, 20)); indicatorSeriesRef.current['sma20'] = s;
+    }
+    if (activeIndicators['sma50']) {
+      const s = chart.addSeries(LineSeries, { color: '#f59e0b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+      s.setData(calcSMA(data, 50)); indicatorSeriesRef.current['sma50'] = s;
+    }
+    if (activeIndicators['ema20']) {
+      const out: any[] = []; let ema = data[0]?.close || 0; const k = 2 / (20 + 1);
+      for (let i = 0; i < data.length; i++) { ema = i === 0 ? data[i].close : data[i].close * k + ema * (1 - k); out.push({ time: data[i].time, value: ema }); }
+      const s = chart.addSeries(LineSeries, { color: '#a855f7', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+      s.setData(out); indicatorSeriesRef.current['ema20'] = s;
+    }
+  };
+  useEffect(() => { applyIndicators(); }, [activeIndicators]);
 
   // create the chart once
   useEffect(() => {
@@ -185,6 +261,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         } catch {}
         updateLines();
         syncPositions();
+        applyIndicators();
         setStatus('ok');
       })
       .catch(() => {
@@ -201,9 +278,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     updateLines();
     syncPositions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryPrice, sl, tp]);
+  }, [entryPrice, sl, tp, openedAt]);
 
-  // drag SL/TP lines with mouse (window-based for reliable pointer tracking)
+  // drag SL/TP lines with mouse (window-based)
   useEffect(() => {
     const el = containerRef.current;
     const getSeries = () => seriesRef.current;
@@ -239,6 +316,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       return false;
     };
     const onDown = (e: PointerEvent) => {
+      if (activeTool !== 'cursor') return;
       if (e.button !== 0) return;
       const y = posY(e);
       const key = hitTest(y);
@@ -256,7 +334,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         try { price = getSeries()?.coordinateToPrice(y) as number | null; } catch {}
         if (price == null || !isFinite(price)) return;
         try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
-        // فكرتك: مع كل تحريك حدّث المنصة فوراً ليبقى المستوى حيّاً
         setPositions((prev) => ({ ...prev, [k]: y }));
         const p = allPropsRef.current;
         if (k === 'sl' && p.onSlChange) p.onSlChange(price);
@@ -280,9 +357,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       window.removeEventListener('pointercancel', onUp, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeTool]);
 
-  // ---- overlay handle drag (transparent hit area, always 32px tall, no duplicate visible line) ----
+  // overlay handle drag
   const handleDrag = useRef<LineKey | null>(null);
   const onHandleDown = (key: LineKey) => (e: React.PointerEvent) => {
     if (e.button !== 0) return;
@@ -311,7 +388,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       try { price = s.coordinateToPrice(y) as number | null; } catch {}
       if (price == null || !isFinite(price)) return;
       try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
-      // مع كل تحريك: حدّث موضع المقبض فوراً + حدّث المنصة (اقتراحك)
       setPositions((prev) => ({ ...prev, [k]: y }));
       const p = allPropsRef.current;
       if (k === 'sl' && p.onSlChange) p.onSlChange(price);
@@ -331,70 +407,131 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     };
   }, []);
 
+  // drawing tools click on chart
+  const onChartClick = (e: React.MouseEvent) => {
+    if (activeTool === 'cursor') return;
+    const s = seriesRef.current;
+    const el = containerRef.current;
+    if (!s || !el) return;
+    const y = e.clientY - el.getBoundingClientRect().top;
+    const x = e.clientX - el.getBoundingClientRect().left;
+    let price: number | null = null;
+    try { price = s.coordinateToPrice(y) as number | null; } catch {}
+    if (activeTool === 'hline' && price != null) {
+      const id = Date.now().toString();
+      try {
+        const pl = s.createPriceLine({ price, color: '#60a5fa', lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'H' });
+        setDrawLines((prev) => [...prev, { id, type: 'hline', price, line: pl }]);
+      } catch {}
+    } else if (activeTool === 'vline') {
+      // vertical line simulated as price line with time marker - use overlay rect
+      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'vline', x }]);
+    } else if (activeTool === 'arrow') {
+      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'arrow', x, y }]);
+    }
+  };
+
+  const clearDrawings = () => {
+    const s = seriesRef.current;
+    drawLines.forEach((d) => { if (d.line) try { s.removePriceLine(d.line); } catch {} });
+    setDrawLines([]);
+  };
+
+  const scrollBy = (dir: number) => {
+    try { const ts = chartRef.current?.timeScale(); const range = ts.getVisibleRange(); if (!range) return; const size = range.to - range.from; ts.setVisibleRange({ from: range.from + dir * size * 0.2, to: range.to + dir * size * 0.2 }); } catch {}
+  };
+  const resetView = () => { try { chartRef.current?.timeScale()?.fitContent(); chartRef.current?.timeScale()?.scrollToRealTime(); syncPositions(); } catch {} };
+
   return (
-    <div className="relative h-full w-full">
-      {status === 'empty' && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-          <span className="text-sm font-bold text-brand-text/40 bg-black/60 px-4 py-2 rounded-lg">
-            {symbol} — لا توجد بيانات / no data
-          </span>
+    <div className="relative h-full w-full flex flex-col">
+      {/* top toolbar: timeframe x2 + drawing tools */}
+      <div className="flex items-center justify-between gap-2 px-1 py-1 bg-[#0b0e14] border-b border-white/5">
+        <div className="flex items-center gap-1">
+          {TIMEFRAMES.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTf(t)}
+              className={`px-4 py-1.5 rounded text-sm font-black uppercase tracking-wide transition-colors ${
+                tf === t ? 'bg-[#F59E0B] text-black' : 'bg-white/5 text-brand-text/60 hover:bg-white/15 hover:text-white'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
-      )}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1">
-        {TIMEFRAMES.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTf(t)}
-            className={`px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-wide transition-colors ${
-              tf === t
-                ? 'bg-[#F59E0B] text-black'
-                : 'bg-white/5 text-brand-text/60 hover:bg-white/15 hover:text-white'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+        <div className="flex items-center gap-1">
+          {DRAW_TOOLS.map((tl) => (
+            <button
+              key={tl.id}
+              onClick={() => setActiveTool(tl.id)}
+              title={tl.label}
+              className={`w-8 h-8 rounded flex items-center justify-center text-sm font-bold border ${activeTool === tl.id ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'}`}
+            >
+              {tl.icon}
+            </button>
+          ))}
+          <button onClick={clearDrawings} title="مسح الرسم" className="w-8 h-8 rounded flex items-center justify-center text-xs bg-white/5 border border-white/10 text-white/60 hover:bg-white/10">✕</button>
+        </div>
       </div>
 
-      <div ref={containerRef} className="h-full w-full" style={{ touchAction: 'none', userSelect: 'none' }} />
-      {/* transparent hit handles - no duplicate visible line, only hit area */}
-      <div ref={overlayRef} className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 15 }}>
-        {typeof positions.sl === 'number' && sl != null && (
-          <div
-            onPointerDown={onHandleDown('sl')}
-            onPointerUp={onHandleUp('sl')}
-            onPointerCancel={onHandleUp('sl')}
-            title="اسحب لتغيير SL"
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 36,
-              top: positions.sl - 20,
-              height: 40,
-              pointerEvents: 'auto',
-              cursor: 'ns-resize',
-              background: 'transparent',
-            }}
-          />
-        )}
-        {typeof positions.tp === 'number' && tp != null && (
-          <div
-            onPointerDown={onHandleDown('tp')}
-            onPointerUp={onHandleUp('tp')}
-            onPointerCancel={onHandleUp('tp')}
-            title="اسحب لتغيير TP"
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 36,
-              top: positions.tp - 20,
-              height: 40,
-              pointerEvents: 'auto',
-              cursor: 'ns-resize',
-              background: 'transparent',
-            }}
-          />
-        )}
+      <div className="flex flex-1 min-h-0">
+        {/* left indicators tab */}
+        <div className="w-10 bg-[#0b0e14] border-r border-white/5 flex flex-col items-center py-2 gap-1">
+          <div className="text-[8px] font-black text-white/40 tracking-widest mb-1">المؤشرات</div>
+          {INDICATORS.map((ind) => (
+            <button
+              key={ind.id}
+              onClick={() => setActiveIndicators((p) => ({ ...p, [ind.id]: !p[ind.id] }))}
+              title={ind.label}
+              className={`w-8 h-8 rounded text-[8px] font-black leading-tight flex items-center justify-center border ${activeIndicators[ind.id] ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'}`}
+            >
+              {ind.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative flex-1 min-w-0">
+          {status === 'empty' && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+              <span className="text-sm font-bold text-brand-text/40 bg-black/60 px-4 py-2 rounded-lg">
+                {symbol} — لا توجد بيانات / no data
+              </span>
+            </div>
+          )}
+          <div ref={containerRef} className="h-full w-full" style={{ touchAction: 'none', userSelect: 'none' }} onClick={onChartClick} />
+          {/* overlay handles */}
+          <div ref={overlayRef} className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 15 }}>
+            {typeof positions.sl === 'number' && sl != null && (
+              <div onPointerDown={onHandleDown('sl')} onPointerUp={onHandleUp('sl')} onPointerCancel={onHandleUp('sl')} title="اسحب SL" style={{ position: 'absolute', left: 0, right: 36, top: positions.sl - 20, height: 40, pointerEvents: 'auto', cursor: 'ns-resize', background: 'transparent' }} />
+            )}
+            {typeof positions.tp === 'number' && tp != null && (
+              <div onPointerDown={onHandleDown('tp')} onPointerUp={onHandleUp('tp')} onPointerCancel={onHandleUp('tp')} title="اسحب TP" style={{ position: 'absolute', left: 0, right: 36, top: positions.tp - 20, height: 40, pointerEvents: 'auto', cursor: 'ns-resize', background: 'transparent' }} />
+            )}
+            {/* vertical line drawings */}
+            {drawLines.filter((d) => d.type === 'vline').map((d) => (
+              <div key={d.id} style={{ position: 'absolute', left: d.x, top: 0, bottom: 0, width: 1, background: '#60a5fa', opacity: 0.8, pointerEvents: 'none' }} />
+            ))}
+            {drawLines.filter((d) => d.type === 'arrow').map((d) => (
+              <div key={d.id} style={{ position: 'absolute', left: d.x - 10, top: d.y - 10, pointerEvents: 'none', color: '#f59e0b', fontSize: 20 }}>➤</div>
+            ))}
+            {/* yellow flashing star at entry */}
+            {starPos && entryPrice != null && (
+              <div style={{ position: 'absolute', left: starPos.x - 14, top: starPos.y - 14, pointerEvents: 'none', zIndex: 25 }}>
+                <div className="relative w-7 h-7 flex items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75 animate-ping" />
+                  <span className="relative text-yellow-400 text-xl leading-none drop-shadow-[0_0_6px_rgba(250,204,21,0.9)]">★</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* bottom nav: scroll back/forward/reset */}
+      <div className="flex items-center justify-center gap-3 py-1.5 bg-[#0b0e14] border-t border-white/5">
+        <button onClick={() => scrollBy(-1)} title="للخلف" className="w-10 h-8 rounded bg-white/5 border border-white/10 text-white hover:bg-white/10 flex items-center justify-center text-lg">←</button>
+        <button onClick={() => scrollBy(1)} title="للأمام" className="w-10 h-8 rounded bg-white/5 border border-white/10 text-white hover:bg-white/10 flex items-center justify-center text-lg">→</button>
+        <button onClick={resetView} title="إعادة الضبط" className="w-10 h-8 rounded bg-[#F59E0B] text-black font-black flex items-center justify-center text-lg">↻</button>
       </div>
     </div>
   );
