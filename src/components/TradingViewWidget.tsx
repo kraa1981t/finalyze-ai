@@ -207,19 +207,31 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       }
       return false;
     };
+    const refreshCache = () => {
+      try {
+        for (const def of lineDefs()) {
+          if (def.price == null) continue;
+          const y = getSeries()?.priceToCoordinate(def.price);
+          if (typeof y === 'number') lineCoordCache.current[def.key] = y;
+        }
+      } catch {}
+    };
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
-      const key = hitTest(posY(e));
+      const y = posY(e);
+      refreshCache();
+      const key = hitTest(y);
+      // console.log('[drag] down', y, '->', key);
       if (key) {
         draggingRef.current = key;
         el.style.cursor = 'ns-resize';
-        e.preventDefault();
+        try { e.preventDefault(); } catch {}
       }
     };
     const onMove = (e: PointerEvent | MouseEvent) => {
-      const y = posY(e);
       const k = draggingRef.current;
       if (k) {
+        const y = posY(e);
         let price: number | null = null;
         try { price = getSeries()?.coordinateToPrice(y) as number | null; } catch {}
         if (price == null || !isFinite(price)) return;
@@ -229,12 +241,16 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         if (k === 'sl' && p.onSlChange) p.onSlChange(price);
         else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
       } else {
-        try { el.style.cursor = nearestForCursor(y) ? 'ns-resize' : 'crosshair'; } catch {}
+        try { el.style.cursor = nearestForCursor(posY(e)) ? 'ns-resize' : 'crosshair'; } catch {}
       }
     };
-    const onUp = () => {
-      draggingRef.current = null;
-      el.style.cursor = 'crosshair';
+    const onUp = (e: PointerEvent) => {
+      if (draggingRef.current) {
+        // console.log('[drag] up', draggingRef.current);
+        draggingRef.current = null;
+        el.style.cursor = 'crosshair';
+        refreshCache();
+      }
     };
     el.addEventListener('pointerdown', onDown);
     window.addEventListener('pointermove', onMove, true);
@@ -274,7 +290,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         ))}
       </div>
 
-      <div ref={containerRef} className="h-full w-full" />
+      <div ref={containerRef} className="h-full w-full" style={{ touchAction: 'none', userSelect: 'none' }} />
     </div>
   );
 }
