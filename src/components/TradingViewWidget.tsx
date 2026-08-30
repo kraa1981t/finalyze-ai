@@ -27,12 +27,14 @@ const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
   const dataRef = useRef<any[]>([]);
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
   const [tf, setTf] = useState('1h');
+  const [positions, setPositions] = useState<{ sl?: number; tp?: number }>({});
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
 
   const allPropsRef = useRef({ entryPrice, sl, tp, onSlChange, onTpChange });
@@ -74,6 +76,31 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     }
   };
 
+  const syncPositions = () => {
+    const series = seriesRef.current;
+    if (!series) return;
+    requestAnimationFrame(() => {
+      const next: { sl?: number; tp?: number } = {};
+      for (const k of ['sl', 'tp'] as const) {
+        const price = k === 'sl' ? allPropsRef.current.sl : allPropsRef.current.tp;
+        if (price == null) continue;
+        try {
+          const y = series.priceToCoordinate(price);
+          if (typeof y === 'number' && isFinite(y)) next[k] = y;
+        } catch {}
+      }
+      setPositions((prev) => {
+        const merged: { sl?: number; tp?: number } = { ...prev };
+        if (next.sl !== undefined) merged.sl = next.sl;
+        else if (merged.sl === undefined && next.sl === undefined) {}
+        if (next.tp !== undefined) merged.tp = next.tp;
+        // keep previous if new is missing (handle stays draggable even if price leaves viewport)
+        if (Object.keys(next).length === 0) return prev;
+        return { ...merged, ...next };
+      });
+    });
+  };
+
   // create the chart once
   useEffect(() => {
     const el = containerRef.current;
@@ -106,6 +133,11 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       chartRef.current = chart;
       seriesRef.current = series;
       updateLines();
+      syncPositions();
+      try {
+        chart.timeScale().subscribeVisibleTimeRangeChange(syncPositions);
+        chart.priceScale('right').subscribeSizeInvalidated(syncPositions);
+      } catch {}
     } catch {
       return;
     }
@@ -152,6 +184,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           chartRef.current?.timeScale()?.fitContent?.();
         } catch {}
         updateLines();
+        syncPositions();
         setStatus('ok');
       })
       .catch(() => {
@@ -166,6 +199,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   // redraw lines when entry/sl/tp change
   useEffect(() => {
     updateLines();
+    syncPositions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryPrice, sl, tp]);
 
@@ -246,6 +280,53 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ---- overlay handle drag (transparent hit area, always 32px tall, no duplicate visible line) ----
+  const handleDrag = useRef<LineKey | null>(null);
+  const onHandleDown = (key: LineKey) => (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handleDrag.current = key;
+    draggingRef.current = key;
+    try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch {}
+  };
+  const onHandleUp = (key: LineKey) => (e: React.PointerEvent) => {
+    if (handleDrag.current === key) handleDrag.current = null;
+    draggingRef.current = null;
+    try { (e.currentTarget as HTMLElement).releasePointerCapture?.((e as any).pointerId); } catch {}
+  };
+  useEffect(() => {
+    const onWinMove = (e: PointerEvent) => {
+      const k = handleDrag.current || draggingRef.current;
+      if (!k) return;
+      const s = seriesRef.current;
+      const ov = overlayRef.current;
+      const el = containerRef.current;
+      const target = ov || el;
+      if (!s || !target) return;
+      const y = e.clientY - target.getBoundingClientRect().top;
+      let price: number | null = null;
+      try { price = s.coordinateToPrice(y) as number | null; } catch {}
+      if (price == null || !isFinite(price)) return;
+      try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
+      const p = allPropsRef.current;
+      if (k === 'sl' && p.onSlChange) p.onSlChange(price);
+      else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
+    };
+    const onWinUp = () => {
+      handleDrag.current = null;
+      draggingRef.current = null;
+    };
+    window.addEventListener('pointermove', onWinMove, true);
+    window.addEventListener('pointerup', onWinUp, true);
+    window.addEventListener('pointercancel', onWinUp, true);
+    return () => {
+      window.removeEventListener('pointermove', onWinMove, true);
+      window.removeEventListener('pointerup', onWinUp, true);
+      window.removeEventListener('pointercancel', onWinUp, true);
+    };
+  }, []);
+
   return (
     <div className="relative h-full w-full">
       {status === 'empty' && (
@@ -272,6 +353,45 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       </div>
 
       <div ref={containerRef} className="h-full w-full" style={{ touchAction: 'none', userSelect: 'none' }} />
+      {/* transparent hit handles - no duplicate visible line, only hit area */}
+      <div ref={overlayRef} className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 15 }}>
+        {typeof positions.sl === 'number' && sl != null && (
+          <div
+            onPointerDown={onHandleDown('sl')}
+            onPointerUp={onHandleUp('sl')}
+            onPointerCancel={onHandleUp('sl')}
+            title="اسحب لتغيير SL"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 36,
+              top: positions.sl - 20,
+              height: 40,
+              pointerEvents: 'auto',
+              cursor: 'ns-resize',
+              background: 'transparent',
+            }}
+          />
+        )}
+        {typeof positions.tp === 'number' && tp != null && (
+          <div
+            onPointerDown={onHandleDown('tp')}
+            onPointerUp={onHandleUp('tp')}
+            onPointerCancel={onHandleUp('tp')}
+            title="اسحب لتغيير TP"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 36,
+              top: positions.tp - 20,
+              height: 40,
+              pointerEvents: 'auto',
+              cursor: 'ns-resize',
+              background: 'transparent',
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }
