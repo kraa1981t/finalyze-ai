@@ -27,17 +27,23 @@ const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
 export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
   const dataRef = useRef<any[]>([]);
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
-  const draggingRef = useRef<LineKey | null>(null);
-  const lineCoordCache = useRef<Partial<Record<LineKey, number>>>({});
   const [tf, setTf] = useState('1h');
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
 
   const allPropsRef = useRef({ entryPrice, sl, tp, onSlChange, onTpChange });
   allPropsRef.current = { entryPrice, sl, tp, onSlChange, onTpChange };
+
+  // live pixel positions of each price line, kept in sync on every render/data change
+  const [positions, setPositions] = useState<{ entry?: number; sl?: number; tp?: number }>({});
+  const positionsRef = useRef<{ entry?: number; sl?: number; tp?: number }>({});
+  const positionsRefSetter = (p: { entry?: number; sl?: number; tp?: number }) => {
+    positionsRef.current = p;
+  };
 
   const lineDefs = (p = allPropsRef.current) => {
     return [
@@ -47,15 +53,18 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     ];
   };
 
-  const updateLines = () => {
+  // Draw (or update) price lines on the series + compute their pixel Y positions into overlay
+  const syncLines = () => {
     const series = seriesRef.current;
-    if (!series) return;
+    const chart = chartRef.current;
+    if (!series || !chart) return;
+
+    const pos: { entry?: number; sl?: number; tp?: number } = {};
     const pl = priceLinesRef.current;
     for (const def of lineDefs()) {
-      const existing = pl[def.key];
       if (def.price != null) {
         try {
-          if (!existing) {
+          if (!pl[def.key]) {
             pl[def.key] = series.createPriceLine({
               price: def.price,
               color: def.color,
@@ -65,17 +74,36 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
               title: def.title,
             });
           } else {
-            existing.applyOptions({ price: def.price });
+            pl[def.key].applyOptions({ price: def.price });
           }
-          const y = series.priceToCoordinate(def.price);
-          if (y != null) lineCoordCache.current[def.key] = y;
         } catch {}
-      } else if (existing) {
-        try { series.removePriceLine(existing); } catch {}
+      } else if (pl[def.key]) {
+        try { series.removePriceLine(pl[def.key]); } catch {}
         pl[def.key] = undefined;
       }
     }
+
+    // Recompute pixel positions on the next frame AFTER chart auto-size settles
+    requestAnimationFrame(() => {
+      for (const def of lineDefs()) {
+        if (def.price == null) continue;
+        try {
+          const y = series.priceToCoordinate(def.price);
+          if (typeof y === 'number' && isFinite(y) && y >= 0) {
+            pos[def.key] = y;
+          }
+        } catch {}
+      }
+      positionsRefSetter(pos);
+      setPositions(pos);
+    });
   };
+
+  // update lines whenever sl/tp/entry change or chart data changes
+  useEffect(() => {
+    syncLines();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryPrice, sl, tp]);
 
   // create the chart once
   useEffect(() => {
@@ -108,7 +136,13 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       });
       chartRef.current = chart;
       seriesRef.current = series;
-      updateLines();
+
+      // Recompute overlay positions whenever the chart redraws (pan/zoom/resize)
+      chart.subscribeCrosshairMove(() => syncLines());
+      chart.timeScale().subscribeVisibleTimeRangeChange(() => syncLines());
+      chart.priceScale('right').subscribeSizeInvalidated(() => syncLines());
+
+      syncLines();
     } catch {
       return;
     }
@@ -154,7 +188,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           seriesRef.current?.setData(candles);
           chartRef.current?.timeScale()?.fitContent?.();
         } catch {}
-        updateLines();
+        syncLines();
         setStatus('ok');
       })
       .catch(() => {
@@ -166,105 +200,55 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, tf]);
 
-  // redraw lines when entry/sl/tp change
-  useEffect(() => {
-    updateLines();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryPrice, sl, tp]);
+  // ---- Draggable overlay strips (SL/TP) ----
+  // Each strip is a real DOM div; dragging it converts pointer Y -> price and calls back.
+  const stripDrag = useRef<LineKey | null>(null);
+  const stripPointerId = useRef<number>(-1);
 
-  // drag SL/TP lines with mouse (window-based for reliable pointer tracking)
-  useEffect(() => {
-    const el = containerRef.current;
-    const getSeries = () => seriesRef.current;
-    if (!el) return;
-    const posY = (e: MouseEvent | PointerEvent) => e.clientY - el.getBoundingClientRect().top;
-    const lineYFor = (def: { key: LineKey; price?: number | null }): number | null => {
-      if (def.price == null) return null;
-      try {
-        const y = getSeries()?.priceToCoordinate(def.price);
-        if (typeof y === 'number') { lineCoordCache.current[def.key] = y; return y; }
-      } catch {}
-      return lineCoordCache.current[def.key] ?? null;
-    };
-    const hitTest = (y: number) => {
-      let best: LineKey | null = null;
-      let bestDist = 24;
-      for (const def of lineDefs()) {
-        if (!def.editable) continue;
-        const lineY = lineYFor(def);
-        if (lineY != null) {
-          const d = Math.abs(lineY - y);
-          if (d < bestDist) { bestDist = d; best = def.key; }
-        }
-      }
-      return best;
-    };
-    const nearestForCursor = (y: number) => {
-      for (const def of lineDefs()) {
-        if (!def.editable) continue;
-        const lineY = lineYFor(def);
-        if (lineY != null && Math.abs(lineY - y) <= 12) return true;
-      }
-      return false;
-    };
-    const refreshCache = () => {
-      try {
-        for (const def of lineDefs()) {
-          if (def.price == null) continue;
-          const y = getSeries()?.priceToCoordinate(def.price);
-          if (typeof y === 'number') lineCoordCache.current[def.key] = y;
-        }
-      } catch {}
-    };
-    const onDown = (e: PointerEvent) => {
-      if (e.button !== 0) return;
-      const y = posY(e);
-      refreshCache();
-      const key = hitTest(y);
-      if (key) {
-        draggingRef.current = key;
-        el.style.cursor = 'ns-resize';
-        try { e.preventDefault(); } catch {}
-      }
-    };
-    const onMove = (e: PointerEvent | MouseEvent) => {
-      const k = draggingRef.current;
-      if (k) {
-        const y = posY(e);
-        let price: number | null = null;
-        try { price = getSeries()?.coordinateToPrice(y) as number | null; } catch {}
-        if (price == null || !isFinite(price)) return;
-        try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
-        lineCoordCache.current[k] = y;
-        const p = allPropsRef.current;
-        if (k === 'sl' && p.onSlChange) p.onSlChange(price);
-        else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
-      } else {
-        try { el.style.cursor = nearestForCursor(posY(e)) ? 'ns-resize' : 'crosshair'; } catch {}
-      }
-    };
-    const onUp = (e: PointerEvent) => {
-      if (draggingRef.current) {
-        draggingRef.current = null;
-        el.style.cursor = 'crosshair';
-        refreshCache();
-      }
-    };
-    el.addEventListener('pointerdown', onDown);
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-    return () => {
-      el.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('pointermove', onMove, true);
-      window.removeEventListener('pointerup', onUp, true);
-      window.removeEventListener('pointercancel', onUp, true);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const onStripDown = (key: LineKey) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    stripDrag.current = key;
+    stripPointerId.current = e.pointerId;
+    try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch {}
+  };
+
+  const onStripMove = (key: LineKey) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (stripDrag.current !== key) return;
+    const series = seriesRef.current;
+    const el = overlayRef.current;
+    if (!series || !el) return;
+    const rect = el.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    let price: number | null = null;
+    try { price = series.coordinateToPrice(y) as number | null; } catch {}
+    if (price == null || !isFinite(price)) return;
+    const p = allPropsRef.current;
+    if (key === 'sl' && p.onSlChange) p.onSlChange(price);
+    else if (key === 'tp' && p.onTpChange) p.onTpChange(price);
+  };
+
+  const onStripUp = (key: LineKey) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (stripDrag.current === key) {
+      stripDrag.current = null;
+      try { (e.currentTarget as HTMLElement).releasePointerCapture?.(stripPointerId.current); } catch {}
+    }
+  };
+
+  const stripCommon = (key: LineKey): React.CSSProperties => ({
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    touchAction: 'none',
+    cursor: 'ns-resize',
+    zIndex: 15,
+  });
+
+  const pos = positionsRef.current;
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full" style={{ touchAction: 'none' }}>
       {status === 'empty' && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <span className="text-sm font-bold text-brand-text/40 bg-black/60 px-4 py-2 rounded-lg">
@@ -272,12 +256,12 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           </span>
         </div>
       )}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1">
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1">
         {TIMEFRAMES.map((t) => (
           <button
             key={t}
             onClick={() => setTf(t)}
-            className={`px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-wide transition-colors ${
+            className={`relative z-40 px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-wide transition-colors ${
               tf === t
                 ? 'bg-[#F59E0B] text-black'
                 : 'bg-white/5 text-brand-text/60 hover:bg-white/15 hover:text-white'
@@ -289,6 +273,43 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       </div>
 
       <div ref={containerRef} className="h-full w-full" style={{ touchAction: 'none', userSelect: 'none' }} />
+
+      <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden" style={{ touchAction: 'none' }}>
+        {typeof pos.sl === 'number' && sl != null && (
+          <div
+            onPointerDown={onStripDown('sl')}
+            onPointerMove={onStripMove('sl')}
+            onPointerUp={onStripUp('sl')}
+            onPointerCancel={onStripUp('sl')}
+            className="pointer-events-auto"
+            style={{ ...stripCommon('sl'), top: pos.sl - 12, height: 24, background: 'transparent' }}
+          >
+            <div
+              style={{
+                position: 'absolute', left: 0, right: 0, top: 11,
+                height: 2, background: '#f23645', opacity: 0.9,
+              }}
+            />
+          </div>
+        )}
+        {typeof pos.tp === 'number' && tp != null && (
+          <div
+            onPointerDown={onStripDown('tp')}
+            onPointerMove={onStripMove('tp')}
+            onPointerUp={onStripUp('tp')}
+            onPointerCancel={onStripUp('tp')}
+            className="pointer-events-auto"
+            style={{ ...stripCommon('tp'), top: pos.tp - 12, height: 24, background: 'transparent' }}
+          >
+            <div
+              style={{
+                position: 'absolute', left: 0, right: 0, top: 11,
+                height: 2, background: '#089981', opacity: 0.9,
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
