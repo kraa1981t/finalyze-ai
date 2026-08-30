@@ -510,14 +510,27 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   };
 
   const scrollBy = (dir: number) => {
-    try { const ts = chartRef.current?.timeScale(); const range = ts.getVisibleRange(); if (!range) return; const size = range.to - range.from; ts.setVisibleRange({ from: range.from + dir * size * 0.2, to: range.to + dir * size * 0.2 }); } catch {}
+    try {
+      const ts = chartRef.current?.timeScale();
+      const lr = ts.getVisibleLogicalRange();
+      if (!lr) return;
+      const size = lr.to - lr.from;
+      ts.setVisibleLogicalRange({ from: lr.from + dir * size * 0.3, to: lr.to + dir * size * 0.3 });
+    } catch {}
   };
   const resetView = () => {
     try {
-      // يرجع السعر لآخر نقطة دون تصغير الشموع (يحافظ على الزوم الحالي)
-      chartRef.current?.timeScale()?.scrollToRealTime();
+      const ts = chartRef.current?.timeScale();
+      const n = dataRef.current.length;
+      const lr = ts.getVisibleLogicalRange();
+      const size = lr ? lr.to - lr.from : 60;
+      const half = size / 2;
+      // يضع آخر شمعة في الوسط لرؤية أفضل مع الحفاظ على حجم الشموع
+      ts.setVisibleLogicalRange({ from: n - half - 5, to: n + half - 5 });
       syncPositions();
-    } catch {}
+    } catch {
+      try { chartRef.current?.timeScale()?.scrollToRealTime(); syncPositions(); } catch {}
+    }
   };
 
   return (
