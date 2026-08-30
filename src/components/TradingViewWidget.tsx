@@ -61,6 +61,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   drawLinesRef.current = drawLines;
   const [activeIndicators, setActiveIndicators] = useState<Record<string, boolean>>({});
   const [starPos, setStarPos] = useState<{ x: number; y: number } | null>(null);
+  const starCandleTimeRef = useRef<number | null>(null);
   const indicatorSeriesRef = useRef<Record<string, any>>({});
   const [indicatorStyles, setIndicatorStyles] = useState<Record<string, { color: string; width: number }>>({
     rsi: { color: '#f59e0b', width: 2 },
@@ -111,7 +112,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const series = seriesRef.current;
     const chart = chartRef.current;
     if (!series || !chart) return;
-    // تثبيت مباشر بدون RAF لتبقى النجمة مسمّرة على شمعتها أثناء السحب اليدوي
     const next: { sl?: number; tp?: number } = {};
     for (const k of ['sl', 'tp'] as const) {
       const price = k === 'sl' ? allPropsRef.current.sl : allPropsRef.current.tp;
@@ -122,31 +122,61 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       } catch {}
     }
     if (Object.keys(next).length) setPositions((prev) => ({ ...prev, ...next }));
-    // star position - مسمّرة على جسم شمعة الدخول ولا تغادرها
+    // star position - مسمّرة بقوة على جسم الشمعة التي فُتحت عليها
     const ep = allPropsRef.current.entryPrice;
     const at = allPropsRef.current.openedAt;
-    if (ep != null && at != null && series && dataRef.current.length) {
+    if (ep != null && at != null && series) {
       try {
         const y = series.priceToCoordinate(ep);
         if (typeof y !== 'number' || !isFinite(y)) { setStarPos(null); return; }
-        const atSec = Math.floor(at / 1000);
-        let candleTime: any = null;
-        let bestDiff = Infinity;
-        for (const c of dataRef.current) {
-          const diff = Math.abs(c.time - atSec);
-          if (diff < bestDiff) { bestDiff = diff; candleTime = c.time; }
+        let candleTime = starCandleTimeRef.current;
+        // إذا لم تُحسب بعد، ابحث عنها
+        if (candleTime == null && dataRef.current.length) {
+          const atSec = Math.floor(at / 1000);
+          let bestDiff = Infinity, best: any = null;
+          for (const c of dataRef.current) {
+            const diff = Math.abs(c.time - atSec);
+            if (diff < bestDiff) { bestDiff = diff; best = c.time; }
+          }
+          const tfSec: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+          if (best != null && bestDiff <= (tfSec[tf] || 3600) * 3) { starCandleTimeRef.current = best; candleTime = best; }
         }
-        const tfSec: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
-        const maxDiff = (tfSec[tf] || 3600) * 3;
+        if (candleTime == null) { setStarPos(null); return; }
         let x: number | null = null;
-        if (candleTime != null && bestDiff <= maxDiff) {
-          try { x = chart.timeScale().timeToCoordinate(candleTime as any); } catch {}
-        }
-        if (typeof x === 'number' && isFinite(x) && x >= 0) setStarPos({ x, y });
+        try { x = chart.timeScale().timeToCoordinate(candleTime as any); } catch {}
+        if (typeof x === 'number' && isFinite(x) && x >= -20) setStarPos({ x, y });
         else setStarPos(null);
       } catch { setStarPos(null); }
     } else setStarPos(null);
   };
+
+  // احسب شمعة الدخول مرة واحدة عند فتح الصفقة
+  useEffect(() => {
+    if (entryPrice != null && openedAt != null && dataRef.current.length) {
+      const atSec = Math.floor(openedAt / 1000);
+      let best: any = null, bestDiff = Infinity;
+      for (const c of dataRef.current) {
+        const diff = Math.abs(c.time - atSec);
+        if (diff < bestDiff) { bestDiff = diff; best = c.time; }
+      }
+      const tfSec: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+      if (best != null && bestDiff <= (tfSec[tf] || 3600) * 3) starCandleTimeRef.current = best;
+      else starCandleTimeRef.current = null;
+    } else {
+      starCandleTimeRef.current = null;
+      setStarPos(null);
+    }
+    syncPositions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryPrice, openedAt, tf]);
+
+  // حافظ على تثبيت النجمة أثناء أي حركة يدوية (pan/zoom) عبر تحديث دوري سريع
+  useEffect(() => {
+    if (entryPrice == null || openedAt == null) return;
+    const id = setInterval(syncPositions, 80);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryPrice, openedAt]);
 
   // indicator helpers
   const calcSMA = (data: any[], len: number) => {
