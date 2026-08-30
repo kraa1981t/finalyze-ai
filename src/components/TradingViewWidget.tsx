@@ -221,7 +221,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       const y = posY(e);
       refreshCache();
       const key = hitTest(y);
-      console.log('[DRAG] down y=' + Math.round(y) + ' hit=' + key + ' dragging=' + draggingRef.current + ' sl=' + allPropsRef.current.sl + ' tp=' + allPropsRef.current.tp);
       if (key) {
         draggingRef.current = key;
         el.style.cursor = 'ns-resize';
@@ -245,9 +244,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       }
     };
     const onUp = (e: PointerEvent) => {
-      console.log('[DRAG] up dragging=' + draggingRef.current);
       if (draggingRef.current) {
-        // console.log('[drag] up', draggingRef.current);
         draggingRef.current = null;
         el.style.cursor = 'crosshair';
         refreshCache();
