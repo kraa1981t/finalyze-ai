@@ -606,13 +606,17 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   };
 
   async function adjustSl(tradeId: string, newSl: number) {
-    await store.updateTrade(tradeId, { sl: newSl > 0 ? newSl : null });
+    const v = newSl > 0 ? newSl : null;
+    setTrades((prev) => prev.map((t) => t.id === tradeId ? { ...t, sl: v } : t));
     setPriceTick(p => p + 1);
+    await store.updateTrade(tradeId, { sl: v });
   }
 
   async function adjustTp(tradeId: string, newTp: number) {
-    await store.updateTrade(tradeId, { tp: newTp > 0 ? newTp : null });
+    const v = newTp > 0 ? newTp : null;
+    setTrades((prev) => prev.map((t) => t.id === tradeId ? { ...t, tp: v } : t));
     setPriceTick(p => p + 1);
+    await store.updateTrade(tradeId, { tp: v });
   }
 
   // Start inline editing of an open trade's SL/TP levels.
