@@ -256,6 +256,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         try { price = getSeries()?.coordinateToPrice(y) as number | null; } catch {}
         if (price == null || !isFinite(price)) return;
         try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
+        // فكرتك: مع كل تحريك حدّث المنصة فوراً ليبقى المستوى حيّاً
+        setPositions((prev) => ({ ...prev, [k]: y }));
         const p = allPropsRef.current;
         if (k === 'sl' && p.onSlChange) p.onSlChange(price);
         else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
@@ -309,6 +311,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       try { price = s.coordinateToPrice(y) as number | null; } catch {}
       if (price == null || !isFinite(price)) return;
       try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
+      // مع كل تحريك: حدّث موضع المقبض فوراً + حدّث المنصة (اقتراحك)
+      setPositions((prev) => ({ ...prev, [k]: y }));
       const p = allPropsRef.current;
       if (k === 'sl' && p.onSlChange) p.onSlChange(price);
       else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
