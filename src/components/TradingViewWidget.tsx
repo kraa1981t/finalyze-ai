@@ -71,6 +71,28 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     vol: { color: '#10b981', width: 1 },
   });
 
+  // Persist chart work place across manual refresh (sessionStorage)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('joseph_chart_ui');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.tf) setTf(s.tf);
+        if (s.activeTool) setActiveTool(s.activeTool);
+        if (s.activeIndicators) setActiveIndicators(s.activeIndicators);
+        if (s.indicatorStyles) setIndicatorStyles(s.indicatorStyles);
+        if (s.drawColor) setDrawColor(s.drawColor);
+        if (s.drawWidth) setDrawWidth(s.drawWidth);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('joseph_chart_ui', JSON.stringify({ tf, activeTool, activeIndicators, indicatorStyles, drawColor, drawWidth }));
+    } catch {}
+  }, [tf, activeTool, activeIndicators, indicatorStyles, drawColor, drawWidth]);
+
   const allPropsRef = useRef({ entryPrice, sl, tp, onSlChange, onTpChange, openedAt });
   allPropsRef.current = { entryPrice, sl, tp, onSlChange, onTpChange, openedAt };
 

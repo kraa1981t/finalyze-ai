@@ -169,6 +169,28 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [symbolsCollapsed, setSymbolsCollapsed] = useState(false);
   const [ticketCollapsed, setTicketCollapsed] = useState(false);
 
+  // Persist work place across manual refresh (sessionStorage) - clears when browser/tab closed
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('joseph_session_ui');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.symbol) setSymbol(s.symbol);
+        if (s.category) setCategory(s.category);
+        if (s.tab) setTab(s.tab);
+        if (s.platform) setPlatform(s.platform);
+        if (typeof s.symbolsCollapsed === 'boolean') setSymbolsCollapsed(s.symbolsCollapsed);
+        if (typeof s.ticketCollapsed === 'boolean') setTicketCollapsed(s.ticketCollapsed);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol, category, tab, platform, symbolsCollapsed, ticketCollapsed }));
+    } catch {}
+  }, [symbol, category, tab, platform, symbolsCollapsed, ticketCollapsed]);
+
   const store = getTradeStore(user);
 
   // Refs that always hold the latest trades/balance so the price subscription's
