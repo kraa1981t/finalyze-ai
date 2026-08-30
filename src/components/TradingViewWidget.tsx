@@ -32,14 +32,9 @@ const DRAW_TOOLS = [
   { id: 'vline', label: 'عمودي', icon: '│' },
   { id: 'trend', label: 'اتجاه', icon: '╱' },
   { id: 'arrow', label: 'سهم', icon: '➤' },
-  { id: 'rect', label: 'مستطيل', icon: '▭' },
-  { id: 'fib', label: 'فيبو', icon: '≋' },
 ];
 
 const INDICATORS = [
-  { id: 'sma20', label: 'SMA 20' },
-  { id: 'sma50', label: 'SMA 50' },
-  { id: 'ema20', label: 'EMA 20' },
   { id: 'rsi', label: 'RSI' },
   { id: 'bb', label: 'Bollinger' },
   { id: 'vol', label: 'Volume' },
@@ -67,6 +62,11 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const [activeIndicators, setActiveIndicators] = useState<Record<string, boolean>>({});
   const [starPos, setStarPos] = useState<{ x: number; y: number } | null>(null);
   const indicatorSeriesRef = useRef<Record<string, any>>({});
+  const [indicatorStyles, setIndicatorStyles] = useState<Record<string, { color: string; width: number }>>({
+    rsi: { color: '#f59e0b', width: 2 },
+    bb: { color: '#3b82f6', width: 1 },
+    vol: { color: '#10b981', width: 1 },
+  });
 
   const allPropsRef = useRef({ entryPrice, sl, tp, onSlChange, onTpChange, openedAt });
   allPropsRef.current = { entryPrice, sl, tp, onSlChange, onTpChange, openedAt };
@@ -171,25 +171,54 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const chart = chartRef.current;
     const data = dataRef.current;
     if (!chart || !data.length) return;
-    // remove old
     Object.values(indicatorSeriesRef.current).forEach((s: any) => { try { chart.removeSeries(s); } catch {} });
     indicatorSeriesRef.current = {};
-    if (activeIndicators['sma20']) {
-      const s = chart.addSeries(LineSeries, { color: '#3b82f6', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-      s.setData(calcSMA(data, 20)); indicatorSeriesRef.current['sma20'] = s;
+    const getStyle = (id: string, fallback: string) => {
+      const st = indicatorStyles[id];
+      return { color: st?.color || fallback, width: st?.width || 2 };
+    };
+    if (activeIndicators['rsi']) {
+      // RSI 14
+      const rsi: any[] = [];
+      let gains = 0, losses = 0;
+      for (let i = 1; i < data.length; i++) {
+        const diff = data[i].close - data[i - 1].close;
+        if (i <= 14) { if (diff > 0) gains += diff; else losses -= diff; if (i === 14) { const rs = losses === 0 ? 100 : gains / losses; rsi.push({ time: data[i].time, value: 100 - 100 / (1 + rs) }); } }
+        else {
+          const g = diff > 0 ? diff : 0, l = diff < 0 ? -diff : 0;
+          gains = (gains * 13 + g) / 14; losses = (losses * 13 + l) / 14;
+          const rs = losses === 0 ? 100 : gains / losses;
+          rsi.push({ time: data[i].time, value: 100 - 100 / (1 + rs) });
+        }
+      }
+      const { color, width } = getStyle('rsi', '#f59e0b');
+      const s = chart.addSeries(LineSeries, { color, lineWidth: width as any, priceLineVisible: false, lastValueVisible: false });
+      s.setData(rsi); indicatorSeriesRef.current['rsi'] = s;
     }
-    if (activeIndicators['sma50']) {
-      const s = chart.addSeries(LineSeries, { color: '#f59e0b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-      s.setData(calcSMA(data, 50)); indicatorSeriesRef.current['sma50'] = s;
+    if (activeIndicators['bb']) {
+      const len = 20; const { color, width } = getStyle('bb', '#3b82f6');
+      const sma = calcSMA(data, len);
+      const up: any[] = [], low: any[] = [];
+      for (let i = len - 1; i < data.length; i++) {
+        let sumSq = 0; const mean = sma[i - len + 1]?.value; if (mean == null) continue;
+        for (let j = i - len + 1; j <= i; j++) sumSq += (data[j].close - mean) ** 2;
+        const std = Math.sqrt(sumSq / len);
+        up.push({ time: data[i].time, value: mean + 2 * std });
+        low.push({ time: data[i].time, value: mean - 2 * std });
+      }
+      const s1 = chart.addSeries(LineSeries, { color, lineWidth: width as any, priceLineVisible: false, lastValueVisible: false });
+      const s2 = chart.addSeries(LineSeries, { color, lineWidth: width as any, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed });
+      s1.setData(up); s2.setData(low); indicatorSeriesRef.current['bb_up'] = s1; indicatorSeriesRef.current['bb_low'] = s2;
     }
-    if (activeIndicators['ema20']) {
-      const out: any[] = []; let ema = data[0]?.close || 0; const k = 2 / (20 + 1);
-      for (let i = 0; i < data.length; i++) { ema = i === 0 ? data[i].close : data[i].close * k + ema * (1 - k); out.push({ time: data[i].time, value: ema }); }
-      const s = chart.addSeries(LineSeries, { color: '#a855f7', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-      s.setData(out); indicatorSeriesRef.current['ema20'] = s;
+    if (activeIndicators['vol']) {
+      const { color, width } = getStyle('vol', '#10b981');
+      const s = chart.addSeries(LineSeries, { color, lineWidth: width as any, priceLineVisible: false, lastValueVisible: false });
+      // volume proxy: use candle range as pseudo-volume
+      s.setData(data.map((c: any) => ({ time: c.time, value: Math.abs(c.close - c.open) * 1000 })));
+      indicatorSeriesRef.current['vol'] = s;
     }
   };
-  useEffect(() => { applyIndicators(); }, [activeIndicators]);
+  useEffect(() => { applyIndicators(); }, [activeIndicators, indicatorStyles]);
 
   // create the chart once
   useEffect(() => {
@@ -508,18 +537,27 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       </div>
 
       <div className="flex flex-1 min-h-0">
-        {/* left indicators tab */}
-        <div className="w-14 bg-[#0b0e14] border-r border-white/5 flex flex-col items-center py-2 gap-1.5">
-          <div className="text-[9px] font-black text-white/40 tracking-widest mb-1">المؤشرات</div>
+        {/* left indicators tab - مع تحكم بالحجم واللون */}
+        <div className="w-16 bg-[#0b0e14] border-r border-white/5 flex flex-col items-center py-2 gap-1.5">
+          <div className="text-[8px] font-black text-white/40 tracking-widest mb-1">المؤشرات</div>
           {INDICATORS.map((ind) => (
-            <button
-              key={ind.id}
-              onClick={() => setActiveIndicators((p) => ({ ...p, [ind.id]: !p[ind.id] }))}
-              title={ind.label}
-              className={`w-10 h-10 rounded-lg text-[10px] font-black leading-tight flex items-center justify-center border-2 ${activeIndicators[ind.id] ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'}`}
-            >
-              {ind.label}
-            </button>
+            <div key={ind.id} className="flex flex-col items-center gap-1">
+              <button
+                onClick={() => setActiveIndicators((p) => ({ ...p, [ind.id]: !p[ind.id] }))}
+                title={ind.label}
+                className={`w-10 h-10 rounded-lg text-[9px] font-black leading-tight flex items-center justify-center border-2 ${activeIndicators[ind.id] ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'}`}
+              >
+                {ind.label}
+              </button>
+              {activeIndicators[ind.id] && (
+                <div className="flex items-center gap-1">
+                  <input type="color" value={indicatorStyles[ind.id]?.color || '#f59e0b'} onChange={(e) => setIndicatorStyles((p) => ({ ...p, [ind.id]: { color: e.target.value, width: p[ind.id]?.width || 2 } }))} className="w-5 h-5 rounded cursor-pointer bg-transparent border border-white/20" title="لون" />
+                  <select value={indicatorStyles[ind.id]?.width || 2} onChange={(e) => setIndicatorStyles((p) => ({ ...p, [ind.id]: { color: p[ind.id]?.color || '#f59e0b', width: parseInt(e.target.value) } }))} className="bg-[#1a1d26] text-white text-[9px] rounded border border-white/20 px-0.5 py-0.5">
+                    <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option><option value={5}>5</option>
+                  </select>
+                </div>
+              )}
+            </div>
           ))}
         </div>
 
