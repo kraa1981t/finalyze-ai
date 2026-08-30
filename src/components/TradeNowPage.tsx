@@ -11,7 +11,7 @@ import {
   calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE, DEFAULT_LEVERAGE, LEVERAGE_OPTIONS, isMarketOpen,
 } from '../services/paperTradingService';
 import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
-import { playOpenSound, playCloseSound } from '../lib/tradeSounds';
+import { playOpenSound, playCloseSound, playDragTick } from '../lib/tradeSounds';
 import { pricesToUsd, usdToPrice, slAmountUSD } from '../lib/positionMath';
 
 interface TradeNowPageProps {
@@ -639,6 +639,27 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     setTrades((prev) => prev.map((t) => t.id === tradeId ? { ...t, tp: v } : t));
     setPriceTick(p => p + 1);
     await store.updateTrade(tradeId, { tp: v });
+  }
+
+  async function stepOpenTradeLevel(t: PaperTrade, kind: 'sl' | 'tp', dir: number) {
+    const step = 0.25;
+    const curUsd = kind === 'sl'
+      ? (t.sl != null ? slAmountUSD(t.symbol, Math.abs(t.entryPrice - t.sl), t.qty, t.category) : 0)
+      : (t.tp != null ? slAmountUSD(t.symbol, Math.abs(t.entryPrice - t.tp), t.qty, t.category) : 0);
+    const nextUsd = +(curUsd + dir * step).toFixed(2);
+    if (nextUsd <= 0) {
+      playDragTick();
+      if (kind === 'sl') await adjustSl(t.id, 0);
+      else await adjustTp(t.id, 0);
+      return;
+    }
+    const isBuy = kind === 'tp' ? t.side === 'buy' : t.side !== 'buy';
+    const newPrice = usdToPrice(t.symbol, nextUsd, t.entryPrice, isBuy, t.qty, t.category);
+    if (newPrice != null && isFinite(newPrice)) {
+      playDragTick();
+      if (kind === 'sl') await adjustSl(t.id, newPrice);
+      else await adjustTp(t.id, newPrice);
+    }
   }
 
   // Start inline editing of an open trade's SL/TP levels.
@@ -1291,18 +1312,28 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                               </button>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2">
-                              <div className="text-base font-bold" dir="ltr">
-                                <span className={`${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`}>{slUsd != null ? `$${slUsd.toFixed(2)}` : '—'}</span>
-                                <span className="text-brand-text/30"> / </span>
-                                <span className={`${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`}>{tpUsd != null ? `$${tpUsd.toFixed(2)}` : '—'}</span>
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-0.5">
+                                <span className={`text-base font-bold min-w-[52px] text-center ${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`} dir="ltr">{slUsd != null ? `$${slUsd.toFixed(2)}` : '—'}</span>
+                                <div className="flex flex-col gap-0.5">
+                                  <button onClick={() => stepOpenTradeLevel(t, 'sl', 1)} className="w-6 h-3.5 rounded bg-red-500/15 hover:bg-red-500/30 text-red-300 flex items-center justify-center active:scale-90 transition-all" title="زيادة SL">▲</button>
+                                  <button onClick={() => stepOpenTradeLevel(t, 'sl', -1)} className="w-6 h-3.5 rounded bg-red-500/15 hover:bg-red-500/30 text-red-300 flex items-center justify-center active:scale-90 transition-all" title="نقص SL">▼</button>
+                                </div>
+                              </div>
+                              <span className="text-brand-text/30">/</span>
+                              <div className="flex items-center gap-0.5">
+                                <span className={`text-base font-bold min-w-[52px] text-center ${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`} dir="ltr">{tpUsd != null ? `$${tpUsd.toFixed(2)}` : '—'}</span>
+                                <div className="flex flex-col gap-0.5">
+                                  <button onClick={() => stepOpenTradeLevel(t, 'tp', 1)} className="w-6 h-3.5 rounded bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 flex items-center justify-center active:scale-90 transition-all" title="زيادة TP">▲</button>
+                                  <button onClick={() => stepOpenTradeLevel(t, 'tp', -1)} className="w-6 h-3.5 rounded bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 flex items-center justify-center active:scale-90 transition-all" title="نقص TP">▼</button>
+                                </div>
                               </div>
                               <button
                                 onClick={() => startEditLevels(t)}
-                                className="w-7 h-7 rounded-md bg-white/10 text-brand-text/60 hover:text-sky-300 hover:bg-sky-500/20 flex items-center justify-center transition-colors"
+                                className="w-7 h-7 rounded-md bg-white/10 text-brand-text/60 hover:text-sky-300 hover:bg-sky-500/20 flex items-center justify-center transition-colors ml-1"
                                 title={isAr ? 'تعديل الوقف/الهدف (بالدولار)' : 'Edit SL / TP (USD)'}
                               >
-                                <Pencil size={16} />
+                                <Pencil size={14} />
                               </button>
                             </div>
                           )}
