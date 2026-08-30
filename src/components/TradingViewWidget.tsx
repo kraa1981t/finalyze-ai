@@ -190,7 +190,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   }, [symbol, tf]);
 
   // ---- Draggable overlay strips (SL/TP) ----
-  // Each strip is a real DOM div; dragging it converts pointer Y -> price and calls back.
   const stripDrag = useRef<LineKey | null>(null);
   const stripPointerId = useRef<number>(-1);
 
@@ -226,6 +225,39 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       try { (e.currentTarget as HTMLElement).releasePointerCapture?.(stripPointerId.current); } catch {}
     }
   };
+
+  // window-level fallback so drag continues even if pointer leaves the strip
+  useEffect(() => {
+    const onWindowMove = (e: PointerEvent) => {
+      const k = stripDrag.current;
+      if (!k) return;
+      const series = seriesRef.current;
+      const el = overlayRef.current;
+      if (!series || !el) return;
+      const rect = el.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      let price: number | null = null;
+      try { price = series.coordinateToPrice(y) as number | null; } catch {}
+      if (price == null || !isFinite(price)) return;
+      const p = allPropsRef.current;
+      if (k === 'sl' && p.onSlChange) p.onSlChange(price);
+      else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
+    };
+    const onWindowUp = () => {
+      if (stripDrag.current) {
+        console.log('[STRIP] window up', stripDrag.current);
+        stripDrag.current = null;
+      }
+    };
+    window.addEventListener('pointermove', onWindowMove, true);
+    window.addEventListener('pointerup', onWindowUp, true);
+    window.addEventListener('pointercancel', onWindowUp, true);
+    return () => {
+      window.removeEventListener('pointermove', onWindowMove, true);
+      window.removeEventListener('pointerup', onWindowUp, true);
+      window.removeEventListener('pointercancel', onWindowUp, true);
+    };
+  }, []);
 
   const stripCommon = (key: LineKey): React.CSSProperties => ({
     position: 'absolute',
@@ -265,20 +297,19 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
 
       <div ref={containerRef} className="h-full w-full" style={{ touchAction: 'none', userSelect: 'none' }} />
 
-      <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden" style={{ touchAction: 'none' }}>
+      <div ref={overlayRef} className="absolute inset-0 overflow-hidden" style={{ touchAction: 'none', pointerEvents: 'none', zIndex: 20 }}>
         {typeof pos.sl === 'number' && sl != null && (
           <div
             onPointerDown={onStripDown('sl')}
             onPointerMove={onStripMove('sl')}
             onPointerUp={onStripUp('sl')}
             onPointerCancel={onStripUp('sl')}
-            className="pointer-events-auto"
-            style={{ ...stripCommon('sl'), top: pos.sl - 12, height: 24, background: 'transparent' }}
+            style={{ ...stripCommon('sl'), top: pos.sl - 16, height: 32, background: 'rgba(242,54,69,0.08)', pointerEvents: 'auto' }}
           >
             <div
               style={{
-                position: 'absolute', left: 0, right: 0, top: 11,
-                height: 2, background: '#f23645', opacity: 0.9,
+                position: 'absolute', left: 0, right: 0, top: 15,
+                height: 2, background: '#f23645', opacity: 0.95,
               }}
             />
           </div>
@@ -289,13 +320,12 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             onPointerMove={onStripMove('tp')}
             onPointerUp={onStripUp('tp')}
             onPointerCancel={onStripUp('tp')}
-            className="pointer-events-auto"
-            style={{ ...stripCommon('tp'), top: pos.tp - 12, height: 24, background: 'transparent' }}
+            style={{ ...stripCommon('tp'), top: pos.tp - 16, height: 32, background: 'rgba(8,153,129,0.08)', pointerEvents: 'auto' }}
           >
             <div
               style={{
-                position: 'absolute', left: 0, right: 0, top: 11,
-                height: 2, background: '#089981', opacity: 0.9,
+                position: 'absolute', left: 0, right: 0, top: 15,
+                height: 2, background: '#089981', opacity: 0.95,
               }}
             />
           </div>
