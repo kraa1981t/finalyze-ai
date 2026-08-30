@@ -56,6 +56,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const [tf, setTf] = useState('1h');
   const [positions, setPositions] = useState<{ sl?: number; tp?: number }>({});
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
+  const [drawColor, setDrawColor] = useState('#60a5fa');
+  const [drawWidth, setDrawWidth] = useState(2);
 
   // new UI states
   const [activeTool, setActiveTool] = useState('cursor');
@@ -123,19 +125,23 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         if (Object.keys(next).length === 0) return prev;
         return { ...prev, ...next };
       });
-      // star position
+      // star position - يتبع تاريخ الدخول الحقيقي، وإن كان خارج النطاق يظهر قرب ملصق Entry يميناً
       const ep = allPropsRef.current.entryPrice;
       const at = allPropsRef.current.openedAt;
       if (ep != null && at != null && series) {
         try {
           const y = series.priceToCoordinate(ep);
           const t = Math.floor(at / 1000) as any;
-          const x = chart.timeScale().timeToCoordinate(t);
-          if (typeof y === 'number' && typeof x === 'number' && isFinite(y) && isFinite(x) && x > 0) {
-            setStarPos({ x, y });
-          } else if (typeof y === 'number' && isFinite(y)) {
-            // fallback: if time out of range, place near left side at entry price level
-            setStarPos({ x: 80, y });
+          let x: number | null = null;
+          try { x = chart.timeScale().timeToCoordinate(t); } catch {}
+          const w = containerRef.current?.clientWidth || 600;
+          if (typeof y === 'number' && isFinite(y)) {
+            if (typeof x === 'number' && isFinite(x) && x > 10 && x < w - 10) setStarPos({ x, y });
+            else {
+              // خارج النطاق: ضع النجمة قرب ملصق Entry يميناً ليبقى مرئياً عند سعر الدخول الصحيح
+              const lx = Math.max(40, w - 90);
+              setStarPos({ x: lx, y });
+            }
           } else setStarPos(null);
         } catch { setStarPos(null); }
       } else setStarPos(null);
@@ -420,15 +426,15 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     if (activeTool === 'hline' && price != null) {
       const id = Date.now().toString();
       try {
-        const pl = s.createPriceLine({ price, color: '#60a5fa', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'H' });
-        setDrawLines((prev) => [...prev, { id, type: 'hline', price, line: pl }]);
+        const pl = s.createPriceLine({ price, color: drawColor, lineWidth: drawWidth as any, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'H' });
+        setDrawLines((prev) => [...prev, { id, type: 'hline', price, line: pl, color: drawColor, width: drawWidth }]);
       } catch {}
     } else if (activeTool === 'vline') {
-      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'vline', x }]);
+      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'vline', x, color: drawColor, width: drawWidth }]);
     } else if (activeTool === 'arrow') {
-      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'arrow', x, y }]);
+      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'arrow', x, y, color: drawColor }]);
     } else if (activeTool === 'trend' || activeTool === 'rect' || activeTool === 'fib') {
-      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: activeTool, x, y }]);
+      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: activeTool, x, y, color: drawColor, width: drawWidth }]);
     }
   };
 
@@ -476,13 +482,19 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           {DRAW_TOOLS.map((tl) => (
             <button
               key={tl.id}
-              onClick={() => setActiveTool(tl.id)}
-              title={tl.label}
+              onClick={() => setActiveTool((prev) => (prev === tl.id ? 'cursor' : tl.id))}
+              title={tl.label + ' (اضغط مرة ثانية للإلغاء)'}
               className={`w-11 h-11 rounded-lg flex items-center justify-center text-lg font-bold border-2 ${activeTool === tl.id ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'}`}
             >
               {tl.icon}
             </button>
           ))}
+          <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/10">
+            <input type="color" value={drawColor} onChange={(e) => setDrawColor(e.target.value)} title="لون الخط" className="w-8 h-8 rounded cursor-pointer bg-transparent border border-white/20" />
+            <select value={drawWidth} onChange={(e) => setDrawWidth(parseInt(e.target.value))} title="سمك الخط" className="bg-[#1a1d26] text-white text-xs rounded border border-white/20 px-1 py-1">
+              <option value={1}>1px</option><option value={2}>2px</option><option value={3}>3px</option><option value={4}>4px</option><option value={5}>5px</option>
+            </select>
+          </div>
           <button onClick={clearDrawings} title="مسح الكل" className="w-11 h-11 rounded-lg flex items-center justify-center text-sm font-black bg-white/5 border-2 border-white/10 text-white/60 hover:bg-white/10">✕</button>
         </div>
       </div>
@@ -522,20 +534,20 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             )}
             {/* drawings with per-object delete */}
             {drawLines.filter((d) => d.type === 'vline').map((d) => (
-              <div key={d.id} style={{ position: 'absolute', left: d.x, top: 0, bottom: 0, width: 2, background: '#60a5fa', opacity: 0.9, pointerEvents: 'none' }}>
-                <button onClick={() => deleteDrawing(d.id)} title="حذف" style={{ position: 'absolute', top: 4, left: -10, pointerEvents: 'auto', background: '#1f2937', color: 'white', border: '1px solid #60a5fa', borderRadius: 6, width: 20, height: 20, fontSize: 10, lineHeight: '18px' }}>✕</button>
+              <div key={d.id} style={{ position: 'absolute', left: d.x, top: 0, bottom: 0, width: d.width || 2, background: d.color || '#60a5fa', opacity: 0.9, pointerEvents: 'none' }}>
+                <button onClick={() => deleteDrawing(d.id)} title="حذف" style={{ position: 'absolute', top: 4, left: -10, pointerEvents: 'auto', background: '#1f2937', color: 'white', border: `1px solid ${d.color || '#60a5fa'}`, borderRadius: 6, width: 20, height: 20, fontSize: 10, lineHeight: '18px' }}>✕</button>
               </div>
             ))}
             {drawLines.filter((d) => d.type === 'arrow').map((d) => (
-              <div key={d.id} style={{ position: 'absolute', left: d.x - 14, top: d.y - 14, pointerEvents: 'none', color: '#f59e0b', fontSize: 28 }}>
+              <div key={d.id} style={{ position: 'absolute', left: d.x - 14, top: d.y - 14, pointerEvents: 'none', color: d.color || '#f59e0b', fontSize: 28 }}>
                 ➤
-                <button onClick={() => deleteDrawing(d.id)} title="حذف" style={{ position: 'absolute', top: -8, right: -12, pointerEvents: 'auto', background: '#1f2937', color: 'white', border: '1px solid #f59e0b', borderRadius: 6, width: 18, height: 18, fontSize: 9 }}>✕</button>
+                <button onClick={() => deleteDrawing(d.id)} title="حذف" style={{ position: 'absolute', top: -8, right: -12, pointerEvents: 'auto', background: '#1f2937', color: 'white', border: `1px solid ${d.color || '#f59e0b'}`, borderRadius: 6, width: 18, height: 18, fontSize: 9 }}>✕</button>
               </div>
             ))}
             {drawLines.filter((d) => d.type === 'trend' || d.type === 'rect' || d.type === 'fib').map((d) => (
-              <div key={d.id} style={{ position: 'absolute', left: d.x - 12, top: d.y - 12, pointerEvents: 'none', color: '#a78bfa', fontSize: 26 }}>
+              <div key={d.id} style={{ position: 'absolute', left: d.x - 12, top: d.y - 12, pointerEvents: 'none', color: d.color || '#a78bfa', fontSize: 26 }}>
                 {d.type === 'trend' ? '╱' : d.type === 'rect' ? '▭' : '≋'}
-                <button onClick={() => deleteDrawing(d.id)} title="حذف" style={{ position: 'absolute', top: -8, right: -10, pointerEvents: 'auto', background: '#1f2937', color: 'white', border: '1px solid #a78bfa', borderRadius: 6, width: 18, height: 18, fontSize: 9 }}>✕</button>
+                <button onClick={() => deleteDrawing(d.id)} title="حذف" style={{ position: 'absolute', top: -8, right: -10, pointerEvents: 'auto', background: '#1f2937', color: 'white', border: `1px solid ${d.color || '#a78bfa'}`, borderRadius: 6, width: 18, height: 18, fontSize: 9 }}>✕</button>
               </div>
             ))}
             {drawLines.filter((d) => d.type === 'hline').map((d, idx) => (
