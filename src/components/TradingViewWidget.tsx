@@ -7,6 +7,7 @@ import {
   LineStyle,
   CrosshairMode,
 } from 'lightweight-charts';
+import { playClickSound, playDragTick } from '../lib/tradeSounds';
 
 interface TradingViewWidgetProps {
   symbol: string;
@@ -48,6 +49,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const dataRef = useRef<any[]>([]);
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
+  const lastDragSoundRef = useRef(0);
   const [tf, setTf] = useState('1h');
   const [positions, setPositions] = useState<{ sl?: number; tp?: number }>({});
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
@@ -171,10 +173,13 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   }, [entryPrice, openedAt, tf]);
 
   // حافظ على تثبيت النجمة أثناء أي حركة يدوية (pan/zoom) عبر تحديث دوري سريع
+  // صفر انحراف: تحديث مستمر عبر RAF لتبقى النجمة مسمّرة تماماً أثناء تحريك السعر
   useEffect(() => {
     if (entryPrice == null || openedAt == null) return;
-    const id = setInterval(syncPositions, 80);
-    return () => clearInterval(id);
+    let raf = 0;
+    const loop = () => { syncPositions(); raf = requestAnimationFrame(loop); };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryPrice, openedAt]);
 
@@ -400,6 +405,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         if (price == null || !isFinite(price)) return;
         try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
         setPositions((prev) => ({ ...prev, [k]: y }));
+        if (Date.now() - lastDragSoundRef.current > 90) { playDragTick(); lastDragSoundRef.current = Date.now(); }
         const p = allPropsRef.current;
         if (k === 'sl' && p.onSlChange) p.onSlChange(price);
         else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
@@ -454,6 +460,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       if (price == null || !isFinite(price)) return;
       try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
       setPositions((prev) => ({ ...prev, [k]: y }));
+      if (Date.now() - lastDragSoundRef.current > 90) { playDragTick(); lastDragSoundRef.current = Date.now(); }
       const p = allPropsRef.current;
       if (k === 'sl' && p.onSlChange) p.onSlChange(price);
       else if (k === 'tp' && p.onTpChange) p.onTpChange(price);
@@ -487,13 +494,14 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       try {
         const pl = s.createPriceLine({ price, color: drawColor, lineWidth: drawWidth as any, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'H' });
         setDrawLines((prev) => [...prev, { id, type: 'hline', price, line: pl, color: drawColor, width: drawWidth }]);
+        playClickSound();
       } catch {}
     } else if (activeTool === 'vline') {
-      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'vline', x, color: drawColor, width: drawWidth }]);
+      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'vline', x, color: drawColor, width: drawWidth }]); playClickSound();
     } else if (activeTool === 'arrow') {
-      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'arrow', x, y, color: drawColor }]);
+      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: 'arrow', x, y, color: drawColor }]); playClickSound();
     } else if (activeTool === 'trend' || activeTool === 'rect' || activeTool === 'fib') {
-      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: activeTool, x, y, color: drawColor, width: drawWidth }]);
+      setDrawLines((prev) => [...prev, { id: Date.now().toString(), type: activeTool, x, y, color: drawColor, width: drawWidth }]); playClickSound();
     }
   };
 
@@ -503,6 +511,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     setDrawLines([]);
   };
   const deleteDrawing = (id: string) => {
+    playClickSound();
     const s = seriesRef.current;
     const target = drawLines.find((d) => d.id === id);
     if (target?.line) try { s.removePriceLine(target.line); } catch {}
@@ -541,8 +550,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           {TIMEFRAMES.map((t) => (
             <button
               key={t}
-              onClick={() => setTf(t)}
-              className={`px-6 py-2.5 rounded-lg text-base font-black uppercase tracking-wide transition-colors ${
+              onClick={() => { playClickSound(); setTf(t); }}
+              className={`px-6 py-2.5 rounded-lg text-base font-black uppercase tracking-wide transition-all active:scale-95 hover:scale-[1.02] ${
                 tf === t ? 'bg-[#F59E0B] text-black' : 'bg-white/5 text-brand-text/60 hover:bg-white/15 hover:text-white'
               }`}
             >
@@ -554,20 +563,20 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           {DRAW_TOOLS.map((tl) => (
             <button
               key={tl.id}
-              onClick={() => setActiveTool((prev) => (prev === tl.id ? 'cursor' : tl.id))}
+              onClick={() => { playClickSound(); setActiveTool((prev) => (prev === tl.id ? 'cursor' : tl.id)); }}
               title={tl.label + ' (اضغط مرة ثانية للإلغاء)'}
-              className={`w-11 h-11 rounded-lg flex items-center justify-center text-lg font-bold border-2 ${activeTool === tl.id ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'}`}
+              className={`w-11 h-11 rounded-lg flex items-center justify-center text-lg font-bold border-2 transition-all active:scale-90 hover:scale-105 ${activeTool === tl.id ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'}`}
             >
               {tl.icon}
             </button>
           ))}
           <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/10">
-            <input type="color" value={drawColor} onChange={(e) => setDrawColor(e.target.value)} title="لون الخط" className="w-8 h-8 rounded cursor-pointer bg-transparent border border-white/20" />
-            <select value={drawWidth} onChange={(e) => setDrawWidth(parseInt(e.target.value))} title="سمك الخط" className="bg-[#1a1d26] text-white text-xs rounded border border-white/20 px-1 py-1">
+            <input type="color" value={drawColor} onChange={(e) => { playClickSound(); setDrawColor(e.target.value); }} title="لون الخط" className="w-8 h-8 rounded cursor-pointer bg-transparent border border-white/20 hover:scale-110 transition-transform" />
+            <select value={drawWidth} onChange={(e) => { playClickSound(); setDrawWidth(parseInt(e.target.value)); }} title="سمك الخط" className="bg-[#1a1d26] text-white text-xs rounded border border-white/20 px-1 py-1 cursor-pointer">
               <option value={1}>1px</option><option value={2}>2px</option><option value={3}>3px</option><option value={4}>4px</option><option value={5}>5px</option>
             </select>
           </div>
-          <button onClick={clearDrawings} title="مسح الكل" className="w-11 h-11 rounded-lg flex items-center justify-center text-sm font-black bg-white/5 border-2 border-white/10 text-white/60 hover:bg-white/10">✕</button>
+          <button onClick={() => { playClickSound(); clearDrawings(); }} title="مسح الكل" className="w-11 h-11 rounded-lg flex items-center justify-center text-sm font-black bg-white/5 border-2 border-white/10 text-white/60 hover:bg-white/10 active:scale-90 transition-all">✕</button>
         </div>
       </div>
 
@@ -578,16 +587,16 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           {INDICATORS.map((ind) => (
             <div key={ind.id} className="flex flex-col items-center gap-1">
               <button
-                onClick={() => setActiveIndicators((p) => ({ ...p, [ind.id]: !p[ind.id] }))}
+                onClick={() => { playClickSound(); setActiveIndicators((p) => ({ ...p, [ind.id]: !p[ind.id] })); }}
                 title={ind.label}
-                className={`w-10 h-10 rounded-lg text-[9px] font-black leading-tight flex items-center justify-center border-2 ${activeIndicators[ind.id] ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'}`}
+                className={`w-10 h-10 rounded-lg text-[9px] font-black leading-tight flex items-center justify-center border-2 transition-all active:scale-90 hover:scale-105 ${activeIndicators[ind.id] ? 'bg-[#F59E0B] text-black border-[#F59E0B]' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'}`}
               >
                 {ind.label}
               </button>
               {activeIndicators[ind.id] && (
                 <div className="flex items-center gap-1">
-                  <input type="color" value={indicatorStyles[ind.id]?.color || '#f59e0b'} onChange={(e) => setIndicatorStyles((p) => ({ ...p, [ind.id]: { color: e.target.value, width: p[ind.id]?.width || 2 } }))} className="w-5 h-5 rounded cursor-pointer bg-transparent border border-white/20" title="لون" />
-                  <select value={indicatorStyles[ind.id]?.width || 2} onChange={(e) => setIndicatorStyles((p) => ({ ...p, [ind.id]: { color: p[ind.id]?.color || '#f59e0b', width: parseInt(e.target.value) } }))} className="bg-[#1a1d26] text-white text-[9px] rounded border border-white/20 px-0.5 py-0.5">
+                  <input type="color" value={indicatorStyles[ind.id]?.color || '#f59e0b'} onChange={(e) => { playClickSound(); setIndicatorStyles((p) => ({ ...p, [ind.id]: { color: e.target.value, width: p[ind.id]?.width || 2 } })); }} className="w-5 h-5 rounded cursor-pointer bg-transparent border border-white/20 hover:scale-110 transition-transform" title="لون" />
+                  <select value={indicatorStyles[ind.id]?.width || 2} onChange={(e) => { playClickSound(); setIndicatorStyles((p) => ({ ...p, [ind.id]: { color: p[ind.id]?.color || '#f59e0b', width: parseInt(e.target.value) } })); }} className="bg-[#1a1d26] text-white text-[9px] rounded border border-white/20 px-0.5 py-0.5 cursor-pointer">
                     <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option><option value={5}>5</option>
                   </select>
                 </div>
@@ -651,9 +660,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
 
       {/* bottom nav: scroll back/forward/reset */}
       <div className="flex items-center justify-center gap-4 py-2 bg-[#0b0e14] border-t border-white/5">
-        <button onClick={() => scrollBy(-1)} title="للخلف" className="w-14 h-10 rounded-lg bg-white/5 border-2 border-white/10 text-white hover:bg-white/10 flex items-center justify-center text-xl">←</button>
-        <button onClick={() => scrollBy(1)} title="للأمام" className="w-14 h-10 rounded-lg bg-white/5 border-2 border-white/10 text-white hover:bg-white/10 flex items-center justify-center text-xl">→</button>
-        <button onClick={resetView} title="العودة لآخر سعر (مع الحفاظ على الحجم)" className="w-14 h-10 rounded-lg bg-[#F59E0B] text-black font-black flex items-center justify-center text-xl border-2 border-[#F59E0B]">↻</button>
+        <button onClick={() => { playClickSound(); scrollBy(-1); }} title="للخلف" className="w-14 h-10 rounded-lg bg-white/5 border-2 border-white/10 text-white hover:bg-white/10 active:scale-90 transition-all flex items-center justify-center text-xl">←</button>
+        <button onClick={() => { playClickSound(); scrollBy(1); }} title="للأمام" className="w-14 h-10 rounded-lg bg-white/5 border-2 border-white/10 text-white hover:bg-white/10 active:scale-90 transition-all flex items-center justify-center text-xl">→</button>
+        <button onClick={() => { playClickSound(); resetView(); }} title="العودة لآخر سعر (مع الحفاظ على الحجم)" className="w-14 h-10 rounded-lg bg-[#F59E0B] text-black font-black flex items-center justify-center text-xl border-2 border-[#F59E0B] active:scale-90 transition-all">↻</button>
       </div>
     </div>
   );

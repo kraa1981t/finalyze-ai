@@ -53,3 +53,31 @@ export function playCloseSound() {
     o.stop(c.currentTime + 0.04);
   } catch {}
 }
+
+export function playClickSound() {
+  try {
+    const c = ctx();
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(1000, c.currentTime);
+    g.gain.setValueAtTime(0.18, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.05);
+    o.connect(g); g.connect(c.destination);
+    o.start(c.currentTime); o.stop(c.currentTime + 0.05);
+  } catch {}
+}
+
+export function playDragTick() {
+  try {
+    const c = ctx();
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(700, c.currentTime);
+    g.gain.setValueAtTime(0.12, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.04);
+    o.connect(g); g.connect(c.destination);
+    o.start(c.currentTime); o.stop(c.currentTime + 0.04);
+  } catch {}
+}
