@@ -175,14 +175,13 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   // drag SL/TP lines with mouse (window-based for reliable pointer tracking)
   useEffect(() => {
     const el = containerRef.current;
-    const series = seriesRef.current;
-    if (!el || !series) return;
-    const lastPointerId = { current: -1 };
+    const getSeries = () => seriesRef.current;
+    if (!el) return;
     const posY = (e: MouseEvent | PointerEvent) => e.clientY - el.getBoundingClientRect().top;
     const lineYFor = (def: { key: LineKey; price?: number | null }): number | null => {
       if (def.price == null) return null;
       try {
-        const y = series.priceToCoordinate(def.price);
+        const y = getSeries()?.priceToCoordinate(def.price);
         if (typeof y === 'number') { lineCoordCache.current[def.key] = y; return y; }
       } catch {}
       return lineCoordCache.current[def.key] ?? null;
@@ -213,9 +212,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       const key = hitTest(posY(e));
       if (key) {
         draggingRef.current = key;
-        lastPointerId.current = e.pointerId;
         el.style.cursor = 'ns-resize';
-        try { el.setPointerCapture?.(e.pointerId); } catch {}
         e.preventDefault();
       }
     };
@@ -224,7 +221,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       const k = draggingRef.current;
       if (k) {
         let price: number | null = null;
-        try { price = series.coordinateToPrice(y) as number | null; } catch {}
+        try { price = getSeries()?.coordinateToPrice(y) as number | null; } catch {}
         if (price == null || !isFinite(price)) return;
         try { priceLinesRef.current[k]?.applyOptions({ price }); } catch {}
         lineCoordCache.current[k] = y;
@@ -238,7 +235,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const onUp = () => {
       draggingRef.current = null;
       el.style.cursor = 'crosshair';
-      try { el.releasePointerCapture?.(lastPointerId.current); } catch {}
     };
     el.addEventListener('pointerdown', onDown);
     window.addEventListener('pointermove', onMove, true);
@@ -249,10 +245,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       window.removeEventListener('pointermove', onMove, true);
       window.removeEventListener('pointerup', onUp, true);
       window.removeEventListener('pointercancel', onUp, true);
-      draggingRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryPrice, sl, tp]);
+  }, []);
 
   return (
     <div className="relative h-full w-full">
