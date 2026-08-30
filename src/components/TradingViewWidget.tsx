@@ -111,49 +111,41 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const series = seriesRef.current;
     const chart = chartRef.current;
     if (!series || !chart) return;
-    requestAnimationFrame(() => {
-      const next: { sl?: number; tp?: number } = {};
-      for (const k of ['sl', 'tp'] as const) {
-        const price = k === 'sl' ? allPropsRef.current.sl : allPropsRef.current.tp;
-        if (price == null) continue;
-        try {
-          const y = series.priceToCoordinate(price);
-          if (typeof y === 'number' && isFinite(y)) next[k] = y;
-        } catch {}
-      }
-      setPositions((prev) => {
-        if (Object.keys(next).length === 0) return prev;
-        return { ...prev, ...next };
-      });
-      // star position - مثبتة على هيكل الشمعة التي فُتحت فيها الصفقة تماماً
-      const ep = allPropsRef.current.entryPrice;
-      const at = allPropsRef.current.openedAt;
-      if (ep != null && at != null && series) {
-        try {
-          const y = series.priceToCoordinate(ep);
-          if (typeof y !== 'number' || !isFinite(y)) { setStarPos(null); return; }
-          const atSec = Math.floor(at / 1000);
-          // ابحث عن الشمعة الأقرب لتاريخ الفتح - لتثبيت النجمة على جسمها
-          let candleTime: any = null;
-          let bestDiff = Infinity;
-          for (const c of dataRef.current) {
-            const diff = Math.abs(c.time - atSec);
-            if (diff < bestDiff) { bestDiff = diff; candleTime = c.time; }
-          }
-          // إذا كانت المسافة كبيرة (> فريم ×2) اعتبرها غير موجودة ولا تظهر النجمة بعيداً
-          const tfSec: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
-          const maxDiff = (tfSec[tf] || 3600) * 2;
-          let x: number | null = null;
-          if (candleTime != null && bestDiff <= maxDiff) {
-            try { x = chart.timeScale().timeToCoordinate(candleTime as any); } catch {}
-          } else {
-            try { x = chart.timeScale().timeToCoordinate(Math.floor(atSec) as any); } catch {}
-          }
-          if (typeof x === 'number' && isFinite(x)) setStarPos({ x, y });
-          else setStarPos(null);
-        } catch { setStarPos(null); }
-      } else setStarPos(null);
-    });
+    // تثبيت مباشر بدون RAF لتبقى النجمة مسمّرة على شمعتها أثناء السحب اليدوي
+    const next: { sl?: number; tp?: number } = {};
+    for (const k of ['sl', 'tp'] as const) {
+      const price = k === 'sl' ? allPropsRef.current.sl : allPropsRef.current.tp;
+      if (price == null) continue;
+      try {
+        const y = series.priceToCoordinate(price);
+        if (typeof y === 'number' && isFinite(y)) next[k] = y;
+      } catch {}
+    }
+    if (Object.keys(next).length) setPositions((prev) => ({ ...prev, ...next }));
+    // star position - مسمّرة على جسم شمعة الدخول ولا تغادرها
+    const ep = allPropsRef.current.entryPrice;
+    const at = allPropsRef.current.openedAt;
+    if (ep != null && at != null && series && dataRef.current.length) {
+      try {
+        const y = series.priceToCoordinate(ep);
+        if (typeof y !== 'number' || !isFinite(y)) { setStarPos(null); return; }
+        const atSec = Math.floor(at / 1000);
+        let candleTime: any = null;
+        let bestDiff = Infinity;
+        for (const c of dataRef.current) {
+          const diff = Math.abs(c.time - atSec);
+          if (diff < bestDiff) { bestDiff = diff; candleTime = c.time; }
+        }
+        const tfSec: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+        const maxDiff = (tfSec[tf] || 3600) * 3;
+        let x: number | null = null;
+        if (candleTime != null && bestDiff <= maxDiff) {
+          try { x = chart.timeScale().timeToCoordinate(candleTime as any); } catch {}
+        }
+        if (typeof x === 'number' && isFinite(x) && x >= 0) setStarPos({ x, y });
+        else setStarPos(null);
+      } catch { setStarPos(null); }
+    } else setStarPos(null);
   };
 
   // indicator helpers

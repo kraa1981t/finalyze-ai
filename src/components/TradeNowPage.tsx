@@ -770,9 +770,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         </div>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         {/* Symbol Selector (full width) */}
-        <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-2.5 space-y-1.5">
+        <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-2 space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-sm font-black uppercase tracking-wider text-brand-text/60">{isAr ? 'الرموز' : 'Symbols'}</span>
           </div>
@@ -1066,7 +1066,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
 
           {/* Chart / MT5 (full width, below order ticket) */}
-          <div ref={chartPanelRef} className="rounded-2xl overflow-hidden border border-white/10 bg-black/20 h-[62vh] min-h-[440px] pb-3 relative flex flex-col">
+          <div ref={chartPanelRef} className={`rounded-2xl overflow-hidden border border-white/10 bg-black/20 pb-3 relative flex flex-col ${ticketCollapsed ? 'h-[74vh] min-h-[520px]' : 'h-[62vh] min-h-[440px]'}`}>
             {/* Toggle bar */}
             <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
               {platform === 'chart' && (
