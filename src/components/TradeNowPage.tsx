@@ -1065,8 +1065,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
           </div>
 
-          {/* Chart / MT5 (full width, below order ticket) */}
-          <div ref={chartPanelRef} className={`rounded-2xl overflow-hidden border border-white/10 bg-black/20 pb-3 relative flex flex-col ${ticketCollapsed ? 'h-[76vh] min-h-[540px] -mt-1' : 'h-[62vh] min-h-[440px]'}`}>
+          {/* Chart / MT5 - يبقى خط التاريخ السفلي ظاهراً مهما فُتحت الأقسام */}
+          <div ref={chartPanelRef} className={`rounded-2xl overflow-hidden border border-white/10 bg-black/20 pb-3 relative flex flex-col flex-shrink-0 ${
+            symbolsCollapsed && ticketCollapsed ? 'h-[72vh] min-h-[500px] -mt-1' : symbolsCollapsed || ticketCollapsed ? 'h-[62vh] min-h-[440px]' : 'h-[50vh] min-h-[380px]'
+          }`}>
             {/* Toggle bar */}
             <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
               {platform === 'chart' && (
