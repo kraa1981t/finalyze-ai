@@ -962,16 +962,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               </button>
             )}
 
-            {/* TradingView chart for displayed symbols - separate from trading chart */}
-            <div className="mt-2 rounded-xl overflow-hidden border border-white/10 bg-black/20">
-              <div className="flex items-center justify-between px-2 py-1.5 bg-black/30">
-                <span className="text-xs font-black uppercase tracking-wider text-white/50">شارت الرمز TradingView</span>
-                <span className="text-xs font-bold text-emerald-400">{symbol}</span>
-              </div>
-              <div className="h-[320px]">
-                <TradingViewEmbed symbol={toTvSymbol(symbol)} interval="60" />
-              </div>
-            </div>
           </>
           )}
           <div className="flex justify-center -mt-1">
@@ -1124,6 +1114,15 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               </svg>
             </button>
           </div>
+          </div>
+
+          {/* Symbol TradingView Chart - شارت الرمز (TradingView) منفصل عن شارت التداول */}
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-black uppercase tracking-wider text-white/50">شارت الرمز TradingView</span>
+              <span className="text-xs font-bold text-emerald-400">{symbol}</span>
+            </div>
+            <TradingViewEmbed symbol={toTvSymbol(symbol)} interval="60" />
           </div>
 
           {/* Chart / MT5 - يبقى خط التاريخ السفلي ظاهراً مهما فُتحت الأقسام */}
