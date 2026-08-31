@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { AnalysisResult, SignalType, MarketType } from '../types';
 import { Activity, Zap, BarChart2, Info, Lock } from 'lucide-react';
-import TradingViewWidget from './TradingViewWidget';
+import TradingViewEmbed from './TradingViewEmbed';
 import { Language, translations } from '../lib/i18n';
 import { playClick, initAudio } from '../lib/audioEngine';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
@@ -172,7 +172,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
             )}
           </div>
           <div className="h-[350px] md:h-[500px] rounded-2xl overflow-hidden relative">
-            <TradingViewWidget symbol={activeSymbol} />
+            <TradingViewEmbed symbol={activeSymbol} interval="60" />
           </div>
         </div>
       )}

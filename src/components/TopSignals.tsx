@@ -4,7 +4,7 @@ import { X, Trash2, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
-import TradingViewWidget from './TradingViewWidget';
+import TradingViewEmbed from './TradingViewEmbed';
 
 interface TopSignalsProps {
   signals: AnalysisResult[];
@@ -179,7 +179,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
             )}
           </div>
           <div className="h-[350px] md:h-[500px] rounded-2xl overflow-hidden relative">
-            <TradingViewWidget symbol={selectedSymbol} />
+            <TradingViewEmbed symbol={selectedSymbol} interval="60" />
           </div>
         </div>
       )}

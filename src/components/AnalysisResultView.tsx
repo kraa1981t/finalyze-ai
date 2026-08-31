@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { AnalysisResult, SignalType, StrategySettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Zap, ShieldAlert, MessageSquare, BarChart2, ChevronDown, Info, ArrowLeft } from 'lucide-react';
-import TradingViewWidget from './TradingViewWidget';
+import TradingViewEmbed from './TradingViewEmbed';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 import { playClick, initAudio } from '../lib/audioEngine';
@@ -72,7 +72,7 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
       {/* 1. Top Section: Interactive Chart */}
       <div className="w-full">
         <div className="h-[250px] md:h-[300px] bg-brand-bg rounded-2xl overflow-hidden shadow-2xl border border-brand-text/5 relative">
-          <TradingViewWidget symbol={selectedResult.symbol} />
+          <TradingViewEmbed symbol={selectedResult.symbol} interval="60" />
           <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
              <div className="px-3 py-1.5 bg-brand-bg/80 backdrop-blur-2xl rounded-full border border-brand-text/20 text-brand-text text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-2 shadow-2xl">
                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,1)]" />
