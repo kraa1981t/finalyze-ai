@@ -5,6 +5,7 @@ import TradingViewEmbed from './TradingViewEmbed';
 import { Language, translations } from '../lib/i18n';
 import { playClick, initAudio } from '../lib/audioEngine';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
+import MarketHoursIndicator from './MarketHoursIndicator';
 
 interface ClientDashboardProps {
   results: AnalysisResult[];
@@ -109,6 +110,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
           <span className="text-sm font-black text-emerald-400">{isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}</span>
           <span className="text-xs text-emerald-400/60 font-bold">{isAr ? 'يتم تحليل الفرض في الوقت الفعلي من المطور' : 'Opportunities synchronized in real-time from developer'}</span>
         </div>
+        <MarketHoursIndicator lang={lang} />
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="relative w-16 h-16 mb-4">
             <div className="absolute inset-0 border-b-2 border-emerald-400 rounded-full animate-spin" />
@@ -131,7 +133,8 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
         </div>
         <span className="text-sm font-black text-emerald-400">{isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}</span>
         <span className="text-xs text-emerald-400/60 font-bold">{isAr ? 'يتم مزامنة الفرص تلقائياً' : 'Opportunities synchronized in real-time'}</span>
-      </div>
+        </div>
+        <MarketHoursIndicator lang={lang} />
 
       {/* Signal Cards grouped by category */}
       <div className="space-y-4">
@@ -237,3 +240,4 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
     </div>
   );
 }
+

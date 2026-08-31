@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
 import TradingViewEmbed from './TradingViewEmbed';
+import MarketHoursIndicator from './MarketHoursIndicator';
 
 interface TopSignalsProps {
   signals: AnalysisResult[];
@@ -73,6 +74,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
           <Trash2 size={12} />
           {t.clearAllResults}
         </button>
+        <MarketHoursIndicator lang={lang} compact />
         <h3 className="text-sm font-black text-yellow-400 flex items-center gap-2 uppercase tracking-[0.2em]">
           <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
           {t.topSignals}
@@ -107,6 +109,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
           <Trash2 size={12} />
           {t.clearAllResults}
         </button>
+        <MarketHoursIndicator lang={lang} compact />
         <h3 className="text-sm font-black text-yellow-400 flex items-center gap-2 uppercase tracking-[0.2em]">
           <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
           {t.topSignals}
@@ -248,3 +251,4 @@ function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate
     </div>
   );
 }
+
