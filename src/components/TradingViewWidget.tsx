@@ -51,7 +51,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
   const lastDragSoundRef = useRef(0);
-  const [tf, setTf] = useState('1h');
+  const [tf, setTf] = useState('1D');
   const [positions, setPositions] = useState<{ sl?: number; tp?: number }>({});
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
   const [drawColor, setDrawColor] = useState('#60a5fa');
@@ -337,7 +337,10 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         dataRef.current = candles;
         try {
           seriesRef.current?.setData(candles);
-          chartRef.current?.timeScale()?.fitContent?.();
+          const ts = chartRef.current?.timeScale();
+          ts?.applyOptions({ barSpacing: 8 });
+          const n = candles.length;
+          ts?.setVisibleLogicalRange({ from: Math.max(0, n - 35), to: n + 8 });
         } catch {}
         updateLines();
         syncPositions();
