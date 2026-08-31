@@ -21,19 +21,48 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
   const t = translations[lang];
   const now = new Date();
 
+  const getLabel = (key: string) => {
+    if (isAr) {
+      switch (key) {
+        case 'forex': return t.forex;
+        case 'crypto': return t.crypto;
+        case 'stocks': return t.stocks;
+        case 'metals': return t.metals;
+        default: return key;
+      }
+    }
+    switch (key) {
+      case 'forex': return 'Forex';
+      case 'crypto': return 'Crypto';
+      case 'stocks': return 'Stocks';
+      case 'metals': return 'Metals';
+      default: return key;
+    }
+  };
+
+  const getOpenTitle = (label: string, open: boolean) => {
+    return `${label}: ${open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed')}`;
+  };
+
+  const circleClass = compact
+    ? 'inline-flex items-center justify-center min-w-[72px] h-12 rounded-full text-xs font-black border transition-colors'
+    : 'flex-1 inline-flex items-center justify-center h-14 rounded-full text-sm font-black border transition-colors';
+
+  const colorClass = (open: boolean) => open
+    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+    : 'bg-red-500/20 text-red-400 border-red-500/40';
+
   if (compact) {
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between gap-2">
         {CAT_KEYS.map(key => {
           const open = isCategoryOpen(key, now);
-          const label = isAr ? (key === 'forex' ? 'ف' : key === 'crypto' ? 'ك' : key === 'stocks' ? 'س' : 'م') : key[0].toUpperCase();
+          const label = getLabel(key);
           return (
             <span
               key={key}
-              className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[8px] font-black border transition-colors ${
-                open ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-red-500/20 text-red-400 border-red-500/50'
-              }`}
-              title={`${key}: ${open ? (isAr ? 'مفتوح' : 'Open') : (isAr ? 'مغلق' : 'Closed')}`}
+              className={`${circleClass} ${colorClass(open)}`}
+              title={getOpenTitle(label, open)}
             >
               {label}
             </span>
@@ -44,17 +73,15 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center justify-between gap-3 w-full">
       {CAT_KEYS.map(key => {
         const open = isCategoryOpen(key, now);
-        const label = isAr ? (key === 'forex' ? t.forex : key === 'crypto' ? t.crypto : key === 'stocks' ? t.stocks : t.metals) : (key === 'forex' ? 'Forex' : key === 'crypto' ? 'Crypto' : key === 'stocks' ? 'Stocks' : 'Metals');
+        const label = getLabel(key);
         return (
           <span
             key={key}
-            className={`inline-flex items-center justify-center min-w-[44px] h-6 rounded-full text-[10px] font-black border transition-colors ${
-              open ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-red-500/20 text-red-400 border-red-500/40'
-            }`}
-            title={`${label}: ${open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed')}`}
+            className={`${circleClass} ${colorClass(open)}`}
+            title={getOpenTitle(label, open)}
           >
             {label}
           </span>
