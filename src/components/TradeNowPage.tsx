@@ -618,6 +618,12 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     return () => document.removeEventListener('fullscreenchange', onFs);
   }, []);
 
+  // keep chart time axis always visible after expand/collapse
+  useEffect(() => {
+    const t = setTimeout(() => window.dispatchEvent(new Event('resize')), 120);
+    return () => clearTimeout(t);
+  }, [symbolsCollapsed, ticketCollapsed]);
+
   // Manually adjust a TP/SL USD amount by $0.50 steps (up or down)
   const adjustPrice = (kind: 'tp' | 'sl', dir: number) => {
     const raw = kind === 'tp' ? tpPrice : slPrice;
@@ -1149,6 +1155,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         category={activeTrade?.category}
                         qty={activeTrade?.qty}
                         openedAt={activeTrade?.openedAt}
+                        livePrice={livePrice}
                         onSlChange={activeTrade ? (p) => adjustSl(activeTrade.id, p) : undefined}
                         onTpChange={activeTrade ? (p) => adjustTp(activeTrade.id, p) : undefined}
                       />

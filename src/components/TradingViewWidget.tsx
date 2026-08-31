@@ -18,6 +18,7 @@ interface TradingViewWidgetProps {
   category?: string | null;
   qty?: number | null;
   openedAt?: number | null;
+  livePrice?: number | null;
   onSlChange?: (price: number) => void;
   onTpChange?: (price: number) => void;
   [key: string]: any;
@@ -41,7 +42,7 @@ const INDICATORS = [
   { id: 'vol', label: 'Volume' },
 ];
 
-export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange, openedAt }: TradingViewWidgetProps) {
+export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChange, onTpChange, openedAt, livePrice }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
@@ -344,6 +345,16 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, tf]);
+
+  // live price tick - يحرك الشارت حياً ويحدّث الشريط العمودي
+  useEffect(() => {
+    if (livePrice == null || !seriesRef.current || !dataRef.current.length) return;
+    const last = dataRef.current[dataRef.current.length - 1];
+    if (!last) return;
+    const upd = { ...last, close: livePrice, high: Math.max(last.high, livePrice), low: Math.min(last.low, livePrice) };
+    dataRef.current[dataRef.current.length - 1] = upd;
+    try { seriesRef.current.update(upd); } catch {}
+  }, [livePrice]);
 
   // redraw lines when entry/sl/tp change
   useEffect(() => {
