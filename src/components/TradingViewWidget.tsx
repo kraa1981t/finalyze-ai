@@ -64,6 +64,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   drawLinesRef.current = drawLines;
   const [activeIndicators, setActiveIndicators] = useState<Record<string, boolean>>({});
   const [starPos, setStarPos] = useState<{ x: number; y: number } | null>(null);
+  const lastTfChangeRef = useRef(0);
   const indicatorSeriesRef = useRef<Record<string, any>>({});
   const [indicatorStyles, setIndicatorStyles] = useState<Record<string, { color: string; width: number }>>({
     rsi: { color: '#f59e0b', width: 2 },
@@ -169,8 +170,12 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         if (x == null || !isFinite(x) || x < -20) {
           try { x = chart.timeScale().timeToCoordinate(atSec as any); } catch {}
         }
-        if (typeof x === 'number' && isFinite(x)) setStarPos({ x, y });
-        // إن فشل التحويل احتفظ بالموضع السابق ولا تخفِ النجمة أثناء تحميل الفريم الجديد
+        if (typeof x === 'number' && isFinite(x) && x >= -20) setStarPos({ x, y });
+        else {
+          // أثناء تغيير الفريم احتفظ بالنجمة 1.2 ثانية لتجنب الاختفاء، وإلا أخفها (خرجت من العرض)
+          if (Date.now() - lastTfChangeRef.current < 1200) return;
+          setStarPos(null);
+        }
       } catch {}
     } else if (ep == null || at == null) setStarPos(null);
   };
@@ -185,6 +190,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryPrice, openedAt]);
+
+  useEffect(() => { lastTfChangeRef.current = Date.now(); }, [tf]);
 
   // indicator helpers
   const calcSMA = (data: any[], len: number) => {

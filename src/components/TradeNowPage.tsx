@@ -1121,7 +1121,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               <span className="text-xs font-black uppercase tracking-wider text-white/50">شارت الرمز TradingView</span>
               <span className="text-xs font-bold text-emerald-400">{symbol}</span>
             </div>
-            <TradingViewEmbed symbol={toTvSymbol(symbol)} interval={{ '1m': '1', '5m': '5', '15m': '15', '1h': '60', '4h': '240', '1d': 'D', '1W': 'W', '1M': 'M' }[tf] || '60'} />
+            <TradingViewEmbed symbol={toTvSymbol(symbol)} interval="60" />
           </div>
 
           {/* Chart / MT5 - يبقى خط التاريخ السفلي ظاهراً مهما فُتحت الأقسام */}
