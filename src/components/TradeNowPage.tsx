@@ -6,6 +6,7 @@ import { SYMBOL_CATEGORIES } from '../constants';
 import { Language } from '../lib/i18n';
 import TradingViewWidget from './TradingViewWidget';
 import MT5Web from './MT5Web';
+import TradingViewEmbed from './TradingViewEmbed';
 import {
   PaperTrade, getTradeStore, getLivePrice, subscribePrices,
   calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE, DEFAULT_LEVERAGE, LEVERAGE_OPTIONS, isMarketOpen,
@@ -960,6 +961,17 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                 {isAr ? `↩ استعادة الرموز المحذوفة (${hiddenSymbols.length})` : `↩ Restore removed symbols (${hiddenSymbols.length})`}
               </button>
             )}
+
+            {/* TradingView chart for displayed symbols - separate from trading chart */}
+            <div className="mt-2 rounded-xl overflow-hidden border border-white/10 bg-black/20">
+              <div className="flex items-center justify-between px-2 py-1.5 bg-black/30">
+                <span className="text-xs font-black uppercase tracking-wider text-white/50">شارت الرمز TradingView</span>
+                <span className="text-xs font-bold text-emerald-400">{symbol}</span>
+              </div>
+              <div className="h-[320px]">
+                <TradingViewEmbed symbol={toTvSymbol(symbol)} interval="60" />
+              </div>
+            </div>
           </>
           )}
           <div className="flex justify-center -mt-1">
