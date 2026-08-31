@@ -6,6 +6,7 @@ import { SYMBOL_CATEGORIES } from '../constants';
 import { Language } from '../lib/i18n';
 import TradingViewWidget from './TradingViewWidget';
 import MT5Web from './MT5Web';
+import TradingViewEmbed from './TradingViewEmbed';
 import {
   PaperTrade, getTradeStore, getLivePrice, subscribePrices,
   calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE, DEFAULT_LEVERAGE, LEVERAGE_OPTIONS, isMarketOpen,
@@ -1112,6 +1113,15 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               </svg>
             </button>
           </div>
+          </div>
+
+          {/* Symbol Chart TradingView - شارت الرمز فقط (TradingView) */}
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-black uppercase tracking-wider text-white/50">شارت الرمز TradingView</span>
+              <span className="text-xs font-bold text-emerald-400">{symbol}</span>
+            </div>
+            <TradingViewEmbed symbol={toTvSymbol(symbol)} interval={{ '1m': '1', '5m': '5', '15m': '15', '1h': '60', '4h': '240', '1d': 'D', '1W': 'W', '1M': 'M' }[tf] || '60'} />
           </div>
 
           {/* Chart / MT5 - يبقى خط التاريخ السفلي ظاهراً مهما فُتحت الأقسام */}
