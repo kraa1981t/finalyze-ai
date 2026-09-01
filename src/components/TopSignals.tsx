@@ -66,19 +66,20 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
 
   if (signals.length === 0) return (
     <div className="mb-12 space-y-6">
-      <div className={cn("flex items-center justify-between px-4", isAr ? "flex-row" : "flex-row-reverse")}>
-        <button 
-          onClick={onClearAll}
-          className="flex items-center gap-2 px-3 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-red-500 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
-        >
-          <Trash2 size={12} />
-          {t.clearAllResults}
-        </button>
+<div className={cn("flex items-center gap-4 px-4", isAr ? "flex-row" : "flex-row-reverse")}>
+        <div className="flex-1">
+          <button 
+            onClick={onClearAll}
+            className="flex items-center gap-2 px-3 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-red-500 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+          >
+            <Trash2 size={12} />
+            {t.clearAllResults}
+          </button>
+        </div>
         <MarketHoursIndicator lang={lang} compact />
-        <h3 className="text-sm font-black text-yellow-400 flex items-center gap-2 uppercase tracking-[0.2em]">
-          <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-          {t.topSignals}
-        </h3>
+        <div className="flex-1">
+          <span className="text-sm font-black text-yellow-400">{t.bestSignals}</span>
+        </div>
       </div>
       <div className="w-full bg-[#D1FAE5]/40 backdrop-blur-xl rounded-full h-3 border border-[#D1FAE5]/60 shadow-[0_0_25px_rgba(209,250,229,0.3)]" />
       <p className="text-center text-white/30 text-sm py-8">
