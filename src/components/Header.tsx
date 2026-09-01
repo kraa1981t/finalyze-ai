@@ -106,6 +106,11 @@ export default function Header({
   const t = translations[lang];
   const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
+  // Live scanning only counts when auto-analysis is actually enabled. This makes
+  // the top button flip to OFF the instant the developer toggles it, instead of
+  // staying frozen on the last SYNCED/progress state until a scan finishes.
+  const liveAnalysisActive = !!(analysisProgress && autoSettings.isEnabled);
+
   const [customAvatar, setCustomAvatar] = useState<string | null>(null);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -607,45 +612,41 @@ export default function Header({
 
               {/* Auto Analysis + Sync Status */}
               {isDeveloper ? (
-                <button
-                  onClick={() => {
-                    initAudio();
-                    onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled });
-                  }}
-                  className={cn(
-                    "flex items-center gap-2.5 px-5 py-3 rounded-2xl border shadow-md transition-all backdrop-blur-sm flex-shrink-0",
-                    analysisProgress
-                      ? 'bg-emerald-600 border-emerald-700 text-white animate-pulse'
-                      : lastSyncStatus?.ok
-                        ? 'bg-emerald-600 border-emerald-700 text-white'
-                        : lastSyncStatus
-                          ? 'bg-red-700 border-red-800 text-white'
-                          : autoSettings.isEnabled
-                            ? 'bg-emerald-600 border-emerald-700 text-white'
-                            : 'bg-red-700 border-red-800 text-white'
-                  )}
-                >
+            <button
+              onClick={() => {
+                initAudio();
+                onAutoSettingsChange({ ...autoSettings, isEnabled: !autoSettings.isEnabled });
+              }}
+              className={cn(
+                "flex items-center gap-2.5 px-5 py-3 rounded-2xl border shadow-md transition-all backdrop-blur-sm flex-shrink-0 active:scale-95",
+                liveAnalysisActive
+                  ? 'bg-emerald-600 border-emerald-700 text-white animate-pulse'
+                  : autoSettings.isEnabled
+                    ? 'bg-emerald-600 border-emerald-700 text-white'
+                    : 'bg-red-700 border-red-800 text-white'
+              )}
+            >
                   <div className="relative flex-shrink-0">
-                    {analysisProgress ? (
+                    {liveAnalysisActive ? (
                       <div className="w-[28px] h-[28px] rounded-full bg-white animate-bounce" />
-                    ) : lastSyncStatus ? (
+                    ) : autoSettings.isEnabled && lastSyncStatus ? (
                       <span className="text-[24px] font-black leading-none">{lastSyncStatus.ok ? '✓' : '✗'}</span>
                     ) : (
                       <Zap size={24} fill={autoSettings.isEnabled ? "currentColor" : "none"} className="text-white" />
                     )}
                   </div>
                   <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                    {analysisProgress
+                    {liveAnalysisActive
                       ? `${analysisProgress.index + 1}/${analysisProgress.total}`
-                      : lastSyncStatus
+                      : autoSettings.isEnabled && lastSyncStatus
                         ? (lastSyncStatus.ok ? 'SYNCED' : 'FAIL')
                         : autoSettings.isEnabled ? (isWaiting ? 'WAIT' : 'ON') : 'OFF'
                     }
                   </span>
-                  {lastSyncStatus?.count !== undefined && (
+                  {autoSettings.isEnabled && lastSyncStatus?.count !== undefined && (
                     <span className="text-[16px] font-black text-yellow-300 leading-none">{lastSyncStatus.count}</span>
                   )}
-                  {analysisProgress && (() => {
+                  {liveAnalysisActive && (() => {
                     // Show the currently-open exchange name when analyzing stocks, else the category chip
                     if (analysisProgress.exchange) {
                       return (

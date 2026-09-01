@@ -412,10 +412,11 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
           ].map((item) => (
             <button key={item.key} onClick={() => {
               const next = !(settings as any)[item.key];
-              handleChange(item.key as keyof StrategySettings, next);
+              const applied: any = { ...settings, [item.key]: next };
               if ((item.key === 'candleDirectionFilter' || item.key === 'candleSizeFilter') && next) {
-                handleChange('useCandleMatch', true);
+                applied.useCandleMatch = true;
               }
+              onSettingsChange(applied);
             }}
               className={`flex items-center justify-between p-3.5 rounded-xl border-2 transition-all text-right ${
                 (settings as any)[item.key]
