@@ -751,7 +751,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   }, [closedTrades, openTrades.length, equity, leverage]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 pt-2 pb-3 space-y-3">
+    <div className="w-full px-2 sm:px-4 pt-2 pb-3 space-y-3">
       {/* Account bar */}
       <div className="rounded-2xl border border-[#F59E0B]/40 bg-gradient-to-r from-[#F59E0B]/15 via-transparent to-transparent px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
