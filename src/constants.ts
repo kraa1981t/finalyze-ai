@@ -35,10 +35,12 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   pullbackCandleConfirm: false,
   useFilterSideways: true,
   useCandleMatch: false,
+  candleDirectionFilter: true,
+  candleSizeFilter: true,
   candleMatchDailyEnabled: true,
   candleMatchWeeklyEnabled: true,
   candleMatchMonthlyEnabled: true,
-  candleMatchDailyThreshold: 10,
+  candleMatchDailyThreshold: 15,
   candleMatchWeeklyThreshold: 20,
   candleMatchMonthlyThreshold: 30,
 };

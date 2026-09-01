@@ -54,54 +54,54 @@ export function validateCandleMatchInput(input: CandleMatchInput): CandleMatchVa
     errors.push(`Invalid signal type: ${input.signal}`);
   }
 
-  // Check 2: If candle match is enabled, check direction consistency
+  // Check 2: If candle match is enabled, check direction consistency.
+  // DIRECTION UNIFICATION now requires ALL THREE timeframes (1D/1W/1M)
+  // to be aligned in ONE direction — not just two.
   if (input.settings.useCandleMatch) {
     const directions = [input.dailyDirection, input.weeklyDirection, input.monthlyDirection].filter(d => d !== null);
-    
-    if (directions.length >= 2) {
+
+    if (directions.length === 3) {
       const firstDir = directions[0];
       const allSame = directions.every(d => d === firstDir);
-      
+
       if (!allSame) {
-        warnings.push('Candle directions conflict across timeframes — signal will be blocked');
+        warnings.push('Candle directions conflict across the 3 timeframes — signal will be blocked');
       }
 
       // Check direction vs signal
       const signalIsBuy = input.signal === SignalType.BUY || input.signal === SignalType.STRONG_BUY;
       const signalIsSell = input.signal === SignalType.SELL || input.signal === SignalType.STRONG_SELL;
-      
+
       if (signalIsBuy && firstDir === 'bearish') {
         errors.push('CRITICAL: Bearish candles cannot confirm BUY signal');
       }
       if (signalIsSell && firstDir === 'bullish') {
         errors.push('CRITICAL: Bullish candles cannot confirm SELL signal');
       }
+    } else if (input.settings.candleDirectionFilter !== false) {
+      warnings.push('Direction unification needs all 3 timeframes (1D/1W/1M) with data');
     }
 
-    // Check thresholds
-    const bodyMultiplier = input.isCrypto ? 1 : (input.marketType === 'forex' ? 10000 : 100);
-    
+    // Check size thresholds (bodies received here are already normalized as
+    // % of ATR; defaults: daily 15 / weekly 20 / monthly 30)
     if (input.dailyBody !== null && input.settings.candleMatchDailyEnabled !== false) {
-      const threshold = input.settings.candleMatchDailyThreshold ?? 10;
-      const bodyPips = input.dailyBody * bodyMultiplier;
-      if (bodyPips < threshold) {
-        warnings.push(`Daily body (${bodyPips.toFixed(1)} pips) below threshold (${threshold} pips)`);
+      const threshold = input.settings.candleMatchDailyThreshold ?? 15;
+      if (input.dailyBody < threshold) {
+        warnings.push(`Daily body (${input.dailyBody.toFixed(1)}% of ATR) below threshold (${threshold}%)`);
       }
     }
-    
+
     if (input.weeklyBody !== null && input.settings.candleMatchWeeklyEnabled !== false) {
       const threshold = input.settings.candleMatchWeeklyThreshold ?? 20;
-      const bodyPips = input.weeklyBody * bodyMultiplier;
-      if (bodyPips < threshold) {
-        warnings.push(`Weekly body (${bodyPips.toFixed(1)} pips) below threshold (${threshold} pips)`);
+      if (input.weeklyBody < threshold) {
+        warnings.push(`Weekly body (${input.weeklyBody.toFixed(1)}% of ATR) below threshold (${threshold}%)`);
       }
     }
-    
+
     if (input.monthlyBody !== null && input.settings.candleMatchMonthlyEnabled !== false) {
       const threshold = input.settings.candleMatchMonthlyThreshold ?? 30;
-      const bodyPips = input.monthlyBody * bodyMultiplier;
-      if (bodyPips < threshold) {
-        warnings.push(`Monthly body (${bodyPips.toFixed(1)} pips) below threshold (${threshold} pips)`);
+      if (input.monthlyBody < threshold) {
+        warnings.push(`Monthly body (${input.monthlyBody.toFixed(1)}% of ATR) below threshold (${threshold}%)`);
       }
     }
   }

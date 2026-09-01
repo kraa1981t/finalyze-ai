@@ -1601,77 +1601,156 @@ Return ONLY valid JSON:
       });
     }
 
-    // ═══ STEP 5e: Candle Match Filter (Daily/Weekly/Monthly) ═══
-    // STRICT ALIGNMENT RULE — a symbol is only shown when its match candles
-    // are aligned in ONE direction:
-    //   1. Every active candle must point the SAME direction (all bullish OR all bearish)
-    //   2. Each active candle body must meet its configured threshold
-    //   3. The candle direction must MATCH the signal direction
-    //   4. At least 2 active candles are required to confirm alignment
-    // Anything else (conflicting directions, missing data, below-threshold
-    // bodies, or a signal opposing the candles) forces the symbol to NEUTRAL,
-    // so it is never displayed.
+    // ═══ STEP 5e: Advanced Candle Filters (Daily/Weekly/Monthly) ═══
+    // TWO INDEPENDENT filters — each can be disabled separately:
+    //
+    //  A) DIRECTION UNIFICATION — the THREE timeframes (1D/1W/1M) must ALL be
+    //     aligned in ONE direction, and that direction must match the signal.
+    //     Requires ALL THREE timeframes to be present (not just two).
+    //
+    //  B) SIZE FILTER — measures the CURRENT (in-progress, NOT completed)
+    //     candle body of each timeframe relative to its own ATR(14): the body
+    //     as a % of the typical range. Each timeframe must meet its threshold
+    //     (defaults: daily 15%, weekly 20%, monthly 30%).
+    //
+    // Either filter failing forces the symbol to NEUTRAL (never displayed).
     var candleMatchBlocked = false;
     if (settings?.useCandleMatch && candleMatchData) {
-      const lastCandle = (raw: any): { body: number; direction: 'bullish' | 'bearish' | 'unknown' } | null => {
+      const extractCandles = (raw: any): { open: number; high: number; low: number; close: number }[] | null => {
         const q = raw?.chart?.result?.[0]?.indicators?.quote?.[0];
-        if (!q?.close) return null;
-        const closes = q.close.filter((c: any) => c != null);
-        const opensArr = q.open?.filter((c: any) => c != null) || closes;
-        if (closes.length < 1) return null;
-        const o = opensArr[opensArr.length - 1] ?? closes[closes.length - 1];
-        const c = closes[closes.length - 1];
-        const body = Math.abs(c - o);
-        const direction: 'bullish' | 'bearish' | 'unknown' = c > o ? 'bullish' : c < o ? 'bearish' : 'unknown';
-        return { body, direction };
+        const ts = raw?.chart?.result?.[0]?.timestamp;
+        if (!q?.open || !q?.high || !q?.low || !q?.close) return null;
+        const n = Math.min(q.open.length, q.high.length, q.low.length, q.close.length, ts ? ts.length : Infinity);
+        const out: { open: number; high: number; low: number; close: number }[] = [];
+        for (let i = 0; i < n; i++) {
+          const open = q.open[i], high = q.high[i], low = q.low[i], close = q.close[i];
+          if (open == null || high == null || low == null || close == null) continue;
+          out.push({ open, high, low, close });
+        }
+        return out.length ? out : null;
       };
-      const bodyMultiplier = isCrypto ? 1 : (type === MarketType.FOREX ? 10000 : 100);
-
-      const active: { label: string; body: number; threshold: number; direction: string }[] = [];
-      const push = (label: string, raw: any, enabled: boolean, threshold: number) => {
-        if (!enabled || threshold <= 0) return;
-        const c = lastCandle(raw);
-        if (!c) return;
-        active.push({ label, body: c.body * bodyMultiplier, threshold, direction: c.direction });
+      // Average True Range over the last 14 candles of the same timeframe
+      const atr = (candles: { open: number; high: number; low: number; close: number }[]): number => {
+        const n = candles.length;
+        if (n < 2) return 0;
+        const start = Math.max(0, n - 14);
+        let sum = 0, cnt = 0;
+        for (let i = start; i < n; i++) {
+          const c = candles[i];
+          const prevClose = i > 0 ? candles[i - 1].close : c.close;
+          sum += Math.max(c.high - c.low, Math.abs(c.high - prevClose), Math.abs(c.low - prevClose));
+          cnt++;
+        }
+        return cnt ? sum / cnt : 0;
       };
-      push('1D', candleMatchData.daily, settings.candleMatchDailyEnabled !== false, settings.candleMatchDailyThreshold ?? 10);
-      push('1W', candleMatchData.weekly, settings.candleMatchWeeklyEnabled !== false, settings.candleMatchWeeklyThreshold ?? 20);
-      push('1M', candleMatchData.monthly, settings.candleMatchMonthlyEnabled !== false, settings.candleMatchMonthlyThreshold ?? 30);
+      // NOTE: The LAST element of the series is the CURRENT candle (the one
+      // still forming). We measure it directly — never only completed candles.
+      const currentCandle = (candles: { open: number; high: number; low: number; close: number }[]) => {
+        const c = candles[candles.length - 1];
+        if (!c) return null;
+        const body = Math.abs(c.close - c.open);
+        const direction: 'bullish' | 'bearish' | 'unknown' = c.close > c.open ? 'bullish' : c.close < c.open ? 'bearish' : 'unknown';
+        const a = atr(candles);
+        return { body, direction, atr: a, pct: a > 0 ? (body / a) * 100 : 0 };
+      };
 
-      const enoughData = active.length >= 2;
-      const firstDir = active[0]?.direction || null;
-      const allSameDir = active.length > 0 && active.every(a => a.direction === firstDir);
-      const allAbove = active.length > 0 && active.every(a => a.body >= a.threshold);
+      const frames: { label: string; key: string }[] = [
+        { label: '1D', key: 'daily' },
+        { label: '1W', key: 'weekly' },
+        { label: '1M', key: 'monthly' },
+      ];
+
+      const info = frames.map((f) => {
+        const raw = candleMatchData[f.key as 'daily' | 'weekly' | 'monthly'];
+        const enabled = f.key === 'daily' ? settings.candleMatchDailyEnabled !== false
+          : f.key === 'weekly' ? settings.candleMatchWeeklyEnabled !== false
+          : settings.candleMatchMonthlyEnabled !== false;
+        const threshold = f.key === 'daily' ? (settings.candleMatchDailyThreshold ?? 15)
+          : f.key === 'weekly' ? (settings.candleMatchWeeklyThreshold ?? 20)
+          : (settings.candleMatchMonthlyThreshold ?? 30);
+        const candles = extractCandles(raw);
+        const cur = candles ? currentCandle(candles) : null;
+        return { label: f.label, enabled, threshold, cur };
+      });
+
       const signalIsBuy = finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY;
       const signalIsSell = finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL;
-      const signalAligned = signalIsBuy || signalIsSell;
-      const candlesMatchSignal = firstDir === 'bullish' ? signalIsBuy : firstDir === 'bearish' ? signalIsSell : false;
 
-      const matched = enoughData && allSameDir && allAbove && signalAligned && candlesMatchSignal;
+      // Value string format is parsed by AnalysisDetailPage.parseCandleInfo:
+      // e.g. "1D: 45 Bullish ↑ ✓ | 1W: 22 Bearish ↓ ✗"
+      const frameStr = (i: { label: string; enabled: boolean; threshold: number; cur: { body: number; direction: 'bullish' | 'bearish' | 'unknown'; atr: number; pct: number } | null }): string | null => {
+        if (!i.cur) return null;
+        const dirName = i.cur.direction === 'bullish' ? 'Bullish' : i.cur.direction === 'bearish' ? 'Bearish' : null;
+        if (!dirName) return null;
+        const arrow = i.cur.direction === 'bullish' ? '↑' : '↓';
+        const ok = i.cur.pct >= i.threshold ? '✓' : '✗';
+        return `${i.label}: ${i.cur.pct.toFixed(0)} ${dirName} ${arrow} ${ok}`;
+      };
 
-      if (!matched) {
-        candleMatchBlocked = true;
-        if (finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
-            finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL) {
-          finalSignal = SignalType.NEUTRAL;
+      // ── FILTER A: Direction unification across the THREE timeframes ──
+      const directionFilterOn = settings.candleDirectionFilter !== false;
+      let directionBlocked = false;
+      let directionWhy = '';
+      let dirValue = '';
+      if (directionFilterOn) {
+        const dirFrames = info.filter(i => i.enabled && i.cur);
+        dirValue = dirFrames.map(frameStr).filter(Boolean).join(' | ');
+        const enough = dirFrames.length === 3;
+        const firstDir = dirFrames[0]?.cur?.direction || null;
+        const allSame = enough && dirFrames.every(i => i.cur!.direction === firstDir);
+        const dirMatchSignal = firstDir === 'bullish' ? signalIsBuy : firstDir === 'bearish' ? signalIsSell : false;
+        if (!enough) directionWhy = 'needs all 3 timeframes (1D/1W/1M) with data';
+        else if (!allSame) directionWhy = 'candle directions conflict across the 3 timeframes';
+        else if (!dirMatchSignal) directionWhy = 'signal opposes candle direction';
+        directionBlocked = !(enough && allSame && dirMatchSignal);
+      }
+
+      // ── FILTER B: Size — current candle body vs its own ATR(14), as % ──
+      const sizeFilterOn = settings.candleSizeFilter !== false;
+      let sizeBlocked = false;
+      let sizeWhy = '';
+      let sizeValue = '';
+      if (sizeFilterOn) {
+        const sizeFrames = info.filter(i => i.enabled && i.threshold > 0 && i.cur);
+        sizeValue = sizeFrames.map(frameStr).filter(Boolean).join(' | ');
+        if (sizeFrames.length === 0) {
+          sizeBlocked = true;
+          sizeWhy = 'no candle size data';
+        } else {
+          const below = sizeFrames.filter(i => i.cur!.pct < i.threshold);
+          if (below.length > 0) {
+            sizeBlocked = true;
+            sizeWhy = `size below threshold: ${below.map(b => `${b.label} ${b.cur!.pct.toFixed(0)}%<${b.threshold}%`).join(', ')}`;
+          }
         }
-        const why = !enoughData ? 'insufficient aligned candle data (need 2+)'
-          : !allSameDir ? 'candle directions conflict across timeframes'
-          : !allAbove ? 'candle body below threshold'
-          : !signalAligned ? 'no directional signal to match'
-          : 'signal opposes candle direction';
+      }
+
+      candleMatchBlocked = (directionFilterOn && directionBlocked) || (sizeFilterOn && sizeBlocked);
+
+      if (candleMatchBlocked) {
+        if (signalIsBuy || signalIsSell) finalSignal = SignalType.NEUTRAL;
+        if (directionFilterOn && directionBlocked) {
+          detailedReasons.push({
+            check: 'Candle Match',
+            value: dirValue || 'no data',
+            status: 'negative',
+            impact: `BLOCKED: ${directionWhy}`
+          });
+        }
+        if (sizeFilterOn && sizeBlocked) {
+          detailedReasons.push({
+            check: 'Candle Match',
+            value: sizeValue || 'no data',
+            status: 'negative',
+            impact: `BLOCKED: ${sizeWhy}`
+          });
+        }
+      } else if (directionFilterOn || sizeFilterOn) {
         detailedReasons.push({
-          check: 'Candle Match Filter',
-          value: active.length ? active.map(a => `${a.label}: ${a.direction || 'no data'} ${a.body.toFixed(1)}/${a.threshold}`).join(' | ') : 'no data',
-          status: 'negative',
-          impact: `BLOCKED: ${why}`
-        });
-      } else {
-        detailedReasons.push({
-          check: 'Candle Match Filter',
-          value: active.map(a => `${a.label}: ${a.direction} ${a.body.toFixed(1)}/${a.threshold}`).join(' | '),
+          check: 'Candle Match',
+          value: info.map(frameStr).filter(Boolean).join(' | '),
           status: 'positive',
-          impact: `all candles aligned ${firstDir} — matches signal`
+          impact: 'all three candle directions aligned + sizes meet thresholds'
         });
       }
     }
