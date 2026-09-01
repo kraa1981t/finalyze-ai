@@ -21,24 +21,29 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
   const t = translations[lang];
   const now = new Date();
 
-  const getLabel = (key: string) => {
-    if (isAr) {
-      switch (key) {
-        case 'forex': return t.forex;
-        case 'crypto': return t.crypto;
-        case 'stocks': return t.stocks;
-        case 'metals': return t.metals;
-        default: return key;
-      }
-    }
-    switch (key) {
-      case 'forex': return 'Forex';
-      case 'crypto': return 'Crypto';
-      case 'stocks': return 'Stocks';
-      case 'metals': return 'Metals';
-      default: return key;
-    }
+  const getLabelAndStatus = (key: string) => {
+    const open = isCategoryOpen(key, now);
+    const label = getLabel(key);
+    const status = open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed');
+    return { label, status };
   };
+
+  const circleContent = (({ label, status }: { label: string; status: string }) => {
+    if (compact) {
+      return (
+        <span className="flex flex-col items-center text-xs">
+          {label}
+          <div className="mt-1 text-[8px]">{status}</div>
+        </span>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center text-sm">
+        {label}
+        <div className="mt-1 text-[10px]">{status}</div>
+      </div>
+    );
+  });
 
   const getOpenTitle = (label: string, open: boolean) => {
     return `${label}: ${open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed')}`;
