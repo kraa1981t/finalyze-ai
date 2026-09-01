@@ -5,6 +5,20 @@
 // that left US/European stock charts empty when a symbol was not in the small
 // hard-coded maps.
 
+// Authoritative lookup for forex / crypto / metals / indices / stocks. Every
+// entry maps an app symbol (BTCUSD, XAUUSD, US500) to the full TradingView
+// symbol (BINANCE:BTCUSDT, OANDA:XAUUSD, ...). Any app symbol that lives in
+// this database renders a real chart on the first try in every category —
+// previously bare symbols like BTCUSD/EURUSD produced an empty TradingView
+// search box instead of candles.
+import { SYMBOL_DB } from '../services/symbolSuggestions';
+
+const SYMBOL_TV: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const s of SYMBOL_DB) map[s.symbol.toUpperCase()] = s.tv;
+  return map;
+})();
+
 // Explicit one-off mappings (kept for symbols that do not follow a suffix rule).
 const EXPLICIT: Record<string, string> = {
   // Japanese stocks (Yahoo .T → Tokyo Stock Exchange)
@@ -73,6 +87,12 @@ export function toTvSymbol(symbol: string): string {
 
   const upper = sym.toUpperCase();
 
+  // Known app symbol (crypto/forex/metals/indices/stocks from the symbol DB) →
+  // use its exact TradingView symbol. This guarantees candles render for every
+  // category, including cryptos like BTCUSD → BINANCE:BTCUSDT.
+  const db = SYMBOL_TV[upper];
+  if (db) return db;
+
   // Explicit one-off mapping wins.
   if (EXPLICIT[sym]) return EXPLICIT[sym];
 
@@ -88,6 +108,15 @@ export function toTvSymbol(symbol: string): string {
     if (ex) return `${ex}:${base}`;
     // Unknown suffix → pass through (no way to guess exchange).
     return sym;
+  }
+
+  // Crypto not in the DB: XXXUSD / XXXUSDT (e.g. a new or custom coin) →
+  // Binance. A token ending in USD/USDT that isn't a known forex pair (which
+  // would be exactly 6 letters and already covered by SYMBOL_DB) is crypto —
+  // rendering candles beats an empty TV search box. Checked BEFORE the plain-US
+  // ticker branch so unknown cryptos aren't mislabeled as NASDAQ stocks.
+  if (/[A-Z0-9]{1,10}USD(T)?$/i.test(upper) && !/^[A-Z]{3}[A-Z]{3}$/.test(upper)) {
+    return `BINANCE:${upper.replace(/USD(T)?$/, 'USDT')}`;
   }
 
   // Plain US ticker (no suffix) — choose a reasonable exchange.
