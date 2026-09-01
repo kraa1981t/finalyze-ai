@@ -23,7 +23,23 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
 
   const getLabelAndStatus = (key: string) => {
     const open = isCategoryOpen(key, now);
-    const label = getLabel(key);
+    if (isAr) {
+      switch (key) {
+        case 'forex': label = t.forex; break;
+        case 'crypto': label = t.crypto; break;
+        case 'stocks': label = t.stocks; break;
+        case 'metals': label = t.metals; break;
+        default: label = key;
+      }
+    } else {
+      switch (key) {
+        case 'forex': label = 'Forex'; break;
+        case 'crypto': label = 'Crypto'; break;
+        case 'stocks': label = 'Stocks'; break;
+        case 'metals': label = 'Metals'; break;
+        default: label = key;
+      }
+    }
     const status = open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed');
     return { label, status };
   };
