@@ -12,7 +12,7 @@ import {
 } from '../services/paperTradingService';
 import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
 import { playOpenSound, playCloseSound, playDragTick } from '../lib/tradeSounds';
-import { pricesToUsd, usdToPrice, slAmountUSD } from '../lib/positionMath';
+import { pricesToUsd, usdToPrice, slAmountUSD, notionalInUSD } from '../lib/positionMath';
 
 interface TradeNowPageProps {
   lang: Language;
@@ -106,8 +106,7 @@ function detectCategory(sym: string): string {
 const ORIGINAL_SYMBOLS = new Set<string>(Object.values(SYMBOL_CATEGORIES).flat() as string[]);
 
 function calcMargin(t: Pick<PaperTrade, 'category' | 'symbol' | 'qty' | 'entryPrice'>, leverage: number = DEFAULT_LEVERAGE): number {
-  const notional = t.entryPrice * t.qty * (t.category === 'forex' ? 100000 : t.category === 'metals' ? 100 : 1);
-  return notional / leverage;
+  return notionalInUSD(t.category, t.symbol, t.entryPrice, t.qty) / leverage;
 }
 
 const fmtMoney = (v: number) =>
@@ -479,8 +478,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     setBusy(true);
 
     // Check that the resulting trade's margin fits within the account balance
-    const notional = livePrice * qty * (pendingCat === 'forex' ? 100000 : pendingCat === 'metals' ? 100 : 1);
-    const requiredMargin = notional / leverage;
+    const requiredMargin = notionalInUSD(pendingCat, symbol, livePrice, qty) / leverage;
     if (requiredMargin > balance) {
       setToast(isAr
         ? `هامش غير كافٍ (مطلوب $${requiredMargin.toFixed(0)} / الرصيد $${balance.toFixed(0)})`

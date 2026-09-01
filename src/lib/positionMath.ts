@@ -32,6 +32,39 @@ export function currencyToUsdFactor(symbol: string): number {
   return 1;                                               // USD (US stocks/ADR)
 }
 
+// Approximate USD value of 1 unit of a currency. Used to convert a forex
+// notional expressed in the QUOTE currency into USD for margin checks.
+function currencyUsdPerUnit(code: string): number {
+  switch ((code || '').toUpperCase()) {
+    case 'USD': return 1;
+    case 'JPY': return 1 / USDJPY_APPROX;
+    case 'EUR': return 1.08;
+    case 'GBP': return 1.27;
+    case 'CHF': return 1 / 0.88;
+    case 'AUD': return 0.65;
+    case 'NZD': return 0.60;
+    case 'CAD': return 1 / 1.37;
+    case 'MXN': return 1 / 18;
+    case 'TRY': return 1 / 34;
+    default: return 1;
+  }
+}
+
+// Notional value of a trade in USD (for margin checks).
+// - forex: 1 lot = 100,000 units of the BASE currency; notional in the quote
+//   currency = qty * contractSize * price, then converted to USD. For USDJPY
+//   (~146) 0.01 lot is ~$970, NOT $146,000 (that bug rejected valid trades).
+export function notionalInUSD(category: string, symbol: string, price: number, qty: number): number {
+  const c = category || '';
+  if (c === 'forex') {
+    const quote = (symbol || '').toUpperCase().slice(-3);
+    return qty * 100000 * price * currencyUsdPerUnit(quote);
+  }
+  if (c === 'metals') return price * qty * 100;
+  if (c === 'stocks') return price * qty * STOCK_CONTRACT_SIZE * currencyToUsdFactor(symbol);
+  return price * qty;
+}
+
 export function detectInstrumentType(symbol: string): InstrumentType {
   const s = symbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
