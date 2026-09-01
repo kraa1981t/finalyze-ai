@@ -1148,7 +1148,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                     return (
                       <TradingViewWidget
                         key={symbol}
-                        symbol={toTvSymbol(symbol)}
+                        symbol={symbol}
                         entryPrice={activeTrade?.entryPrice}
                         sl={activeTrade?.sl}
                         tp={activeTrade?.tp}
