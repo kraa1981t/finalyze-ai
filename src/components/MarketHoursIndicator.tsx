@@ -1,5 +1,5 @@
 import React from 'react';
-import { getOpenStockExchanges } from '../lib/marketHours';
+import { getOpenStockExchanges, exchangeLabel } from '../lib/marketHours';
 import { Language, translations } from '../lib/i18n';
 
 interface MarketHoursIndicatorProps {
@@ -24,6 +24,7 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
   const getLabelAndStatus = (key: string) => {
     const open = isCategoryOpen(key, now);
     let label: string;
+    let status: string;
     if (isAr) {
       switch (key) {
         case 'forex': label = t.forex; break;
@@ -41,8 +42,18 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
         default: label = key;
       }
     }
-    const status = open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed');
-    return { label, status };
+
+    if (key === 'stocks') {
+      const openExchanges = getOpenStockExchanges(now);
+      if (openExchanges.length > 0) {
+        status = openExchanges.map(ex => exchangeLabel(ex.key, isAr ? 'ar' : 'en')).join(isAr ? '، ' : ', ');
+      } else {
+        status = isAr ? 'سوق مغلق' : 'Market Closed';
+      }
+    } else {
+      status = open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed');
+    }
+    return { label, status, open };
   };
 
   const getLabel = (key: string): string => getLabelAndStatus(key).label;
@@ -64,8 +75,8 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
     );
   });
 
-  const getOpenTitle = (label: string, open: boolean) => {
-    return `${label}: ${open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed')}`;
+  const getOpenTitle = (label: string, status: string) => {
+    return `${label}: ${status}`;
   };
 
   const circleClass = compact
@@ -80,15 +91,14 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
     return (
       <div className="flex items-center justify-between gap-2">
         {CAT_KEYS.map(key => {
-          const open = isCategoryOpen(key, now);
-          const label = getLabel(key);
+          const { label, status, open } = getLabelAndStatus(key);
           return (
             <span
               key={key}
               className={`${circleClass} ${colorClass(open)}`}
-              title={getOpenTitle(label, open)}
+              title={getOpenTitle(label, status)}
             >
-              {label}
+              {circleContent({ label, status })}
             </span>
           );
         })}
@@ -99,15 +109,14 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
   return (
     <div className="flex items-center justify-between gap-3 w-full">
       {CAT_KEYS.map(key => {
-        const open = isCategoryOpen(key, now);
-        const label = getLabel(key);
+        const { label, status, open } = getLabelAndStatus(key);
         return (
           <span
             key={key}
             className={`${circleClass} ${colorClass(open)}`}
-            title={getOpenTitle(label, open)}
+            title={getOpenTitle(label, status)}
           >
-            {label}
+            {circleContent({ label, status })}
           </span>
         );
       })}
