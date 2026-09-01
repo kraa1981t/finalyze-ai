@@ -469,7 +469,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     const pendingCat = detectCategory(symbol);
     // Block opening when the market for this asset is closed (weekend/hours).
     // Crypto trades 24/7 and is always allowed.
-    if (!isMarketOpen(pendingCat)) {
+    if (!isMarketOpen(pendingCat, symbol)) {
       setToast(isAr
         ? 'السوق مغلق لهذا الأصل، لا يمكن فتح صفقة. التداول متاح حالياً للكريبتو فقط (24/7).'
         : 'Market is closed for this asset — cannot open a trade. Trading is currently available for crypto only (24/7).');
@@ -525,7 +525,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   async function closeTrade(t: PaperTrade) {
     const exit = priceOf(t);
     if (!exit) return;
-    if (!isMarketOpen(t.category)) {
+    if (!isMarketOpen(t.category, t.symbol)) {
       setToast(isAr
         ? 'السوق مغلق لهذا الأصل، لا يمكن إغلاق الصفقة حالياً. الكريبتو يعمل 24/7.'
         : 'Market is closed for this asset — cannot close the trade now. Crypto trades 24/7.');

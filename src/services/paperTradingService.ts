@@ -2,6 +2,7 @@ import { db } from '../lib/firebase';
 import { collection, doc, getDoc, setDoc, addDoc, updateDoc, query, where, getDocs, Timestamp, writeBatch } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import { SYMBOL_CATEGORIES } from '../constants';
+import { isExchangeOpen } from '../lib/marketHours';
 
 export interface PaperTrade {
   id: string;
@@ -25,11 +26,27 @@ export const MIN_BALANCE = 500;
 export const DEFAULT_LEVERAGE = 100; // 1:100
 export const LEVERAGE_OPTIONS = [50, 100, 200, 400, 500];
 
+// Map a stock symbol to its exchange region (us/eu/jp) based on its ticker suffix.
+function detectStockExchange(symbol: string): 'us' | 'eu' | 'jp' | null {
+  const s = (symbol || '').toUpperCase();
+  if (/^\d{4}\.T$/.test(s) || /\.T$/.test(s)) return 'jp';
+  if (/\.(AS|PA|SW|DE|L|CO|MI)$/.test(s)) return 'eu';
+  return null;
+}
+
 // Market opening hours by asset category.
 // Crypto trades 24/7; forex/metals trade Mon-Fri with the weekly break
-// (Fri 21:00 UTC -> Sun 21:00 UTC); stocks/indices follow US session hours.
-export function isMarketOpen(category: string, now: Date = new Date()): boolean {
+// (Fri 21:00 UTC -> Sun 21:00 UTC); stocks follow their own exchange session
+// (US/Europe/Japan) determined by the symbol.
+export function isMarketOpen(category: string, symbol?: string, now: Date = new Date()): boolean {
   if (category === 'crypto') return true; // 24/7
+
+  // Stocks/indices: check the specific exchange session for the symbol.
+  if (category === 'stocks') {
+    const ex = detectStockExchange(symbol || '');
+    if (ex && ex !== 'us') return isExchangeOpen(ex, now);
+    // Otherwise fall through to default US-session logic below.
+  }
 
   const u = new Date(now.toUTCString());
   const day = u.getUTCDay(); // 0 Sun .. 6 Sat
