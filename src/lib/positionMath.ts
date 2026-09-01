@@ -16,6 +16,22 @@ const CURRENCIES = ['EUR','GBP','AUD','NZD','CAD','CHF','USD','JPY','TRY','ZAR',
 // Approximate USD/JPY used to convert JPY-quoted pip values to USD
 const USDJPY_APPROX = 150;
 
+// 1 lot of a stock = 100 shares (standard broker contract), so 0.01 lot = 1 share.
+export const STOCK_CONTRACT_SIZE = 100;
+
+// Convert a price change in the instrument's own currency into USD.
+// Yahoo returns Japanese/European stock prices in their local currency (JPY/EUR/GBP/CHF/NOK)
+// while US stocks are already USD. Returns the USD value of 1 unit of the local currency.
+export function currencyToUsdFactor(symbol: string): number {
+  const s = (symbol || '').toUpperCase();
+  if (/\.T$/.test(s)) return 1 / USDJPY_APPROX;          // JPY -> USD
+  if (/\.(PA|DE|AS|MI)$/.test(s)) return 1.08;           // EUR -> USD
+  if (/\.L$/.test(s)) return 1.27;                        // GBP -> USD
+  if (/\.SW$/.test(s)) return 1 / 0.88;                   // CHF -> USD
+  if (/\.CO$/.test(s)) return 0.095;                      // NOK -> USD
+  return 1;                                               // USD (US stocks/ADR)
+}
+
 export function detectInstrumentType(symbol: string): InstrumentType {
   const s = symbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -55,6 +71,9 @@ export function slAmountUSD(symbol: string, slDistance: number, qty: number, cat
     const cfg = getInstrumentConfig(symbol);
     return (slDistance / cfg.pipSize) * cfg.pipValuePerLotUSD * qty;
   }
+  if (category === 'stocks') {
+    return slDistance * qty * STOCK_CONTRACT_SIZE * currencyToUsdFactor(symbol);
+  }
   return slDistance * qty;
 }
 
@@ -69,7 +88,9 @@ export function usdToPrice(symbol: string, amountUSD: number, entryPrice: number
     return above ? entryPrice + distance : entryPrice - distance;
   }
   if (amountUSD > 0 && qty > 0) {
-    const distance = amountUSD / qty;
+    const distance = category === 'stocks'
+      ? amountUSD / (qty * STOCK_CONTRACT_SIZE * currencyToUsdFactor(symbol))
+      : amountUSD / qty;
     return above ? entryPrice + distance : entryPrice - distance;
   }
   return entryPrice;

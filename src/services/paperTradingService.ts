@@ -3,6 +3,7 @@ import { collection, doc, getDoc, setDoc, addDoc, updateDoc, query, where, getDo
 import { User } from 'firebase/auth';
 import { SYMBOL_CATEGORIES } from '../constants';
 import { isExchangeOpen } from '../lib/marketHours';
+import { STOCK_CONTRACT_SIZE, currencyToUsdFactor } from '../lib/positionMath';
 
 export interface PaperTrade {
   id: string;
@@ -91,7 +92,12 @@ export function calcPnl(trade: Pick<PaperTrade, 'category' | 'symbol' | 'side' |
     case 'metals':
       return diff * trade.qty * 100; // 1 lot = 100 oz
     case 'crypto':
-    case 'stocks':
+      return diff * trade.qty;
+    case 'stocks': {
+      // 0.01 lot = 1 share (contract size 100). Japanese/European stock prices
+      // are in local currency, so convert the P&L to USD.
+      return diff * trade.qty * STOCK_CONTRACT_SIZE * currencyToUsdFactor(trade.symbol);
+    }
     default:
       return diff * trade.qty;
   }
