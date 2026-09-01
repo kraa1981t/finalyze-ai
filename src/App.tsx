@@ -527,7 +527,17 @@ export default function App() {
   const [settings, setSettings] = useState<StrategySettings>(() => {
     const saved = localStorage.getItem('strategy_settings');
     if (saved) {
-      try { return { ...DEFAULT_STRATEGY_SETTINGS, ...JSON.parse(saved) }; } catch (e) { return DEFAULT_STRATEGY_SETTINGS; }
+      try {
+        const merged = { ...DEFAULT_STRATEGY_SETTINGS, ...JSON.parse(saved) };
+        // Migrate legacy default thresholds (10/20/30 pips) to the new
+        // ATR-normalized defaults (15/20/30 %). We only override when the
+        // stored value exactly equals the old default, so a user who
+        // intentionally set a specific pip value keeps their choice.
+        if (merged.candleMatchDailyThreshold === 10) merged.candleMatchDailyThreshold = 15;
+        if (merged.candleMatchWeeklyThreshold === 20) merged.candleMatchWeeklyThreshold = 20;
+        if (merged.candleMatchMonthlyThreshold === 30) merged.candleMatchMonthlyThreshold = 30;
+        return merged;
+      } catch (e) { return DEFAULT_STRATEGY_SETTINGS; }
     }
     return DEFAULT_STRATEGY_SETTINGS;
   });
