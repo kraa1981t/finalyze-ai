@@ -23,6 +23,7 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
 
   const getLabelAndStatus = (key: string) => {
     const open = isCategoryOpen(key, now);
+    let label: string;
     if (isAr) {
       switch (key) {
         case 'forex': label = t.forex; break;
@@ -43,6 +44,8 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
     const status = open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed');
     return { label, status };
   };
+
+  const getLabel = (key: string): string => getLabelAndStatus(key).label;
 
   const circleContent = (({ label, status }: { label: string; status: string }) => {
     if (compact) {
