@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, ShieldX, CheckCircle, XCircle, AlertTriangle, BarChart3, Target, Zap, CandlestickChart, Clipboard, Check } from 'lucide-react';
+import { toTvSymbol } from '../lib/tvSymbol';
 import { AnalysisResult, SignalType } from '../types';
 import { Language } from '../lib/i18n';
 import LotSizeCalculator from './LotSizeCalculator';
@@ -48,26 +49,6 @@ function getStatusStyle(status: string) {
     case 'negative': return 'border-red-500/30 bg-red-500/5';
     default: return 'border-yellow-500/30 bg-yellow-500/5';
   }
-}
-
-const TV_SYMBOL_MAP: Record<string, string> = {
-  '7203.T': 'TSE:7203', '6758.T': 'TSE:6758', '8306.T': 'TSE:8306',
-  '9984.T': 'TSE:9984', '7974.T': 'TSE:7974', '7267.T': 'TSE:7267',
-  '9432.T': 'TSE:9432', '6861.T': 'TSE:6861', '6501.T': 'TSE:6501', '8035.T': 'TSE:8035',
-  '7751.T': 'TSE:7751', '6954.T': 'TSE:6954', '6301.T': 'TSE:6301', '5020.T': 'TSE:5020', '9020.T': 'TSE:9020',
-  'ASML.AS': 'AMS:ASML', 'MC.PA': 'EPA:MC', 'NESN.SW': 'SWX:NESN', 'SAP.DE': 'ETR:SAP',
-  'SHEL.L': 'LON:SHEL', 'ULVR.L': 'LON:ULVR', 'ALV.DE': 'ETR:ALV', 'OR.PA': 'EPA:OR',
-  'AZN.L': 'LON:AZN', 'ROG.SW': 'SWX:ROG', 'MBG.DE': 'ETR:MBG',
-  'BARC.L': 'LON:BARC', 'BNP.PA': 'EPA:BNP', 'TTE.PA': 'EPA:TTE', 'BP.L': 'LON:BP',
-  'DBK.DE': 'ETR:DBK', 'IFX.DE': 'ETR:IFX', 'ADS.DE': 'ETR:ADS', 'NOVO-B.CO': 'CPH:NOVO-B',
-  '6942.T': 'TSE:6942', '6902.T': 'TSE:6902', '7201.T': 'TSE:7201',
-};
-
-function toTradingViewSymbol(sym: string): string {
-  if (TV_SYMBOL_MAP[sym]) return TV_SYMBOL_MAP[sym];
-  if (sym.includes(':')) return sym;
-  if (/^\d{4}\.T$/.test(sym)) return `TSE:${sym.replace('.T', '')}`;
-  return sym;
 }
 
 function parseCandleInfo(value: string) {
@@ -168,7 +149,7 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
 
   useEffect(() => {
     if (!isClient && chartRef.current && result.symbol) {
-      const tvSymbol = toTradingViewSymbol(result.symbol);
+      const tvSymbol = toTvSymbol(result.symbol);
       chartRef.current.innerHTML = '';
       const widget = document.createElement('div');
       widget.className = 'tradingview-widget-container';

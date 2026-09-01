@@ -13,6 +13,7 @@ import {
 import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
 import { playOpenSound, playCloseSound, playDragTick } from '../lib/tradeSounds';
 import { pricesToUsd, usdToPrice, slAmountUSD, notionalInUSD } from '../lib/positionMath';
+import { toTvSymbol as toTvSymbolShared } from '../lib/tvSymbol';
 
 interface TradeNowPageProps {
   lang: Language;
@@ -86,6 +87,10 @@ function toTvSymbol(sym: string): string {
     'BARC.L': 'LON:BARC', 'BNP.PA': 'EPA:BNP',
   };
   if (indexMap[s]) return indexMap[s];
+  // European / Asia-Pacific stocks with an exchange suffix (e.g. LVMH.PA,
+  // SIE.DE, GSK.L) — reuse the shared converter so the chart always renders.
+  const suffixed = toTvSymbolShared(sym);
+  if (suffixed !== sym) return suffixed;
   // For unknown symbols, try NYSE first (most US stocks)
   return `NYSE:${s}`;
 }
