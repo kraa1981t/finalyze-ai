@@ -9,6 +9,7 @@ interface AnalysisDetailPageProps {
   result: AnalysisResult;
   onBack: () => void;
   lang: Language;
+  isClient?: boolean;
 }
 
 function getSignalColor(signal: SignalType) {
@@ -70,7 +71,7 @@ function parseCandleInfo(value: string) {
   }).filter(Boolean);
 }
 
-export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDetailPageProps) {
+export default function AnalysisDetailPage({ result, onBack, lang, isClient = false }: AnalysisDetailPageProps) {
   const [copied, setCopied] = useState(false);
   const isAr = lang === 'ar';
   const chartRef = useRef<HTMLDivElement>(null);
@@ -121,8 +122,32 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const directionWord = result.direction === 'buy' || result.signal === SignalType.BUY || result.signal === SignalType.STRONG_BUY
+    ? (isAr ? 'صعودي' : 'bullish')
+    : (isAr ? 'هبوطي' : 'bearish');
+
+  const narrativeParts: string[] = [];
+
+  narrativeParts.push(isAr
+    ? `تم اختيار الرمز ${result.symbol} كإشارة ${getSignalLabel(result.signal, lang)} بثقة ${fmt(result.confidence)}% نتيجة تظافر مجموعة من العوامل الفنية والاقتصادية والزخم السعري.`
+    : `Symbol ${result.symbol} was selected as a ${getSignalLabel(result.signal, lang)} signal with ${fmt(result.confidence)}% confidence, driven by a combination of technical, economic, and price-momentum factors.`);
+
+  narrativeParts.push(isAr
+    ? `من الناحية الفنية، بلغت درجة المؤشرات ${fmt(result.technicalScore)}% حيث أظهرت مؤشرات الشارت مثل RSI وEMA وحجم التداول اتجاهاً ${directionWord} واضحاً، مع إشارات اختراق للأطر الزمنية المتعددة وسحب سعري صحي قبل التحرك.`
+    : `Technically, the indicator score reached ${fmt(result.technicalScore)}% as chart indicators such as RSI, EMA, and volume showed a clear ${directionWord} trend, with breakouts across multiple timeframes and a healthy pullback before the move.`);
+
+  narrativeParts.push(isAr
+    ? `عزز ذلك زخم معنويات السوق الذي سجل ${fmt(result.sentimentScore)}%، حيث تدعم التدفقات المالية ونبرة الأخبار المالية اتجاه هذا الزوج، مما يرفع احتمالية استمرار الحركة نحو أهداف السعر المحددة.`
+    : `This was reinforced by market sentiment momentum at ${fmt(result.sentimentScore)}%, where capital flows and the tone of financial news favour this pair, increasing the probability of continuation toward the defined price targets.`);
+
+  narrativeParts.push(isAr
+    ? `كما لعبت العوامل الاقتصادية دوراً محورياً، إذ تدعم بيانات التضخم وأسعار الفائدة وقرارات البنوك المركزية التوجه الحالي، بينما يظل أثر الأخبار القادمة محسوباً بحذر لتجنب المفاجآت التي قد تغير مسار الحركة.`
+    : `Economic factors also played a pivotal role, as inflation data, interest rates, and central bank decisions support the current direction, while the impact of upcoming news remains carefully accounted for to avoid surprises.`);
+
+  const generateClientNarrative = () => narrativeParts.join(' ');
+
   useEffect(() => {
-    if (chartRef.current && result.symbol) {
+    if (!isClient && chartRef.current && result.symbol) {
       chartRef.current.innerHTML = '';
       const widget = document.createElement('div');
       widget.className = 'tradingview-widget-container';
@@ -170,6 +195,7 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
             <ArrowLeft size={20} className="text-black" />
           </button>
           <div className="flex-1">
+            {!isClient && (
             <div className="flex items-center gap-2">
               <span className="text-xl font-black text-white">{result.symbol}</span>
               <span className={`px-3 py-1 rounded-lg text-xs font-black text-white ${colors.bg} shadow-lg ${colors.glow}`}>
@@ -177,7 +203,9 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
               </span>
               <span className={`text-2xl font-black ${colors.text}`}>{fmt(result.confidence)}%</span>
             </div>
+            )}
           </div>
+          {!isClient && (
           <button
             onClick={handleCopy}
             className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"
@@ -185,11 +213,60 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
           >
             {copied ? <Check size={18} className="text-emerald-400" /> : <Clipboard size={18} className="text-white/70" />}
           </button>
+          )}
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 space-y-3 mt-4 pb-20">
+      <div className={isClient ? "max-w-5xl mx-auto px-4 space-y-3 mt-4 pb-20" : "max-w-5xl mx-auto px-4 space-y-3 mt-4 pb-20"}>
 
+        {isClient ? (
+          <>
+            {/* Client view: only scores + calculator + narrative */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
+                <BarChart3 size={28} className="text-blue-400 mx-auto mb-2" />
+                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'تقني' : 'Technical'}</div>
+                <div className="text-5xl font-black text-blue-400">{fmt(result.technicalScore)}%</div>
+              </div>
+              <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
+                <Zap size={28} className="text-purple-400 mx-auto mb-2" />
+                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'مشاعر' : 'Sentiment'}</div>
+                <div className="text-5xl font-black text-purple-400">{fmt(result.sentimentScore)}%</div>
+              </div>
+              <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
+                <Target size={28} className="text-emerald-400 mx-auto mb-2" />
+                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'ثقة' : 'Confidence'}</div>
+                <div className={`text-5xl font-black ${colors.text}`}>{fmt(result.confidence)}%</div>
+              </div>
+            </div>
+
+            {result.signal !== 'neutral' && result.signal !== 'no_entry' && (
+              <div className="rounded-2xl border border-white/5 bg-[#111827] overflow-hidden">
+                <LotSizeCalculator
+                  symbol={result.symbol}
+                  stopLoss={result.stopLoss || 0}
+                  takeProfit={result.takeProfit || 0}
+                  entryPrice={result.entryPrice}
+                  signal={result.signal as any}
+                  lang={lang}
+                />
+              </div>
+            )}
+
+            <div className="rounded-2xl p-6 border border-[#F59E0B]/40 bg-[#F59E0B]/5">
+              <div className="flex items-center gap-2 mb-4">
+                <Zap size={22} className="text-[#F59E0B]" />
+                <span className="text-lg font-black text-[#F59E0B] uppercase tracking-wider">
+                  {isAr ? 'لماذا هذا التحليل؟' : 'Why this signal?'}
+                </span>
+              </div>
+              <p className="text-lg leading-relaxed text-yellow-300 font-semibold" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
+                {generateClientNarrative()}
+              </p>
+            </div>
+          </>
+        ) : (
+        <>
         {/* 1. Signal Scores - large */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
@@ -386,6 +463,8 @@ export default function AnalysisDetailPage({ result, onBack, lang }: AnalysisDet
             <div className="text-sm text-white/40 uppercase tracking-wider mb-2">{isAr ? 'ملخص' : 'Summary'}</div>
             <p className="text-base text-white/70 leading-relaxed">{result.summary}</p>
           </div>
+        )}
+        </>
         )}
       </div>
     </motion.div>

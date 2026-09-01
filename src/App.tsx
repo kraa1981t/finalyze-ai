@@ -64,6 +64,7 @@ export default function App() {
   });
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [detailResult, setDetailResult] = useState<AnalysisResult | null>(null);
+  const [clientDetailResult, setClientDetailResult] = useState<AnalysisResult | null>(null);
   const [clientSignals, setClientSignals] = useState<AnalysisResult[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
@@ -1655,6 +1656,15 @@ export default function App() {
           result={detailResult}
           onBack={() => setDetailResult(null)}
           lang={lang}
+          isClient={false}
+        />
+      )}
+      {clientDetailResult && (
+        <AnalysisDetailPage
+          result={clientDetailResult}
+          onBack={() => setClientDetailResult(null)}
+          lang={lang}
+          isClient={true}
         />
       )}
 
@@ -1981,7 +1991,7 @@ export default function App() {
         {!isDeveloperSession() && !analysisResults && !isAnalyzing && effectivePage === 'main' && (
           <div className="max-w-7xl mx-auto px-4">
             <AdSlot position="header" lang={lang} />
-            <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} onDetail={setDetailResult} />
+            <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} onDetail={setClientDetailResult} />
           </div>
         )}
 
