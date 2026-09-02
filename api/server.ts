@@ -343,6 +343,57 @@ function twelveDataSymbol(symbol: string): string | null {
   return null;
 }
 
+// Yahoo symbol candidates for a forex pair, in order of reliability.
+// Yahoo exposes steady daily OHLC for "EURUSD=X" (and most pairs also as
+// "EUR-USD"). Used to prefer clean Yahoo candles over Twelve Data's daily
+// series which can carry implausible outlier candles.
+function attemptsYahooFor(symbol: string): string[] {
+  const s = (symbol || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (s.length === 6) {
+    return [`${s}=X`, `${s.slice(0, 3)}-${s.slice(3)}`];
+  }
+  return [`${s}=X`];
+}
+
+function sanitizeCandles<T>(data: T): T {
+  try {
+    const result = (data as any)?.chart?.result?.[0];
+    if (!result) return data;
+    const quote = result?.indicators?.quote?.[0];
+    const close = quote?.close;
+    if (!Array.isArray(result.timestamp) || !Array.isArray(close)) return data;
+    const ranges: number[] = [];
+    for (let i = 0; i < close.length; i++) {
+      const o = quote.open?.[i], h = quote.high?.[i], l = quote.low?.[i], c = close[i];
+      if (o == null || h == null || l == null || c == null) continue;
+      ranges.push(Math.abs(h - l));
+    }
+    if (ranges.length < 10) return data;
+    const sorted = [...ranges].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    if (!median || median <= 0) return data;
+    const limit = median * 5;
+    const keep: number[] = [];
+    let dropped = 0;
+    for (let i = 0; i < close.length; i++) {
+      const o = quote.open?.[i], h = quote.high?.[i], l = quote.low?.[i], c = close[i], t = result.timestamp[i];
+      if (o == null || h == null || l == null || c == null || t == null) continue;
+      if (Math.abs(h - l) > limit) { dropped++; continue; }
+      keep.push(i);
+    }
+    if (dropped > 0 && keep.length > 0) {
+      result.timestamp = keep.map((i) => result.timestamp[i]);
+      quote.open = keep.map((i) => quote.open[i]);
+      quote.high = keep.map((i) => quote.high[i]);
+      quote.low = keep.map((i) => quote.low[i]);
+      quote.close = keep.map((i) => quote.close[i]);
+      if (Array.isArray(quote.volume)) quote.volume = keep.map((i) => quote.volume[i]);
+      console.log(`[sanitize] dropped ${dropped} outlier candles`);
+    }
+  } catch {}
+  return data;
+}
+
 const fetchTwelveDataOHLC = async (symbol: string, timeframe: string): Promise<any> => {
   if (!TWELVE_DATA_API_KEY) return null;
   const tdSymbol = twelveDataSymbol(symbol);
@@ -445,14 +496,39 @@ app.get("/api/market-data", async (req, res) => {
       if (binanceData) return res.json(binanceData);
     }
 
-    // Try Twelve Data first for forex (accurate current candle OHLC)
+    // Forex data source. Twelve Data historically returned these candles first,
+    // but its higher-timeframe (1d/1w/1M) series occasionally contains isolated
+    // outlier candles with implausible ranges (e.g. an EURUSD daily range of 0.10
+    // when the real median is ~0.005). Those become the long-wicked "hammer /
+    // pin bar" candles users see vs other platforms. Yahoo's daily series is
+    // clean and directly comparable to other charting platforms, so prefer it
+    // for daily+ and keep Twelve Data for intraday + as a fallback.
     if (isForex) {
-      const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
-      if (twelveData) {
-        console.log(`[TwelveData] ${rawSymbol} ${timeframe} OK`);
-        return res.json(twelveData);
+      const dailyUp = timeframe === '1d' || timeframe === '1w' || timeframe === '1M';
+      const primary = dailyUp ? 'yahoo' : 'twelve';
+
+      const yahooFor = dailyUp ? attemptsYahooFor(rawSymbol) : [];
+      if (primary === 'yahoo') {
+        for (const attempt of yahooFor) {
+          const cand = await fetchMarketData(attempt, dailyUp ? (timeframe === '1d' ? '6mo' : timeframe === '1w' ? '2y' : '5y') : '6mo', dailyUp ? (timeframe === '1d' ? '1d' : timeframe === '1w' ? '1wk' : '1mo') : '1d');
+          if (cand) {
+            console.log(`[Yahoo] ${rawSymbol} ${timeframe} OK`);
+            return res.json(sanitizeCandles(cand));
+          }
+        }
+        const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
+        if (twelveData) {
+          console.log(`[TwelveData(fb)] ${rawSymbol} ${timeframe} OK`);
+          return res.json(sanitizeCandles(twelveData));
+        }
+      } else {
+        const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
+        if (twelveData) {
+          console.log(`[TwelveData] ${rawSymbol} ${timeframe} OK`);
+          return res.json(sanitizeCandles(twelveData));
+        }
       }
-      console.log(`[TwelveData] ${rawSymbol} ${timeframe} failed, falling back to Yahoo`);
+      console.log(`[$primary] ${rawSymbol} ${timeframe} failed, falling back to generic path`);
     }
 
     let attempts: string[] = [];
@@ -482,7 +558,7 @@ app.get("/api/market-data", async (req, res) => {
 
     const hasQuotes = finalData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
     if (!hasQuotes) return res.status(404).json({ error: "No data found" });
-    res.json(finalData);
+    res.json(sanitizeCandles(finalData));
   } catch (error: any) {
     res.status(500).json({ error: "Server Error" });
   }
