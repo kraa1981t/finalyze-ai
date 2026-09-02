@@ -447,6 +447,9 @@ app.get("/api/market-data", async (req, res) => {
     const timeframe = (req.query.timeframe as string) || '1d';
     if (!symbol) return res.status(400).json({ error: "Symbol is required" });
 
+    // Version marker to verify deployment (increment on each deploy)
+    const _deployVersion = 'v3-sanitize-yahoo';
+
     const rawSymbol = symbol.toUpperCase().replace(/ /g, '');
     const customMappings: Record<string, string> = {
       'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F', 'XPDUSD': 'PA=F',
@@ -513,19 +516,20 @@ app.get("/api/market-data", async (req, res) => {
           const cand = await fetchMarketData(attempt, dailyUp ? (timeframe === '1d' ? '6mo' : timeframe === '1w' ? '2y' : '5y') : '6mo', dailyUp ? (timeframe === '1d' ? '1d' : timeframe === '1w' ? '1wk' : '1mo') : '1d');
           if (cand) {
             console.log(`[Yahoo] ${rawSymbol} ${timeframe} OK`);
-            return res.json(sanitizeCandles(cand));
+            const sanitized = sanitizeCandles(cand);
+            return res.json({ ...sanitized, _v: _deployVersion });
           }
         }
         const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
         if (twelveData) {
           console.log(`[TwelveData(fb)] ${rawSymbol} ${timeframe} OK`);
-          return res.json(sanitizeCandles(twelveData));
+          return res.json({ ...sanitizeCandles(twelveData), _v: _deployVersion + '-twelve-fb' });
         }
       } else {
         const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
         if (twelveData) {
           console.log(`[TwelveData] ${rawSymbol} ${timeframe} OK`);
-          return res.json(sanitizeCandles(twelveData));
+          return res.json({ ...sanitizeCandles(twelveData), _v: _deployVersion + '-twelve-fb' });
         }
       }
       console.log(`[$primary] ${rawSymbol} ${timeframe} failed, falling back to generic path`);
@@ -558,7 +562,7 @@ app.get("/api/market-data", async (req, res) => {
 
     const hasQuotes = finalData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
     if (!hasQuotes) return res.status(404).json({ error: "No data found" });
-    res.json(sanitizeCandles(finalData));
+    res.json({ ...sanitizeCandles(finalData), _v: _deployVersion });
   } catch (error: any) {
     res.status(500).json({ error: "Server Error" });
   }
