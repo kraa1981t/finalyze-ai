@@ -42,7 +42,10 @@ interface TradingViewWidgetProps {
 
 type LineKey = 'entry' | 'sl' | 'tp';
 
-const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d', '1W', '1M'];
+// Day/week/month (higher) timeframes removed from the trading chart: the
+// backend daily+ data currently returns outlier-spiked candles for several
+// forex symbols, so only intraday timeframes are shown here.
+const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h'];
 
 const DRAW_TOOLS = [
   { id: 'cursor', label: 'مؤشر', icon: '↖' },
@@ -67,7 +70,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
   const lastDragSoundRef = useRef(0);
-  const [tf, setTf] = useState('1D');
+  const [tf, setTf] = useState('4h');
   const [positions, setPositions] = useState<{ sl?: number; tp?: number }>({});
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
   const [drawColor, setDrawColor] = useState('#60a5fa');
@@ -94,7 +97,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
       const raw = sessionStorage.getItem('joseph_chart_ui');
       if (raw) {
         const s = JSON.parse(raw);
-        if (s.tf) setTf(s.tf);
+        if (s.tf && TIMEFRAMES.includes(s.tf)) setTf(s.tf);
         if (s.activeTool) setActiveTool(s.activeTool);
         if (s.activeIndicators) setActiveIndicators(s.activeIndicators);
         if (s.indicatorStyles) setIndicatorStyles(s.indicatorStyles);
