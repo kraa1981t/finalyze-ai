@@ -543,20 +543,13 @@ app.get("/api/market-data", async (req, res) => {
           if (cand) {
             console.log(`[Yahoo] ${rawSymbol} ${timeframe} OK`);
             const sanitized = sanitizeCandles(cand);
-            if (sanitized?.chart?.result?.[0]?.meta) sanitized.chart.result[0].meta.dbg = 'yahoo-v2-idx';
             return res.json(sanitized);
           }
         }
         const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
         if (twelveData) {
           console.log(`[TwelveData(fb)] ${rawSymbol} ${timeframe} OK`);
-          const sanitized = sanitizeCandles(twelveData);
-          const nBefore = twelveData?.chart?.result?.[0]?.timestamp?.length;
-          const nAfter = sanitized?.chart?.result?.[0]?.timestamp?.length;
-          if (sanitized?.chart?.result?.[0]?.meta) {
-            sanitized.chart.result[0].meta.dbg = `td-fb-idx n${nBefore}->${nAfter}`;
-          }
-          return res.json(sanitized);
+          return res.json(sanitizeCandles(twelveData));
         }
       } else {
         const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
