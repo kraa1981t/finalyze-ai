@@ -197,6 +197,91 @@ body {
   background-color: #A7F3D0 !important;
 }
 
+/* ── Category tab buttons: visible icons + blue when selected ── */
+.light .bg-sky-500\/10 {
+  background-color: rgba(14, 116, 144, 0.18) !important;
+}
+.light .text-sky-300 {
+  color: #0E7490 !important;
+  font-weight: 700 !important;
+}
+.light .border-sky-500\/20 {
+  border-color: rgba(14, 116, 144, 0.35) !important;
+}
+.light .hover\:bg-sky-500\/20:hover {
+  background-color: rgba(14, 116, 144, 0.25) !important;
+}
+/* Selected category stays blue */
+.light .bg-sky-500 {
+  background-color: #0EA5E9 !important;
+  color: #000 !important;
+}
+.light .bg-sky-400 {
+  background-color: #38BDF8 !important;
+  color: #000 !important;
+}
+.light .text-sky-200 {
+  color: #0E7490 !important;
+}
+
+/* ── Symbol tag buttons: visible text ── */
+.light .bg-sky-500\/15 {
+  background-color: rgba(14, 116, 144, 0.15) !important;
+}
+
+/* ── Settings page: double text size ── */
+.light #settings,
+.light [class*="Settings"],
+.light [class*="settings"] {
+  font-size: 1.125rem !important;
+}
+.light #settings h2,
+.light [class*="Settings"] h2,
+.light #settings .text-xl {
+  font-size: 1.75rem !important;
+}
+.light #settings .text-sm,
+.light [class*="Settings"] .text-sm {
+  font-size: 1rem !important;
+}
+.light #settings .text-xs,
+.light [class*="Settings"] .text-xs {
+  font-size: 0.9375rem !important;
+}
+.light #settings label,
+.light [class*="Settings"] label {
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: #064E3B !important;
+}
+.light #settings input,
+.light [class*="Settings"] input {
+  font-size: 1rem !important;
+}
+.light #settings .text-brand-text,
+.light [class*="Settings"] .text-brand-text {
+  color: #064E3B !important;
+}
+.light #settings .text-brand-muted,
+.light [class*="Settings"] .text-brand-muted {
+  color: #065F46 !important;
+  font-size: 0.9375rem !important;
+}
+.light #settings .border-white\/5,
+.light #settings .border-white\/10,
+.light [class*="Settings"] .border-white\/5,
+.light [class*="Settings"] .border-white\/10 {
+  border-color: rgba(6, 78, 59, 0.15) !important;
+}
+.light #settings .bg-brand-bg,
+.light [class*="Settings"] .bg-brand-bg {
+  background-color: #D1FAE5 !important;
+}
+.light #settings .bg-brand-alt,
+.light [class*="Settings"] .bg-brand-alt {
+  background-color: #A7F3D0 !important;
+}
+
 .market-card {
   @apply relative overflow-hidden bg-brand-alt border border-slate-700 rounded-xl transition-all duration-300 hover:shadow-lg hover:border-primary/30;
 }
