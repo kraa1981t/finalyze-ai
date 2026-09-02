@@ -1,3 +1,45 @@
+// Remove outlier candles whose range (high-low) exceeds median*5.
+// This is a frontend safety-net: even if the API returns stale Twelve Data
+// with corrupted daily candles, they get stripped before chart/analysis.
+function sanitizeCandles(data: any): any {
+  try {
+    const result = data?.chart?.result?.[0];
+    if (!result) return data;
+    const quote = result?.indicators?.quote?.[0];
+    const close: number[] | undefined = quote?.close;
+    if (!Array.isArray(result.timestamp) || !Array.isArray(close)) return data;
+    const ranges: number[] = [];
+    for (let i = 0; i < close.length; i++) {
+      const o = quote.open?.[i], h = quote.high?.[i], l = quote.low?.[i], c = close[i];
+      if (o == null || h == null || l == null || c == null) continue;
+      ranges.push(Math.abs(h - l));
+    }
+    if (ranges.length < 10) return data;
+    const sorted = [...ranges].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    if (!median || median <= 0) return data;
+    const limit = median * 5;
+    const keep: number[] = [];
+    let dropped = 0;
+    for (let i = 0; i < close.length; i++) {
+      const o = quote.open?.[i], h = quote.high?.[i], l = quote.low?.[i], c = close[i], t = result.timestamp[i];
+      if (o == null || h == null || l == null || c == null || t == null) continue;
+      if (Math.abs(h - l) > limit) { dropped++; continue; }
+      keep.push(i);
+    }
+    if (dropped > 0 && keep.length > 0) {
+      result.timestamp = keep.map((i) => result.timestamp[i]);
+      quote.open = keep.map((i) => quote.open[i]);
+      quote.high = keep.map((i) => quote.high[i]);
+      quote.low = keep.map((i) => quote.low[i]);
+      quote.close = keep.map((i) => quote.close[i]);
+      if (Array.isArray(quote.volume)) quote.volume = keep.map((i) => quote.volume[i]);
+      console.log(`[sanitize-frontend] dropped ${dropped} outlier candles from ${close.length}`);
+    }
+  } catch {}
+  return data;
+}
+
 const BINANCE_BASE = 'https://api.binance.com/api/v3';
 const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 const ALTERNATIVE_BASE = 'https://api.alternative.me';
@@ -345,7 +387,7 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
       if (r.ok) {
         const d = await r.json();
         const hasData = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
-        if (d && d.chart && hasData) { _dataCache.set(cacheKey, { data: d, ts: Date.now() }); return d; }
+        if (d && d.chart && hasData) { _dataCache.set(cacheKey, { data: sanitizeCandles(d), ts: Date.now() }); return sanitizeCandles(d); }
         console.warn(`[FetchData] ${symbol} server returned data but no valid close. hasData=${hasData}, d.chart=${!!d?.chart}`);
       } else {
         console.warn(`[FetchData] ${symbol} server responded ${r.status} ${r.statusText}`);
@@ -360,7 +402,7 @@ export async function fetchMarketDataDirect(symbol: string, timeframe: string): 
   // Fallback: try Yahoo Finance directly via CORS proxy
   try {
     const data = await fetchYahooFinance(symbol, timeframe);
-    if (data) { _dataCache.set(cacheKey, { data, ts: Date.now() }); return data; }
+    if (data) { _dataCache.set(cacheKey, { data: sanitizeCandles(data), ts: Date.now() }); return sanitizeCandles(data); }
   } catch {}
 
   throw new Error('Market data currently unavailable from the source.');
