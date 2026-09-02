@@ -355,7 +355,7 @@ function attemptsYahooFor(symbol: string): string[] {
   return [`${s}=X`];
 }
 
-function sanitizeCandles<T>(data: T): T {
+function sanitizeCandles(data: any): any {
   try {
     const result = (data as any)?.chart?.result?.[0];
     if (!result) return data;

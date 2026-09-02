@@ -359,7 +359,7 @@ function attemptsYahooFor(symbol: string): string[] {
 // pin bar" candles that look broken vs other platforms. We drop any candle
 // whose range exceeds 5x the median range, which strips genuine data glitches
 // without removing real (usually <3x) volatile days.
-function sanitizeCandles<T>(data: T): T {
+function sanitizeCandles(data: any): any {
   try {
     const result = (data as any)?.chart?.result?.[0];
     if (!result) return data;
