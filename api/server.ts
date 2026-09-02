@@ -175,10 +175,8 @@ app.get("/api/crypto-prices", async (_req, res) => {
 
 // Helper: Yahoo Finance Fetch
 const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
-const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string) => {
+const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string, retries: number = 2) => {
   for (const host of YAHOO_HOSTS) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
     try {
       // Try with ETF alternatives first for index symbols
       const ETF_ALTS: Record<string, string> = {
@@ -188,27 +186,41 @@ const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: strin
       };
       const yahooSym = ETF_ALTS[sym] || sym;
       const url = `https://${host}/v8/finance/chart/${encodeURIComponent(yahooSym)}?range=${rangeStr}&interval=${intervalStr}`;
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-          'Accept': 'application/json',
-          'Origin': 'https://finance.yahoo.com',
-          'Referer': 'https://finance.yahoo.com/'
+      // Try several times on the same host to ride out transient rate-limits / cold-start delays.
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 20000);
+        try {
+          const response = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+              'Accept': 'application/json',
+              'Origin': 'https://finance.yahoo.com',
+              'Referer': 'https://finance.yahoo.com/'
+            }
+          });
+          clearTimeout(timeout);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.chart?.result?.[0]) {
+              // Rewrite symbol back to original for ETF alternatives
+              if (yahooSym !== sym && data.chart?.result?.[0]?.meta) {
+                data.chart.result[0].meta.symbol = sym;
+              }
+              return data;
+            }
+          }
+          // Small backoff before retrying the same host
+          await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+        } catch (e) {
+          clearTimeout(timeout);
+          // Backoff before next retry
+          await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
         }
-      });
-      clearTimeout(timeout);
-      if (!response.ok) continue;
-      const data = await response.json();
-      if (data.chart?.result?.[0]) {
-        // Rewrite symbol back to original for ETF alternatives
-        if (yahooSym !== sym && data.chart?.result?.[0]?.meta) {
-          data.chart.result[0].meta.symbol = sym;
-        }
-        return data;
       }
     } catch (e) {
-      clearTimeout(timeout);
+      // move to next host
     }
   }
   return null;
