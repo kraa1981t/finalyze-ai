@@ -9,6 +9,22 @@ import {
 } from 'lightweight-charts';
 import { playClickSound, playDragTick } from '../lib/tradeSounds';
 
+// Strip outlier candles whose range exceeds median*5 — protects the chart
+// even when the backend returns stale Twelve Data with implausible spikes.
+function sanitizeCandlesForChart(candles: { time: number; open: number; high: number; low: number; close: number }[]) {
+  if (candles.length < 10) return candles;
+  const ranges = candles.map((c) => Math.abs(c.high - c.low));
+  const sorted = [...ranges].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  if (!median || median <= 0) return candles;
+  const limit = median * 5;
+  const filtered = candles.filter((c) => Math.abs(c.high - c.low) <= limit);
+  if (filtered.length < candles.length) {
+    console.log(`[sanitize-chart] dropped ${candles.length - filtered.length} outlier candles`);
+  }
+  return filtered.length > 0 ? filtered : candles;
+}
+
 interface TradingViewWidgetProps {
   symbol: string;
   entryPrice?: number | null;
@@ -321,7 +337,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           setStatus('empty');
           return;
         }
-        const candles: any[] = [];
+        let candles: any[] = [];
         for (let i = 0; i < ts.length; i++) {
           const o = q.open?.[i];
           const h = q.high?.[i];
@@ -334,6 +350,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           setStatus('empty');
           return;
         }
+        candles = sanitizeCandlesForChart(candles);
         dataRef.current = candles;
         try {
           seriesRef.current?.setData(candles);
