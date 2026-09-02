@@ -445,10 +445,7 @@ app.get("/api/market-data", async (req, res) => {
   try {
     const symbol = req.query.symbol as string;
     const timeframe = (req.query.timeframe as string) || '1d';
-    if (!symbol) return res.status(400).json({ error: "Symbol is required", _v: 'v4-entry' });
-
-    // Version marker to verify deployment (increment on each deploy)
-    const _deployVersion = 'v3-sanitize-yahoo';
+    if (!symbol) return res.status(400).json({ error: "Symbol is required" });
 
     const rawSymbol = symbol.toUpperCase().replace(/ /g, '');
     const customMappings: Record<string, string> = {
@@ -517,19 +514,19 @@ app.get("/api/market-data", async (req, res) => {
           if (cand) {
             console.log(`[Yahoo] ${rawSymbol} ${timeframe} OK`);
             const sanitized = sanitizeCandles(cand);
-            return res.json({ ...sanitized, _v: _deployVersion });
+            return res.json(sanitized);
           }
         }
         const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
         if (twelveData) {
           console.log(`[TwelveData(fb)] ${rawSymbol} ${timeframe} OK`);
-          return res.json({ ...sanitizeCandles(twelveData), _v: _deployVersion + '-twelve-fb' });
+          return res.json(sanitizeCandles(twelveData));
         }
       } else {
         const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
         if (twelveData) {
           console.log(`[TwelveData] ${rawSymbol} ${timeframe} OK`);
-          return res.json({ ...sanitizeCandles(twelveData), _v: _deployVersion + '-twelve-fb' });
+          return res.json(sanitizeCandles(twelveData));
         }
       }
       console.log(`[$primary] ${rawSymbol} ${timeframe} failed, falling back to generic path`);
@@ -562,7 +559,7 @@ app.get("/api/market-data", async (req, res) => {
 
     const hasQuotes = finalData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.length > 0;
     if (!hasQuotes) return res.status(404).json({ error: "No data found" });
-    res.json({ ...sanitizeCandles(finalData), _v: _deployVersion });
+    res.json(sanitizeCandles(finalData));
   } catch (error: any) {
     res.status(500).json({ error: "Server Error" });
   }
