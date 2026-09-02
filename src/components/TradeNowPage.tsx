@@ -154,6 +154,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   // Inline SL/TP editing for an open trade
   const [editId, setEditId] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  // Closed-trades P&L reporting period
+  const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year' | 'all'>('all');
   const chartPanelRef = useRef<HTMLDivElement>(null);
   const [chartFullscreen, setChartFullscreen] = useState(false);
   const [editSl, setEditSl] = useState<string>('');
@@ -750,6 +752,37 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     return { total: closedTrades.length, winRate: closedTrades.length ? Math.round((wins / closedTrades.length) * 100) : 0, totalPnl, totalMargin, marginLevel };
   }, [closedTrades, openTrades.length, equity, leverage]);
 
+  // Closed trades P&L filtered by selected reporting period
+  const periodStats = React.useMemo(() => {
+    const allClosed = trades.filter((t) => t.status === 'closed');
+    const now = Date.now();
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(); startOfWeek.setHours(0, 0, 0, 0);
+    const dow = (startOfWeek.getDay() + 6) % 7; // Monday = 0
+    startOfWeek.setDate(startOfWeek.getDate() - dow);
+    const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
+    const startOfYear = new Date(); startOfYear.setMonth(0, 1); startOfYear.setHours(0, 0, 0, 0);
+    const bounds: Record<string, number> = {
+      day: startOfDay.getTime(),
+      week: startOfWeek.getTime(),
+      month: startOfMonth.getTime(),
+      year: startOfYear.getTime(),
+      all: 0,
+    };
+    const from = bounds[reportPeriod] ?? 0;
+    let pnl = 0;
+    let count = 0;
+    let wins = 0;
+    for (const t of allClosed) {
+      if ((t.closedAt || 0) < from) continue;
+      const p = t.pnl ?? 0;
+      pnl += p;
+      count++;
+      if (p > 0) wins++;
+    }
+    return { pnl, count, winRate: count ? Math.round((wins / count) * 100) : 0 };
+  }, [trades, reportPeriod]);
+
   return (
     <div className="w-full px-2 sm:px-4 pt-2 pb-3 space-y-3">
       {/* Account bar */}
@@ -1083,23 +1116,53 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             )}
 
           {/* Stats mini */}
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4 grid grid-cols-4 gap-2 text-center">
-            <div>
-              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'صفقات' : 'Trades'}</div>
-              <div className="text-lg font-black text-brand-text">{stats.total}</div>
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
+            {/* Period selector for closed-trades P&L report */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider mr-1">
+                {isAr ? 'أرباح الصفقات المغلقة:' : 'Closed P&L:'}
+              </span>
+              {([
+                ['day', isAr ? 'اليوم' : 'Day'],
+                ['week', isAr ? 'الأسبوع' : 'Week'],
+                ['month', isAr ? 'الشهر' : 'Month'],
+                ['year', isAr ? 'السنة' : 'Year'],
+                ['all', isAr ? 'الكل' : 'All'],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setReportPeriod(key)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-colors border ${
+                    reportPeriod === key
+                      ? 'bg-[#F59E0B] text-black border-[#F59E0B]'
+                      : 'bg-white/5 text-brand-text/60 border-white/10 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              <span className={`ml-auto text-lg font-black ${periodStats.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">
+                {fmtMoney(periodStats.pnl)}
+              </span>
             </div>
-            <div>
-              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'نسبة الفوز' : 'Win rate'}</div>
-              <div className="text-lg font-black text-emerald-400">{stats.winRate}%</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'صافي الربح' : 'Net P&L'}</div>
-              <div className={`text-lg font-black ${stats.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtMoney(stats.totalPnl)}</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'الهامش' : 'Margin'}</div>
-              <div className={`text-lg font-black ${stats.marginLevel > 200 ? 'text-emerald-400' : stats.marginLevel > 100 ? 'text-yellow-400' : 'text-red-400'}`}>
-                {stats.totalMargin > 0 ? `${stats.marginLevel}%` : '—'}
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div>
+                <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'صفقات' : 'Trades'}</div>
+                <div className="text-lg font-black text-brand-text">{stats.total}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'نسبة الفوز' : 'Win rate'}</div>
+                <div className="text-lg font-black text-emerald-400">{stats.winRate}%</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'ربح مغلق مفتوح' : 'Floating P&L'}</div>
+                <div className={`text-lg font-black ${unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtMoney(unrealizedPnl)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'الهامش' : 'Margin'}</div>
+                <div className={`text-lg font-black ${stats.marginLevel > 200 ? 'text-emerald-400' : stats.marginLevel > 100 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {stats.totalMargin > 0 ? `${stats.marginLevel}%` : '—'}
+                </div>
               </div>
             </div>
           </div>

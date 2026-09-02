@@ -200,6 +200,9 @@ body {
 /* Symbol name above chart: sky-blue in light mode instead of white */
 .light .chart-symbol-name {
   color: #0EA5E9 !important;
+  font-size: 2em !important;
+  font-weight: 900 !important;
+  text-shadow: 0 0 10px rgba(14, 165, 233, 0.35) !important;
 }
 
 /* ── Category tab buttons: visible icons + blue when selected ── */
