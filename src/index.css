@@ -40,6 +40,94 @@ body {
   --color-brand-muted: #047857;
 }
 
+/* ── Light-mode global overrides ──────────────────────────────── */
+
+/* Labels & small text: bump up size + contrast */
+.light .text-xs,
+.light .text-\[10px\] {
+  font-size: 0.8125rem !important;  /* ~13px */
+  font-weight: 600 !important;
+  color: #064E3B !important;
+}
+
+/* All text-brand-muted → darker so it's readable on green */
+.light .text-brand-muted {
+  color: #065F46 !important;
+}
+
+/* All border-white/* → semi-transparent dark so borders show on green */
+.light .border-white\/5,
+.light .border-white\/10,
+.light .border-white\/20 {
+  border-color: rgba(6, 78, 59, 0.15) !important;
+}
+
+/* "Market Open", "Market Closed", sublabels */
+.light .text-brand-muted,
+.light .text-\[11px\] {
+  font-size: 0.8125rem !important;
+  color: #065F46 !important;
+  font-weight: 600 !important;
+}
+
+/* Table headers, stat labels */
+.light th,
+.light .text-center {
+  color: #064E3B !important;
+}
+
+/* Input / select fields — make background white-ish so text is readable */
+.light input,
+.light select,
+.light textarea {
+  background-color: #ffffff !important;
+  color: #064E3B !important;
+  border-color: #059669 !important;
+}
+
+/* Placeholder text inside inputs */
+.light input::placeholder,
+.light select::placeholder,
+.light textarea::placeholder {
+  color: #047857 !important;
+}
+
+/* Go back button text */
+.light .text-brand-text {
+  color: #064E3B !important;
+}
+
+/* Slider / range labels (volume 0.01, 0.1, etc.) */
+.light .text-\[10px\],
+.light .text-\[11px\],
+.light .text-\[12px\] {
+  color: #064E3B !important;
+  font-weight: 600 !important;
+}
+
+/* Footer */
+.light footer {
+  color: #064E3B !important;
+  border-top-color: rgba(6, 78, 59, 0.2) !important;
+}
+
+/* Signal cards inner text */
+.light .signal-card-green,
+.light .signal-card-green-active {
+  color: #064E3B !important;
+}
+
+/* All white/5 white/10 backgrounds → slightly green-tinted */
+.light .bg-white\/5 {
+  background-color: rgba(6, 78, 59, 0.08) !important;
+}
+.light .bg-white\/10 {
+  background-color: rgba(6, 78, 59, 0.12) !important;
+}
+.light .bg-white\/15 {
+  background-color: rgba(6, 78, 59, 0.16) !important;
+}
+
 .market-card {
   @apply relative overflow-hidden bg-brand-alt border border-slate-700 rounded-xl transition-all duration-300 hover:shadow-lg hover:border-primary/30;
 }
