@@ -175,7 +175,7 @@ app.get("/api/crypto-prices", async (_req, res) => {
 
 // Helper: Yahoo Finance Fetch
 const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
-const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string, retries: number = 3) => {
+const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string, retries: number = 3, cacheBust: string = '') => {
   for (const host of YAHOO_HOSTS) {
     try {
       // Try with ETF alternatives first for index symbols
@@ -185,7 +185,7 @@ const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: strin
         '^HSI': 'EWH', '^AXJO': 'EWA',
       };
       const yahooSym = ETF_ALTS[sym] || sym;
-      const url = `https://${host}/v8/finance/chart/${encodeURIComponent(yahooSym)}?range=${rangeStr}&interval=${intervalStr}`;
+      const url = `https://${host}/v8/finance/chart/${encodeURIComponent(yahooSym)}?range=${rangeStr}&interval=${intervalStr}${cacheBust}`;
       // Try several times on the same host to ride out transient rate-limits / cold-start delays.
       for (let attempt = 0; attempt <= retries; attempt++) {
         const controller = new AbortController();
@@ -522,18 +522,17 @@ app.get("/api/market-data", async (req, res) => {
       const yahooFor = dailyUp ? attemptsYahooFor(rawSymbol) : [];
       if (primary === 'yahoo') {
         for (const attempt of yahooFor) {
-          const cand = await fetchMarketData(attempt, dailyUp ? (timeframe === '1d' ? '6mo' : timeframe === '1w' ? '2y' : '5y') : '6mo', dailyUp ? (timeframe === '1d' ? '1d' : timeframe === '1w' ? '1wk' : '1mo') : '1d');
+          const cacheBust = dailyUp ? `&_cb=${Date.now()}` : '';
+          const cand = await fetchMarketData(attempt, dailyUp ? (timeframe === '1d' ? '6mo' : timeframe === '1w' ? '2y' : '5y') : '6mo', dailyUp ? (timeframe === '1d' ? '1d' : timeframe === '1w' ? '1wk' : '1mo') : '1d', 3, cacheBust);
           if (cand) {
             console.log(`[Yahoo] ${rawSymbol} ${timeframe} OK`);
             const sanitized = sanitizeCandles(cand);
             return res.json(sanitized);
           }
         }
-        const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
-        if (twelveData) {
-          console.log(`[TwelveData(fb)] ${rawSymbol} ${timeframe} OK`);
-          return res.json(sanitizeCandles(twelveData));
-        }
+        // Daily+: NO Twelve Data fallback — Yahoo is the only trusted source.
+        // Twelve Data daily candles carry outlier spikes that corrupt charts.
+        // If Yahoo failed above, fall through to the generic path (which retries Yahoo).
       } else {
         const twelveData = await fetchTwelveDataOHLC(rawSymbol, timeframe);
         if (twelveData) {
