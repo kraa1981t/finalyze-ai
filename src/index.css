@@ -197,22 +197,9 @@ body {
   background-color: #A7F3D0 !important;
 }
 
-/* ── Signal cards: symbol name always sky-blue in light mode ── */
-/* Target the italic symbol name span (has inline color from meta.symbolColor) */
-.light .signal-card span.italic {
+/* Symbol name above chart: sky-blue in light mode instead of white */
+.light .chart-symbol-name {
   color: #0EA5E9 !important;
-}
-/* Target the confidence percentage text */
-.light .signal-card span.font-mono {
-  color: #064E3B !important;
-}
-/* Target the signal label text (Buy Signal / Strong Buy) */
-.light .signal-card span:not(.italic):not(.font-mono) {
-  color: #064E3B !important;
-}
-/* Timestamp and small meta text */
-.light .signal-card span.text-\[10px\] {
-  color: #065F46 !important;
 }
 
 /* ── Category tab buttons: visible icons + blue when selected ── */

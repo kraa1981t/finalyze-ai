@@ -1136,7 +1136,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   </button>
                   <div className="ml-auto flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-xs font-black text-white">{symbol}</span>
+                    <span className="text-xs font-black text-white chart-symbol-name">{symbol}</span>
                     {!priceLoading && <span className="text-xs font-bold text-emerald-400">{fmtPrice(livePrice)}</span>}
                   </div>
                 </>
