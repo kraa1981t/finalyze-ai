@@ -445,7 +445,7 @@ app.get("/api/market-data", async (req, res) => {
   try {
     const symbol = req.query.symbol as string;
     const timeframe = (req.query.timeframe as string) || '1d';
-    if (!symbol) return res.status(400).json({ error: "Symbol is required" });
+    if (!symbol) return res.status(400).json({ error: "Symbol is required", _v: 'v4-entry' });
 
     // Version marker to verify deployment (increment on each deploy)
     const _deployVersion = 'v3-sanitize-yahoo';
