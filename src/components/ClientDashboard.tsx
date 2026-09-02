@@ -167,7 +167,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
         <div className="bg-brand-alt rounded-3xl border border-white/10 overflow-hidden shadow-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <BarChart2 size={18} className="text-primary" />
-            <span className="text-base font-black text-white italic tracking-wider">{activeSymbol}</span>
+            <span className="text-base font-black text-white italic tracking-wider chart-symbol-name">{activeSymbol}</span>
             {activeResult && SIGNAL_META[activeResult.signal] && (
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${SIGNAL_META[activeResult.signal].bg} ${SIGNAL_META[activeResult.signal].color} border ${SIGNAL_META[activeResult.signal].border}`}>
                 {isAr ? SIGNAL_META[activeResult.signal].labelAr : SIGNAL_META[activeResult.signal].labelEn}

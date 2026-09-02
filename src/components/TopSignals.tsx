@@ -171,7 +171,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
         <div className="bg-brand-alt rounded-3xl border border-white/10 overflow-hidden shadow-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <BarChart2 size={18} className="text-primary" />
-            <span className="text-base font-black text-white italic tracking-wider">{selectedSymbol}</span>
+            <span className="text-base font-black text-white italic tracking-wider chart-symbol-name">{selectedSymbol}</span>
             {SIGNAL_META[selectedResult.signal] && (
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${SIGNAL_META[selectedResult.signal].bg} ${SIGNAL_META[selectedResult.signal].color} border ${SIGNAL_META[selectedResult.signal].border}`}>
                 {isAr ? SIGNAL_META[selectedResult.signal].labelAr : SIGNAL_META[selectedResult.signal].labelEn}
