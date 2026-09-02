@@ -175,7 +175,7 @@ app.get("/api/crypto-prices", async (_req, res) => {
 
 // Helper: Yahoo Finance Fetch
 const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
-const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string, retries: number = 2) => {
+const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: string, retries: number = 3) => {
   for (const host of YAHOO_HOSTS) {
     try {
       const ETF_ALTS: Record<string, string> = {
@@ -210,11 +210,11 @@ const fetchMarketData = async (sym: string, rangeStr: string, intervalStr: strin
             }
           }
           // Small backoff before retrying the same host
-          await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
         } catch (e) {
           clearTimeout(timeout);
           // Backoff before next retry
-          await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
         }
       }
     } catch (e) {
