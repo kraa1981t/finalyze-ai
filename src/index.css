@@ -34,10 +34,10 @@ body {
 }
 
 .light {
-  --color-brand-bg: #E8E4DE;
-  --color-brand-alt: #DDD8D0;
-  --color-brand-text: #0F172A;
-  --color-brand-muted: #64748B;
+  --color-brand-bg: #D1FAE5;
+  --color-brand-alt: #A7F3D0;
+  --color-brand-text: #064E3B;
+  --color-brand-muted: #047857;
 }
 
 .market-card {
@@ -45,7 +45,7 @@ body {
 }
 
 .light .market-card {
-  @apply bg-[#DDD8D0] border-slate-300;
+  @apply bg-[#A7F3D0] border-emerald-300;
 }
 
 .gradient-line {
