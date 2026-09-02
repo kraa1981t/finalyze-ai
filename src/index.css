@@ -128,6 +128,75 @@ body {
   background-color: rgba(6, 78, 59, 0.16) !important;
 }
 
+/* "No signals yet" text and any text-white/* */
+.light .text-white\/30,
+.light .text-white\/40,
+.light .text-white\/50,
+.light .text-white\/60 {
+  color: #065F46 !important;
+  opacity: 1 !important;
+}
+
+/* Black/20 backgrounds → green-tinted */
+.light .bg-black\/20 {
+  background-color: rgba(6, 78, 59, 0.12) !important;
+}
+
+/* Category buttons: Forex, Crypto, Stocks, Metals */
+.light .bg-brand-text {
+  background-color: #064E3B !important;
+  color: #D1FAE5 !important;
+}
+
+/* "BEST SIGNALS", "SYMBOLS" section headers */
+.light .uppercase.tracking-\[0\.2em\],
+.light .uppercase.tracking-widest,
+.light .uppercase.tracking-wider {
+  color: #064E3B !important;
+}
+
+/* All text-slate-400, text-slate-500, text-slate-600 → dark green for light mode */
+.light .text-slate-400 { color: #065F46 !important; }
+.light .text-slate-500 { color: #065F46 !important; }
+.light .text-slate-600 { color: #047857 !important; }
+
+/* Card / panel containers */
+.light .bg-brand-bg {
+  background-color: #D1FAE5 !important;
+}
+.light .bg-brand-alt {
+  background-color: #A7F3D0 !important;
+}
+
+/* All text-emerald-400 → darker emerald for readability */
+.light .text-emerald-400 { color: #047857 !important; }
+
+/* All text-red-400 → darker red for readability */
+.light .text-red-400 { color: #B91C1C !important; }
+
+/* Hero / banner area */
+.light .bg-brand-bg {
+  background-color: #D1FAE5 !important;
+}
+
+/* Dropdown / menu panels */
+.light .bg-brand-alt.border {
+  border-color: rgba(6, 78, 59, 0.2) !important;
+}
+
+/* Buttons with bg-white/5 → visible */
+.light button.bg-white\/5 {
+  background-color: rgba(6, 78, 59, 0.1) !important;
+  color: #064E3B !important;
+}
+
+/* text-black on amber backgrounds stays OK — no override needed */
+
+/* Any remaining hardcoded dark bg in light mode */
+.light [class*="bg-[#0"] {
+  background-color: #A7F3D0 !important;
+}
+
 .market-card {
   @apply relative overflow-hidden bg-brand-alt border border-slate-700 rounded-xl transition-all duration-300 hover:shadow-lg hover:border-primary/30;
 }
