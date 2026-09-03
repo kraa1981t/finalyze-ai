@@ -1116,53 +1116,23 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             )}
 
           {/* Stats mini */}
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
-            {/* Period selector for closed-trades P&L report */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider mr-1">
-                {isAr ? 'أرباح الصفقات المغلقة:' : 'Closed P&L:'}
-              </span>
-              {([
-                ['day', isAr ? 'اليوم' : 'Day'],
-                ['week', isAr ? 'الأسبوع' : 'Week'],
-                ['month', isAr ? 'الشهر' : 'Month'],
-                ['year', isAr ? 'السنة' : 'Year'],
-                ['all', isAr ? 'الكل' : 'All'],
-              ] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setReportPeriod(key)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-colors border ${
-                    reportPeriod === key
-                      ? 'bg-[#F59E0B] text-black border-[#F59E0B]'
-                      : 'bg-white/5 text-brand-text/60 border-white/10 hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-              <span className={`ml-auto text-lg font-black ${periodStats.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">
-                {fmtMoney(periodStats.pnl)}
-              </span>
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4 grid grid-cols-4 gap-2 text-center">
+            <div>
+              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'صفقات' : 'Trades'}</div>
+              <div className="text-lg font-black text-brand-text">{stats.total}</div>
             </div>
-            <div className="grid grid-cols-4 gap-2 text-center">
-              <div>
-                <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'صفقات' : 'Trades'}</div>
-                <div className="text-lg font-black text-brand-text">{stats.total}</div>
-              </div>
-              <div>
-                <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'نسبة الفوز' : 'Win rate'}</div>
-                <div className="text-lg font-black text-emerald-400">{stats.winRate}%</div>
-              </div>
-              <div>
-                <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'ربح مغلق مفتوح' : 'Floating P&L'}</div>
-                <div className={`text-lg font-black ${unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtMoney(unrealizedPnl)}</div>
-              </div>
-              <div>
-                <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'الهامش' : 'Margin'}</div>
-                <div className={`text-lg font-black ${stats.marginLevel > 200 ? 'text-emerald-400' : stats.marginLevel > 100 ? 'text-yellow-400' : 'text-red-400'}`}>
-                  {stats.totalMargin > 0 ? `${stats.marginLevel}%` : '—'}
-                </div>
+            <div>
+              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'نسبة الفوز' : 'Win rate'}</div>
+              <div className="text-lg font-black text-emerald-400">{stats.winRate}%</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'صافي الربح' : 'Net P&L'}</div>
+              <div className={`text-lg font-black ${stats.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtMoney(stats.totalPnl)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'الهامش' : 'Margin'}</div>
+              <div className={`text-lg font-black ${stats.marginLevel > 200 ? 'text-emerald-400' : stats.marginLevel > 100 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {stats.totalMargin > 0 ? `${stats.marginLevel}%` : '—'}
               </div>
             </div>
           </div>
@@ -1253,39 +1223,89 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </button>
         </div>
 
-        <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-white/10">
-          <span className="text-sm font-bold text-brand-text/50">
-            {tab === 'positions'
-              ? (isAr ? `الصفقات المفتوحة: ${openTrades.length}` : `Open positions: ${openTrades.length}`)
-              : (isAr ? `إجمالي السجل: ${closedTrades.length}` : `History entries: ${closedTrades.length}`)}
-          </span>
-          {tab === 'positions' && openTrades.length > 0 ? (
-            <button
-              onClick={() => closeAllTrades()}
-              disabled={busy}
-              className="flex items-center gap-1.5 rounded-lg bg-red-500/80 hover:bg-red-500 px-3 py-1.5 text-xs font-black text-white uppercase tracking-wider transition-colors disabled:opacity-50"
-            >
-              <XCircle size={14} />
-              {isAr ? 'إغلاق الكل' : 'Close All'}
-            </button>
-          ) : tab === 'history' && closedTrades.length > 0 ? (
-            <button
-              onClick={() => {
-                if (!confirmClear) {
-                  setConfirmClear(true);
-                  setTimeout(() => setConfirmClear(false), 3000);
-                  return;
-                }
-                clearHistory();
-              }}
-              disabled={busy}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black text-white uppercase tracking-wider transition-colors disabled:opacity-50 ${confirmClear ? 'bg-red-500 hover:bg-red-600' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              <Trash2 size={14} />
-              {confirmClear ? (isAr ? 'تأكيد المسح' : 'Confirm') : (isAr ? 'مسح السجل' : 'Clear History')}
-            </button>
-          ) : null}
-        </div>
+        {/* Floating P&L under the "Close All" icon */}
+        {tab === 'positions' && (
+          <div className="flex items-stretch justify-between gap-2 px-4 py-2 border-b border-white/10">
+            <span className="text-sm font-bold text-brand-text/50 self-center">
+              {isAr ? `الصفقات المفتوحة: ${openTrades.length}` : `Open positions: ${openTrades.length}`}
+            </span>
+            <div className="flex flex-col items-stretch gap-1">
+              {openTrades.length > 0 && (
+                <button
+                  onClick={() => closeAllTrades()}
+                  disabled={busy}
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-red-500/80 hover:bg-red-500 px-3 py-1.5 text-xs font-black text-white uppercase tracking-wider transition-colors disabled:opacity-50"
+                >
+                  <XCircle size={14} />
+                  {isAr ? 'إغلاق الكل' : 'Close All'}
+                </button>
+              )}
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">
+                  {isAr ? 'ربح/خسارة عائمة' : 'Floating P&L'}
+                </span>
+                <span className={`text-sm font-black ${unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">
+                  {fmtMoney(unrealizedPnl)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* History: count + period selector for closed-trades P&L */}
+        {tab === 'history' && (
+          <div className="space-y-2 px-4 py-2 border-b border-white/10">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-bold text-brand-text/50">
+                {isAr ? `إجمالي السجل: ${closedTrades.length}` : `History entries: ${closedTrades.length}`}
+              </span>
+              {closedTrades.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (!confirmClear) {
+                      setConfirmClear(true);
+                      setTimeout(() => setConfirmClear(false), 3000);
+                      return;
+                    }
+                    clearHistory();
+                  }}
+                  disabled={busy}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black text-white uppercase tracking-wider transition-colors disabled:opacity-50 ${confirmClear ? 'bg-red-500 hover:bg-red-600' : 'bg-white/10 hover:bg-white/20'}`}
+                >
+                  <Trash2 size={14} />
+                  {confirmClear ? (isAr ? 'تأكيد المسح' : 'Confirm') : (isAr ? 'مسح السجل' : 'Clear History')}
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider mr-1">
+                {isAr ? 'مجموع الربح/الخسارة للفترة:' : 'Period P&L:'}
+              </span>
+              {([
+                ['day', isAr ? 'اليوم' : 'Day'],
+                ['week', isAr ? 'الأسبوع' : 'Week'],
+                ['month', isAr ? 'الشهر' : 'Month'],
+                ['year', isAr ? 'السنة' : 'Year'],
+                ['all', isAr ? 'الكل' : 'All'],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setReportPeriod(key)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-colors border ${
+                    reportPeriod === key
+                      ? 'bg-[#F59E0B] text-black border-[#F59E0B]'
+                      : 'bg-white/5 text-brand-text/60 border-white/10 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              <span className={`ml-auto text-base font-black ${periodStats.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">
+                {fmtMoney(periodStats.pnl)}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="max-h-[400px] overflow-y-auto overflow-x-auto">
           {tab === 'positions' ? (
