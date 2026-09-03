@@ -908,9 +908,11 @@ export async function analyzeMarket(params: {
       fetchMarketDataDirect(symbol, macro1).catch((e) => { console.warn(`[Engine] ${symbol} macro fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
     ]);
 
-    // Fetch daily/weekly/monthly data for Candle Match Filter (only if enabled)
+    // Fetch daily/weekly/monthly data for Candle Match Filter
+    // (fetched whenever the direction-unify filter or size filter is active,
+    //  since the direction filter is ON by default and must always be enforced)
     let candleMatchData: { daily: any; weekly: any; monthly: any } | null = null;
-    if (settings?.useCandleMatch) {
+    if (settings?.useCandleMatch || settings?.candleDirectionFilter !== false || settings?.candleSizeFilter !== false) {
       const [dailyRaw, weeklyRaw, monthlyRaw] = await Promise.all([
         fetchMarketDataDirect(symbol, '1d').catch((e) => { console.warn(`[Engine] ${symbol} daily fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
         fetchMarketDataDirect(symbol, '1w').catch((e) => { console.warn(`[Engine] ${symbol} weekly fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
@@ -1615,7 +1617,7 @@ Return ONLY valid JSON:
     //
     // Either filter failing forces the symbol to NEUTRAL (never displayed).
     var candleMatchBlocked = false;
-    if (settings?.useCandleMatch && candleMatchData) {
+    if (candleMatchData) {
       const extractCandles = (raw: any): { open: number; high: number; low: number; close: number }[] | null => {
         const q = raw?.chart?.result?.[0]?.indicators?.quote?.[0];
         const ts = raw?.chart?.result?.[0]?.timestamp;
