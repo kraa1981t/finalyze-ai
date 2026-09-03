@@ -634,9 +634,14 @@ app.get("/api/quote", async (req, res) => {
     const quoteAttempts = isForex ? attemptsYahooFor(symbol) : [quoteSymbol];
     const uniqueAttempts = [...new Set([...quoteAttempts, quoteSymbol])];
     let lastFresh = 0;
-    // FOREX ONLY: Frankfurter (ECB) first — it is reliable, free and NOT frozen by
-    // region on Vercel. Yahoo acts as a secondary source.
+    // FOREX: prefer Yahoo when it returns a LIVE tick (moves every second, which
+    // makes the floating P&L feel alive). open.er-api/ECB (fetchFrfQuote) is a
+    // reliable substitute but is static intraday — it makes P&L look frozen.
     if (isForex) {
+      for (const attempt of uniqueAttempts) {
+        const y = await fetchYahooQuote(attempt);
+        if (typeof y === 'number' && y > 0) { lastFresh = y; return answerQuote(res, symbol, y); }
+      }
       const frf = await fetchFrfQuote(symbol);
       if (typeof frf === 'number' && frf > 0) return answerQuote(res, symbol, frf);
     }
