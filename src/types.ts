@@ -97,7 +97,6 @@ export interface StrategySettings {
   useFilterSideways?: boolean;
   useCandleMatch?: boolean;
   candleDirectionFilter?: boolean;
-  candleSizeFilter?: boolean;
   candleMatchDailyEnabled?: boolean;
   candleMatchWeeklyEnabled?: boolean;
   candleMatchMonthlyEnabled?: boolean;

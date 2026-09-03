@@ -5,16 +5,14 @@
  *
  * CRITICAL INVARIANTS (DO NOT CHANGE WITHOUT REVIEW):
  *
- * 1. DIRECTION UNIFICATION — the THREE timeframes (1D/1W/1M) MUST all be
- *    aligned in ONE direction (all bullish or all bearish). Two is NOT
- *    enough — all three are required.
- * 2. Candle direction MUST match signal direction:
- *    BUY → candles MUST be bullish, SELL → candles MUST be bearish.
- * 3. SIZE FILTER — the CURRENT (in-progress) candle body of each timeframe,
- *    measured as % of its own ATR(14), MUST meet its configured threshold
- *    (defaults: daily 15%, weekly 20%, monthly 30%).
- * 4. The two filters are INDEPENDENT — each can be enabled/disabled alone.
- * 5. If either active filter fails → the signal MUST NOT be shown.
+ * 1. REVERSAL PREVENTION — the signal is BLOCKED ONLY when BOTH the
+ *    weekly (1W) AND monthly (1M) candles oppose the signal direction.
+ *    e.g. BUY is blocked only if 1W AND 1M are both bearish.
+ *    If only ONE of them opposes (or the daily aligns), the signal stays.
+ * 2. Candle direction MUST match signal direction when reversing:
+ *    BUY → blocked if 1W+1M both bearish. SELL → blocked if 1W+1M both bullish.
+ * 3. The greedy Candle Size (ATR) filter has been REMOVED entirely.
+ * 4. If the reversal filter fails → the signal MUST NOT be shown.
  * ═══════════════════════════════════════════════════════════════════
  */
 
@@ -23,7 +21,6 @@ import { DEFAULT_STRATEGY_SETTINGS } from '../../constants';
 
 // ═══ TYPES ═══
 interface CandleData {
-  pct: number;      // Current candle body size as % of its own ATR(14)
   direction: 'bullish' | 'bearish' | 'unknown';
 }
 
@@ -31,7 +28,7 @@ interface CandleMatchResult {
   matched: boolean;
   blocked: boolean;
   reason: string;
-  candles: { label: string; pct: number; direction: string; meetsThreshold: boolean }[];
+  candles: { label: string; direction: string }[];
 }
 
 // ═══ CORE CANDLE MATCH FUNCTION (mirrors geminiService.ts STEP 5e) ═══
@@ -44,59 +41,56 @@ function calculateCandleMatch(
   signal: SignalType,
 ): CandleMatchResult {
   const frames = [
-    { label: '1D', data: daily, enabled: settings.candleMatchDailyEnabled !== false, threshold: settings.candleMatchDailyThreshold ?? 15 },
-    { label: '1W', data: weekly, enabled: settings.candleMatchWeeklyEnabled !== false, threshold: settings.candleMatchWeeklyThreshold ?? 20 },
-    { label: '1M', data: monthly, enabled: settings.candleMatchMonthlyEnabled !== false, threshold: settings.candleMatchMonthlyThreshold ?? 30 },
+    { label: '1D', data: daily, enabled: settings.candleMatchDailyEnabled !== false },
+    { label: '1W', data: weekly, enabled: settings.candleMatchWeeklyEnabled !== false },
+    { label: '1M', data: monthly, enabled: settings.candleMatchMonthlyEnabled !== false },
   ];
 
   const signalIsBuy = signal === SignalType.BUY || signal === SignalType.STRONG_BUY;
   const signalIsSell = signal === SignalType.SELL || signal === SignalType.STRONG_SELL;
 
-  // ── FILTER A: Direction unification across the THREE timeframes ──
+  // ── FILTER A: Reversal prevention — block ONLY when 1W AND 1M both oppose ──
   const directionFilterOn = settings.candleDirectionFilter !== false;
   let directionOk = true;
   let directionReason = '';
-  const dirFrames = frames.filter(f => f.enabled && f.data);
   if (directionFilterOn) {
-    const enough = dirFrames.length === 3;
-    const firstDir = dirFrames[0]?.data?.direction || null;
-    const allSame = enough && dirFrames.every(f => f.data!.direction === firstDir);
-    const dirMatch = firstDir === 'bullish' ? signalIsBuy : firstDir === 'bearish' ? signalIsSell : false;
-    directionOk = enough && allSame && dirMatch;
-    if (!enough) directionReason = 'needs all 3 timeframes (1D/1W/1M) with data';
-    else if (!allSame) directionReason = 'candle directions conflict across the 3 timeframes';
-    else if (!dirMatch) directionReason = `candles are ${firstDir}, signal is ${signalIsBuy ? 'BUY' : 'SELL'} — direction contradiction`;
+    const dirFrames = frames.filter(f => f.enabled && f.data && f.data!.direction !== 'unknown');
+    const weekly = dirFrames.find(f => f.label === '1W');
+    const monthly = dirFrames.find(f => f.label === '1M');
+    if (weekly && monthly) {
+      const weeklyBearish = weekly.data!.direction === 'bearish';
+      const weeklyBullish = weekly.data!.direction === 'bullish';
+      const monthlyBearish = monthly.data!.direction === 'bearish';
+      const monthlyBullish = monthly.data!.direction === 'bullish';
+      if (signalIsBuy && weeklyBearish && monthlyBearish) {
+        directionOk = false;
+        directionReason = '1W & 1M both bearish oppose BUY — reversal risk';
+      } else if (signalIsSell && weeklyBullish && monthlyBullish) {
+        directionOk = false;
+        directionReason = '1W & 1M both bullish oppose SELL — reversal risk';
+      }
+    } else {
+      directionReason = '1W and 1M candle data required';
+    }
   }
 
-  // ── FILTER B: Size — current candle body vs its own ATR(14), as % ──
-  const sizeFilterOn = settings.candleSizeFilter !== false;
-  let sizeOk = true;
-  const sizeFrames = frames.filter(f => f.enabled && f.threshold > 0 && f.data);
-  if (sizeFilterOn) {
-    sizeOk = sizeFrames.length > 0 && sizeFrames.every(f => f.data!.pct >= f.threshold);
-  }
-
-  const matched = (!directionFilterOn || directionOk) && (!sizeFilterOn || sizeOk);
+  const matched = !directionFilterOn || directionOk;
   const blocked = !matched;
 
   let reason = '';
   if (blocked) {
-    if (directionFilterOn && !directionOk) reason = `BLOCKED: ${directionReason}`;
-    else if (sizeFilterOn && !sizeOk) reason = 'BLOCKED: candle size below threshold (% of ATR)';
-    else reason = 'BLOCKED (no active filter)';
+    reason = `BLOCKED: ${directionReason}`;
   } else {
-    reason = 'all three candle directions aligned + sizes meet thresholds';
+    reason = '1W & 1M do not both oppose the signal — allowed';
   }
 
   return {
     matched,
     blocked,
     reason,
-    candles: dirFrames.filter(f => f.data).map(f => ({
+    candles: frames.filter(f => f.data).map(f => ({
       label: f.label,
-      pct: f.data!.pct,
       direction: f.data!.direction,
-      meetsThreshold: f.data!.pct >= f.threshold,
     })),
   };
 }
@@ -117,303 +111,165 @@ function assert(condition: boolean, testName: string, details?: string) {
 
 function runTests() {
   console.log('\n═══════════════════════════════════════════════════════');
-  console.log('  CANDLE MATCH FILTER — PROTECTION TEST SUITE');
+  console.log('  CANDLE MATCH FILTER — REVERSAL PREVENTION TEST SUITE');
   console.log('═══════════════════════════════════════════════════════\n');
 
   const settings: StrategySettings = {
     ...DEFAULT_STRATEGY_SETTINGS,
     useCandleMatch: true,
     candleDirectionFilter: true,
-    candleSizeFilter: true,
     candleMatchDailyEnabled: true,
     candleMatchWeeklyEnabled: true,
     candleMatchMonthlyEnabled: true,
-    candleMatchDailyThreshold: 15,
-    candleMatchWeeklyThreshold: 20,
-    candleMatchMonthlyThreshold: 30,
   };
 
   // ══════════════════════════════════════════════════════════════
-  // GROUP 1: Size thresholds (% of ATR) — current candles
+  // GROUP 1: BUY signal — blocked only when 1W AND 1M both bearish
   // ══════════════════════════════════════════════════════════════
-  console.log('📏 GROUP 1: Size Thresholds (% of ATR)');
+  console.log('🛑 GROUP 1: BUY — reversal prevention');
 
-  // Test 1.1: All bullish, all above thresholds → MATCHED
+  // Test 1.1: 1W bearish + 1M bearish + daily bullish → BLOCKED
   const r1 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    { pct: 25, direction: 'bullish' },
-    { pct: 35, direction: 'bullish' },
+    { direction: 'bullish' },
+    { direction: 'bearish' },  // 1W opposes
+    { direction: 'bearish' },  // 1M opposes
     settings, SignalType.BUY
   );
-  assert(r1.matched === true, '1.1 All bullish, all above thresholds → MATCHED');
-  assert(r1.blocked === false, '1.1 Not blocked');
+  assert(r1.matched === false, '1.1 1W+1M both bearish, daily bullish → BLOCKED');
+  assert(r1.reason.includes('both bearish'), '1.1 Reason: both bearish');
 
-  // Test 1.2: Daily below threshold → BLOCKED
+  // Test 1.2: 1W bearish + 1M bullish → NOT blocked (only one opposes)
   const r2 = calculateCandleMatch(
-    { pct: 5, direction: 'bullish' },   // 5 < 15 threshold
-    { pct: 25, direction: 'bullish' },
-    { pct: 35, direction: 'bullish' },
+    { direction: 'bullish' },
+    { direction: 'bearish' },  // 1W opposes
+    { direction: 'bullish' },
     settings, SignalType.BUY
   );
-  assert(r2.matched === false, '1.2 Daily below threshold (5 < 15) → BLOCKED');
-  assert(r2.blocked === true, '1.2 Blocked');
+  assert(r2.matched === true, '1.2 Only 1W bearish, 1M bullish → ALLOWED');
 
-  // Test 1.3: Weekly below threshold → BLOCKED
+  // Test 1.3: 1W bullish + 1M bearish → NOT blocked (only one opposes)
   const r3 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    { pct: 10, direction: 'bullish' },  // 10 < 20 threshold
-    { pct: 35, direction: 'bullish' },
+    { direction: 'bullish' },
+    { direction: 'bullish' },
+    { direction: 'bearish' },  // 1M opposes
     settings, SignalType.BUY
   );
-  assert(r3.matched === false, '1.3 Weekly below threshold (10 < 20) → BLOCKED');
+  assert(r3.matched === true, '1.3 Only 1M bearish, 1W bullish → ALLOWED');
 
-  // Test 1.4: Monthly below threshold → BLOCKED
+  // Test 1.4: All bullish → NOT blocked
   const r4 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    { pct: 25, direction: 'bullish' },
-    { pct: 20, direction: 'bullish' },  // 20 < 30 threshold
+    { direction: 'bullish' },
+    { direction: 'bullish' },
+    { direction: 'bullish' },
     settings, SignalType.BUY
   );
-  assert(r4.matched === false, '1.4 Monthly below threshold (20 < 30) → BLOCKED');
+  assert(r4.matched === true, '1.4 All bullish → ALLOWED');
 
   // ══════════════════════════════════════════════════════════════
-  // GROUP 2: Direction consistency — all THREE required
+  // GROUP 2: SELL signal — blocked only when 1W AND 1M both bullish
   // ══════════════════════════════════════════════════════════════
-  console.log('\n🔀 GROUP 2: Direction Consistency (3 timeframes)');
+  console.log('\n🛑 GROUP 2: SELL — reversal prevention');
 
-  // Test 2.1: Mixed directions → BLOCKED
+  // Test 2.1: 1W bullish + 1M bullish → BLOCKED
   const r5 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    { pct: 25, direction: 'bearish' },  // Different!
-    { pct: 35, direction: 'bullish' },
-    settings, SignalType.BUY
-  );
-  assert(r5.matched === false, '2.1 Mixed directions (bullish/bearish/bullish) → BLOCKED');
-
-  // Test 2.2: All bearish → MATCHED for SELL
-  const r6 = calculateCandleMatch(
-    { pct: 15, direction: 'bearish' },
-    { pct: 25, direction: 'bearish' },
-    { pct: 35, direction: 'bearish' },
+    { direction: 'bearish' },
+    { direction: 'bullish' },  // 1W opposes
+    { direction: 'bullish' },  // 1M opposes
     settings, SignalType.SELL
   );
-  assert(r6.matched === true, '2.2 All bearish + SELL signal → MATCHED');
+  assert(r5.matched === false, '2.1 1W+1M both bullish, daily bearish → BLOCKED');
+
+  // Test 2.2: 1W bullish + 1M bearish → ALLOWED (only one opposes)
+  const r6 = calculateCandleMatch(
+    { direction: 'bearish' },
+    { direction: 'bullish' },  // 1W opposes
+    { direction: 'bearish' },
+    settings, SignalType.SELL
+  );
+  assert(r6.matched === true, '2.2 Only 1W bullish, 1M bearish → ALLOWED');
+
+  // Test 2.3: All bearish → ALLOWED
+  const r7 = calculateCandleMatch(
+    { direction: 'bearish' },
+    { direction: 'bearish' },
+    { direction: 'bearish' },
+    settings, SignalType.SELL
+  );
+  assert(r7.matched === true, '2.3 All bearish → ALLOWED');
 
   // ══════════════════════════════════════════════════════════════
   // GROUP 3: Direction vs Signal mismatch (CRITICAL SAFETY)
   // ══════════════════════════════════════════════════════════════
-  console.log('\n🛡️ GROUP 3: Signal Direction Mismatch (CRITICAL)');
+  console.log('\n🛡️ GROUP 3: Critical Reversal Scenarios');
 
-  // Test 3.1: Bearish candles + BUY signal → BLOCKED (CVX bug fix)
-  const r7 = calculateCandleMatch(
-    { pct: 66.8, direction: 'bearish' },
-    { pct: 65.5, direction: 'bearish' },
-    { pct: 65.5, direction: 'bearish' },
+  // Test 3.1: BUY signal but 1W+1M both bearish → BLOCKED (CVX-style bug)
+  const r8 = calculateCandleMatch(
+    { direction: 'bearish' },
+    { direction: 'bearish' },
+    { direction: 'bearish' },
     settings, SignalType.BUY
   );
-  assert(r7.matched === false, '3.1 Bearish candles + BUY signal → BLOCKED (CVX bug)');
-  assert(r7.reason.includes('direction contradiction'), '3.1 Reason mentions direction contradiction');
+  assert(r8.matched === false, '3.1 BUY + 1W&1M both bearish → BLOCKED (reversal)');
 
-  // Test 3.2: Bullish candles + SELL signal → BLOCKED
-  const r8 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    { pct: 25, direction: 'bullish' },
-    { pct: 35, direction: 'bullish' },
-    settings, SignalType.SELL
-  );
-  assert(r8.matched === false, '3.2 Bullish candles + SELL signal → BLOCKED');
-
-  // Test 3.3: Bullish candles + STRONG_BUY → MATCHED
+  // Test 3.2: BUY signal, only daily bearish, 1W+1M bullish → ALLOWED
   const r9 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    { pct: 25, direction: 'bullish' },
-    { pct: 35, direction: 'bullish' },
-    settings, SignalType.STRONG_BUY
+    { direction: 'bearish' },  // daily opposes but doesn't matter
+    { direction: 'bullish' },
+    { direction: 'bullish' },
+    settings, SignalType.BUY
   );
-  assert(r9.matched === true, '3.3 Bullish candles + STRONG_BUY → MATCHED');
+  assert(r9.matched === true, '3.2 BUY + only daily bearish → ALLOWED (daily no longer blocks)');
 
-  // Test 3.4: Bearish candles + STRONG_SELL → MATCHED
+  // Test 3.3: NEUTRAL signal → never reversed/blocked by candles
   const r10 = calculateCandleMatch(
-    { pct: 15, direction: 'bearish' },
-    { pct: 25, direction: 'bearish' },
-    { pct: 35, direction: 'bearish' },
-    settings, SignalType.STRONG_SELL
-  );
-  assert(r10.matched === true, '3.4 Bearish candles + STRONG_SELL → MATCHED');
-
-  // Test 3.5: Any candles + NEUTRAL → BLOCKED (no direction to match)
-  const r11 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    { pct: 25, direction: 'bullish' },
-    { pct: 35, direction: 'bullish' },
+    { direction: 'bullish' },
+    { direction: 'bearish' },
+    { direction: 'bearish' },
     settings, SignalType.NEUTRAL
   );
-  assert(r11.matched === false, '3.5 Bullish candles + NEUTRAL signal → BLOCKED');
+  assert(r10.matched === true, '3.3 NEUTRAL signal → not blocked by candles');
 
   // ══════════════════════════════════════════════════════════════
-  // GROUP 4: Edge cases
+  // GROUP 4: Missing / insufficient data
   // ══════════════════════════════════════════════════════════════
-  console.log('\n⚡ GROUP 4: Edge Cases');
+  console.log('\n⚡ GROUP 4: Missing / Insufficient Data');
 
-  // Test 4.1: Only 1 candle available → Needs all three → BLOCKED
-  const r12 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    null,
-    null,
-    settings, SignalType.BUY
-  );
-  assert(r12.matched === false, '4.1 Only 1 candle → BLOCKED (needs all 3)');
-
-  // Test 4.2: Only 2 candles available → Not enough (must be 3)
-  const r12b = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    { pct: 25, direction: 'bullish' },
+  // Test 4.1: Missing monthly → cannot evaluate both, default ALLOWED (lenient)
+  const r11 = calculateCandleMatch(
+    { direction: 'bullish' },
+    { direction: 'bearish' },
     null,
     settings, SignalType.BUY
   );
-  assert(r12b.matched === false, '4.2 Only 2 candles → BLOCKED (all 3 required)');
+  assert(r11.matched === true, '4.1 Missing 1M → ALLOWED (lenient, keeps signal)');
 
-  // Test 4.3: No candles → BLOCKED
-  const r13 = calculateCandleMatch(null, null, null, settings, SignalType.BUY);
-  assert(r13.matched === false, '4.3 No candles → BLOCKED');
-
-  // Test 4.4: Exactly at threshold → MATCHED
-  const r14 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },   // Exactly 15 (threshold = 15)
-    { pct: 20, direction: 'bullish' },   // Exactly 20 (threshold = 20)
-    { pct: 30, direction: 'bullish' },   // Exactly 30 (threshold = 30)
-    settings, SignalType.BUY
-  );
-  assert(r14.matched === true, '4.4 All exactly at thresholds → MATCHED');
-
-  // Test 4.5: One below, two above → BLOCKED
-  const r15 = calculateCandleMatch(
-    { pct: 14, direction: 'bullish' },    // 14 < 15
-    { pct: 25, direction: 'bullish' },
-    { pct: 35, direction: 'bullish' },
-    settings, SignalType.BUY
-  );
-  assert(r15.matched === false, '4.5 One candle below threshold → BLOCKED');
+  // Test 4.2: No candles at all → ALLOWED (cannot prove reversal)
+  const r12 = calculateCandleMatch(null, null, null, settings, SignalType.BUY);
+  assert(r12.matched === true, '4.2 No candles → ALLOWED (no reversal detected)');
 
   // ══════════════════════════════════════════════════════════════
-  // GROUP 5: Normalized size — same thresholds across all markets
+  // GROUP 5: Filter disabled
   // ══════════════════════════════════════════════════════════════
-  console.log('\n💱 GROUP 5: Normalized (market-agnostic) sizes');
-  // ATR-normalization means the same % threshold applies identically to
-  // stocks, forex and crypto — no per-market multipliers needed anymore.
-  const r16 = calculateCandleMatch(
-    { pct: 25, direction: 'bullish' },
-    { pct: 30, direction: 'bullish' },
-    { pct: 40, direction: 'bullish' },
-    settings, SignalType.BUY
-  );
-  assert(r16.matched === true, '5.1 Normalized pct passes for stocks/forex/crypto alike → MATCHED');
+  console.log('\n🔓 GROUP 5: Filter Disabled');
 
-  // ══════════════════════════════════════════════════════════════
-  // GROUP 6: Real-world scenario (JNJ from screenshots)
-  // ══════════════════════════════════════════════════════════════
-  console.log('\n📊 GROUP 6: Real-World Scenarios');
-
-  // Test 6.1: JNJ — All bullish, all above thresholds, BUY signal
-  const r18 = calculateCandleMatch(
-    { pct: 66.8, direction: 'bullish' },
-    { pct: 66.8, direction: 'bullish' },
-    { pct: 72.5, direction: 'bullish' },
-    settings, SignalType.BUY
-  );
-  assert(r18.matched === true, '6.1 JNJ: All bullish + BUY → MATCHED');
-  assert(r18.candles.every(c => c.meetsThreshold), '6.1 All candles meet thresholds');
-
-  // Test 6.2: CVX — All bearish but BUY signal (the bug we fixed)
-  const r19 = calculateCandleMatch(
-    { pct: 66.8, direction: 'bearish' },
-    { pct: 65.5, direction: 'bearish' },
-    { pct: 65.5, direction: 'bearish' },
-    settings, SignalType.BUY
-  );
-  assert(r19.matched === false, '6.2 CVX: All bearish + BUY → BLOCKED (critical bug fix)');
-  assert(r19.reason.includes('direction contradiction'), '6.2 Correct error message');
-
-  // ══════════════════════════════════════════════════════════════
-  // GROUP 7: Disabled candles — direction still needs all THREE
-  // ══════════════════════════════════════════════════════════════
-  console.log('\n🔧 GROUP 7: Disabled Candles');
-
-  // Test 7.1: Daily disabled → Only 2 candles → direction BLOCKED (needs 3)
-  const settingsNoDaily = { ...settings, candleMatchDailyEnabled: false };
-  const r20 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    { pct: 25, direction: 'bullish' },
-    { pct: 35, direction: 'bullish' },
-    settingsNoDaily, SignalType.BUY
-  );
-  assert(r20.matched === false, '7.1 Daily disabled, 2 candles → BLOCKED (all 3 required)');
-  assert(r20.reason.includes('needs all 3'), '7.1 Reason mentions needing all 3 timeframes');
-
-  // Test 7.2: Only 1 candle enabled → Not enough
-  const settingsOnlyDaily = {
-    ...settings,
-    candleMatchDailyEnabled: true,
-    candleMatchWeeklyEnabled: false,
-    candleMatchMonthlyEnabled: false,
-  };
-  const r21 = calculateCandleMatch(
-    { pct: 15, direction: 'bullish' },
-    null,
-    null,
-    settingsOnlyDaily, SignalType.BUY
-  );
-  assert(r21.matched === false, '7.2 Only 1 candle enabled → Insufficient data');
-
-  // ══════════════════════════════════════════════════════════════
-  // GROUP 8: Threshold zero = disable size only (direction still needs 3)
-  // ══════════════════════════════════════════════════════════════
-  console.log('\n🚫 GROUP 8: Threshold Zero = Disable Sizing');
-
-  // Test 8.1: Daily threshold 0 → Daily excluded from size check only
-  const settingsZeroDaily = { ...settings, candleMatchDailyThreshold: 0 };
-  const r22 = calculateCandleMatch(
-    { pct: 5, direction: 'bullish' },
-    { pct: 25, direction: 'bullish' },
-    { pct: 35, direction: 'bullish' },
-    settingsZeroDaily, SignalType.BUY
-  );
-  assert(r22.matched === true, '8.1 Daily threshold 0 → Excluded from size, 3 directions OK → MATCHED');
-
-  // ══════════════════════════════════════════════════════════════
-  // GROUP 9: Filters are INDEPENDENT
-  // ══════════════════════════════════════════════════════════════
-  console.log('\n🔓 GROUP 9: Independent Filters');
-
-  // Test 9.1: Direction OFF, size ON → mixed directions but sizes OK → MATCHED
+  // Test 5.1: Direction filter OFF → nothing blocked
   const settingsNoDir = { ...settings, candleDirectionFilter: false };
-  const r23 = calculateCandleMatch(
-    { pct: 25, direction: 'bullish' },
-    { pct: 30, direction: 'bearish' },
-    { pct: 40, direction: 'bullish' },
+  const r13 = calculateCandleMatch(
+    { direction: 'bullish' },
+    { direction: 'bearish' },
+    { direction: 'bearish' },
     settingsNoDir, SignalType.BUY
   );
-  assert(r23.matched === true, '9.1 Direction OFF, size ON → MATCHED');
+  assert(r13.matched === true && r13.blocked === false, '5.1 Direction filter OFF → no block');
 
-  // Test 9.2: Direction ON, size OFF → aligned directions but small bodies → MATCHED
-  const settingsNoSize = { ...settings, candleSizeFilter: false };
-  const r24 = calculateCandleMatch(
-    { pct: 2, direction: 'bullish' },
-    { pct: 3, direction: 'bullish' },
-    { pct: 4, direction: 'bullish' },
-    settingsNoSize, SignalType.BUY
+  // Test 5.2: STRONG_BUY with both 1W+1M bearish → BLOCKED
+  const r14 = calculateCandleMatch(
+    { direction: 'bullish' },
+    { direction: 'bearish' },
+    { direction: 'bearish' },
+    settings, SignalType.STRONG_BUY
   );
-  assert(r24.matched === true, '9.2 Direction ON, size OFF → MATCHED');
-
-  // Test 9.3: Both OFF → nothing blocks, neutral never forced by this step
-  const settingsBothOff = { ...settings, candleDirectionFilter: false, candleSizeFilter: false };
-  const r25 = calculateCandleMatch(
-    { pct: 2, direction: 'bullish' },
-    { pct: 3, direction: 'bearish' },
-    { pct: 4, direction: 'bullish' },
-    settingsBothOff, SignalType.BUY
-  );
-  assert(r25.matched === true && r25.blocked === false, '9.3 Both OFF → no block');
+  assert(r14.matched === false, '5.2 STRONG_BUY + 1W&1M both bearish → BLOCKED');
 
   // ══════════════════════════════════════════════════════════════
   // SUMMARY
@@ -423,10 +279,10 @@ function runTests() {
   console.log('═══════════════════════════════════════════════════════\n');
 
   if (failed > 0) {
-    console.log('⚠️  CRITICAL: Some tests failed! The candle match filter may be broken.');
+    console.log('⚠️  CRITICAL: Some tests failed! The reversal prevention filter may be broken.');
     console.log('⚠️  DO NOT deploy until all tests pass.\n');
   } else {
-    console.log('✅ All tests passed. Candle match filter is protected.\n');
+    console.log('✅ All tests passed. Reversal prevention filter is protected.\n');
   }
 
   return failed === 0;

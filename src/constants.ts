@@ -36,13 +36,9 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   useFilterSideways: true,
   useCandleMatch: false,
   candleDirectionFilter: true,
-  candleSizeFilter: true,
   candleMatchDailyEnabled: true,
   candleMatchWeeklyEnabled: true,
   candleMatchMonthlyEnabled: true,
-  candleMatchDailyThreshold: 15,
-  candleMatchWeeklyThreshold: 20,
-  candleMatchMonthlyThreshold: 30,
 };
 
 export const DEFAULT_AUTO_SETTINGS = {

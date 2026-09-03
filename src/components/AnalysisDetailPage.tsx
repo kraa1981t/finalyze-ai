@@ -52,17 +52,23 @@ function getStatusStyle(status: string) {
 }
 
 function parseCandleInfo(value: string) {
-  // New format: "1d: 66.8 Bearish ↑ ✓ | 1w: 65.5 Bearish ↑ ✓"
-  // Old format: "1d: 18.8 ↑ ✓, 1w: 25.3 ↑"
+  // Reformatted: "1D: Bullish ↑ | 1W: Bearish ↓ | 1M: Bullish ↑" (no % ATR anymore)
+  // Legacy formats kept for backwards-compatible parsing.
   const parts = value.split(/[|,]/).map((p: string) => p.trim());
   return parts.map((part: string) => {
-    // Try new format first: "1d: 66.8 Bearish ↑ ✓"
+    // New format: "1D: Bullish ↑" (no number)
+    const revMatch = part.match(/^(\S+):\s*(Bullish|Bearish)\s*(↑|↓)/);
+    if (revMatch) {
+      const [, tf, dirName, dirChar] = revMatch;
+      return { tf, body: '', dirChar, checkChar: undefined, isBullish: dirName === 'Bullish', isMatch: true };
+    }
+    // Previous format: "1d: 66.8 Bearish ↑ ✓"
     const newMatch = part.match(/^(\S+):\s*([\d.]+)\s+(Bullish|Bearish)\s+(↑|↓)\s*(✓|✗)?/);
     if (newMatch) {
       const [, tf, body, dirName, dirChar, checkChar] = newMatch;
       return { tf, body, dirChar, checkChar, isBullish: dirName === 'Bullish', isMatch: checkChar !== '✗' };
     }
-    // Try old format: "1d: 18.8 ↑ ✓"
+    // Old format: "1d: 18.8 ↑ ✓"
     const oldMatch = part.match(/^(\S+):\s*([\d.]+)\s*\((.)\s*(.)?\)/);
     if (oldMatch) {
       const [, tf, body, dirChar, checkChar] = oldMatch;
@@ -410,8 +416,14 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl font-black font-mono text-white">{c.body}</span>
-                        <span className="text-sm text-white/40">{isAr ? '٪ ATR' : '% ATR'}</span>
+                        {c.body ? (
+                          <>
+                            <span className="text-2xl font-black font-mono text-white">{c.body}</span>
+                            <span className="text-sm text-white/40">{isAr ? '٪ ATR' : '% ATR'}</span>
+                          </>
+                        ) : (
+                          <span className="text-sm text-white/40">{isAr ? '—' : '—'}</span>
+                        )}
                         <span className={`text-2xl font-black ${c.isMatch ? 'text-emerald-400' : 'text-red-400'}`}>
                           {c.isMatch ? '✓' : '✗'}
                         </span>

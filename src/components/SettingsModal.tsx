@@ -406,14 +406,13 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             { key: 'useHigherTimeframe', label: isAr ? 'الإطار الأعلى' : 'Higher Timeframe', desc: isAr ? 'تأكيد من الإطار الأكبر' : 'Confirm from higher TF' },
             { key: 'useVolumeAnalysis', label: isAr ? 'تحليل الحجم' : 'Volume Analysis', desc: isAr ? 'تحليل تدفق الحجم' : 'Volume flow analysis' },
             { key: 'useFilterSideways', label: isAr ? 'فلتر الاتجاه العرضي' : 'Sideways Filter', desc: isAr ? 'حظر الإشارات في الأسواق العرضية' : 'Block signals in sideways markets' },
-            { key: 'useCandleMatch', label: isAr ? 'تطابق جذوع الشموع' : 'Candle Body Match', desc: isAr ? 'تفعيل فلترَي الشموع المتقدمة' : 'Enable advanced candle filters' },
-            { key: 'candleDirectionFilter', label: isAr ? 'توحيد اتجاه الشموع (الثلاثة)' : 'Direction Unify (all 3)', desc: isAr ? 'اشتراط 1D/1W/1M على اتجاه واحد مع الإشارة' : 'Require 1D/1W/1M in ONE direction matching signal' },
-            { key: 'candleSizeFilter', label: isAr ? 'فلتر حجم الشموع (ATR)' : 'Candle Size (ATR)', desc: isAr ? 'الشمعة الحالية مقابل ATR — عتبات 15/20/30٪' : 'Current candle body vs ATR — 15/20/30%' },
+            { key: 'useCandleMatch', label: isAr ? 'فلتر منع الانعكاس (الشموع)' : 'Reversal Guard (Candles)', desc: isAr ? 'تفعيل فلتر الشموع المتقدم' : 'Enable the advanced reversal-prevention filter' },
+            { key: 'candleDirectionFilter', label: isAr ? 'منع الانعكاس (1W + 1M)' : 'Reversal Prevention (1W + 1M)', desc: isAr ? 'حظر فقط إذا كانت 1W و 1M كلتاهما ضد الإشارة' : 'Block only when BOTH 1W and 1M oppose the signal' },
           ].map((item) => (
             <button key={item.key} onClick={() => {
               const next = !(settings as any)[item.key];
               const applied: any = { ...settings, [item.key]: next };
-              if ((item.key === 'candleDirectionFilter' || item.key === 'candleSizeFilter') && next) {
+              if ((item.key === 'candleDirectionFilter') && next) {
                 applied.useCandleMatch = true;
               }
               onSettingsChange(applied);
@@ -439,74 +438,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         </div>
       </div>
 
-      {/* Section 4b: Candle Match Thresholds */}
-      {settings.useCandleMatch && (
-        <div className="space-y-3">
-          <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
-            <span className="text-[#F59E0B]">◆</span> {isAr ? 'عتبات حجم جذوع الشموع (٪ من ATR)' : 'Candle Body Size Thresholds (% of ATR)'}
-          </h3>
-          <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-4">
-            <div className="text-[10px] text-brand-text/40">{isAr ? 'الشمعة الحالية لكل إطار تُقاس كمئوية من متوسط مداها (ATR 14). حدد الحد الأدنى ٪ (0 = تعطيل). الافتراضي: يومي 15٪ / أسبوعي 20٪ / شهري 30٪ — يدعم الأرقام العشرية مثل 25.5' : 'The CURRENT candle of each timeframe is measured as % of its own ATR(14). Set the min % (0 = disable). Defaults: daily 15% / weekly 20% / monthly 30% — supports decimals like 25.5'}</div>
 
-            {/* Daily Candle */}
-            <div className="flex items-center justify-between py-2 border-b border-white/5">
-              <div className="flex items-center gap-2">
-                <button onClick={() => handleChange('candleMatchDailyEnabled', !settings.candleMatchDailyEnabled)}
-                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${settings.candleMatchDailyEnabled !== false ? 'bg-[#F59E0B]' : 'bg-white/20'}`}>
-                  <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${settings.candleMatchDailyEnabled !== false ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
-                <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة يومية' : 'Daily (1d)'}</span>
-              </div>
-              <div className="flex items-center gap-1" dir="ltr" lang="en">
-                <input type="text" inputMode="decimal" lang="en" autoComplete="off"
-                  value={settings.candleMatchDailyThreshold ?? 15}
-                  onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); if (v === '' || v === '.') { handleChange('candleMatchDailyThreshold', 0); } else { const n = parseFloat(v); if (!isNaN(n)) handleChange('candleMatchDailyThreshold', n); } }}
-                  style={{ fontVariantNumeric: 'lining-nums tabular-nums', WebkitTextSecurity: 'none' }}
-                  className="w-20 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
-                <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? '٪ ATR' : '% ATR'}</span>
-              </div>
-            </div>
-
-            {/* Weekly Candle */}
-            <div className="flex items-center justify-between py-2 border-b border-white/5">
-              <div className="flex items-center gap-2">
-                <button onClick={() => handleChange('candleMatchWeeklyEnabled', !settings.candleMatchWeeklyEnabled)}
-                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${settings.candleMatchWeeklyEnabled !== false ? 'bg-[#F59E0B]' : 'bg-white/20'}`}>
-                  <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${settings.candleMatchWeeklyEnabled !== false ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
-                <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة أسبوعية' : 'Weekly (1w)'}</span>
-              </div>
-              <div className="flex items-center gap-1" dir="ltr" lang="en">
-                <input type="text" inputMode="decimal" lang="en" autoComplete="off"
-                  value={settings.candleMatchWeeklyThreshold ?? 20}
-                  onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); if (v === '' || v === '.') { handleChange('candleMatchWeeklyThreshold', 0); } else { const n = parseFloat(v); if (!isNaN(n)) handleChange('candleMatchWeeklyThreshold', n); } }}
-                  style={{ fontVariantNumeric: 'lining-nums tabular-nums', WebkitTextSecurity: 'none' }}
-                  className="w-20 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
-                <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? '٪ ATR' : '% ATR'}</span>
-              </div>
-            </div>
-
-            {/* Monthly Candle */}
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-2">
-                <button onClick={() => handleChange('candleMatchMonthlyEnabled', !settings.candleMatchMonthlyEnabled)}
-                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${settings.candleMatchMonthlyEnabled !== false ? 'bg-[#F59E0B]' : 'bg-white/20'}`}>
-                  <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${settings.candleMatchMonthlyEnabled !== false ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
-                <span className="text-xs font-bold text-brand-text">{isAr ? 'شمعة شهرية' : 'Monthly (1M)'}</span>
-              </div>
-              <div className="flex items-center gap-1" dir="ltr" lang="en">
-                <input type="text" inputMode="decimal" lang="en" autoComplete="off"
-                  value={settings.candleMatchMonthlyThreshold ?? 30}
-                  onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); if (v === '' || v === '.') { handleChange('candleMatchMonthlyThreshold', 0); } else { const n = parseFloat(v); if (!isNaN(n)) handleChange('candleMatchMonthlyThreshold', n); } }}
-                  style={{ fontVariantNumeric: 'lining-nums tabular-nums', WebkitTextSecurity: 'none' }}
-                  className="w-20 text-center text-sm font-black font-mono text-[#F59E0B] bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none" />
-                <span className="text-[10px] font-black" style={{color:'#F59E0B'}}>{isAr ? '٪ ATR' : '% ATR'}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Section 5: Developer Trend Age Zones */}
       {user && (user.email === 'taybekraa@gmail.com' || user.email === 'kraakraa109@gmail.com' || user.email === 'bachasalman69@gmail.com') && (

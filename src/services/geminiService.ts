@@ -969,10 +969,10 @@ export async function analyzeMarket(params: {
     ]);
 
     // Fetch daily/weekly/monthly data for Candle Match Filter
-    // (fetched whenever the direction-unify filter or size filter is active,
+    // (fetched whenever the direction-unify filter is active,
     //  since the direction filter is ON by default and must always be enforced)
     let candleMatchData: { daily: any; weekly: any; monthly: any } | null = null;
-    if (settings?.useCandleMatch || settings?.candleDirectionFilter !== false || settings?.candleSizeFilter !== false) {
+    if (settings?.useCandleMatch || settings?.candleDirectionFilter !== false) {
       const [dailyRaw, weeklyRaw, monthlyRaw] = await Promise.all([
         fetchMarketDataDirect(symbol, '1d').catch((e) => { console.warn(`[Engine] ${symbol} daily fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
         fetchMarketDataDirect(symbol, '1w').catch((e) => { console.warn(`[Engine] ${symbol} weekly fetch fail:`, e.message); return { chart: { result: [{ indicators: { quote: [{}] } }] } }; }),
@@ -1694,19 +1694,12 @@ Return ONLY valid JSON:
       });
     }
 
-    // ═══ STEP 5e: Advanced Candle Filters (Daily/Weekly/Monthly) ═══
-    // TWO INDEPENDENT filters — each can be disabled separately:
-    //
-    //  A) DIRECTION UNIFICATION — the THREE timeframes (1D/1W/1M) must ALL be
-    //     aligned in ONE direction, and that direction must match the signal.
-    //     Requires ALL THREE timeframes to be present (not just two).
-    //
-    //  B) SIZE FILTER — measures the CURRENT (in-progress, NOT completed)
-    //     candle body of each timeframe relative to its own ATR(14): the body
-    //     as a % of the typical range. Each timeframe must meet its threshold
-    //     (defaults: daily 15%, weekly 20%, monthly 30%).
-    //
-    // Either filter failing forces the symbol to NEUTRAL (never displayed).
+    // ═══ STEP 5e: Advanced Candle Filter — REVERSAL PREVENTION (1W + 1M) ═══
+    // The Direction Unify filter now works as a REVERSAL SAFETY NET:
+    // it BLOCKS a signal ONLY when BOTH the weekly (1W) AND monthly (1M)
+    // candles oppose the signal direction (e.g. both bearish against a BUY).
+    // If only one opposes the signal (or the daily aligns), the signal is kept.
+    // The greedy "Candle Size (ATR)" filter has been REMOVED entirely.
     var candleMatchBlocked = false;
     if (candleMatchData) {
       const extractCandles = (raw: any): { open: number; high: number; low: number; close: number }[] | null => {
@@ -1722,29 +1715,11 @@ Return ONLY valid JSON:
         }
         return out.length ? out : null;
       };
-      // Average True Range over the last 14 candles of the same timeframe
-      const atr = (candles: { open: number; high: number; low: number; close: number }[]): number => {
-        const n = candles.length;
-        if (n < 2) return 0;
-        const start = Math.max(0, n - 14);
-        let sum = 0, cnt = 0;
-        for (let i = start; i < n; i++) {
-          const c = candles[i];
-          const prevClose = i > 0 ? candles[i - 1].close : c.close;
-          sum += Math.max(c.high - c.low, Math.abs(c.high - prevClose), Math.abs(c.low - prevClose));
-          cnt++;
-        }
-        return cnt ? sum / cnt : 0;
-      };
-      // NOTE: The LAST element of the series is the CURRENT candle (the one
-      // still forming). We measure it directly — never only completed candles.
-      const currentCandle = (candles: { open: number; high: number; low: number; close: number }[]) => {
+      // Direction of the CURRENT (still forming) candle of the timeframe.
+      const currentDirection = (candles: { open: number; high: number; low: number; close: number }[]): 'bullish' | 'bearish' | 'unknown' => {
         const c = candles[candles.length - 1];
-        if (!c) return null;
-        const body = Math.abs(c.close - c.open);
-        const direction: 'bullish' | 'bearish' | 'unknown' = c.close > c.open ? 'bullish' : c.close < c.open ? 'bearish' : 'unknown';
-        const a = atr(candles);
-        return { body, direction, atr: a, pct: a > 0 ? (body / a) * 100 : 0 };
+        if (!c) return 'unknown';
+        return c.close > c.open ? 'bullish' : c.close < c.open ? 'bearish' : 'unknown';
       };
 
       const frames: { label: string; key: string }[] = [
@@ -1758,92 +1733,66 @@ Return ONLY valid JSON:
         const enabled = f.key === 'daily' ? settings.candleMatchDailyEnabled !== false
           : f.key === 'weekly' ? settings.candleMatchWeeklyEnabled !== false
           : settings.candleMatchMonthlyEnabled !== false;
-        const threshold = f.key === 'daily' ? (settings.candleMatchDailyThreshold ?? 15)
-          : f.key === 'weekly' ? (settings.candleMatchWeeklyThreshold ?? 20)
-          : (settings.candleMatchMonthlyThreshold ?? 30);
         const candles = extractCandles(raw);
-        const cur = candles ? currentCandle(candles) : null;
-        return { label: f.label, enabled, threshold, cur };
+        const dir = candles ? currentDirection(candles) : 'unknown';
+        return { label: f.label, enabled, dir };
       });
 
       const signalIsBuy = finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY;
       const signalIsSell = finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL;
 
       // Value string format is parsed by AnalysisDetailPage.parseCandleInfo:
-      // e.g. "1D: 45 Bullish ↑ ✓ | 1W: 22 Bearish ↓ ✗"
-      const frameStr = (i: { label: string; enabled: boolean; threshold: number; cur: { body: number; direction: 'bullish' | 'bearish' | 'unknown'; atr: number; pct: number } | null }): string | null => {
-        if (!i.cur) return null;
-        const dirName = i.cur.direction === 'bullish' ? 'Bullish' : i.cur.direction === 'bearish' ? 'Bearish' : null;
-        if (!dirName) return null;
-        const arrow = i.cur.direction === 'bullish' ? '↑' : '↓';
-        const ok = i.cur.pct >= i.threshold ? '✓' : '✗';
-        return `${i.label}: ${i.cur.pct.toFixed(0)} ${dirName} ${arrow} ${ok}`;
+      // e.g. "1D: Bullish ↑ | 1W: Bearish ↓ | 1M: Bullish ↑"
+      const frameStr = (i: { label: string; enabled: boolean; dir: 'bullish' | 'bearish' | 'unknown' }): string | null => {
+        if (i.dir === 'unknown') return null;
+        const dirName = i.dir === 'bullish' ? 'Bullish' : 'Bearish';
+        const arrow = i.dir === 'bullish' ? '↑' : '↓';
+        return `${i.label}: ${dirName} ${arrow}`;
       };
 
-      // ── FILTER A: Direction unification across the THREE timeframes ──
+      // ── FILTER A: Reversal prevention — block ONLY when 1W AND 1M both oppose ──
       const directionFilterOn = settings.candleDirectionFilter !== false;
       let directionBlocked = false;
       let directionWhy = '';
       let dirValue = '';
       if (directionFilterOn) {
-        const dirFrames = info.filter(i => i.enabled && i.cur);
+        const dirFrames = info.filter(i => i.enabled && i.dir !== 'unknown');
         dirValue = dirFrames.map(frameStr).filter(Boolean).join(' | ');
-        const enough = dirFrames.length === 3;
-        const firstDir = dirFrames[0]?.cur?.direction || null;
-        const allSame = enough && dirFrames.every(i => i.cur!.direction === firstDir);
-        const dirMatchSignal = firstDir === 'bullish' ? signalIsBuy : firstDir === 'bearish' ? signalIsSell : false;
-        if (!enough) directionWhy = 'needs all 3 timeframes (1D/1W/1M) with data';
-        else if (!allSame) directionWhy = 'candle directions conflict across the 3 timeframes';
-        else if (!dirMatchSignal) directionWhy = 'signal opposes candle direction';
-        directionBlocked = !(enough && allSame && dirMatchSignal);
-      }
-
-      // ── FILTER B: Size — current candle body vs its own ATR(14), as % ──
-      const sizeFilterOn = settings.candleSizeFilter !== false;
-      let sizeBlocked = false;
-      let sizeWhy = '';
-      let sizeValue = '';
-      if (sizeFilterOn) {
-        const sizeFrames = info.filter(i => i.enabled && i.threshold > 0 && i.cur);
-        sizeValue = sizeFrames.map(frameStr).filter(Boolean).join(' | ');
-        if (sizeFrames.length === 0) {
-          sizeBlocked = true;
-          sizeWhy = 'no candle size data';
-        } else {
-          const below = sizeFrames.filter(i => i.cur!.pct < i.threshold);
-          if (below.length > 0) {
-            sizeBlocked = true;
-            sizeWhy = `size below threshold: ${below.map(b => `${b.label} ${b.cur!.pct.toFixed(0)}%<${b.threshold}%`).join(', ')}`;
+        const weekly = dirFrames.find(f => f.label === '1W');
+        const monthly = dirFrames.find(f => f.label === '1M');
+        if (weekly && monthly) {
+          const weeklyOpposesBuy = weekly.dir === 'bearish';
+          const weeklyOpposesSell = weekly.dir === 'bullish';
+          const monthlyOpposesBuy = monthly.dir === 'bearish';
+          const monthlyOpposesSell = monthly.dir === 'bullish';
+          if (signalIsBuy && weeklyOpposesBuy && monthlyOpposesBuy) {
+            directionBlocked = true;
+            directionWhy = '1W & 1M both bearish oppose BUY — reversal risk';
+          } else if (signalIsSell && weeklyOpposesSell && monthlyOpposesSell) {
+            directionBlocked = true;
+            directionWhy = '1W & 1M both bullish oppose SELL — reversal risk';
           }
+        } else {
+          directionWhy = '1W and 1M candle data required';
         }
       }
 
-      candleMatchBlocked = (directionFilterOn && directionBlocked) || (sizeFilterOn && sizeBlocked);
+      candleMatchBlocked = directionFilterOn && directionBlocked;
 
       if (candleMatchBlocked) {
         if (signalIsBuy || signalIsSell) finalSignal = SignalType.NEUTRAL;
-        if (directionFilterOn && directionBlocked) {
-          detailedReasons.push({
-            check: 'Candle Match',
-            value: dirValue || 'no data',
-            status: 'negative',
-            impact: `BLOCKED: ${directionWhy}`
-          });
-        }
-        if (sizeFilterOn && sizeBlocked) {
-          detailedReasons.push({
-            check: 'Candle Match',
-            value: sizeValue || 'no data',
-            status: 'negative',
-            impact: `BLOCKED: ${sizeWhy}`
-          });
-        }
-      } else if (directionFilterOn || sizeFilterOn) {
+        detailedReasons.push({
+          check: 'Candle Match',
+          value: dirValue || 'no data',
+          status: 'negative',
+          impact: `BLOCKED: ${directionWhy}`
+        });
+      } else if (directionFilterOn) {
         detailedReasons.push({
           check: 'Candle Match',
           value: info.map(frameStr).filter(Boolean).join(' | '),
           status: 'positive',
-          impact: 'all three candle directions aligned + sizes meet thresholds'
+          impact: '1W & 1M do not both oppose the signal — allowed'
         });
       }
     }

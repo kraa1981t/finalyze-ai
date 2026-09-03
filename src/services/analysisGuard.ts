@@ -54,55 +54,29 @@ export function validateCandleMatchInput(input: CandleMatchInput): CandleMatchVa
     errors.push(`Invalid signal type: ${input.signal}`);
   }
 
-  // Check 2: If candle match is enabled, check direction consistency.
-  // DIRECTION UNIFICATION now requires ALL THREE timeframes (1D/1W/1M)
-  // to be aligned in ONE direction — not just two.
-  if (input.settings.useCandleMatch) {
-    const directions = [input.dailyDirection, input.weeklyDirection, input.monthlyDirection].filter(d => d !== null);
+  // Check 2: If candle match (reversal prevention) is enabled, check direction.
+  // REVERSAL PREVENTION now blocks only when BOTH weekly (1W) AND monthly (1M)
+  // oppose the signal — the greedy 3-way unification and size filter were removed.
+  if (input.settings.useCandleMatch || input.settings.candleDirectionFilter !== false) {
+    const weeklyDir = input.weeklyDirection;
+    const monthlyDir = input.monthlyDirection;
+    const signalIsBuy = input.signal === SignalType.BUY || input.signal === SignalType.STRONG_BUY;
+    const signalIsSell = input.signal === SignalType.SELL || input.signal === SignalType.STRONG_SELL;
 
-    if (directions.length === 3) {
-      const firstDir = directions[0];
-      const allSame = directions.every(d => d === firstDir);
+    if (weeklyDir && monthlyDir && weeklyDir !== 'unknown' && monthlyDir !== 'unknown') {
+      const weeklyOpposesBuy = weeklyDir === 'bearish';
+      const weeklyOpposesSell = weeklyDir === 'bullish';
+      const monthlyOpposesBuy = monthlyDir === 'bearish';
+      const monthlyOpposesSell = monthlyDir === 'bullish';
 
-      if (!allSame) {
-        warnings.push('Candle directions conflict across the 3 timeframes — signal will be blocked');
+      if (signalIsBuy && weeklyOpposesBuy && monthlyOpposesBuy) {
+        errors.push('CRITICAL: 1W and 1M both bearish cannot confirm BUY signal — reversal risk');
       }
-
-      // Check direction vs signal
-      const signalIsBuy = input.signal === SignalType.BUY || input.signal === SignalType.STRONG_BUY;
-      const signalIsSell = input.signal === SignalType.SELL || input.signal === SignalType.STRONG_SELL;
-
-      if (signalIsBuy && firstDir === 'bearish') {
-        errors.push('CRITICAL: Bearish candles cannot confirm BUY signal');
+      if (signalIsSell && weeklyOpposesSell && monthlyOpposesSell) {
+        errors.push('CRITICAL: 1W and 1M both bullish cannot confirm SELL signal — reversal risk');
       }
-      if (signalIsSell && firstDir === 'bullish') {
-        errors.push('CRITICAL: Bullish candles cannot confirm SELL signal');
-      }
-    } else if (input.settings.candleDirectionFilter !== false) {
-      warnings.push('Direction unification needs all 3 timeframes (1D/1W/1M) with data');
-    }
-
-    // Check size thresholds (bodies received here are already normalized as
-    // % of ATR; defaults: daily 15 / weekly 20 / monthly 30)
-    if (input.dailyBody !== null && input.settings.candleMatchDailyEnabled !== false) {
-      const threshold = input.settings.candleMatchDailyThreshold ?? 15;
-      if (input.dailyBody < threshold) {
-        warnings.push(`Daily body (${input.dailyBody.toFixed(1)}% of ATR) below threshold (${threshold}%)`);
-      }
-    }
-
-    if (input.weeklyBody !== null && input.settings.candleMatchWeeklyEnabled !== false) {
-      const threshold = input.settings.candleMatchWeeklyThreshold ?? 20;
-      if (input.weeklyBody < threshold) {
-        warnings.push(`Weekly body (${input.weeklyBody.toFixed(1)}% of ATR) below threshold (${threshold}%)`);
-      }
-    }
-
-    if (input.monthlyBody !== null && input.settings.candleMatchMonthlyEnabled !== false) {
-      const threshold = input.settings.candleMatchMonthlyThreshold ?? 30;
-      if (input.monthlyBody < threshold) {
-        warnings.push(`Monthly body (${input.monthlyBody.toFixed(1)}% of ATR) below threshold (${threshold}%)`);
-      }
+    } else {
+      warnings.push('Reversal prevention needs 1W and 1M candle data');
     }
   }
 
@@ -222,17 +196,6 @@ export function validateSettings(settings: StrategySettings): SettingsValidation
   }
   if (settings.strongThreshold < 0 || settings.strongThreshold > 100) {
     errors.push(`strongThreshold out of range: ${settings.strongThreshold}`);
-  }
-
-  // Check candle match thresholds
-  if (settings.candleMatchDailyThreshold !== undefined && settings.candleMatchDailyThreshold < 0) {
-    errors.push(`candleMatchDailyThreshold cannot be negative: ${settings.candleMatchDailyThreshold}`);
-  }
-  if (settings.candleMatchWeeklyThreshold !== undefined && settings.candleMatchWeeklyThreshold < 0) {
-    errors.push(`candleMatchWeeklyThreshold cannot be negative: ${settings.candleMatchWeeklyThreshold}`);
-  }
-  if (settings.candleMatchMonthlyThreshold !== undefined && settings.candleMatchMonthlyThreshold < 0) {
-    errors.push(`candleMatchMonthlyThreshold cannot be negative: ${settings.candleMatchMonthlyThreshold}`);
   }
 
   // Check age zones
