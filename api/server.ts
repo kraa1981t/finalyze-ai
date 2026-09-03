@@ -490,6 +490,31 @@ async function fetchYahooQuote(symbol: string): Promise<number | null> {
   return null;
 }
 
+// Frankfurter (ECB) — free, no API key, no daily credit cap, and NOT subject to
+// the geo/region stale-data problem that makes Yahoo return frozen AUDUSD/GBPUSD
+// from Vercel server IPs. Returns a live-ish midpoint for an ABC/XYZ pair.
+//   from = first 3 chars (base), to = last 3 chars (quote): rate = base->quote.
+async function fetchFrfQuote(fxSymbol: string): Promise<number | null> {
+  const s = (fxSymbol || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (s.length !== 6) return null;
+  const from = s.slice(0, 3);
+  const to = s.slice(3);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const url = `https://api.frankfurter.dev/v1/latest?base=${from}&_cb=${Date.now()}`;
+    const response = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
+    clearTimeout(timeout);
+    if (!response.ok) return null;
+    const d = await response.json();
+    const rate = Number(d?.rates?.[to]);
+    if (typeof rate === 'number' && isFinite(rate) && rate > 0) return rate;
+  } catch {
+    clearTimeout(timeout);
+  }
+  return null;
+}
+
 // API Route: Latest Spot Quote (fast, lightweight). Returns { symbol, price, ts }
 // Used by the paper-trading live P&L engine so open trades move with REAL market
 // prices instead of polling full 5m candle histories. Per-class source:
@@ -578,6 +603,12 @@ app.get("/api/quote", async (req, res) => {
     const quoteAttempts = isForex ? attemptsYahooFor(symbol) : [quoteSymbol];
     const uniqueAttempts = [...new Set([...quoteAttempts, quoteSymbol])];
     let lastFresh = 0;
+    // FOREX ONLY: Frankfurter (ECB) first — it is reliable, free and NOT frozen by
+    // region on Vercel. Yahoo acts as a secondary source.
+    if (isForex) {
+      const frf = await fetchFrfQuote(symbol);
+      if (typeof frf === 'number' && frf > 0) return answerQuote(res, symbol, frf);
+    }
     for (const attempt of uniqueAttempts) {
       const price = await fetchYahooQuote(attempt);
       if (typeof price === 'number' && price > 0) { lastFresh = price; return answerQuote(res, symbol, price); }
