@@ -34,7 +34,7 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   pullbackVolConfirm: false,
   pullbackCandleConfirm: false,
   useFilterSideways: true,
-  useCandleMatch: false,
+  useCandleMatch: true,
   candleDirectionFilter: true,
   candleMatchDailyEnabled: true,
   candleMatchWeeklyEnabled: true,

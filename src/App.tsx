@@ -528,7 +528,8 @@ export default function App() {
     const saved = localStorage.getItem('strategy_settings');
     if (saved) {
       try {
-        const merged = { ...DEFAULT_STRATEGY_SETTINGS, ...JSON.parse(saved) };
+        const raw: any = JSON.parse(saved);
+        const merged: any = { ...DEFAULT_STRATEGY_SETTINGS, ...raw };
         // Migrate legacy default thresholds (10/20/30 pips) to the new
         // ATR-normalized defaults (15/20/30 %). We only override when the
         // stored value exactly equals the old default, so a user who
@@ -536,6 +537,24 @@ export default function App() {
         if (merged.candleMatchDailyThreshold === 10) merged.candleMatchDailyThreshold = 15;
         if (merged.candleMatchWeeklyThreshold === 20) merged.candleMatchWeeklyThreshold = 20;
         if (merged.candleMatchMonthlyThreshold === 30) merged.candleMatchMonthlyThreshold = 30;
+        // ── One-time migration: Reversal Guard (1W+1M) is a baseline safety guard and must be ON by default.
+        // Legacy installs have {useCandleMatch:false, candleDirectionFilter:false/undefined} because the default used to be OFF.
+        // We auto-correct once and set a flag, so afterwards the user's manual OFF is respected.
+        const MIGRATION_KEY = 'reversalGuardMigrated_v2';
+        let needsPersist = false;
+        if (!localStorage.getItem(MIGRATION_KEY)) {
+          if (merged.useCandleMatch !== true) { merged.useCandleMatch = true; needsPersist = true; }
+          if (merged.candleDirectionFilter !== true) { merged.candleDirectionFilter = true; needsPersist = true; }
+          // Ensure daily/weekly/monthly enables are ON as well (they default to true)
+          if (merged.candleMatchDailyEnabled === false && raw.candleMatchDailyEnabled === undefined) { merged.candleMatchDailyEnabled = true; needsPersist = true; }
+          if (merged.candleMatchWeeklyEnabled === false && raw.candleMatchWeeklyEnabled === undefined) { merged.candleMatchWeeklyEnabled = true; needsPersist = true; }
+          if (merged.candleMatchMonthlyEnabled === false && raw.candleMatchMonthlyEnabled === undefined) { merged.candleMatchMonthlyEnabled = true; needsPersist = true; }
+          if (needsPersist) { try { localStorage.setItem('strategy_settings', JSON.stringify(merged)); } catch {} }
+          try { localStorage.setItem(MIGRATION_KEY, '1'); } catch {}
+        } else {
+          // After migration, keep parent in sync: if direction filter is ON, guard must be ON
+          if (merged.candleDirectionFilter === true && merged.useCandleMatch !== true) merged.useCandleMatch = true;
+        }
         return merged;
       } catch (e) { return DEFAULT_STRATEGY_SETTINGS; }
     }
