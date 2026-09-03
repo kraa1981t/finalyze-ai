@@ -1,6 +1,6 @@
 ﻿{
     "autoUpdate":  true,
-    "description":  "eede351 chore: save working state before stable backup",
-    "savedAt":  "2026-08-18 00:13",
-    "stableVersion":  "eede351"
+    "description":  "9d83fbb v4.3.0-stable: light-mode visibility overhaul + trade platform P&L reporting",
+    "savedAt":  "2026-09-03 01:10",
+    "stableVersion":  "9d83fbb"
 }
