@@ -293,17 +293,17 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
 
   const modalHeader = (
     <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5" dir="rtl">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary/20 text-primary rounded-lg">
-          <Settings2 size={24} />
+      <div className="flex items-center gap-4">
+        <div className="p-3 bg-primary/20 text-primary rounded-xl">
+          <Settings2 size={42} />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-brand-text">{isAr ? 'إعدادات التحليل الذكي' : 'Smart Analysis Settings'}</h2>
-          <p className="text-sm text-brand-text/50">{isAr ? 'قم بضبط معايير الذكاء الاصطناعي بدقة' : 'Fine-tune AI analysis parameters precisely'}</p>
+          <h2 className="text-4xl md:text-[48px] font-black text-brand-text leading-tight">{isAr ? 'إعدادات التحليل الذكي' : 'Smart Analysis Settings'}</h2>
+          <p className="text-xl md:text-[28px] text-brand-text/50 leading-snug mt-1">{isAr ? 'قم بضبط معايير الذكاء الاصطناعي بدقة' : 'Fine-tune AI analysis parameters precisely'}</p>
         </div>
       </div>
-      <button onClick={onClose} className="p-2 text-brand-text/50 hover:text-red-500 hover:bg-white/5 rounded-lg transition-colors">
-        <X size={24} />
+      <button onClick={onClose} className="p-3 text-brand-text/50 hover:text-red-500 hover:bg-white/5 rounded-xl transition-colors">
+        <X size={36} />
       </button>
     </div>
   );
@@ -328,20 +328,20 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
     };
 
     return (
-      <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+      <div className="flex items-center justify-between py-4 border-b border-white/5 last:border-0 gap-4">
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-bold text-brand-text">{label}</div>
-          {desc && <div className="text-[10px] text-brand-text/40 mt-0.5">{desc}</div>}
+          <div className="text-2xl md:text-[30px] font-black text-brand-text leading-tight">{label}</div>
+          {desc && <div className="text-base md:text-[22px] text-brand-text/45 mt-1.5 leading-snug">{desc}</div>}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
           <input type="text" inputMode="decimal" translate="no" dir="ltr" lang="en"
             value={focused ? draft : draft}
             onFocus={() => { setFocused(true); setDraft(String(value)); }}
             onBlur={commit}
             onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(String(value)); setFocused(false); } }}
             onChange={(e) => setDraft(e.target.value.replace(/[^0-9.\-]/g, ''))}
-            className={`w-20 text-center text-sm font-black font-mono notranslate ${color} bg-transparent border border-white/10 rounded-lg py-1.5 focus:border-primary outline-none`} />
-          {suffix && <span className="text-xs text-[#F59E0B] font-bold whitespace-nowrap">{suffix}</span>}
+            className={`w-28 md:w-32 text-center text-xl md:text-[28px] font-black font-mono notranslate ${color} bg-transparent border-2 border-white/10 rounded-xl py-2.5 focus:border-primary outline-none`} />
+          {suffix && <span className="text-lg md:text-[24px] text-[#F59E0B] font-black whitespace-nowrap">{suffix}</span>}
         </div>
       </div>
     );
@@ -351,11 +351,11 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
     <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar" dir="rtl">
       
       {/* Section 1: Confidence Thresholds */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
-          <span className="text-[#F59E0B]">◆</span> {isAr ? 'عتبات الثقة' : 'Confidence Thresholds'}
+      <div className="space-y-4">
+        <h3 className="text-2xl md:text-[32px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
+          <span className="text-[#F59E0B] text-3xl">◆</span> {isAr ? 'عتبات الثقة' : 'Confidence Thresholds'}
         </h3>
-        <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+        <div className="bg-white/5 border border-white/5 rounded-2xl p-5 md:p-6">
           <NumberInput label={isAr ? 'حد الإشارة القوية' : 'Strong Signal Threshold'} value={settings.strongThreshold} onChange={(v) => handleChange('strongThreshold', v)} color="text-[#F59E0B]" desc={isAr ? 'الثقة المطلوبة لإشارة قوية (≥)' : 'Confidence required for strong signal (≥)'} />
           <NumberInput label={isAr ? 'الشروط الداعمة للقوة' : 'Min Support for Strong'} value={settings.minStrongSupport} onChange={(v) => handleChange('minStrongSupport', v)} color="text-[#F59E0B]" desc={isAr ? 'نسبة الشروط الداعمة المطلوبة لإشارة قوية (≥%)' : 'Support ratio required for strong signal (≥%)'} />
           <NumberInput label={isAr ? 'حد الإشارة العادية' : 'Buy/Sell Threshold'} value={settings.buyThreshold} onChange={(v) => handleChange('buyThreshold', v)} color="text-primary" desc={isAr ? 'الثقة المطلوبة لشراء/بيع عادي (≥)' : 'Confidence required for regular buy/sell (≥)'} />
@@ -364,12 +364,12 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
       </div>
 
       {/* Section 2: Primary Conditions (Entry Gates) */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
-          <span className="text-[#F59E0B]">◆</span> {isAr ? 'الشروط الأساسية (أبواب الدخول)' : 'Primary Conditions (Entry Gates)'}
-          <span className="text-[10px] text-brand-text/30 font-mono mr-auto">{isAr ? 'النسبة القصوى 50%' : 'Max 50%'}</span>
+      <div className="space-y-4">
+        <h3 className="text-2xl md:text-[32px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
+          <span className="text-[#F59E0B] text-3xl">◆</span> {isAr ? 'الشروط الأساسية (أبواب الدخول)' : 'Primary Conditions (Entry Gates)'}
+          <span className="text-base md:text-[22px] text-brand-text/35 font-mono mr-auto">{isAr ? 'النسبة القصوى 50%' : 'Max 50%'}</span>
         </h3>
-        <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+        <div className="bg-white/5 border border-white/5 rounded-2xl p-5 md:p-6">
           <NumberInput label={isAr ? '① BB Pullback — تراجع بولينجر' : '① BB Pullback — Bollinger Pullback'} value={settings.primaryBBWeight} onChange={(v) => handleChange('primaryBBWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'تراجع 3-6 شموع + لمس BB + شمعة انتكاس' : '3-6 candle pullback + touch BB + reversal candle'} />
           <NumberInput label={isAr ? '② Supply/Demand — مناطق العرض والطلب' : '② Supply/Demand Zones'} value={settings.primarySDWeight} onChange={(v) => handleChange('primarySDWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'منطقة طلب + صعود = شراء / منطقة عرض + هبوط = بيع' : 'Demand+uptrend=buy / Supply+downtrend=sell'} />
           <NumberInput label={isAr ? '③ Trend Age — عمر الاتجاه' : '③ Trend Age'} value={settings.primaryAgeWeight} onChange={(v) => handleChange('primaryAgeWeight', v)} color="text-[#F59E0B]" desc={isAr ? 'ناضج (25-50) = كامل / رضيع أو قديم = تخفيف' : 'Mature (25-50)=full / Infant or Old=reduced'} />
@@ -379,12 +379,12 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
       </div>
 
       {/* Section 3: Supporting Conditions (Signal Boost) */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
-          <span className="text-[#F59E0B]">◆</span> {isAr ? 'الشروط الداعمة (تعزيز الإشارة)' : 'Supporting Conditions (Signal Boost)'}
-          <span className="text-[10px] text-brand-text/30 font-mono mr-auto">{isAr ? 'النسبة القصوى 20%' : 'Max 20%'}</span>
+      <div className="space-y-4">
+        <h3 className="text-2xl md:text-[32px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
+          <span className="text-[#F59E0B] text-3xl">◆</span> {isAr ? 'الشروط الداعمة (تعزيز الإشارة)' : 'Supporting Conditions (Signal Boost)'}
+          <span className="text-base md:text-[22px] text-brand-text/35 font-mono mr-auto">{isAr ? 'النسبة القصوى 20%' : 'Max 20%'}</span>
         </h3>
-        <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+        <div className="bg-white/5 border border-white/5 rounded-2xl p-5 md:p-6">
           <NumberInput label={isAr ? 'RSI' : 'RSI'} value={settings.supportRSIWeight} onChange={(v) => handleChange('supportRSIWeight', v)} color="text-primary" desc={isAr ? 'تشبع بيع (RSI<30) = شراء / تشبع شراء (RSI>70) = بيع' : 'Oversold (<30)=buy / Overbought (>70)=sell'} />
           <NumberInput label={isAr ? 'EMA Cross — تقاطع المتوسط' : 'EMA Cross'} value={settings.supportEMAWeight} onChange={(v) => handleChange('supportEMAWeight', v)} color="text-primary" desc={isAr ? 'صاعد = دعم شراء / هابط = دعم بيع' : 'Bullish=supports buy / Bearish=supports sell'} />
           <NumberInput label={isAr ? 'Trend Direction — اتجاه الاتجاه' : 'Trend Direction'} value={settings.supportDirWeight} onChange={(v) => handleChange('supportDirWeight', v)} color="text-primary" desc={isAr ? 'صاعد/هابط = يدعم الاتجاه' : 'Uptrend/Downtrend supports direction'} />
@@ -395,11 +395,11 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
       </div>
 
       {/* Section 4: Toggles */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-black text-brand-text/60 uppercase tracking-widest flex items-center gap-2">
-          <span className="text-[#F59E0B]">◆</span> {isAr ? 'مفاتيح التفعيل' : 'Feature Toggles'}
+      <div className="space-y-4">
+        <h3 className="text-2xl md:text-[32px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
+          <span className="text-[#F59E0B] text-3xl">◆</span> {isAr ? 'مفاتيح التفعيل' : 'Feature Toggles'}
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
             { key: 'useIndicators', label: isAr ? 'المؤشرات الفنية' : 'Technical Indicators', desc: isAr ? 'RSI + EMA + Volume' : 'RSI + EMA + Volume' },
             { key: 'useNewsGuard', label: isAr ? 'حماية الأخبار الأسبوعية' : 'Weekly News Guard', desc: isAr ? 'حظر أي رمز عليه خبر قوي جداً خلال الأسبوع، ويُسمح بعد تجاوزه' : 'Block any symbol with a very high-impact event this week; unblock after it passes' },
@@ -417,20 +417,20 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
               }
               onSettingsChange(applied);
             }}
-              className={`flex items-center justify-between p-3.5 rounded-xl border-2 transition-all text-right ${
+              className={`flex items-center justify-between p-5 md:p-6 rounded-2xl border-2 transition-all text-right gap-4 ${
                 (settings as any)[item.key]
                   ? 'bg-[#F59E0B]/10 border-[#F59E0B]/40 text-[#F59E0B]'
                   : 'bg-white/5 border-white/5 text-brand-muted'
               }`}>
-              <div>
-                <div className="text-xs font-bold">{item.label}</div>
-                <div className="text-[10px] opacity-60 mt-0.5">{item.desc}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xl md:text-[26px] font-black leading-tight">{item.label}</div>
+                <div className="text-base md:text-[20px] opacity-70 mt-1.5 leading-snug">{item.desc}</div>
               </div>
-              <div className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${
+              <div className={`w-16 h-9 rounded-full transition-colors flex items-center px-1 shrink-0 ${
                 (settings as any)[item.key] ? 'bg-[#F59E0B]' : 'bg-white/20'
               }`}>
-                <div className={`w-3.5 h-3.5 bg-white rounded-full transition-transform shadow ${
-                  (settings as any)[item.key] ? 'translate-x-4' : 'translate-x-0'
+                <div className={`w-7 h-7 bg-white rounded-full transition-transform shadow ${
+                  (settings as any)[item.key] ? 'translate-x-7' : 'translate-x-0'
                 }`} />
               </div>
             </button>
@@ -442,18 +442,18 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
 
       {/* Section 5: Developer Trend Age Zones */}
       {user && (user.email === 'taybekraa@gmail.com' || user.email === 'kraakraa109@gmail.com' || user.email === 'bachasalman69@gmail.com') && (
-        <div className="space-y-3 pt-4 border-t border-white/10">
-          <h3 className="text-xs font-black text-amber-400 uppercase tracking-widest flex items-center gap-2">
-            <span className="text-amber-400">◆</span> {isAr ? '🔧 مناطق عمر الاتجاه (مطور)' : '🔧 Trend Age Zones (Dev)'}
+        <div className="space-y-4 pt-6 border-t border-white/10">
+          <h3 className="text-2xl md:text-[28px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-3">
+            <span className="text-amber-400 text-3xl">◆</span> {isAr ? '🔧 مناطق عمر الاتجاه (مطور)' : '🔧 Trend Age Zones (Dev)'}
           </h3>
-          <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-5 space-y-6">
+          <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-6 space-y-6">
 
             {/* Zone Visualization */}
             <div className="bg-black/30 rounded-xl p-4">
-              <div className="text-[10px] text-brand-text/40 font-mono mb-2 text-center">
+              <div className="text-base md:text-[20px] text-brand-text/40 font-mono mb-3 text-center">
                 {isAr ? 'مناطق عمر الاتجاه (Total Age)' : 'Trend Age Zones (Total Age)'}
               </div>
-              <div className="flex h-6 rounded-lg overflow-hidden text-[9px] font-black">
+              <div className="flex h-10 rounded-xl overflow-hidden text-base md:text-[18px] font-black">
                 <div className="flex-1 bg-red-500/30 border-r border-black/30 flex items-center justify-center text-red-300">
                   {isAr ? 'رضيع <10' : 'Infant <10'}
                 </div>
@@ -467,7 +467,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                   {isAr ? 'عجوز >50' : 'Aging >50'}
                 </div>
               </div>
-              <div className="flex justify-between mt-1 text-[8px] text-brand-text/30 font-mono px-1">
+              <div className="flex justify-between mt-2 text-sm md:text-[16px] text-brand-text/30 font-mono px-1">
                 <span>0</span>
                 <span>{settings.minInfantAge}</span>
                 <span>{settings.minMatureAge}</span>
@@ -497,27 +497,27 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             <NumberInput label={isAr ? 'أدنى شموع السحبة' : 'Min Pullback Candles'} value={settings.minPullbackCandles || 2} onChange={(v) => handleChange('minPullbackCandles', v)} color="text-cyan-400" desc={isAr ? 'الحد الأدنى للشموع المعاكسة للاتجاه为了 تأكيد نقطة السحبة. افتراضي: 2' : 'Min opposite candles to confirm pullback point. Default: 2'} suffix="" min={1} max={10} />
 
             {/* Pullback Volume Confirm */}
-            <div className="pt-2 border-t border-white/5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-cyan-400">{isAr ? 'تأكيد بالحجم عند السحبة' : 'Pullback Volume Confirm'}</label>
+            <div className="pt-3 border-t border-white/5">
+              <div className="flex items-center justify-between gap-4">
+                <label className="text-xl md:text-[24px] font-black text-cyan-400 leading-tight">{isAr ? 'تأكيد بالحجم عند السحبة' : 'Pullback Volume Confirm'}</label>
                 <button onClick={() => handleChange('pullbackVolConfirm', !settings.pullbackVolConfirm)}
-                  className={`w-12 h-6 rounded-full transition-all ${settings.pullbackVolConfirm ? 'bg-cyan-500' : 'bg-white/10'}`}>
-                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.pullbackVolConfirm ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                  className={`w-16 h-9 rounded-full transition-all shrink-0 ${settings.pullbackVolConfirm ? 'bg-cyan-500' : 'bg-white/10'}`}>
+                  <div className={`w-7 h-7 rounded-full bg-white shadow transition-transform ${settings.pullbackVolConfirm ? 'translate-x-7' : 'translate-x-1'}`} />
                 </button>
               </div>
-              <p className="text-xs text-brand-text/40 mt-1">{isAr ? 'يتطلب حجم مرتفع عند نقطة السحبة للتأكيد' : 'Require high volume at pullback point for confirmation'}</p>
+              <p className="text-base md:text-[20px] text-brand-text/40 mt-2 leading-snug">{isAr ? 'يتطلب حجم مرتفع عند نقطة السحبة للتأكيد' : 'Require high volume at pullback point for confirmation'}</p>
             </div>
 
             {/* Pullback Candle Confirm */}
-            <div className="pt-2 border-t border-white/5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-cyan-400">{isAr ? 'تأكيد بشمعة ارتداد' : 'Pullback Candle Confirm'}</label>
+            <div className="pt-3 border-t border-white/5">
+              <div className="flex items-center justify-between gap-4">
+                <label className="text-xl md:text-[24px] font-black text-cyan-400 leading-tight">{isAr ? 'تأكيد بشمعة ارتداد' : 'Pullback Candle Confirm'}</label>
                 <button onClick={() => handleChange('pullbackCandleConfirm', !settings.pullbackCandleConfirm)}
-                  className={`w-12 h-6 rounded-full transition-all ${settings.pullbackCandleConfirm ? 'bg-cyan-500' : 'bg-white/10'}`}>
-                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.pullbackCandleConfirm ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                  className={`w-16 h-9 rounded-full transition-all shrink-0 ${settings.pullbackCandleConfirm ? 'bg-cyan-500' : 'bg-white/10'}`}>
+                  <div className={`w-7 h-7 rounded-full bg-white shadow transition-transform ${settings.pullbackCandleConfirm ? 'translate-x-7' : 'translate-x-1'}`} />
                 </button>
               </div>
-              <p className="text-xs text-brand-text/40 mt-1">{isAr ? 'يتطلب شمعة ارتداد (Pinbar/Engulfing/Hammer) عند نقطة السحبة' : 'Require reversal candle (Pinbar/Engulfing/Hammer) at pullback point'}</p>
+              <p className="text-base md:text-[20px] text-brand-text/40 mt-2 leading-snug">{isAr ? 'يتطلب شمعة ارتداد (Pinbar/Engulfing/Hammer) عند نقطة السحبة' : 'Require reversal candle (Pinbar/Engulfing/Hammer) at pullback point'}</p>
             </div>
           </div>
         </div>
@@ -676,13 +676,13 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
 
   const modalFooter = (
     <div className="p-6 border-t border-white/10 bg-brand-bg flex items-center justify-between" dir="rtl">
-      <button onClick={resetToDefault} className="px-4 py-2 text-sm text-brand-text/50 hover:text-brand-text font-semibold transition-colors">
+      <button onClick={resetToDefault} className="px-6 py-3 text-xl md:text-[24px] text-brand-text/50 hover:text-brand-text font-black transition-colors">
         {isAr ? 'استعادة الافتراضي' : 'Restore Default'}
       </button>
-      <button onClick={handleSave} className="px-6 py-2 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-2">
+      <button onClick={handleSave} className="px-8 py-3 bg-primary text-white rounded-2xl text-xl md:text-[24px] font-black shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-3">
         {saved ? (
           <>
-            <CheckCircle size={16} />
+            <CheckCircle size={28} />
             {isAr ? 'تم الحفظ ✓' : 'Saved ✓'}
           </>
         ) : (
