@@ -490,29 +490,57 @@ async function fetchYahooQuote(symbol: string): Promise<number | null> {
   return null;
 }
 
-// Frankfurter (ECB) — free, no API key, no daily credit cap, and NOT subject to
-// the geo/region stale-data problem that makes Yahoo return frozen AUDUSD/GBPUSD
-// from Vercel server IPs. Returns a live-ish midpoint for an ABC/XYZ pair.
-//   from = first 3 chars (base), to = last 3 chars (quote): rate = base->quote.
+// Adaptive forex spot sources that are free, keyless, credit-unlimited and — unlike
+// Yahoo from Vercel server IPs — do NOT return region-frozen stale rates (the bug
+// where AUDUSD stuck at 0.7252 / GBPUSD at 1.18). Returns a live midpoint for an
+// ABC/XYZ pair. Tries (1) open.er-api (USD-map cross) then (2) ECB frankfurter.dev.
 async function fetchFrfQuote(fxSymbol: string): Promise<number | null> {
   const s = (fxSymbol || '').toUpperCase().replace(/[^A-Z]/g, '');
   if (s.length !== 6) return null;
   const from = s.slice(0, 3);
   const to = s.slice(3);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  try {
-    const url = `https://api.frankfurter.dev/v1/latest?base=${from}&_cb=${Date.now()}`;
-    const response = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
-    clearTimeout(timeout);
-    if (!response.ok) return null;
-    const d = await response.json();
-    const rate = Number(d?.rates?.[to]);
-    if (typeof rate === 'number' && isFinite(rate) && rate > 0) return rate;
-  } catch {
-    clearTimeout(timeout);
-  }
-  return null;
+
+  // (1) exchangerate-api open.er-api: latest/from USD, cross-derive ABC/XYZ.
+  const erTry = async (): Promise<number | null> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+    try {
+      const url = `https://open.er-api.com/v6/latest/USD?_cb=${Date.now()}`;
+      const response = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
+      clearTimeout(timeout);
+      if (!response.ok) return null;
+      const d = await response.json();
+      if (d?.result !== 'success') return null;
+      const rFrom = Number(d?.rates?.[from]);
+      const rTo = Number(d?.rates?.[to]);
+      if (rFrom > 0 && rTo > 0) return rTo / rFrom; // base->quote
+    } catch {
+      clearTimeout(timeout);
+    }
+    return null;
+  };
+
+  // (2) ECB frankfurter.dev: direct base->quote rates map.
+  const ecbTry = async (): Promise<number | null> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+    try {
+      const url = `https://api.frankfurter.dev/v1/latest?base=${from}&_cb=${Date.now()}`;
+      const response = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
+      clearTimeout(timeout);
+      if (!response.ok) return null;
+      const d = await response.json();
+      const rate = Number(d?.rates?.[to]);
+      if (typeof rate === 'number' && isFinite(rate) && rate > 0) return rate;
+    } catch {
+      clearTimeout(timeout);
+    }
+    return null;
+  };
+
+  const er = await erTry();
+  if (er) return er;
+  return await ecbTry();
 }
 
 // API Route: Latest Spot Quote (fast, lightweight). Returns { symbol, price, ts }
