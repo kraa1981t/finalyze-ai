@@ -517,41 +517,34 @@ app.get("/api/quote", async (req, res) => {
     // Twelve Data /price is NOT used for live polling — the free plan is
     // 800 credits/day and polling every 3s per open symbol exhausts it in
     // minutes (429 "run out of API credits"), which freezes the price at the
-    // last value. Yahoo is free and sufficient for real-time P&L.
+    // last value. Yahoo is free and sufficient for real-time P&L, and its
+    // 1m interval gives a near-real-time regularMarketPrice (5m is delayed).
     // (Twelve Data is still used for /api/market-data higher-TF candles.)
     void TWELVE_DATA_API_KEY; void twelveDataSymbol;
 
-    // ── 3) METALS / INDEX / STOCKS / FOREX-fallback: Yahoo intraday meta regularMarketPrice ──
-    const yahooSym = isMetal ? customMappings[symbol] : isIndex ? indexCfds[symbol] : symbol;
-    const yahooFor = isForex ? attemptsYahooFor(symbol) : [yahooSym];
-    const acY = new AbortController();
-    const timeoutY = setTimeout(() => acY.abort(), 20000);
-    try {
-      for (const attempt of [...new Set([...yahooFor, yahooSym])]) {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(attempt)}?interval=5m&range=1d&_cb=${Date.now()}`;
-        const r = await fetch(url, {
-          signal: acY.signal,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Accept': 'application/json', 'Origin': 'https://finance.yahoo.com', 'Referer': 'https://finance.yahoo.com/'
-          }
-        });
-        if (r.ok) {
-          const d = await r.json();
-          const result = d?.chart?.result?.[0];
-          let price = parseFloat(result?.meta?.regularMarketPrice);
-          if (isNaN(price) || price <= 0) {
-            const closes = result?.indicators?.quote?.[0]?.close;
-            if (Array.isArray(closes)) {
-              for (let i = closes.length - 1; i >= 0; i--) {
-                if (closes[i] != null && closes[i] > 0) { price = closes[i]; break; }
-              }
+    // ── 3) METALS / INDEX / STOCKS / FOREX-fallback: Yahoo real-time via the
+    //       robust fetchMarketData helper (retries across query1+query2 with
+    //       backoff = far more reliable than the single-shot fetch above).
+    //       We read meta.regularMarketPrice (the live price) from the 1m chart.
+    const quoteSymbol = isMetal ? customMappings[symbol] : isIndex ? indexCfds[symbol] : symbol;
+    const quoteAttempts = isForex ? attemptsYahooFor(symbol) : [quoteSymbol];
+    const uniqueAttempts = [...new Set([...quoteAttempts, quoteSymbol])];
+    for (const attempt of uniqueAttempts) {
+      const cand = await fetchMarketData(attempt, '1d', '1m', 2, `&_cb=${Date.now()}&_q=${Math.random().toString(36).slice(2,6)}`);
+      if (cand) {
+        const result = cand?.chart?.result?.[0];
+        let price = parseFloat(result?.meta?.regularMarketPrice);
+        if (isNaN(price) || price <= 0) {
+          const closes = result?.indicators?.quote?.[0]?.close;
+          if (Array.isArray(closes)) {
+            for (let i = closes.length - 1; i >= 0; i--) {
+              if (closes[i] != null && closes[i] > 0) { price = closes[i]; break; }
             }
           }
-          if (!isNaN(price) && price > 0) return res.json({ symbol, price, ts: Date.now() });
         }
+        if (!isNaN(price) && price > 0) return res.json({ symbol, price, ts: Date.now() });
       }
-    } catch { /* fall through */ } finally { clearTimeout(timeoutY); }
+    }
 
     return res.status(404).json({ error: 'No quote available' });
   } catch {
