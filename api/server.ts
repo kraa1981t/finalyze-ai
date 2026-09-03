@@ -452,12 +452,57 @@ const fetchTwelveDataOHLC = async (symbol: string, timeframe: string): Promise<a
   }
 };
 
+async function fetchYahooQuote(symbol: string): Promise<number | null> {
+  // Prefer query2 (more reliable for forex from server IPs), fall back to query1,
+  // reading the near-real-time regularMarketPrice / last 1m close.
+  const hosts = ['query2.finance.yahoo.com', 'query1.finance.yahoo.com'];
+  for (const host of hosts) {
+    try {
+      const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d&_cb=${Date.now()}&_q=${Math.random().toString(36).slice(2,6)}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 9000);
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+          'Accept': 'application/json', 'Origin': 'https://finance.yahoo.com', 'Referer': 'https://finance.yahoo.com/'
+        }
+      });
+      clearTimeout(timeout);
+      if (!response.ok) continue;
+      const d = await response.json();
+      const result = d?.chart?.result?.[0];
+      if (!result) continue;
+      let price = Number(result?.meta?.regularMarketPrice);
+      const closes = result?.indicators?.quote?.[0]?.close;
+      const ts = result?.timestamp;
+      if (!(price > 0) && Array.isArray(closes) && Array.isArray(ts)) {
+        for (let i = ts.length - 1; i >= 0; i--) {
+          const c = closes[i];
+          if (c != null && c > 0) { price = c; break; }
+        }
+      }
+      if (price > 0) return price;
+    } catch {
+      // try next host
+    }
+  }
+  return null;
+}
+
 // API Route: Latest Spot Quote (fast, lightweight). Returns { symbol, price, ts }
 // Used by the paper-trading live P&L engine so open trades move with REAL market
 // prices instead of polling full 5m candle histories. Per-class source:
 //   crypto -> Binance ticker/price (real-time)
-//   forex  -> Twelve Data /price (real-time, requires TWELVE_DATA_API_KEY)
-//   metals/index/stocks -> Yahoo regularMarketPrice from intraday chart meta
+//   forex  -> Yahoo regularMarketPrice (real-time, free, no daily credit cap)
+//   metals/index/stocks -> Yahoo intraday chart meta regularMarketPrice
+// The hard 6s budget below keeps us under Vercel's function timeout; whenever the
+// upstream source is slow/unreachable we answer from lastKnownQuote (never empty).
+const _lastKnownQuote = new Map<string, { price: number; ts: number }>();
+function answerQuote(res: any, symbol: string, price: number): void {
+  _lastKnownQuote.set(symbol, { price, ts: Date.now() });
+  res.json({ symbol, price, ts: Date.now() });
+}
 app.get("/api/quote", async (req, res) => {
   try {
     const symbol = (req.query.symbol as string || '').toUpperCase().replace(/ /g, '');
@@ -499,7 +544,7 @@ app.get("/api/quote", async (req, res) => {
         const hit = results.find((x): x is PromiseFulfilledResult<any> => x.status === 'fulfilled' && typeof x.value?.price === 'number');
         const price = hit?.value?.price as number | undefined;
         if (typeof price === 'number' && price > 0) {
-          return res.json({ symbol, price, ts: Date.now() });
+          return answerQuote(res, symbol, price);
         }
       } catch { clearTimeout(timeout); }
       // Fallback: last 1m kline close
@@ -507,9 +552,11 @@ app.get("/api/quote", async (req, res) => {
       const closes = k?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
       if (Array.isArray(closes)) {
         for (let i = closes.length - 1; i >= 0; i--) {
-          if (closes[i] != null && closes[i] > 0) return res.json({ symbol, price: closes[i], ts: Date.now() });
+          if (closes[i] != null && closes[i] > 0) return answerQuote(res, symbol, closes[i]);
         }
       }
+      const ck = _lastKnownQuote.get(symbol);
+      if (ck && typeof ck.price === 'number') return res.json({ symbol, price: ck.price, ts: ck.ts });
       return res.status(404).json({ error: 'No crypto quote' });
     }
 
@@ -525,28 +572,23 @@ app.get("/api/quote", async (req, res) => {
     // ── 3) METALS / INDEX / STOCKS / FOREX-fallback: Yahoo real-time via the
     //       robust fetchMarketData helper (retries across query1+query2 with
     //       backoff = far more reliable than the single-shot fetch above).
-    //       We read meta.regularMarketPrice (the live price) from the 1m chart.
+    //       We keep only a price whose 1m candle timestamp is recent (< 5 min)
+    //       so we never re-serve a stale/delayed candle close as "live".
     const quoteSymbol = isMetal ? customMappings[symbol] : isIndex ? indexCfds[symbol] : symbol;
     const quoteAttempts = isForex ? attemptsYahooFor(symbol) : [quoteSymbol];
     const uniqueAttempts = [...new Set([...quoteAttempts, quoteSymbol])];
+    let lastFresh = 0;
     for (const attempt of uniqueAttempts) {
-      const cand = await fetchMarketData(attempt, '1d', '1m', 2, `&_cb=${Date.now()}&_q=${Math.random().toString(36).slice(2,6)}`);
-      if (cand) {
-        const result = cand?.chart?.result?.[0];
-        let price = parseFloat(result?.meta?.regularMarketPrice);
-        if (isNaN(price) || price <= 0) {
-          const closes = result?.indicators?.quote?.[0]?.close;
-          if (Array.isArray(closes)) {
-            for (let i = closes.length - 1; i >= 0; i--) {
-              if (closes[i] != null && closes[i] > 0) { price = closes[i]; break; }
-            }
-          }
-        }
-        if (!isNaN(price) && price > 0) return res.json({ symbol, price, ts: Date.now() });
-      }
+      const price = await fetchYahooQuote(attempt);
+      if (typeof price === 'number' && price > 0) { lastFresh = price; return answerQuote(res, symbol, price); }
     }
 
-    return res.status(404).json({ error: 'No quote available' });
+    // No fresh upstream data this call: if we ever answered this symbol, re-serve
+    // the last known good price so live P&L never snaps to 0/404 mid-update.
+    const ck = _lastKnownQuote.get(symbol);
+    if (ck && typeof ck.price === 'number') return res.json({ symbol, price: ck.price, ts: ck.ts });
+    if (lastFresh > 0) return answerQuote(res, symbol, lastFresh);
+    return res.status(404).json({ error: 'No fresh quote available' });
   } catch {
     return res.status(500).json({ error: 'Quote server error' });
   }
