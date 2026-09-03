@@ -243,9 +243,11 @@ const SERVER_CRYPTO_MAP: Record<string, string> = {
 function findServerCryptoPair(symbol: string): string | null {
   const upper = symbol.toUpperCase().replace(/ /g, '');
   if (SERVER_CRYPTO_MAP[upper]) return SERVER_CRYPTO_MAP[upper];
+  const FIAT = new Set(['AUD','EUR','GBP','USD','JPY','NZD','CAD','CHF','MXN','ZAR','TRY','SEK','NOK','DKK','SGD','HKD','CNH','THB','INR','PLN','CZK','HUF','ILS','KRW','TWD']);
   if (upper.endsWith('USD') || upper.endsWith('USDT')) {
     const base = upper.replace(/USD(T)?$/, '');
-    if (base && base.length <= 10) return `${base}USDT`;
+    // Never misinterpret fiat-quotes like AUDUSD/GBPUSD/NZDUSD as crypto pairs.
+    if (base && base.length <= 10 && !FIAT.has(base)) return `${base}USDT`;
   }
   const knownCoins = ['BTC','ETH','SOL','XRP','DOGE','ADA','DOT','MATIC','LINK',
     'UNI','AVAX','ATOM','LTC','BCH','XLM','TRX','FIL','APT','ARB','OP','INJ',
