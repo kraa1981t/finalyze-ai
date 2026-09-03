@@ -513,23 +513,13 @@ app.get("/api/quote", async (req, res) => {
       return res.status(404).json({ error: 'No crypto quote' });
     }
 
-    // ── 2) FOREX: Twelve Data real-time /price ──
-    if (isForex && TWELVE_DATA_API_KEY) {
-      const tdSym = twelveDataSymbol(symbol);
-      if (tdSym) {
-        const ac = new AbortController();
-        const timeout = setTimeout(() => ac.abort(), 8000);
-        try {
-          const r = await fetch(`https://api.twelvedata.com/price?symbol=${encodeURIComponent(tdSym)}&apikey=${TWELVE_DATA_API_KEY}`, { signal: ac.signal });
-          clearTimeout(timeout);
-          if (r.ok) {
-            const d = await r.json();
-            const price = parseFloat(d?.price);
-            if (!isNaN(price) && price > 0) return res.json({ symbol, price, ts: Date.now() });
-          }
-        } catch { clearTimeout(timeout); }
-      }
-    }
+    // ── 2) FOREX: Yahoo real-time (free, no 800/day limit).
+    // Twelve Data /price is NOT used for live polling — the free plan is
+    // 800 credits/day and polling every 3s per open symbol exhausts it in
+    // minutes (429 "run out of API credits"), which freezes the price at the
+    // last value. Yahoo is free and sufficient for real-time P&L.
+    // (Twelve Data is still used for /api/market-data higher-TF candles.)
+    void TWELVE_DATA_API_KEY; void twelveDataSymbol;
 
     // ── 3) METALS / INDEX / STOCKS / FOREX-fallback: Yahoo intraday meta regularMarketPrice ──
     const yahooSym = isMetal ? customMappings[symbol] : isIndex ? indexCfds[symbol] : symbol;
