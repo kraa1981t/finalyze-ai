@@ -402,7 +402,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             { key: 'useIndicators', label: isAr ? 'المؤشرات الفنية' : 'Technical Indicators', desc: isAr ? 'RSI + EMA + Volume' : 'RSI + EMA + Volume' },
-            { key: 'useNewsGuard', label: isAr ? 'حماية الأخبار' : 'News Guard', desc: isAr ? 'تجنب الأخبار القوية' : 'Avoid major news' },
+            { key: 'useNewsGuard', label: isAr ? 'حماية الأخبار الأسبوعية' : 'Weekly News Guard', desc: isAr ? 'حظر أي رمز عليه خبر قوي جداً خلال الأسبوع، ويُسمح بعد تجاوزه' : 'Block any symbol with a very high-impact event this week; unblock after it passes' },
             { key: 'useHigherTimeframe', label: isAr ? 'الإطار الأعلى' : 'Higher Timeframe', desc: isAr ? 'تأكيد من الإطار الأكبر' : 'Confirm from higher TF' },
             { key: 'useVolumeAnalysis', label: isAr ? 'تحليل الحجم' : 'Volume Analysis', desc: isAr ? 'تحليل تدفق الحجم' : 'Volume flow analysis' },
             { key: 'useFilterSideways', label: isAr ? 'فلتر الاتجاه العرضي' : 'Sideways Filter', desc: isAr ? 'حظر الإشارات في الأسواق العرضية' : 'Block signals in sideways markets' },

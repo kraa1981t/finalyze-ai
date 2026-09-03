@@ -9,6 +9,66 @@ import { getCorrelationGroup } from "./portfolioRiskService";
 const _resultCache = new Map<string, { result: AnalysisResult; ts: number }>();
 const RESULT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// ═══ Weekly News Immunity Filter ═══
+// Maps a country code → currency/region tokens that identify which pairs are affected.
+// Only HIGH-impact events within the current calendar week (Mon→Fri) block a symbol.
+const EVENT_COUNTRY_TOKENS: Record<string, string[]> = {
+  'US': ['USD', 'US', 'USA', 'DOLLAR', 'FED', 'CELSIUS'],
+  'JP': ['JPY', 'JP', 'JAPAN', 'YEN', 'BOJ', 'BANK OF JAPAN'],
+  'GB': ['GBP', 'GB', 'UK', 'POUND', 'BOE', 'BANK OF ENGLAND', 'STERLING'],
+  'EU': ['EUR', 'EU', 'EURO', 'ECB', 'EUROPEAN CENTRAL'],
+  'DE': ['EUR', 'EU', 'DE', 'GERMAN', 'ECB'],
+  'FR': ['EUR', 'EU', 'FR', 'FRANCE'],
+  'IT': ['EUR', 'EU', 'IT', 'ITALY'],
+  'ES': ['EUR', 'EU', 'ES', 'SPAIN'],
+  'AU': ['AUD', 'AU', 'AUSSIE', 'RBA', 'RESERVE BANK OF AUSTRALIA'],
+  'CA': ['CAD', 'CA', 'CANADA', 'BOC', 'BANK OF CANADA', 'LOONIE'],
+  'NZ': ['NZD', 'NZ', 'NEW ZEALAND', 'RBNZ', 'KIWI'],
+  'CH': ['CHF', 'CH', 'SWISS', 'SNB', 'SWISS NATIONAL'],
+  'MX': ['MXN', 'MX', 'MEXICO', 'BANXICO'],
+  'CN': ['CNH', 'CNY', 'CN', 'CHINA', 'PBoC', 'YUAN', 'RENMINBI'],
+  'SE': ['SEK', 'SE', 'SWEDEN', 'RIKSBANK'],
+  'NO': ['NOK', 'NO', 'NORWAY', 'NORGES'],
+  'DK': ['DKK', 'DK', 'DENMARK', 'DANMARKS'],
+  'SG': ['SGD', 'SG', 'SINGAPORE'],
+  'HK': ['HKD', 'HK', 'HONG KONG'],
+  'KR': ['KRW', 'KR', 'KOREA'],
+  'TR': ['TRY', 'TR', 'TURKEY', 'CBRT'],
+  'ZA': ['ZAR', 'ZA', 'SOUTH AFRICA', 'SARB'],
+  'IN': ['INR', 'IN', 'INDIA', 'RESERVE BANK OF INDIA'],
+  'RU': ['RUB', 'RU', 'RUSSIA'],
+  'PL': ['PLN', 'PL', 'POLAND'],
+  'CZ': ['CZK', 'CZ', 'CZECH'],
+  'HU': ['HUF', 'HU', 'HUNGARY'],
+  'IL': ['ILS', 'IL', 'ISRAEL'],
+};
+
+// Returns true if the given SYMBOL is affected by an economic event whose country token
+// matches one of the currencies/regions inside the symbol (e.g. USDJPY matches US + JP).
+function symbolAffectedByCountry(symbol: string, country: string): boolean {
+  const sym = (symbol || '').toUpperCase().replace(/[.\s]/g, '');
+  if (!sym) return true; // unknown symbol → be cautious
+  const tokens = EVENT_COUNTRY_TOKENS[country?.toUpperCase()] || [];
+  for (const t of tokens) {
+    const upper = t.toUpperCase();
+    if (upper.length >= 2 && sym.includes(upper)) return true;
+  }
+  // Fallback: whole-country tokens like "JAPAN", "UNITED STATES" → tightened base matching
+  const c = (country || '').toUpperCase();
+  if (sym.includes('XAU') || sym.includes('GOLD')) { if (c === 'US') return true; }
+  return false;
+}
+
+// Returns the next Friday (end of the current trading week) as a Date.
+function endOfCurrentWeek(): Date {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun..6=Sat
+  let diffToFri = (5 - day + 7) % 7; // days until Friday
+  if (diffToFri === 0) diffToFri = 0; // already Friday
+  const end = new Date(now.getTime() + diffToFri * 24 * 3600 * 1000);
+  return end;
+}
+
 export function getApiKey(): string {
   try {
     // 1. Primary key (enabled check)
@@ -1346,6 +1406,37 @@ Return ONLY valid JSON:
       }
     }
 
+    // ═══ WEEKLY NEWS IMMUNITY FILTER (HARD GATE) ═══
+    // User leaves trades open until end of week. If ANY HIGH-impact economic event that
+    // affects THIS symbol falls anywhere in the current calendar week (Mon→Fri), the symbol
+    // is BLOCKED entirely (no_entry) — regardless of how strong the technical signal is.
+    // Once the event time passes (hoursUntil <= 0), the symbol becomes tradable again.
+    var weeklyNewsBlocked = false;
+    let weeklyNewsBlockReason = '';
+    if (settings.useNewsGuard !== false && contextEcon && contextEcon.length > 0) {
+      const weekEnd = endOfCurrentWeek();
+      const highEvents = contextEcon.filter((e: any) => e.impact === 'High');
+      for (const ev of highEvents) {
+        const affected = symbolAffectedByCountry(symbol, ev.country);
+        if (!affected) continue;
+        const eventDate = ev.date ? new Date(ev.date) : null;
+        const hoursUntil = typeof ev.hoursUntil === 'number' ? ev.hoursUntil : (eventDate ? (eventDate.getTime() - Date.now()) / (1000 * 3600) : Infinity);
+        // Upcoming event (still ahead) AND occurring before end of current week → BLOCK
+        if (hoursUntil > 0 && eventDate && eventDate <= weekEnd) {
+          weeklyNewsBlocked = true;
+          weeklyNewsBlockReason = `${ev.country} ${ev.title} (${Math.ceil(hoursUntil)}h)`;
+          break;
+        }
+      }
+    }
+    if (weeklyNewsBlocked) {
+      detailedReasons.push({
+        check: 'News Immunity (Weekly)', value: weeklyNewsBlockReason,
+        status: 'negative',
+        impact: `hard block: high-impact ${symbol} event this week — no entry until it passes`
+      });
+    }
+
     const primaryTotal = 4;
     var primaryMetCount = 0;
     if (bbMet) primaryMetCount++;
@@ -1764,7 +1855,7 @@ Return ONLY valid JSON:
     var agreementBonus = 0;
     
     // If sideways enforcement already blocked, skip direction classification entirely
-    if (finalSignal === ('no_entry' as any)) {
+    if (finalSignal === ('no_entry' as any) || weeklyNewsBlocked) {
       direction = null;
     } else if (higherTFBlocked) {
       direction = null;
@@ -1785,6 +1876,9 @@ Return ONLY valid JSON:
 
     if (finalSignal === ('no_entry' as any)) {
       // Sideways enforcement already blocked — do NOT override
+    } else if (weeklyNewsBlocked) {
+      finalSignal = SignalType.NO_ENTRY;
+      finalConfidence = Math.min(finalConfidence, 0);
     } else if (higherTFBlocked) {
       finalSignal = SignalType.NEUTRAL;
     } else if (candleMatchBlocked) {
