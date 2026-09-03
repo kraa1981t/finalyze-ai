@@ -455,14 +455,14 @@ const fetchTwelveDataOHLC = async (symbol: string, timeframe: string): Promise<a
 };
 
 async function fetchYahooQuote(symbol: string): Promise<number | null> {
-  // Prefer query2 (more reliable for forex from server IPs), fall back to query1,
-  // reading the near-real-time regularMarketPrice / last 1m close.
+  // Race query2 + query1 in parallel (whichever answers first with a valid price),
+  // short 5s abort so slow/unreachable hosts never block the quote for long.
   const hosts = ['query2.finance.yahoo.com', 'query1.finance.yahoo.com'];
-  for (const host of hosts) {
+  const attempts = hosts.map(async (host) => {
     try {
       const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d&_cb=${Date.now()}&_q=${Math.random().toString(36).slice(2,6)}`;
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 9000);
+      const timeout = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
@@ -471,10 +471,10 @@ async function fetchYahooQuote(symbol: string): Promise<number | null> {
         }
       });
       clearTimeout(timeout);
-      if (!response.ok) continue;
+      if (!response.ok) return null;
       const d = await response.json();
       const result = d?.chart?.result?.[0];
-      if (!result) continue;
+      if (!result) return null;
       let price = Number(result?.meta?.regularMarketPrice);
       const closes = result?.indicators?.quote?.[0]?.close;
       const ts = result?.timestamp;
@@ -485,11 +485,12 @@ async function fetchYahooQuote(symbol: string): Promise<number | null> {
         }
       }
       if (price > 0) return price;
-    } catch {
-      // try next host
-    }
-  }
-  return null;
+    } catch {}
+
+    return null;
+  });
+  const settled = await Promise.all(attempts);
+  return settled.find((p): p is number => typeof p === 'number' && p > 0) ?? null;
 }
 
 // Adaptive forex spot sources that are free, keyless, credit-unlimited and — unlike

@@ -112,7 +112,7 @@ export function formatPnl(v: number): string {
 type PriceListener = (price: number) => void;
 
 const _priceCache = new Map<string, { price: number; ts: number }>();
-const PRICE_TTL = 2500;
+const PRICE_TTL = 1000;
 
 async function fetchServerLastPrice(symbol: string): Promise<number | null> {
   try {
@@ -171,7 +171,7 @@ export function subscribePrices(symbols: string[], listener: (symbol: string, pr
     }));
   };
   tick();
-  const iv = setInterval(tick, 3000);
+  const iv = setInterval(tick, 1000);
   return () => { alive = false; clearInterval(iv); };
 }
 
