@@ -299,18 +299,24 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   }, [symbol]);
 
   // Subscribe to prices
+  const openTradeSymbolsSer = [...new Set(openTrades.map((t) => t.symbol))].sort().join('|');
   useEffect(() => {
     const watchList = [...new Set([...openTrades.map((t) => t.symbol), symbol])];
     if (watchList.length === 0) return;
     const unsub = subscribePrices(watchList, (sym, price) => {
+      const prev = priceMapRef.current[sym];
       priceMapRef.current[sym] = price;
       if (sym === symbol) { setLivePrice(price); setPriceLoading(false); }
       checkAutoClose(sym, price);
-      // Trigger re-render so open trades P&L updates live
-      if (openTrades.some((t) => t.symbol === sym)) setPriceTick((p) => p + 1);
+      // Force a re-render for P&L. Skip re-render if the price did NOT change,
+      // but still trigger on any change so the P&L never freezes.
+      if (prev === undefined || prev !== price) setPriceTick((p) => p + 1);
     });
     return unsub;
-  }, [symbol, openTrades.length]);
+    // Rebuild only when the selected symbol or the SET of open symbols changes
+    // (covered by the serialised signature), avoiding stale closures for new trades.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbol, openTradeSymbolsSer]);
 
   const checkAutoClose = useCallback(async (sym: string, price: number) => {
     const currentTrades = tradesRef.current;

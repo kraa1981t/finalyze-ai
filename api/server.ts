@@ -452,6 +452,123 @@ const fetchTwelveDataOHLC = async (symbol: string, timeframe: string): Promise<a
   }
 };
 
+// API Route: Latest Spot Quote (fast, lightweight). Returns { symbol, price, ts }
+// Used by the paper-trading live P&L engine so open trades move with REAL market
+// prices instead of polling full 5m candle histories. Per-class source:
+//   crypto -> Binance ticker/price (real-time)
+//   forex  -> Twelve Data /price (real-time, requires TWELVE_DATA_API_KEY)
+//   metals/index/stocks -> Yahoo regularMarketPrice from intraday chart meta
+app.get("/api/quote", async (req, res) => {
+  try {
+    const symbol = (req.query.symbol as string || '').toUpperCase().replace(/ /g, '');
+    if (!symbol) return res.status(400).json({ error: "Symbol is required" });
+
+    const cryptoPair = findServerCryptoPair(symbol);
+    const isCrypto = !!cryptoPair;
+
+    const customMappings: Record<string, string> = {
+      'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F', 'XPDUSD': 'PA=F',
+      'XCUUSD': 'HG=F',
+    };
+    const indexCfds: Record<string, string> = {
+      'US500': '^GSPC', 'US30': '^DJI', 'US100': '^NDX',
+      'UK100': '^FTSE', 'DE40': '^GDAXI', 'JP225': '^N225',
+      'HK50': '^HSI', 'AU200': '^AXJO',
+    };
+    const isIndex = !!indexCfds[symbol];
+    const isMetal = !!customMappings[symbol] && !isIndex;
+
+    const forexQuotes = ['USD','EUR','JPY','GBP','AUD','NZD','CAD','CHF','MXN','ZAR','TRY','SEK','NOK','DKK','SGD','HKD','CNH','THB','INR','PLN','CZK','HUF','ILS','KRW','TWD'];
+    const isForex = !isMetal && !isCrypto && !isIndex && symbol.length === 6 &&
+      forexQuotes.some(q => symbol.endsWith(q)) && forexQuotes.some(q => symbol.startsWith(q));
+
+    // ── 1) CRYPTO: Binance real-time ticker price ──
+    if (isCrypto) {
+      const pair = findServerCryptoPair(symbol)!;
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 8000);
+      try {
+        const results = await Promise.allSettled(
+          BINANCE_ENDPOINTS.map(async (base) => {
+            const r = await fetch(`${base}/api/v3/ticker/price?symbol=${pair}`, { signal: ac.signal });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+          })
+        );
+        clearTimeout(timeout);
+        const hit = results.find((x): x is PromiseFulfilledResult<any> => x.status === 'fulfilled' && typeof x.value?.price === 'number');
+        const price = hit?.value?.price as number | undefined;
+        if (typeof price === 'number' && price > 0) {
+          return res.json({ symbol, price, ts: Date.now() });
+        }
+      } catch { clearTimeout(timeout); }
+      // Fallback: last 1m kline close
+      const k = await fetchBinanceData(symbol, '1m');
+      const closes = k?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+      if (Array.isArray(closes)) {
+        for (let i = closes.length - 1; i >= 0; i--) {
+          if (closes[i] != null && closes[i] > 0) return res.json({ symbol, price: closes[i], ts: Date.now() });
+        }
+      }
+      return res.status(404).json({ error: 'No crypto quote' });
+    }
+
+    // ── 2) FOREX: Twelve Data real-time /price ──
+    if (isForex && TWELVE_DATA_API_KEY) {
+      const tdSym = twelveDataSymbol(symbol);
+      if (tdSym) {
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 8000);
+        try {
+          const r = await fetch(`https://api.twelvedata.com/price?symbol=${encodeURIComponent(tdSym)}&apikey=${TWELVE_DATA_API_KEY}`, { signal: ac.signal });
+          clearTimeout(timeout);
+          if (r.ok) {
+            const d = await r.json();
+            const price = parseFloat(d?.price);
+            if (!isNaN(price) && price > 0) return res.json({ symbol, price, ts: Date.now() });
+          }
+        } catch { clearTimeout(timeout); }
+      }
+    }
+
+    // ── 3) METALS / INDEX / STOCKS / FOREX-fallback: Yahoo intraday meta regularMarketPrice ──
+    const yahooSym = isMetal ? customMappings[symbol] : isIndex ? indexCfds[symbol] : symbol;
+    const yahooFor = isForex ? attemptsYahooFor(symbol) : [yahooSym];
+    const acY = new AbortController();
+    const timeoutY = setTimeout(() => acY.abort(), 20000);
+    try {
+      for (const attempt of [...new Set([...yahooFor, yahooSym])]) {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(attempt)}?interval=5m&range=1d&_cb=${Date.now()}`;
+        const r = await fetch(url, {
+          signal: acY.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Accept': 'application/json', 'Origin': 'https://finance.yahoo.com', 'Referer': 'https://finance.yahoo.com/'
+          }
+        });
+        if (r.ok) {
+          const d = await r.json();
+          const result = d?.chart?.result?.[0];
+          let price = parseFloat(result?.meta?.regularMarketPrice);
+          if (isNaN(price) || price <= 0) {
+            const closes = result?.indicators?.quote?.[0]?.close;
+            if (Array.isArray(closes)) {
+              for (let i = closes.length - 1; i >= 0; i--) {
+                if (closes[i] != null && closes[i] > 0) { price = closes[i]; break; }
+              }
+            }
+          }
+          if (!isNaN(price) && price > 0) return res.json({ symbol, price, ts: Date.now() });
+        }
+      }
+    } catch { /* fall through */ } finally { clearTimeout(timeoutY); }
+
+    return res.status(404).json({ error: 'No quote available' });
+  } catch {
+    return res.status(500).json({ error: 'Quote server error' });
+  }
+});
+
 // API Route: Market Data
 app.get("/api/market-data", async (req, res) => {
   try {

@@ -116,14 +116,26 @@ const PRICE_TTL = 2500;
 
 async function fetchServerLastPrice(symbol: string): Promise<number | null> {
   try {
-    const r = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=5m`);
+    // Use the lightweight /api/quote endpoint (real-time spot price) rather than
+    // pulling a full 5m candle history. This makes open-trade P&L track the live
+    // market instead of freezing to a delayed candle close, and reduces payload.
+    const r = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
     if (!r.ok) return null;
     const d = await r.json();
-    const closes = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
-    if (Array.isArray(closes)) {
-      for (let i = closes.length - 1; i >= 0; i--) {
-        const c = closes[i];
-        if (c != null && c > 0) return c;
+    const p = Number(d?.price);
+    if (typeof p === 'number' && isFinite(p) && p > 0) return p;
+  } catch {}
+  // Fallback to candle close if the quote route fails (keeps old behaviour).
+  try {
+    const r2 = await fetch(`/api/market-data?symbol=${encodeURIComponent(symbol)}&timeframe=5m`);
+    if (r2.ok) {
+      const d2 = await r2.json();
+      const closes = d2?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+      if (Array.isArray(closes)) {
+        for (let i = closes.length - 1; i >= 0; i--) {
+          const c = closes[i];
+          if (c != null && c > 0) return c;
+        }
       }
     }
   } catch {}
