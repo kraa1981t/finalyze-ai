@@ -404,7 +404,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             { key: 'useIndicators', label: isAr ? 'المؤشرات الفنية' : 'Technical Indicators', desc: isAr ? 'RSI + EMA + Volume' : 'RSI + EMA + Volume' },
             { key: 'useNewsGuard', label: isAr ? 'حماية الأخبار الأسبوعية' : 'Weekly News Guard', desc: isAr ? 'حظر أي رمز عليه خبر قوي جداً خلال الأسبوع، ويُسمح بعد تجاوزه' : 'Block any symbol with a very high-impact event this week; unblock after it passes' },
             { key: 'useHigherTimeframe', label: isAr ? 'الإطار الأعلى' : 'Higher Timeframe', desc: isAr ? 'تأكيد من الإطار الأكبر' : 'Confirm from higher TF' },
-            { key: 'useVolumeAnalysis', label: isAr ? 'تحليل الحجم' : 'Volume Analysis', desc: isAr ? 'تحليل تدفق الحجم' : 'Volume flow analysis' },
+            { key: 'useVolumeAnalysis', label: isAr ? 'تحليل الحجم (الكلاسيكي)' : 'Volume Analysis (Classic)', desc: isAr ? 'ارتفاع الحجم المفاجئ يدعم الزخم' : 'Volume surge supports momentum' },
+            { key: 'useVolumeGuard', label: isAr ? 'حارس الحجم الاحترافي' : 'Volume Guard (Pro)', desc: isAr ? 'فلتر حجم خماسي: كشف فخاخ الامتصاص، جهد مقابل نتيجة، اتجاه الحجم، تفاعل الدعم/المقاومة' : '5-module volume filter: absorption traps, effort vs result, volume trend, S/R interaction' },
             { key: 'useFilterSideways', label: isAr ? 'فلتر الاتجاه العرضي' : 'Sideways Filter', desc: isAr ? 'حظر الإشارات في الأسواق العرضية' : 'Block signals in sideways markets' },
             { key: 'useCandleMatch', label: isAr ? 'فلتر منع الانعكاس (الشموع)' : 'Reversal Guard (Candles)', desc: isAr ? 'تفعيل فلتر الشموع المتقدم' : 'Enable the advanced reversal-prevention filter' },
             { key: 'candleDirectionFilter', label: isAr ? 'منع الانعكاس (1W + 1M)' : 'Reversal Prevention (1W + 1M)', desc: isAr ? 'حظر فقط إذا كانت 1W و 1M كلتاهما ضد الإشارة' : 'Block only when BOTH 1W and 1M oppose the signal' },
@@ -438,6 +439,28 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
         </div>
       </div>
 
+      {/* Volume Guard Threshold (Pro) */}
+      {settings?.useVolumeGuard !== false && (
+        <div className="space-y-2 pt-6 border-t border-white/10">
+          <h3 className="text-2xl md:text-[28px] font-black text-amber-400/60 uppercase tracking-widest">
+            {isAr ? 'عتبة حارس الحجم' : 'Volume Guard Threshold'}
+          </h3>
+          <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-6">
+            <NumberInput
+              label={isAr ? 'عتبة التأكيد' : 'Confirmation Threshold'}
+              desc={isAr
+                ? '≥ العتبة → حجم مؤكد (تعزيز ثقة). 20–العتبة → محايد يمر مع الأنظمة الأخرى. <20 → حجم ضعيف/مشبوه يُحبّط الإشارة. امتصاص مؤكد → قمع كامل.'
+                : '≥ threshold → confirmed volume (confidence boost). 20–threshold → neutral pass aligned with other systems. <20 → weak/suspicious volume suppresses signal. Confirmed absorption → full suppression.'}
+              value={settings?.volumeGuardThreshold ?? 45}
+              onChange={(v) => updateSetting('volumeGuardThreshold', v)}
+              min={20}
+              max={70}
+              suffix=""
+              color='text-amber-400'
+            />
+          </div>
+        </div>
+      )}
 
 
       {/* Section 5: Developer Trend Age Zones */}

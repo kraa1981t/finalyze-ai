@@ -103,6 +103,8 @@ export interface StrategySettings {
   candleMatchDailyThreshold?: number;
   candleMatchWeeklyThreshold?: number;
   candleMatchMonthlyThreshold?: number;
+  useVolumeGuard?: boolean;
+  volumeGuardThreshold?: number;
 }
 
 export interface AutoAnalysisSettings {

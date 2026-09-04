@@ -39,6 +39,8 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   candleMatchDailyEnabled: true,
   candleMatchWeeklyEnabled: true,
   candleMatchMonthlyEnabled: true,
+  useVolumeGuard: true,
+  volumeGuardThreshold: 45,
 };
 
 export const DEFAULT_AUTO_SETTINGS = {

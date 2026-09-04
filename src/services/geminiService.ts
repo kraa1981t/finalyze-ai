@@ -879,6 +879,111 @@ function synthFromMetrics(metrics: any, symbol: string): any {
   return { signal: synthSignal, confidence: synthConf, detailedReasons: [], summary: `${symbol} ${synthSignal} (${synthConf}%) — metrics-based`, microSignal: 'unknown', microTrend: dir, historicalMatch: 'N/A' };
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Professional Volume Quality engine (5 modules)
+// Produces a 0-100 "Volume Quality Score" plus absorption detection.
+// Designed to be a NON-hard-gating filter: when volume data is absent OR
+// the score is merely mediocre, the symbol passes as NEUTRAL so it stays
+// aligned with the other systems and the overall price direction — it never
+// silently kills a genuinely strong signal. Only a clearly broken / low
+// score or a confirmed absorption trap actively suppresses the signal.
+//   Module 1  Relative volume      (0-25)
+//   Module 2  Effort vs Result     (0-25)  ← absorption / climax detector
+//   Module 3  Volume trend         (0-20)
+//   Module 4  S/R pivot interaction(0-20)
+//   Module 5  Absorption penalty   (-30..0)
+// ═══════════════════════════════════════════════════════════════════
+function computeVolumeQuality(
+  closes: number[], highs: number[], lows: number[], volumes: number[], opens: number[], direction: string
+): { score: number; detected: boolean; absorbed: boolean; absorptionLevel: number; reasons: string[] } {
+  const len = closes.length;
+  const v = volumes || [];
+  const base = { score: 0, detected: false, absorbed: false, absorptionLevel: 0, reasons: [] as string[] };
+  // No volume data (some feeds return OHLC only) → neutral pass, do not interfere.
+  if (!v.length || v.length < 8 || len < 10) return base;
+
+  const lastVol = v[len - 1] || 0;
+  const prevVols = v.slice(-6, -1).filter((x: any) => x != null);
+  const avgPrevVol = prevVols.length ? prevVols.reduce((a: number, b: number) => a + b, 0) / prevVols.length : 1;
+  const volRatio = avgPrevVol > 0 ? lastVol / avgPrevVol : 1;
+
+  // ── Module 1: Relative volume (0-25) ──
+  const relScore = Math.max(0, Math.min(25, ((volRatio - 0.8) / 1.7) * 25));
+
+  // ── Module 2: Effort vs Result (0-25) ──
+  const body = Math.abs((closes[len - 1] || 0) - (opens[len - 1] || closes[len - 1] || 0));
+  const range = ((highs[len - 1] || 0) - (lows[len - 1] || 0)) || 1;
+  const bodyRatio = Math.max(0, Math.min(1, body / range));
+  let effortScore = 12.5;
+  if (volRatio > 1.2) {
+    if (bodyRatio >= 0.6) effortScore = 25;
+    else if (bodyRatio >= 0.4) effortScore = 18;
+    else if (bodyRatio >= 0.25) effortScore = 8;   // effort, little result → absorption risk
+    else effortScore = 2;                           // high volume + tiny body → absorption/climax
+  } else {
+    effortScore = bodyRatio >= 0.5 ? 15 : 10;
+  }
+
+  // ── Module 3: Volume trend (0-20) ──
+  const window = Math.max(3, Math.min(5, Math.floor(len / 2)));
+  const recentV = v.slice(-window);
+  const earlierV = v.slice(-window * 2, -window);
+  const recentAvg = recentV.length ? recentV.reduce((a: number, b: number) => a + b, 0) / recentV.length : 1;
+  const earlierAvg = earlierV.length ? earlierV.reduce((a: number, b: number) => a + b, 0) / earlierV.length : 1;
+  const volRising = recentAvg > earlierAvg * 1.1;
+  const priceChange = (closes[len - 1] || 0) - (closes[len - 1 - window] || closes[len - 1] || 0);
+  const priceUp = priceChange > 0;
+  let trendScore = 10;
+  if (direction === 'uptrend') trendScore = volRising ? 20 : (priceUp ? 14 : 8);
+  else if (direction === 'downtrend') trendScore = volRising ? 20 : (priceUp ? 6 : 12);
+  else trendScore = 10;
+
+  // ── Module 4: S/R pivot interaction (0-20) ──
+  const back = Math.max(4, Math.min(10, len - 2));
+  let swingHigh = -Infinity, swingLow = Infinity;
+  for (let i = len - back; i < len - 1; i++) {
+    if (highs[i] > swingHigh) swingHigh = highs[i];
+    if (lows[i] < swingLow) swingLow = lows[i];
+  }
+  const lastClose = closes[len - 1] || 0;
+  const lastHigh = highs[len - 1] || lastClose;
+  const lastLow = lows[len - 1] || lastClose;
+  let srScore = 12;
+  const brokeHigh = isFinite(swingHigh) && lastClose > swingHigh;
+  const brokeLow = isFinite(swingLow) && lastClose < swingLow;
+  const wickAbove = isFinite(swingHigh) && lastHigh > swingHigh && lastClose <= swingHigh;
+  const wickBelow = isFinite(swingLow) && lastLow < swingLow && lastClose >= swingLow;
+  if (brokeHigh || brokeLow) srScore = volRatio > 1.3 ? 20 : 14;     // confirmed breakout w/ volume
+  else if (wickAbove || wickBelow) srScore = volRatio > 1.3 ? 4 : 8; // rejection at pivot → warn
+  else srScore = 12;
+
+  // ── Module 5: Absorption penalty (-30..0) ──
+  let absorptionLevel = 0;
+  if (volRatio > 1.6 && bodyRatio < 0.3) {
+    absorptionLevel = Math.max(absorptionLevel, 2);
+    base.reasons.push('high volume + small body = absorption/climax');
+  }
+  if (volRatio > 1.4 && ((wickAbove && direction === 'uptrend') || (wickBelow && direction === 'downtrend'))) {
+    absorptionLevel = Math.max(absorptionLevel, 2);
+    base.reasons.push('rejection at pivot against direction on elevated volume');
+  }
+  if (volRatio > 2.5 && len >= 20) {
+    const follow = closes.slice(-3, -1).filter((c: any) => c != null);
+    const flatFollow = follow.length > 0 && follow.every((c: number) => lastClose > 0 && Math.abs(c - lastClose) / lastClose < 0.002);
+    if (flatFollow) { absorptionLevel = Math.max(absorptionLevel, 2); base.reasons.push('huge volume spike, no price follow-through'); }
+  }
+  if (volRatio < 0.6 && len >= 20) {
+    absorptionLevel = Math.max(absorptionLevel, 1);
+    base.reasons.push('very low volume — weak conviction');
+  }
+  const absorptionPenalty = absorptionLevel >= 2 ? -30 : absorptionLevel === 1 ? -10 : 0;
+
+  let score = relScore + effortScore + trendScore + srScore + absorptionPenalty;
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  return { score, detected: true, absorbed: absorptionLevel >= 2, absorptionLevel, reasons: base.reasons };
+}
+
 export async function analyzeMarket(params: {
   symbol: string;
   type: MarketType;
@@ -1019,6 +1124,10 @@ export async function analyzeMarket(params: {
     const zonesText = supplyDemandZones.length > 0 
       ? supplyDemandZones.map(z => `${z.type === 'supply' ? 'Supply' : 'Demand'} zone: ${z.bottom.toFixed(2)}ΓÇô${z.top.toFixed(2)} (strength ${z.strength.toFixed(0)}%)`).join('. ')
       : 'No clear zones detected.';
+
+    // ── Professional Volume Quality (5-module filter) ──
+    const volumeQuality = computeVolumeQuality(closes, highs, lows, volumes || [], opens, metrics?.direction || 'sideways');
+    console.log(`[Engine] ${symbol} VolumeQuality=${volumeQuality.score}/100 detected=${volumeQuality.detected} absorbed=${volumeQuality.absorbed} ${volumeQuality.reasons.join('; ')}`);
     
     // Process micro data (already fetched in parallel above)
     var microCloses: number[] = [];
@@ -1823,11 +1932,63 @@ Return ONLY valid JSON:
 
     finalConfidence = Math.min(100, finalConfidence + agreementBonus);
 
+    // ═══ STEP 5f: Professional Volume Quality filter ═══
+    // Non-hard-gating by design:
+    //   - No volume data  → neutral pass (never blocks a genuine signal)
+    //   - score >= threshold (default 45) → confirmed, small confidence boost
+    //   - 20 <= score < threshold → neutral pass (stays aligned with other systems
+    //     and the overall price direction — the symbol is simply "neutral" on volume)
+    //   - score < 20 → weak/suspicious volume → suppress directional signal
+    //   - absorption detected → SEPARATE suppression (the most dangerous trap)
+    const volumeGuardOn = settings?.useVolumeGuard !== false;
+    const volThreshold = settings?.volumeGuardThreshold ?? 45;
+    var volumeQualityBlocked = false;
+    var volumeBoost = 0;
+    if (volumeGuardOn && volumeQuality.detected) {
+      if (volumeQuality.absorbed) {
+        volumeQualityBlocked = true;
+        detailedReasons.push({
+          check: 'Volume Guard (Absorption)',
+          value: `Score ${volumeQuality.score}/100 ${volumeQuality.reasons.join('; ')}`,
+          status: 'negative',
+          impact: 'ABSORPTION TRAP: high volume is being absorbed / rejected against the trend — forced neutral'
+        });
+      } else if (volumeQuality.score >= volThreshold) {
+        volumeBoost = Math.round(finalConfidence * 0.08);
+        detailedReasons.push({
+          check: 'Volume Quality',
+          value: `${volumeQuality.score}/100 (≥${volThreshold})`,
+          status: 'positive',
+          impact: 'healthy confirmed volume — supports the direction'
+        });
+      } else if (volumeQuality.score < 20) {
+        volumeQualityBlocked = true;
+        detailedReasons.push({
+          check: 'Volume Quality',
+          value: `${volumeQuality.score}/100 (<20) ${volumeQuality.reasons.join('; ')}`,
+          status: 'negative',
+          impact: 'broken/weak volume — signal suppressed'
+        });
+      } else {
+        // 20 <= score < threshold → neutral pass (aligned with other systems)
+        detailedReasons.push({
+          check: 'Volume Quality',
+          value: `${volumeQuality.score}/100 (<${volThreshold})`,
+          status: 'neutral',
+          impact: 'mediocre volume — neutral, signal allowed through other systems'
+        });
+      }
+    }
+    finalConfidence = Math.min(100, finalConfidence + volumeBoost);
+
     if (finalSignal === ('no_entry' as any)) {
       // Sideways enforcement already blocked — do NOT override
     } else if (weeklyNewsBlocked) {
       finalSignal = SignalType.NO_ENTRY;
       finalConfidence = Math.min(finalConfidence, 0);
+    } else if (volumeQualityBlocked) {
+      finalSignal = SignalType.NEUTRAL;
+      finalConfidence = Math.min(finalConfidence, 30);
     } else if (higherTFBlocked) {
       finalSignal = SignalType.NEUTRAL;
     } else if (candleMatchBlocked) {
