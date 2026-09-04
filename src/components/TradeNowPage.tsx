@@ -1358,7 +1358,11 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                               setTimeout(() => setToast(null), 2000);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
-                            className="relative px-3 py-1.5 rounded-lg text-lg font-black text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-400/50 cursor-pointer transition-all active:scale-95"
+                            className={`relative px-3 py-1.5 rounded-lg text-lg font-black cursor-pointer transition-all active:scale-95 ${
+                              t.side === 'buy'
+                                ? 'text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-400/50'
+                                : 'text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-400/50'
+                            }`}
                           >
                             {popId === t.id && (
                               <span className="absolute inset-0 rounded-lg animate-ping bg-sky-400/30 pointer-events-none" />

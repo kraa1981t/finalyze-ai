@@ -282,6 +282,37 @@ body {
   background-color: rgba(14, 116, 144, 0.15) !important;
 }
 
+/* ── Open-trade SL / TP step arrows + edit fields in light mode ── */
+.light .text-red-300 {
+  color: #B91C1C !important;
+}
+.light .text-emerald-300 {
+  color: #047857 !important;
+}
+.light .bg-red-500\/15 {
+  background-color: rgba(185, 28, 28, 0.18) !important;
+}
+.light .bg-emerald-500\/15 {
+  background-color: rgba(4, 120, 87, 0.18) !important;
+}
+.light .hover\:bg-red-500\/30:hover {
+  background-color: rgba(185, 28, 28, 0.3) !important;
+}
+.light .hover\:bg-emerald-500\/30:hover {
+  background-color: rgba(4, 120, 87, 0.3) !important;
+}
+/* SL/TP edit inputs: light field instead of dark bg-black/40 */
+.light .bg-black\/40 {
+  background-color: rgba(4, 120, 87, 0.10) !important;
+  border-color: rgba(6, 78, 59, 0.20) !important;
+}
+.light .border-red-500\/40 {
+  border-color: #B91C1C !important;
+}
+.light .border-emerald-500\/40 {
+  border-color: #047857 !important;
+}
+
 /* ── Settings page: double text size ── */
 .light #settings,
 .light [class*="Settings"],
