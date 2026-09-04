@@ -250,6 +250,32 @@ body {
 .light .text-sky-200 {
   color: #0E7490 !important;
 }
+/* Open-position symbol + margin in light mode: vivid dark cyan */
+.light .text-sky-400 {
+  color: #0E7490 !important;
+  font-weight: 800 !important;
+}
+.light .border-sky-500\/30 {
+  border-color: rgba(14, 116, 144, 0.45) !important;
+}
+
+/* ── Signal cards: overrides for inline neon/white symbol colors so they read
+   clearly (non-transparent) on the light-mode green background. These defeat
+   inline style colors via !important. Preserves buy/green vs sell/red cues. ── */
+.light [style*="#00ff88"] { color: #047857 !important; }   /* STRONG_BUY / TP */
+.light [style*="#66ffaa"] { color: #047857 !important; }   /* BUY */
+.light [style*="#ff4444"] { color: #B91C1C !important; }   /* STRONG_SELL / SL */
+.light [style*="#ff5555"] { color: #B91C1C !important; }   /* SELL */
+.light [style*="#ffffff"] { color: #064E3B !important; opacity: 1 !important; } /* confidence % */
+.light [style*="rgba(255,255,255,0.85)"] { color: #064E3B !important; opacity: 1 !important; } /* timestamp */
+
+/* ── Client "Why this signal?" narrative (analysis reasons) in light mode ── */
+.light .text-yellow-300 {
+  color: #B45309 !important;
+}
+.light .text-yellow-400 {
+  color: #B45309 !important;
+}
 
 /* ── Symbol tag buttons: visible text ── */
 .light .bg-sky-500\/15 {
