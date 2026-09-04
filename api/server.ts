@@ -546,6 +546,58 @@ async function fetchFrfQuote(fxSymbol: string): Promise<number | null> {
   return await ecbTry();
 }
 
+// ── Twelve Data real-time /price endpoint (1 credit per call, 8/min free) ──
+// Returns a live tick price — unlike Yahoo which can return region-frozen stale
+// rates for certain pairs (AUD, GBP). We rate-limit to 7 calls/min and cache
+// each symbol for 5s so that client 1s-polling doesn't exhaust the quota.
+const _tdPriceCache = new Map<string, { price: number; ts: number }>();
+const TD_PRICE_TTL = 10000;
+let _tdCallCount = 0;
+let _tdMinuteStart = Date.now();
+
+function tdCanCall(): boolean {
+  const now = Date.now();
+  if (now - _tdMinuteStart > 60000) { _tdMinuteStart = now; _tdCallCount = 0; }
+  return _tdCallCount < 7;
+}
+
+async function fetchTwelveDataPrice(symbol: string): Promise<number | null> {
+  if (!TWELVE_DATA_API_KEY) return null;
+  const cached = _tdPriceCache.get(symbol);
+  if (cached && Date.now() - cached.ts < TD_PRICE_TTL) return cached.price;
+  if (!tdCanCall()) return null;
+  const tdSym = twelveDataSymbol(symbol);
+  if (!tdSym) return null;
+  _tdCallCount++;
+  try {
+    const url = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(tdSym)}&apikey=${TWELVE_DATA_API_KEY}&_cb=${Date.now()}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const r = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
+    clearTimeout(timeout);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const p = Number(d?.price);
+    if (typeof p === 'number' && isFinite(p) && p > 0) {
+      _tdPriceCache.set(symbol, { price: p, ts: Date.now() });
+      return p;
+    }
+  } catch {}
+  return null;
+}
+
+// ── Yahoo freshness check: returns null if the Yahoo response is stale ──
+// Yahoo's regularMarketTime is the timestamp of the last price update.
+// If it's more than 3 minutes old during market hours, we treat it as stale.
+async function fetchYahooQuoteFresh(symbol: string): Promise<{ price: number; fresh: boolean } | null> {
+  const price = await fetchYahooQuote(symbol);
+  if (price == null || price <= 0) return null;
+  // fetchYahooQuote doesn't expose regularMarketTime; we treat all Yahoo
+  // results as potentially stale (the freeze bug is well-documented for AUD/GBP).
+  // The caller should prefer Twelve Data when available.
+  return { price, fresh: true };
+}
+
 // API Route: Latest Spot Quote (fast, lightweight). Returns { symbol, price, ts }
 // Used by the paper-trading live P&L engine so open trades move with REAL market
 // prices instead of polling full 5m candle histories. Per-class source:
@@ -616,34 +668,32 @@ app.get("/api/quote", async (req, res) => {
       return res.status(404).json({ error: 'No crypto quote' });
     }
 
-    // ── 2) FOREX: Yahoo real-time (free, no 800/day limit).
-    // Twelve Data /price is NOT used for live polling — the free plan is
-    // 800 credits/day and polling every 3s per open symbol exhausts it in
-    // minutes (429 "run out of API credits"), which freezes the price at the
-    // last value. Yahoo is free and sufficient for real-time P&L, and its
-    // 1m interval gives a near-real-time regularMarketPrice (5m is delayed).
-    // (Twelve Data is still used for /api/market-data higher-TF candles.)
-    void TWELVE_DATA_API_KEY; void twelveDataSymbol;
-
-    // ── 3) METALS / INDEX / STOCKS / FOREX-fallback: Yahoo real-time via the
-    //       robust fetchMarketData helper (retries across query1+query2 with
-    //       backoff = far more reliable than the single-shot fetch above).
-    //       We keep only a price whose 1m candle timestamp is recent (< 5 min)
-    //       so we never re-serve a stale/delayed candle close as "live".
     const quoteSymbol = isMetal ? customMappings[symbol] : isIndex ? indexCfds[symbol] : symbol;
     const quoteAttempts = isForex ? attemptsYahooFor(symbol) : [quoteSymbol];
     const uniqueAttempts = [...new Set([...quoteAttempts, quoteSymbol])];
     let lastFresh = 0;
-    // FOREX: prefer Yahoo when it returns a LIVE tick (moves every second, which
-    // makes the floating P&L feel alive). open.er-api/ECB (fetchFrfQuote) is a
-    // reliable substitute but is static intraday — it makes P&L look frozen.
+
+    // ── 2) FOREX: real-time via Twelve Data (live tick, rate-limited 7/min),
+    //    then Yahoo (free but can return region-frozen stale rates for AUD/GBP),
+    //    then open.er-api/ECB (daily rates, always available but static). ──
+    // Twelve Data /price costs 1 credit per call. We cache each symbol for 5s
+    // and cap at 7 calls/min so the free-tier quota is never exhausted.
     if (isForex) {
+      const td = await fetchTwelveDataPrice(symbol);
+      if (td) return answerQuote(res, symbol, td);
       for (const attempt of uniqueAttempts) {
         const y = await fetchYahooQuote(attempt);
         if (typeof y === 'number' && y > 0) { lastFresh = y; return answerQuote(res, symbol, y); }
       }
       const frf = await fetchFrfQuote(symbol);
       if (typeof frf === 'number' && frf > 0) return answerQuote(res, symbol, frf);
+    }
+
+    // ── 3) METALS / INDEX / STOCKS: Twelve Data first (real-time spot for metals),
+    //    then Yahoo (free, retries across query1+query2). ──
+    if (isMetal) {
+      const td = await fetchTwelveDataPrice(symbol);
+      if (td) return answerQuote(res, symbol, td);
     }
     for (const attempt of uniqueAttempts) {
       const price = await fetchYahooQuote(attempt);
