@@ -45,7 +45,7 @@ type LineKey = 'entry' | 'sl' | 'tp';
 // Day/week/month (higher) timeframes removed from the trading chart: the
 // backend daily+ data currently returns outlier-spiked candles for several
 // forex symbols, so only intraday timeframes are shown here.
-const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h'];
+const TIMEFRAMES = ['1m', '5m', '15m', '1h'];
 
 const DRAW_TOOLS = [
   { id: 'cursor', label: 'مؤشر', icon: '↖' },
@@ -70,7 +70,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
   const lastDragSoundRef = useRef(0);
-  const [tf, setTf] = useState('4h');
+  const [tf, setTf] = useState('1h');
   const [positions, setPositions] = useState<{ sl?: number; tp?: number }>({});
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
   const [drawColor, setDrawColor] = useState('#60a5fa');

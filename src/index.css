@@ -137,6 +137,25 @@ body {
   opacity: 1 !important;
 }
 
+/* Remaining text-white (full + high-opacity) → dark green so it stays readable
+   on the green light-mode background. Covers the calculator, analysis detail page,
+   trend info, and section content. */
+.light .text-white,
+.light .text-white\/70,
+.light .text-white\/80,
+.light .text-white\/90 {
+  color: #064E3B !important;
+  opacity: 1 !important;
+}
+
+/* Hardcoded #111827 boxes (calculator wrapper, chart) → green tint in light mode */
+.light .bg-\[\#111827\] {
+  background-color: #A7F3D0 !important;
+}
+.light .text-slate-300 {
+  color: #065F46 !important;
+}
+
 /* Black/20 backgrounds → green-tinted */
 .light .bg-black\/20 {
   background-color: rgba(6, 78, 59, 0.12) !important;

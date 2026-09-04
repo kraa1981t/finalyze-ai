@@ -292,7 +292,7 @@ export default function Header({
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('radar'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Zap size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'إعدادات التحليل التلقائي' : 'Auto Analysis Settings'}</span>
+                    <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lang === 'ar' ? 'إعدادات التحليل التلقائي' : 'Auto Analysis Settings'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('apiKey'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">

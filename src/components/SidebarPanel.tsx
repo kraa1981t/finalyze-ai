@@ -68,7 +68,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
               <div className={`shrink-0 p-2.5 rounded-xl bg-gradient-to-br ${item.color} border border-black/10 text-black shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all`}>
                 <Icon size={20} />
               </div>
-              <span className="text-sm font-bold text-black/80 group-hover:text-black transition-colors whitespace-nowrap">
+              <span className="text-sm font-bold text-black/80 group-hover:text-black transition-colors min-w-0 leading-snug">
                 {item.label}
               </span>
             </motion.button>

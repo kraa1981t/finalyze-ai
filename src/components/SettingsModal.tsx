@@ -298,8 +298,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
           <Settings2 size={42} />
         </div>
         <div>
-          <h2 className="text-4xl md:text-[48px] font-black text-brand-text leading-tight">{isAr ? 'إعدادات التحليل الذكي' : 'Smart Analysis Settings'}</h2>
-          <p className="text-xl md:text-[28px] text-brand-text/50 leading-snug mt-1">{isAr ? 'قم بضبط معايير الذكاء الاصطناعي بدقة' : 'Fine-tune AI analysis parameters precisely'}</p>
+          <h2 className="text-3xl md:text-[38px] font-black text-brand-text leading-tight">{isAr ? 'إعدادات التحليل الذكي' : 'Smart Analysis Settings'}</h2>
+          <p className="text-lg md:text-[22px] text-brand-text/50 leading-snug mt-1">{isAr ? 'قم بضبط معايير الذكاء الاصطناعي بدقة' : 'Fine-tune AI analysis parameters precisely'}</p>
         </div>
       </div>
       <button onClick={onClose} className="p-3 text-brand-text/50 hover:text-red-500 hover:bg-white/5 rounded-xl transition-colors">
@@ -330,8 +330,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
     return (
       <div className="flex items-center justify-between py-4 border-b border-white/5 last:border-0 gap-4">
         <div className="flex-1 min-w-0">
-          <div className="text-2xl md:text-[30px] font-black text-brand-text leading-tight">{label}</div>
-          {desc && <div className="text-base md:text-[22px] text-brand-text/45 mt-1.5 leading-snug">{desc}</div>}
+          <div className="text-xl md:text-[24px] font-black text-brand-text leading-tight">{label}</div>
+          {desc && <div className="text-sm md:text-[17px] text-brand-text/45 mt-1.5 leading-snug">{desc}</div>}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <input type="text" inputMode="decimal" translate="no" dir="ltr" lang="en"
@@ -340,8 +340,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             onBlur={commit}
             onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(String(value)); setFocused(false); } }}
             onChange={(e) => setDraft(e.target.value.replace(/[^0-9.\-]/g, ''))}
-            className={`w-28 md:w-32 text-center text-xl md:text-[28px] font-black font-mono notranslate ${color} bg-transparent border-2 border-white/10 rounded-xl py-2.5 focus:border-primary outline-none`} />
-          {suffix && <span className="text-lg md:text-[24px] text-[#F59E0B] font-black whitespace-nowrap">{suffix}</span>}
+            className={`w-24 md:w-28 text-center text-lg md:text-[22px] font-black font-mono notranslate ${color} bg-transparent border-2 border-white/10 rounded-xl py-2 focus:border-primary outline-none`} />
+          {suffix && <span className="text-base md:text-[19px] text-[#F59E0B] font-black whitespace-nowrap">{suffix}</span>}
         </div>
       </div>
     );
@@ -352,8 +352,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
       
       {/* Section 1: Confidence Thresholds */}
       <div className="space-y-4">
-        <h3 className="text-2xl md:text-[32px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
-          <span className="text-[#F59E0B] text-3xl">◆</span> {isAr ? 'عتبات الثقة' : 'Confidence Thresholds'}
+        <h3 className="text-xl md:text-[26px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
+          <span className="text-[#F59E0B] text-2xl">◆</span> {isAr ? 'عتبات الثقة' : 'Confidence Thresholds'}
         </h3>
         <div className="bg-white/5 border border-white/5 rounded-2xl p-5 md:p-6">
           <NumberInput label={isAr ? 'حد الإشارة القوية' : 'Strong Signal Threshold'} value={settings.strongThreshold} onChange={(v) => handleChange('strongThreshold', v)} color="text-[#F59E0B]" desc={isAr ? 'الثقة المطلوبة لإشارة قوية (≥)' : 'Confidence required for strong signal (≥)'} />
@@ -365,8 +365,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
 
       {/* Section 2: Primary Conditions (Entry Gates) */}
       <div className="space-y-4">
-        <h3 className="text-2xl md:text-[32px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
-          <span className="text-[#F59E0B] text-3xl">◆</span> {isAr ? 'الشروط الأساسية (أبواب الدخول)' : 'Primary Conditions (Entry Gates)'}
+        <h3 className="text-xl md:text-[26px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
+          <span className="text-[#F59E0B] text-2xl">◆</span> {isAr ? 'الشروط الأساسية (أبواب الدخول)' : 'Primary Conditions (Entry Gates)'}
           <span className="text-base md:text-[22px] text-brand-text/35 font-mono mr-auto">{isAr ? 'النسبة القصوى 50%' : 'Max 50%'}</span>
         </h3>
         <div className="bg-white/5 border border-white/5 rounded-2xl p-5 md:p-6">
@@ -380,8 +380,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
 
       {/* Section 3: Supporting Conditions (Signal Boost) */}
       <div className="space-y-4">
-        <h3 className="text-2xl md:text-[32px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
-          <span className="text-[#F59E0B] text-3xl">◆</span> {isAr ? 'الشروط الداعمة (تعزيز الإشارة)' : 'Supporting Conditions (Signal Boost)'}
+        <h3 className="text-xl md:text-[26px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
+          <span className="text-[#F59E0B] text-2xl">◆</span> {isAr ? 'الشروط الداعمة (تعزيز الإشارة)' : 'Supporting Conditions (Signal Boost)'}
           <span className="text-base md:text-[22px] text-brand-text/35 font-mono mr-auto">{isAr ? 'النسبة القصوى 20%' : 'Max 20%'}</span>
         </h3>
         <div className="bg-white/5 border border-white/5 rounded-2xl p-5 md:p-6">
@@ -396,8 +396,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
 
       {/* Section 4: Toggles */}
       <div className="space-y-4">
-        <h3 className="text-2xl md:text-[32px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
-          <span className="text-[#F59E0B] text-3xl">◆</span> {isAr ? 'مفاتيح التفعيل' : 'Feature Toggles'}
+        <h3 className="text-xl md:text-[26px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3 leading-tight">
+          <span className="text-[#F59E0B] text-2xl">◆</span> {isAr ? 'مفاتيح التفعيل' : 'Feature Toggles'}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[

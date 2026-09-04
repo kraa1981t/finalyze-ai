@@ -195,8 +195,8 @@ function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.BUY];
   const isJPY = res.symbol.includes('JPY');
   const decimals = isJPY ? 3 : 5;
-  const isStrong = res.signal === SignalType.STRONG_BUY || res.signal === SignalType.STRONG_SELL;
-  const isVeryStrong = res.confidence >= 95;
+const isStrong = res.signal === SignalType.STRONG_BUY || res.signal === SignalType.STRONG_SELL;
+  const isVeryStrong = isStrong && res.confidence >= 90;
   const tpPrice = res.takeProfit || 0;
   const slPrice = res.stopLoss || 0;
 

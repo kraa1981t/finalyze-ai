@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, ShieldX, CheckCircle, XCircle, AlertTriangle, BarChart3, Target, Zap, CandlestickChart, Clipboard, Check } from 'lucide-react';
-import { toTvSymbol } from '../lib/tvSymbol';
 import { AnalysisResult, SignalType } from '../types';
 import { Language } from '../lib/i18n';
 import LotSizeCalculator from './LotSizeCalculator';
@@ -81,7 +80,6 @@ function parseCandleInfo(value: string) {
 export default function AnalysisDetailPage({ result, onBack, lang, isClient = false }: AnalysisDetailPageProps) {
   const [copied, setCopied] = useState(false);
   const isAr = lang === 'ar';
-  const chartRef = useRef<HTMLDivElement>(null);
   const colors = getSignalColor(result.signal);
   const allReasons = result.detailedReasons || [];
 
@@ -153,40 +151,6 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
 
   const generateClientNarrative = () => narrativeParts.join(' ');
 
-  useEffect(() => {
-    if (!isClient && chartRef.current && result.symbol) {
-      const tvSymbol = toTvSymbol(result.symbol);
-      chartRef.current.innerHTML = '';
-      const widget = document.createElement('div');
-      widget.className = 'tradingview-widget-container';
-      widget.style.height = '350px';
-      widget.style.borderRadius = '16px';
-      widget.style.overflow = 'hidden';
-      widget.innerHTML = `
-        <div class="tradingview-widget-container__widget" style="height:100%;width:100%;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/external-embed/embed-widget-advanced-chart.js" async>
-        {
-          "autosize": true,
-          "symbol": "${tvSymbol}",
-          "interval": "D",
-          "timezone": "Etc/UTC",
-          "theme": "dark",
-          "style": "1",
-          "locale": "en",
-          "backgroundColor": "rgba(10, 15, 26, 1)",
-          "gridColor": "rgba(255, 255, 255, 0.03)",
-          "allow_symbol_change": true,
-          "hide_volume": false,
-          "studies": ["STD;EMA", "STD;RSI"],
-          "show_popup_button": true,
-          "popup_width": "1200",
-          "popup_height": "700"
-        }
-        </script>`;
-      chartRef.current.appendChild(widget);
-    }
-  }, [result.symbol, isClient]);
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -205,7 +169,7 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
           <div className="flex-1">
             {!isClient && (
             <div className="flex items-center gap-2">
-              <span className="text-xl font-black text-white">{result.symbol}</span>
+              <span className={`text-xl font-black ${colors.text}`}>{result.symbol}</span>
               <span className={`px-3 py-1 rounded-lg text-xs font-black text-white ${colors.bg} shadow-lg ${colors.glow}`}>
                 {getSignalLabel(result.signal, lang)}
               </span>
@@ -307,47 +271,6 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
             />
           </div>
         )}
-
-        {/* Upcoming Strong News */}
-        {result.detailedReasons && result.detailedReasons.some(r => r.check === 'Economic Events' || r.check === 'Econ Penalty') && (
-          <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-xl p-5 border border-red-500/20">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle size={20} className="text-red-400" />
-              <span className="text-sm font-black uppercase tracking-wider text-red-400">
-                {isAr ? 'أخبار قوية قادمة' : 'UPCOMING STRONG NEWS'}
-              </span>
-            </div>
-            <div className="space-y-3">
-              {result.detailedReasons
-                .filter(r => r.check === 'Economic Events' || r.check === 'Econ Penalty' || r.check === 'News Sentiment')
-                .map((r, i) => (
-                  <div key={i} className="flex items-start gap-3 bg-black/20 rounded-lg p-3 border border-white/5">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <div className={`w-3 h-3 rounded-full ${r.status === 'negative' ? 'bg-red-500 animate-pulse' : r.status === 'positive' ? 'bg-emerald-500' : 'bg-yellow-500'}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-white/90">{r.value}</div>
-                      <div className="text-xs text-white/50 mt-0.5">{r.impact}</div>
-                    </div>
-                    <div className={`flex-shrink-0 px-2 py-1 rounded text-[10px] font-black uppercase ${
-                      r.status === 'negative' ? 'bg-red-500/20 text-red-400' : 
-                      r.status === 'positive' ? 'bg-emerald-500/20 text-emerald-400' : 
-                      'bg-yellow-500/20 text-yellow-400'
-                    }`}>
-                      {r.status === 'negative' ? (isAr ? 'تجنب' : 'AVOID') : 
-                       r.status === 'positive' ? (isAr ? 'آمن' : 'SAFE') : 
-                       (isAr ? 'حذر' : 'CAUTION')}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {/* 3. Chart */}
-        <div className="rounded-2xl overflow-hidden border border-white/5 bg-[#111827]">
-          <div ref={chartRef} className="w-full" style={{ height: '350px' }} />
-        </div>
 
         {/* 4. Trend Info */}
         <div className="grid grid-cols-2 gap-3">
