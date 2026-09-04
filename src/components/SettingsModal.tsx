@@ -449,8 +449,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             <NumberInput
               label={isAr ? 'عتبة التأكيد' : 'Confirmation Threshold'}
               desc={isAr
-                ? '≥ العتبة → حجم مؤكد (تعزيز ثقة). 20–العتبة → محايد يمر مع الأنظمة الأخرى. <20 → حجم ضعيف/مشبوه يُحبّط الإشارة. امتصاص مؤكد → قمع كامل.'
-                : '≥ threshold → confirmed volume (confidence boost). 20–threshold → neutral pass aligned with other systems. <20 → weak/suspicious volume suppresses signal. Confirmed absorption → full suppression.'}
+                ? '≥ العتبة → حجم مؤكد (تعزيز ثقة). < العتبة → الإشارة تُحيد ولا تعرض. امتصاص مؤكد → قمع كامل حتى لو كانت الدرجة عالية.'
+                : '≥ threshold → confirmed volume (confidence boost). < threshold → signal suppressed, not displayed. Confirmed absorption → full suppression even if score is high.'}
               value={settings?.volumeGuardThreshold ?? 45}
               onChange={(v) => updateSetting('volumeGuardThreshold', v)}
               min={20}

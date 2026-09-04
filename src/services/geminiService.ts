@@ -1933,13 +1933,11 @@ Return ONLY valid JSON:
     finalConfidence = Math.min(100, finalConfidence + agreementBonus);
 
     // ═══ STEP 5f: Professional Volume Quality filter ═══
-    // Non-hard-gating by design:
-    //   - No volume data  → neutral pass (never blocks a genuine signal)
+    // HARD GATE (quality-first):
+    //   - No volume data  → neutral pass (never blocks a genuine signal when data is absent)
     //   - score >= threshold (default 45) → confirmed, small confidence boost
-    //   - 20 <= score < threshold → neutral pass (stays aligned with other systems
-    //     and the overall price direction — the symbol is simply "neutral" on volume)
-    //   - score < 20 → weak/suspicious volume → suppress directional signal
-    //   - absorption detected → SEPARATE suppression (the most dangerous trap)
+    //   - score < threshold → SUPPRESSED (no signal without confirmed volume)
+    //   - absorption detected → SEPARATE suppression (the most dangerous trap, even if score ≥45)
     const volumeGuardOn = settings?.useVolumeGuard !== false;
     const volThreshold = settings?.volumeGuardThreshold ?? 45;
     var volumeQualityBlocked = false;
@@ -1961,21 +1959,13 @@ Return ONLY valid JSON:
           status: 'positive',
           impact: 'healthy confirmed volume — supports the direction'
         });
-      } else if (volumeQuality.score < 20) {
+      } else {
         volumeQualityBlocked = true;
         detailedReasons.push({
           check: 'Volume Quality',
-          value: `${volumeQuality.score}/100 (<20) ${volumeQuality.reasons.join('; ')}`,
+          value: `${volumeQuality.score}/100 (<${volThreshold}) ${volumeQuality.reasons.join('; ')}`,
           status: 'negative',
-          impact: 'broken/weak volume — signal suppressed'
-        });
-      } else {
-        // 20 <= score < threshold → neutral pass (aligned with other systems)
-        detailedReasons.push({
-          check: 'Volume Quality',
-          value: `${volumeQuality.score}/100 (<${volThreshold})`,
-          status: 'neutral',
-          impact: 'mediocre volume — neutral, signal allowed through other systems'
+          impact: 'volume below confirmation threshold — signal suppressed (no signal without confirmed volume)'
         });
       }
     }
