@@ -309,7 +309,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
     }
   };
 
-  const htLinked = htpLoaded && htp.enabled && !!(htp.mainTag?.trim()) && !!(htp.zoneId?.trim());
+  const htpLinked = htpLoaded && htp.enabled && !!(htp.mainTag?.trim()) && !!(htp.zoneId?.trim());
 
   const addAd = () => {
     if (!newAd.name.trim()) return;
@@ -736,7 +736,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                 } disabled:opacity-40 disabled:cursor-not-allowed`}
               >
                 {htp.enabled ? <Link2 size={13} /> : <Save size={13} />}
-                {htpSaving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : htLinked ? (isAr ? 'تحديث الإعدادات' : 'Update Settings') : (isAr ? 'حفظ وتفعيل' : 'Save & Enable')}
+                {htpSaving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : htpLinked ? (isAr ? 'تحديث الإعدادات' : 'Update Settings') : (isAr ? 'حفظ وتفعيل' : 'Save & Enable')}
               </button>
               <button
                 onClick={handleHtpDelete}
