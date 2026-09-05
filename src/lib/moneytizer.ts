@@ -1,6 +1,7 @@
 import { db } from './firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { MTZ_DEFAULT_ADS_TXT } from './moneytizer-default';
+import { MTZ_DEFAULT_HEAD_CODE } from './moneytizer-cmp';
 
 export interface MoneytizerConfig {
   enabled: boolean;
@@ -16,7 +17,7 @@ export const DEFAULT_CFG: MoneytizerConfig = {
   enabled: true,
   publisherId: '142894',
   adsTxtContent: MTZ_DEFAULT_ADS_TXT,
-  headCode: '',
+  headCode: MTZ_DEFAULT_HEAD_CODE,
 };
 
 function normalize(cfg: any): MoneytizerConfig {
