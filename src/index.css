@@ -437,8 +437,9 @@ body {
   }
   /* Market category cards keep 2 per row but guarantee 2 lines of text fit without clipping */
   /* (Tailwind already sets min-h-[88px] md:min-h-0; this just prevents clipping if font scales) */
-  /* Signal cards: already 2 per row via grid-cols-2; enforce rectangular full-info display */
+  /* Signal cards: 1 full-width rectangle per row on phones (info fully visible) */
   .signal-card {
-    min-height: 132px !important;
+    min-height: 128px !important;
+    width: 100% !important;
   }
 }
