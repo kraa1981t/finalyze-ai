@@ -13,8 +13,8 @@ export interface Ad {
   id: string;
   name: string;
   code: string;
-  type: 'adsense' | 'adsterra' | 'hilltopads' | 'custom';
-  adUnitType: 'social_bar' | 'popunder' | 'banner' | 'native' | 'interstitial' | 'inpage' | 'direct_link';
+  type: string;
+  adUnitType: 'social_bar' | 'popunder' | 'banner' | 'native' | 'interstitial' | 'inpage' | 'direct_link' | 'video' | 'text';
   position: 'header' | 'sidebar' | 'footer' | 'between' | 'popup' | 'inline';
   size?: string;
   adsterraId?: string;
@@ -50,7 +50,87 @@ const AD_UNIT_TYPE_ICONS: Record<string, string> = {
   interstitial: '🔲',
   inpage: '📄',
   direct_link: '🔗',
+  video: '🎬',
+  text: '🔤',
 };
+
+// ── Universal ad network registry ──
+// Any company can be added here — site recognizes it automatically from the code pasted.
+export type AdNetworkKey = 'adsterra' | 'hilltopads' | 'propellerads' | 'popads' | 'adsense' | 'moneytizer' | 'medianet' | 'resourcesmart' | 'custom';
+
+export interface AdNetworkInfo {
+  key: AdNetworkKey;
+  label: string;
+  color: string;        // tailwind badge color hint
+  panelUrl?: string;
+  patterns: string[];   // substrings to look for in the ad code (lowercased)
+}
+
+export const AD_NETWORKS: AdNetworkInfo[] = [
+  { key: 'adsterra', label: 'Adsterra', color: 'purple', panelUrl: 'https://beta.publishers.adsterra.com/', patterns: ['adsterra', 'serving5', 'serving6', 'allsportsstats', 'adsterraads'] },
+  { key: 'hilltopads', label: 'HilltopAds', color: 'cyan', panelUrl: 'https://publishers.hilltopads.com/', patterns: ['hilltopads', 'truthful-game'] },
+  { key: 'propellerads', label: 'PropellerAds', color: 'orange', panelUrl: 'https://publishers.propellerads.com/', patterns: ['propellerads', 'propeller', 'sid_', 'shakeradspot'] },
+  { key: 'popads', label: 'PopAds', color: 'pink', panelUrl: 'https://www.popads.net/', patterns: ['popads', 'popadscdn'] },
+  { key: 'adsense', label: 'Google AdSense', color: 'blue', panelUrl: 'https://www.google.com/adsense/', patterns: ['googlesyndication', 'adsbygoogle', '/adsense/', 'pagead'] },
+  { key: 'moneytizer', label: 'The Moneytizer', color: 'indigo', panelUrl: 'https://www.moneytizer.com/', patterns: ['themoneytizer', 'moneytizer', 'form_manager'] },
+  { key: 'medianet', label: 'Media.net', color: 'amber', panelUrl: 'https://www.media.net/', patterns: ['media.net', 'media dot net'] },
+  { key: 'resourcesmart', label: 'Resource Smart', color: 'teal', panelUrl: 'https://resourcesmart.net/', patterns: ['resourcesmart', 'gemini', 'yieldbird'] },
+];
+
+export function getNetworkInfo(key: string): AdNetworkInfo {
+  return AD_NETWORKS.find(n => n.key === key) || { key: 'custom', label: 'Custom', color: 'slate', patterns: [] };
+}
+
+function networkBadgeClass(color: string): string {
+  switch (color) {
+    case 'purple': return 'bg-purple-500/20 text-purple-400';
+    case 'cyan': return 'bg-cyan-500/20 text-cyan-400';
+    case 'orange': return 'bg-orange-500/20 text-orange-400';
+    case 'pink': return 'bg-pink-500/20 text-pink-400';
+    case 'indigo': return 'bg-indigo-500/20 text-indigo-400';
+    case 'amber': return 'bg-amber-500/20 text-amber-400';
+    case 'teal': return 'bg-teal-500/20 text-teal-400';
+    case 'blue': return 'bg-blue-500/20 text-blue-400';
+    case 'slate': return 'bg-slate-500/20 text-slate-400';
+    default: return 'bg-slate-500/20 text-slate-400';
+  }
+}
+
+function networkDotClass(color: string): string {
+  switch (color) {
+    case 'purple': return 'bg-purple-400';
+    case 'cyan': return 'bg-cyan-400';
+    case 'orange': return 'bg-orange-400';
+    case 'pink': return 'bg-pink-400';
+    case 'indigo': return 'bg-indigo-400';
+    case 'amber': return 'bg-amber-400';
+    case 'teal': return 'bg-teal-400';
+    case 'blue': return 'bg-blue-400';
+    default: return 'bg-slate-400';
+  }
+}
+
+export function detectAdNetwork(code: string): AdNetworkKey {
+  const c = (code || '').toLowerCase();
+  if (!c.trim()) return 'custom';
+  for (const net of AD_NETWORKS) {
+    if (net.patterns.some(p => c.includes(p))) return net.key;
+  }
+  return 'custom';
+}
+
+// Best-effort detection of the ad unit shape from the code snippet.
+export function detectAdUnitType(code: string): Ad['adUnitType'] {
+  const c = (code || '').toLowerCase();
+  if (c.includes('popunder') || c.includes('popunder') || c.includes('window.open')) return 'popunder';
+  if (c.includes('inpage') || c.includes('in-page') || c.includes('in_page') || c.includes('push')) return 'inpage';
+  if (c.includes('interstitial') || c.includes('fullscreen')) return 'interstitial';
+  if (c.includes('social')) return 'social_bar';
+  if (c.includes('native')) return 'native';
+  if (c.includes('video')) return 'video';
+  if (c.includes('banner') || c.includes('728x90') || c.includes('300x250') || c.includes('320x50') || c.includes('468x60')) return 'banner';
+  return 'banner';
+}
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -152,6 +232,8 @@ const AD_UNIT_TYPES: Record<string, { ar: string; en: string }> = {
   interstitial: { ar: 'شاشة كاملة', en: 'Interstitial' },
   inpage: { ar: 'إعلان داخل الصفحة', en: 'In-Page Ad' },
   direct_link: { ar: 'رابط مباشر', en: 'Direct Link' },
+  video: { ar: 'فيديو', en: 'Video' },
+  text: { ar: 'إعلان نصي', en: 'Text Ad' },
 };
 
 export default function AdsManager({ lang, onBack }: AdsManagerProps) {
@@ -187,14 +269,24 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   const [newAd, setNewAd] = useState({
     name: '',
     code: '',
-    type: 'adsterra' as Ad['type'],
+    type: 'adsterra' as string,
     adUnitType: 'banner' as Ad['adUnitType'],
     position: 'header' as Ad['position'],
     size: '',
     adsterraId: '',
   });
 
-  const resetNewAd = () => setNewAd({ name: '', code: '', type: 'adsterra', adUnitType: 'banner', position: 'header', size: '', adsterraId: '' });
+  const resetNewAd = () => setNewAd({ name: '', code: '', type: '', adUnitType: 'banner', position: 'header', size: '', adsterraId: '' });
+
+  const handleNewAdCodeChange = (code: string) => {
+    setNewAd(prev => {
+      const detected = detectAdNetwork(code);
+      const newState = { ...prev, code };
+      if (detected !== 'custom') newState.type = detected;
+      if (code.trim()) newState.adUnitType = detectAdUnitType(code);
+      return newState;
+    });
+  };
 
   useEffect(() => { setClientEmails(loadClientEmails()); }, []);
 
@@ -248,12 +340,13 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
   const addAd = () => {
     if (!newAd.name.trim()) return;
+    const detectedType = newAd.type || detectAdNetwork(newAd.code);
     const ad: Ad = {
       id: generateId(),
       name: newAd.name.trim(),
       code: newAd.code.trim(),
-      type: newAd.type,
-      adUnitType: newAd.adUnitType,
+      type: detectedType,
+      adUnitType: newAd.code.trim() ? detectAdUnitType(newAd.code) : newAd.adUnitType,
       position: newAd.position,
       size: newAd.size || undefined,
       adsterraId: newAd.adsterraId || undefined,
@@ -585,7 +678,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
         {[
           { key: 'all', label: isAr ? 'كل الشبكات' : 'All Networks', color: 'white' },
-          { key: 'adsterra', label: 'Adsterra', color: 'purple' },
+          ...AD_NETWORKS.map(net => ({ key: net.key, label: net.label, color: net.color })),
           { key: 'custom', label: isAr ? 'مخصص' : 'Custom', color: 'slate' },
         ].map(tab => (
           <button
@@ -593,9 +686,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             onClick={() => setFilterNetwork(tab.key)}
             className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
               filterNetwork === tab.key
-                ? tab.key === 'adsterra' ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' :
-                  tab.key === 'custom' ? 'bg-slate-500 text-white shadow-lg shadow-slate-500/20' :
-                  'bg-primary text-black shadow-lg shadow-emerald-500/20'
+                ? tab.key === 'all' ? 'bg-primary text-black shadow-lg shadow-emerald-500/20' :
+                  'bg-slate-500 text-white shadow-lg shadow-slate-500/20'
                 : 'bg-white/5 text-slate-400 hover:bg-white/10'
             }`}
           >
@@ -634,12 +726,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="text-sm font-black text-white">{ad.name}</span>
                     <span className="text-lg">{AD_UNIT_TYPE_ICONS[ad.adUnitType] || '📢'}</span>
-                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                      ad.type === 'adsterra' ? 'bg-purple-500/20 text-purple-400' :
-                      ad.type === 'adsense' ? 'bg-blue-500/20 text-blue-400' :
-                      'bg-slate-500/20 text-slate-400'
-                    }`}>
-                      {ad.type === 'adsterra' ? 'Adsterra' : ad.type === 'adsense' ? 'AdSense' : isAr ? 'مخصص' : 'Custom'}
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${networkBadgeClass(getNetworkInfo(ad.type).color)}`}>
+                      {getNetworkInfo(ad.type).label}
                     </span>
                     {ad.size && (
                       <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-white/10 text-slate-300">
@@ -774,11 +862,26 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                     <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? 'كود الإعلان' : 'Ad Code'}</label>
                     <textarea
                       value={ad.code}
-                      onChange={(e) => updateAd(ad.id, { code: e.target.value })}
-                      placeholder={isAr ? 'الصق كود الإعلان من Adsterra هنا...' : 'Paste Adsterra ad code here...'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const detected = detectAdNetwork(val);
+                        const updates: Partial<Ad> = { code: val };
+                        if (detected !== 'custom') updates.type = detected;
+                        if (val.trim()) updates.adUnitType = detectAdUnitType(val);
+                        updateAd(ad.id, updates);
+                      }}
+                      placeholder={isAr ? 'الصق كود الإعلان من أي شركة هنا...' : 'Paste ad code from any network here...'}
                       rows={4}
                       className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-primary/50 resize-none"
                     />
+                    {ad.code.trim() && (
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${networkBadgeClass(getNetworkInfo(ad.type).color)}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full inline-block mr-1 align-middle ${networkDotClass(getNetworkInfo(ad.type).color)}`} />
+                          {isAr ? 'تم كشف الشبكة تلقائياً:' : 'Auto-detected network:'} {getNetworkInfo(ad.type).label}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -892,18 +995,17 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
                 <div>
                   <label className="text-[11px] text-slate-400 font-bold block mb-1.5">{isAr ? 'الشبكة الإعلانية' : 'Ad Network'}</label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {[
-                      { value: 'adsterra', label: 'Adsterra', color: 'purple' },
+                      ...AD_NETWORKS.map(net => ({ value: net.key, label: net.label, color: net.color })),
                       { value: 'custom', label: isAr ? 'مخصص' : 'Custom', color: 'slate' },
                     ].map(net => (
                       <button
                         key={net.value}
-                        onClick={() => setNewAd(prev => ({ ...prev, type: net.value as Ad['type'] }))}
-                        className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                        onClick={() => setNewAd(prev => ({ ...prev, type: net.value }))}
+                        className={`flex-1 min-w-[100px] py-2.5 rounded-xl text-xs font-bold transition-all border ${
                           newAd.type === net.value
-                            ? net.color === 'purple' ? 'bg-purple-500/20 border-purple-500/40 text-purple-300' :
-                              'bg-white/10 border-white/20 text-white'
+                            ? 'bg-primary/10 border-primary/40 text-primary'
                             : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
                         }`}
                       >
@@ -911,6 +1013,9 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                       </button>
                     ))}
                   </div>
+                  <p className="text-[10px] text-slate-600 mt-1.5">
+                    {isAr ? '💡 ألصق كود الإعلان وسيكتشف الموقع الشركة تلقائياً' : '💡 Paste the ad code and the site detects the network automatically'}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -967,11 +1072,22 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                   <label className="text-[11px] text-slate-400 font-bold block mb-1.5">{isAr ? 'كود الإعلان' : 'Ad Code'}</label>
                   <textarea
                     value={newAd.code}
-                    onChange={(e) => setNewAd(prev => ({ ...prev, code: e.target.value }))}
-                    placeholder={isAr ? 'الصق كود الإعلان هنا...' : 'Paste ad code here...'}
+                    onChange={(e) => handleNewAdCodeChange(e.target.value)}
+                    placeholder={isAr ? 'الصق كود الإعلان هنا من أي شركة...' : 'Paste ad code here from any network...'}
                     rows={5}
                     className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-slate-500 focus:outline-none focus:border-primary/50 resize-none"
                   />
+                  {newAd.code.trim() && (
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className={`text-[9px] px-2 py-1 rounded-full font-bold uppercase ${networkBadgeClass(getNetworkInfo(newAd.type).color)}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full inline-block mr-1 align-middle ${networkDotClass(getNetworkInfo(newAd.type).color)}`} />
+                        {isAr ? 'تم الكشف تلقائياً:' : 'Auto-detected:'} {getNetworkInfo(newAd.type).label}
+                      </span>
+                      <span className="text-[9px] text-slate-500">
+                        {AD_UNIT_TYPES[detectAdUnitType(newAd.code)]?.[isAr ? 'ar' : 'en']}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3 pt-2">
