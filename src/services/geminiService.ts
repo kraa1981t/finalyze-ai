@@ -2168,6 +2168,9 @@ Return ONLY valid JSON:
       adx: metrics?.adx,
       adxDirection: metrics?.adxDirection,
       maAlignment: metrics?.maAlignment,
+      volumeQuality: volumeQuality.detected ? volumeQuality.score : undefined,
+      volumeQualityThreshold: volThreshold,
+      volumeAbsorbed: volumeQuality.absorbed,
     };
 
     // Cache the result

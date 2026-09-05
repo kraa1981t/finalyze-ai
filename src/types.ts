@@ -50,6 +50,9 @@ export interface AnalysisResult {
   adx?: number;
   adxDirection?: string;
   maAlignment?: string;
+  volumeQuality?: number;
+  volumeQualityThreshold?: number;
+  volumeAbsorbed?: boolean;
 }
 
 export interface UserPreference {

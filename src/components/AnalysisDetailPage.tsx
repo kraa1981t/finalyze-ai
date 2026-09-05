@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, ShieldX, CheckCircle, XCircle, AlertTriangle, BarChart3, Target, Zap, CandlestickChart, Clipboard, Check } from 'lucide-react';
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, ShieldX, CheckCircle, XCircle, AlertTriangle, BarChart3, Target, Zap, CandlestickChart, Clipboard, Check, Waves } from 'lucide-react';
 import { AnalysisResult, SignalType } from '../types';
 import { Language } from '../lib/i18n';
 import LotSizeCalculator from './LotSizeCalculator';
@@ -90,6 +90,13 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
   const supportingReasons = remainingReasons.filter(r => !['BB Pullback', 'Micro BB', 'Supply/Demand', 'Trend Age', 'Pre-Pullback Age', 'News', 'Economic Events'].some(p => r.check?.includes(p)));
 
   const fmt = (v: number) => Number(v).toFixed(0);
+  // Volume Quality badge — 4th top card
+  const volScore = (result as any).volumeQuality as number | undefined;
+  const volThreshold = ((result as any).volumeQualityThreshold as number | undefined) ?? 45;
+  const volAbsorbed = (result as any).volumeAbsorbed as boolean | undefined;
+  const hasVol = typeof volScore === 'number' && Number.isFinite(volScore);
+  const volColor = !hasVol ? 'text-white/30' : volAbsorbed ? 'text-red-400' : (volScore! >= volThreshold ? 'text-cyan-400' : 'text-red-400');
+  const volDisplay = hasVol ? `${fmt(volScore!)}%` : '—';
 
   const generateAnalysisText = () => {
     const lines: string[] = [];
@@ -194,7 +201,7 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
         {isClient ? (
           <>
             {/* Client view: only scores + calculator + narrative */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
                 <BarChart3 size={28} className="text-blue-400 mx-auto mb-2" />
                 <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'تقني' : 'Technical'}</div>
@@ -209,6 +216,12 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
                 <Target size={28} className="text-emerald-400 mx-auto mb-2" />
                 <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'ثقة' : 'Confidence'}</div>
                 <div className={`text-5xl font-black ${colors.text}`}>{fmt(result.confidence)}%</div>
+              </div>
+              <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
+                <Waves size={28} className="text-cyan-400 mx-auto mb-2" />
+                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'الحجم' : 'Volume'}</div>
+                <div className={`text-5xl font-black ${volColor}`}>{volDisplay}</div>
+                {hasVol && <div className="text-xs text-white/30 mt-1 font-mono">{fmt(volScore!)} /100 (≥{volThreshold})</div>}
               </div>
             </div>
 
@@ -239,8 +252,8 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
           </>
         ) : (
         <>
-        {/* 1. Signal Scores - large */}
-        <div className="grid grid-cols-3 gap-4">
+        {/* 1. Signal Scores - large (4 on one row — Volume Quality added) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
             <BarChart3 size={28} className="text-blue-400 mx-auto mb-2" />
             <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'تقني' : 'Technical'}</div>
@@ -255,6 +268,12 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
             <Target size={28} className="text-emerald-400 mx-auto mb-2" />
             <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'ثقة' : 'Confidence'}</div>
             <div className={`text-5xl font-black ${colors.text}`}>{fmt(result.confidence)}%</div>
+          </div>
+          <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
+            <Waves size={28} className="text-cyan-400 mx-auto mb-2" />
+            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'الحجم' : 'Volume'}</div>
+            <div className={`text-5xl font-black ${volColor}`}>{volDisplay}</div>
+            {hasVol && <div className="text-xs text-white/30 mt-1 font-mono">{fmt(volScore!)} /100 (≥{volThreshold})</div>}
           </div>
         </div>
 
