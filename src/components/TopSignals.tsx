@@ -201,27 +201,27 @@ const isStrong = res.signal === SignalType.STRONG_BUY || res.signal === SignalTy
   const slPrice = res.stopLoss || 0;
 
   return (
-    <div className={cn("signal-card rounded-xl border-2 transition-all overflow-hidden relative", isSelected ? 'border-yellow-400 shadow-lg shadow-yellow-400/20' : 'border-amber-600/40')} style={{ backgroundColor: `rgba(var(--card-bg),0.88)`, alignSelf: 'start' }}>
+    <div className={cn("signal-card rounded-2xl border-2 transition-all overflow-hidden relative shadow-lg", isSelected ? 'border-yellow-400 shadow-yellow-400/30' : 'border-amber-500/50')} style={{ backgroundColor: 'rgba(var(--card-bg),0.92)', alignSelf: 'stretch' }}>
       {/* Very strong signal star */}
       {isVeryStrong && (
-        <div className="absolute top-1 right-1 z-20" title={isAr ? 'فرصة قوية جداً' : 'Very Strong Opportunity'}>
+        <div className="absolute top-2 right-2 z-20" title={isAr ? 'فرصة قوية جداً' : 'Very Strong Opportunity'}>
           <svg width="36" height="36" viewBox="0 0 24 24" fill="white" className="drop-shadow-[0_0_8px_rgba(255,255,255,1)] animate-[pulse_1.5s_ease-in-out_infinite]">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
           </svg>
         </div>
       )}
-{/* Main card content */}
-      <button onClick={() => { onSelect(res); }} className="w-full px-4 py-3 sm:py-1.5 flex flex-col items-center gap-1.5">
-        <div className="flex items-center justify-center w-full gap-2 overflow-hidden flex-wrap">
-          <span className="text-base sm:text-sm font-black font-mono" style={{color:'#00ff88'}}>{tpPrice ? tpPrice.toFixed(decimals) : '—'}</span>
-          <span className="text-2xl sm:text-xl font-black italic flex-shrink-0 text-center whitespace-nowrap" style={{ color: meta.symbolColor }}>{res.symbol}</span>
-          <span className="text-base sm:text-sm font-black font-mono" style={{color:'#ff4444'}}>{slPrice ? slPrice.toFixed(decimals) : '—'}</span>
+      {/* Main card content */}
+      <button onClick={() => { onSelect(res); }} className="w-full px-5 py-4 md:py-3 flex flex-col items-center gap-2">
+        <div className="flex items-center justify-center w-full gap-3 flex-wrap">
+          <span className="text-lg md:text-sm font-black font-mono" style={{color:'#00ff88'}}>{tpPrice ? tpPrice.toFixed(decimals) : '—'}</span>
+          <span className="text-3xl md:text-xl font-black italic flex-shrink-0 text-center whitespace-nowrap" style={{ color: meta.symbolColor }}>{res.symbol}</span>
+          <span className="text-lg md:text-sm font-black font-mono" style={{color:'#ff4444'}}>{slPrice ? slPrice.toFixed(decimals) : '—'}</span>
         </div>
-        <span className="text-lg sm:text-base font-black text-center px-2 break-words" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
-        <div className="flex items-center gap-2 flex-wrap justify-center">
-          <span className="text-2xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
+        <span className="text-xl md:text-base font-black text-center px-2 break-words" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
+        <div className="flex items-center gap-3 flex-wrap justify-center">
+          <span className="text-3xl md:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
           {res.isSideways !== undefined && (
-            <span className={`text-xs font-black px-2 py-0.5 rounded-full border ${
+            <span className={`text-sm font-black px-3 py-0.5 rounded-full border ${
               res.isSideways ? 'text-white bg-white/20 border-white/30' :
               res.sidewaysDirection === 'uptrend' ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' :
               res.sidewaysDirection === 'downtrend' ? 'text-red-300 bg-red-500/20 border-red-500/30' : ''
@@ -229,7 +229,7 @@ const isStrong = res.signal === SignalType.STRONG_BUY || res.signal === SignalTy
               {res.isSideways ? (isAr ? 'عرضي' : 'Side') : res.sidewaysDirection === 'uptrend' ? (isAr ? 'صاعد' : 'Up') : res.sidewaysDirection === 'downtrend' ? (isAr ? 'هابط' : 'Down') : ''}
             </span>
           )}
-          <span className="text-[10px] sm:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, isAr ? 'ar' : 'en')}</span>
+          <span className="text-xs md:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, isAr ? 'ar' : 'en')}</span>
         </div>
       </button>
 
