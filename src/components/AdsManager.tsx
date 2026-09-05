@@ -165,17 +165,28 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    loadAdsFromFirestore().then(firestoreAds => {
-      if (firestoreAds.length > 0) {
-        setAds(firestoreAds);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(firestoreAds));
-      } else {
-        const local = loadAds();
-        setAds(local);
-        if (local.length > 0) {
-          saveAdsToFirestore(local);
-        }
+    loadAdsFromFirestore().then(async firestoreAds => {
+      const HTP_AD_ID = 'htp_inpage_footer_v1';
+      const htpExists = firestoreAds.some(a => a.id === HTP_AD_ID);
+      if (!htpExists) {
+        const htpAd: Ad = {
+          id: HTP_AD_ID,
+          name: 'HilltopAds In-Page Push',
+          code: '<script>(function(kiq){var d = document,s = d.createElement("script"),l = d.scripts[d.scripts.length - 1];s.settings = kiq || {};s.src = "//truthful-game.com/bMX.V/sKdsGMli0kYJWrce/Qexms9Du/ZEU/lckGPlTZcZzgO/DrcA2hMGT/cqtsNCz/Mx4zNozbY/yIMDQu";s.async = true;s.referrerPolicy = "no-referrer-when-downgrade";l.parentNode.insertBefore(s, l);})({})</script>',
+          type: 'hilltopads',
+          adUnitType: 'inpage',
+          position: 'footer',
+          size: 'Responsive',
+          enabled: true,
+          paused: false,
+          assignedClients: [],
+          createdAt: Date.now(),
+        };
+        firestoreAds.push(htpAd);
+        await saveAdsToFirestore(firestoreAds);
       }
+      setAds(firestoreAds);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(firestoreAds));
     }).catch(() => {
       setAds(loadAds());
     });
