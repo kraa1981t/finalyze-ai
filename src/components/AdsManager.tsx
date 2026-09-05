@@ -6,7 +6,7 @@ import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import {
   loadMoneytizerConfig, saveMoneytizerConfig, deleteMoneytizerConfig,
-  applyMoneytizer, MoneytizerConfig
+  applyMoneytizer, MoneytizerConfig, DEFAULT_CFG
 } from '../lib/moneytizer';
 
 export interface Ad {
@@ -195,12 +195,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   useEffect(() => { setClientEmails(loadClientEmails()); }, []);
 
   // ── Moneytizer (موقع إعلانات) ──
-  const [mtz, setMtz] = useState<MoneytizerConfig>({
-    enabled: false,
-    publisherId: '',
-    adsTxtContent: '',
-    headCode: '',
-  });
+  const [mtz, setMtz] = useState<MoneytizerConfig>(DEFAULT_CFG);
   const [mtzLoaded, setMtzLoaded] = useState(false);
   const [mtzDirty, setMtzDirty] = useState(false);
   const [mtzSaving, setMtzSaving] = useState(false);

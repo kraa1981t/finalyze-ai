@@ -1,5 +1,6 @@
 import { db } from './firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { MTZ_DEFAULT_ADS_TXT } from './moneytizer-default';
 
 export interface MoneytizerConfig {
   enabled: boolean;
@@ -11,10 +12,10 @@ export interface MoneytizerConfig {
 const MTZ_DOC = 'config/site_moneytizer';
 export const MTZ_STORAGE_KEY = 'finalyze_moneytizer_config';
 
-const DEFAULT_CFG: MoneytizerConfig = {
-  enabled: false,
-  publisherId: '',
-  adsTxtContent: '',
+export const DEFAULT_CFG: MoneytizerConfig = {
+  enabled: true,
+  publisherId: '142894',
+  adsTxtContent: MTZ_DEFAULT_ADS_TXT,
   headCode: '',
 };
 
