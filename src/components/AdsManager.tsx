@@ -3,7 +3,7 @@ import { Plus, Trash2, Eye, EyeOff, Pause, Play, Monitor, Code, X, Copy, Check, 
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import {
   loadMoneytizerConfig, saveMoneytizerConfig, deleteMoneytizerConfig,
   applyMoneytizer, MoneytizerConfig, DEFAULT_CFG
@@ -13,8 +13,8 @@ export interface Ad {
   id: string;
   name: string;
   code: string;
-  type: 'adsense' | 'adsterra' | 'custom';
-  adUnitType: 'social_bar' | 'popunder' | 'banner' | 'native' | 'interstitial';
+  type: 'adsense' | 'adsterra' | 'hilltopads' | 'custom';
+  adUnitType: 'social_bar' | 'popunder' | 'banner' | 'native' | 'interstitial' | 'inpage' | 'direct_link';
   position: 'header' | 'sidebar' | 'footer' | 'between' | 'popup' | 'inline';
   size?: string;
   adsterraId?: string;
@@ -40,6 +40,11 @@ const PRESET_AD_UNITS: Partial<Ad>[] = [
   { name: 'Banner 160x300', adUnitType: 'banner', size: '160x300', type: 'adsterra', position: 'sidebar' },
   { name: 'Banner 468x60', adUnitType: 'banner', size: '468x60', type: 'adsterra', position: 'header' },
   { name: 'Banner 320x50', adUnitType: 'banner', size: '320x50', type: 'adsterra', position: 'footer' },
+  { name: 'HilltopAds In-Page', adUnitType: 'inpage', size: 'Responsive', type: 'hilltopads', position: 'between' },
+  { name: 'HilltopAds Popunder', adUnitType: 'popunder', size: 'Full Page', type: 'hilltopads', position: 'popup' },
+  { name: 'HilltopAds Banner 728x90', adUnitType: 'banner', size: '728x90', type: 'hilltopads', position: 'header' },
+  { name: 'HilltopAds Banner 300x250', adUnitType: 'banner', size: '300x250', type: 'hilltopads', position: 'sidebar' },
+  { name: 'HilltopAds Direct Link', adUnitType: 'direct_link', size: 'N/A', type: 'hilltopads', position: 'between' },
 ];
 
 const AD_UNIT_TYPE_ICONS: Record<string, string> = {
@@ -48,6 +53,8 @@ const AD_UNIT_TYPE_ICONS: Record<string, string> = {
   banner: '🖼️',
   native: '📰',
   interstitial: '🔲',
+  inpage: '📄',
+  direct_link: '🔗',
 };
 
 function generateId(): string {
@@ -148,6 +155,8 @@ const AD_UNIT_TYPES: Record<string, { ar: string; en: string }> = {
   banner: { ar: 'بانر', en: 'Banner' },
   native: { ar: 'إعلان أصلي', en: 'Native Ad' },
   interstitial: { ar: 'شاشة كاملة', en: 'Interstitial' },
+  inpage: { ar: 'إعلان داخل الصفحة', en: 'In-Page Ad' },
+  direct_link: { ar: 'رابط مباشر', en: 'Direct Link' },
 };
 
 export default function AdsManager({ lang, onBack }: AdsManagerProps) {
@@ -178,6 +187,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   const [clientEmails, setClientEmails] = useState<string[]>([]);
   const [assignModal, setAssignModal] = useState<Ad | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterNetwork, setFilterNetwork] = useState<string>('all');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
@@ -191,6 +201,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
     size: '',
     adsterraId: '',
   });
+
+  const resetNewAd = () => setNewAd({ name: '', code: '', type: 'adsterra', adUnitType: 'banner', position: 'header', size: '', adsterraId: '' });
 
   useEffect(() => { setClientEmails(loadClientEmails()); }, []);
 
@@ -242,6 +254,63 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
   const mtzLinked = mtzLoaded && mtz.enabled && !!(mtz.headCode?.trim()) && !!(mtz.adsTxtContent?.trim());
 
+  // ── HilltopAds ──
+  interface HilltopConfig {
+    enabled: boolean;
+    siteId: string;
+    zoneId: string;
+    mainTag: string;
+    adCode: string;
+  }
+  const DEFAULT_HTP: HilltopConfig = { enabled: false, siteId: '', zoneId: '', mainTag: '', adCode: '' };
+  const [htp, setHtp] = useState<HilltopConfig>(DEFAULT_HTP);
+  const [htpLoaded, setHtpLoaded] = useState(false);
+  const [htpDirty, setHtpDirty] = useState(false);
+  const [htpSaving, setHtpSaving] = useState(false);
+  const HTP_DOC = 'config/hilltopads';
+
+  useEffect(() => {
+    getDoc(doc(db, HTP_DOC)).then(snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setHtp({ enabled: d.enabled ?? false, siteId: d.siteId ?? '', zoneId: d.zoneId ?? '', mainTag: d.mainTag ?? '', adCode: d.adCode ?? '' });
+      }
+      setHtpLoaded(true);
+    }).catch(() => setHtpLoaded(true));
+  }, []);
+
+  const handleHtpSave = async () => {
+    setHtpSaving(true);
+    try {
+      await setDoc(doc(db, HTP_DOC), { ...htp, updatedAt: Date.now() }, { merge: true });
+      setHtpDirty(false);
+      showToast(
+        htp.enabled
+          ? (isAr ? 'تم ربط HilltopAds وتفعيله بنجاح' : 'HilltopAds linked & enabled successfully')
+          : (isAr ? 'تم حفظ إعدادات HilltopAds (معطل)' : 'HilltopAds settings saved (disabled)'),
+        'ok'
+      );
+    } catch (e: any) {
+      console.error('HilltopAds save error:', e);
+      showToast(isAr ? `خطأ: ${e.message}` : `Error: ${e.message}`, 'err');
+    }
+    setHtpSaving(false);
+  };
+
+  const handleHtpDelete = async () => {
+    if (!confirm(isAr ? 'فك ربط HilltopAds وحذف كل إعداداته؟' : 'Unlink HilltopAds and delete all its settings?')) return;
+    try {
+      await deleteDoc(doc(db, HTP_DOC));
+      setHtp(DEFAULT_HTP);
+      setHtpDirty(false);
+      showToast(isAr ? 'تم فك الربط بنجاح — لن تظهر إعلانات HilltopAds' : 'Unlinked successfully — no more HilltopAds', 'ok');
+    } catch (e: any) {
+      showToast(isAr ? `خطأ: ${e.message}` : `Error: ${e.message}`, 'err');
+    }
+  };
+
+  const htLinked = htpLoaded && htp.enabled && !!(htp.mainTag?.trim()) && !!(htp.zoneId?.trim());
+
   const addAd = () => {
     if (!newAd.name.trim()) return;
     const ad: Ad = {
@@ -260,7 +329,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
     };
     setAds(prev => [...prev, ad]);
     setHasUnsavedChanges(true);
-    setNewAd({ name: '', code: '', type: 'adsterra', adUnitType: 'banner', position: 'header', size: '', adsterraId: '' });
+    resetNewAd();
     setShowAdd(false);
   };
 
@@ -329,7 +398,11 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const filteredAds = filterType === 'all' ? ads : ads.filter(a => a.adUnitType === filterType);
+  const filteredAds = ads.filter(a => {
+    if (filterType !== 'all' && a.adUnitType !== filterType) return false;
+    if (filterNetwork !== 'all' && a.type !== filterNetwork) return false;
+    return true;
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6" dir={isAr ? 'rtl' : 'ltr'}>
@@ -341,7 +414,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
           </button>
           <div>
             <h1 className="text-xl font-black text-white">{isAr ? 'إدارة الإعلانات' : 'Ads Manager'}</h1>
-            <p className="text-xs text-slate-400">{isAr ? 'إدارة إعلانات Adsterra لحسابات العملاء' : 'Manage Adsterra ads for client accounts'}</p>
+            <p className="text-xs text-slate-400">{isAr ? 'إدارة إعلانات Adsterra / HilltopAds لحسابات العملاء' : 'Manage Adsterra / HilltopAds ads for client accounts'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -353,6 +426,15 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
           >
             <ExternalLink size={12} />
             {isAr ? 'لوحة Adsterra' : 'Adsterra Panel'}
+          </a>
+          <a
+            href="https://publishers.hilltopads.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 px-3 py-2 rounded-xl text-xs font-bold transition-all"
+          >
+            <ExternalLink size={12} />
+            {isAr ? 'لوحة HilltopAds' : 'HilltopAds Panel'}
           </a>
           <button
             onClick={handleSave}
@@ -523,6 +605,156 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
         )}
       </div>
 
+      {/* ── HilltopAds ── */}
+      <div className="rounded-3xl border border-cyan-500/20 bg-cyan-500/[0.04] p-5 md:p-6 space-y-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-cyan-500/20 flex items-center justify-center">
+              <Globe size={20} className="text-cyan-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-white flex items-center gap-2">
+                {isAr ? 'HilltopAds' : 'HilltopAds'}
+                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-cyan-500/20 text-cyan-300">Publisher</span>
+              </h2>
+              <p className="text-[11px] text-slate-400">{isAr ? 'ربط شبكة HilltopAds بموقعك — Popunder / In-Page / Banners' : 'Link HilltopAds to your site — Popunder / In-Page / Banners'}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {htpLinked ? (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                {isAr ? 'مفعل' : 'Active'}
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black bg-white/5 text-slate-500 border border-white/10">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                {isAr ? 'غير مرتبط' : 'Not linked'}
+              </span>
+            )}
+            <button
+              onClick={() => setHtp(prev => ({ ...prev, enabled: !prev.enabled }))}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1.5 transition-all ${
+                htp.enabled ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25' : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+              }`}
+            >
+              {htp.enabled ? <EyeOff size={12} /> : <Eye size={12} />}
+              {isAr ? (htp.enabled ? 'تعطيل' : 'تفعيل') : (htp.enabled ? 'Disable' : 'Enable')}
+            </button>
+          </div>
+        </div>
+
+        {!htpLoaded ? (
+          <div className="text-center py-6 text-xs text-slate-500">{isAr ? 'جاري التحميل...' : 'Loading...'}</div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? 'معرّف الموقع (Site ID)' : 'Site ID'}</label>
+                <input
+                  type="text"
+                  value={htp.siteId}
+                  onChange={(e) => setHtp(prev => ({ ...prev, siteId: e.target.value.replace(/[^0-9]/g, '') }))}
+                  placeholder="916280"
+                  dir="ltr"
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-400/50"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? 'معرّف Zone' : 'Zone ID'}</label>
+                <input
+                  type="text"
+                  value={htp.zoneId}
+                  onChange={(e) => setHtp(prev => ({ ...prev, zoneId: e.target.value.replace(/[^0-9]/g, '') }))}
+                  placeholder={isAr ? 'من لوحة HilltopAds' : 'From HilltopAds panel'}
+                  dir="ltr"
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-400/50"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                {isAr ? 'كود التحقق (فقط)' : 'Verification File'}
+              </label>
+              <div className="flex items-center gap-2 bg-black/30 border border-white/10 rounded-lg px-3 py-2">
+                <code className="text-[10px] text-cyan-300 font-mono flex-1 truncate">/f27c49c20cb52e8d7233.txt</code>
+                <a href="/f27c49c20cb52e8d7233.txt" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 shrink-0">
+                  <ExternalLink size={12} />
+                </a>
+              </div>
+              <p className="text-[10px] text-slate-600 mt-1">{isAr ? 'يجب وضع ملف التحقق في public/' : 'Place verification file in public/'}</p>
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                {isAr ? 'كود HilltopAds الرئيسي' : 'HilltopAds Main Tag'}
+                <span className="text-slate-600"> — {isAr ? 'من لوحة الناشر → Settings' : 'From Publisher Panel → Settings'}</span>
+              </label>
+              <textarea
+                value={htp.mainTag}
+                onChange={(e) => setHtp(prev => ({ ...prev, mainTag: e.target.value }))}
+                placeholder={'<script src="//www.hilltopads.com/script.js" async></script>'}
+                rows={3}
+                dir="ltr"
+                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-400/50 resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                {isAr ? 'كود الإعلان (Zone Script)' : 'Ad Zone Code'}
+                <span className="text-slate-600"> — {isAr ? 'من زر "Get Code" بجانب الـ Zone' : 'From "Get Code" button next to zone'}</span>
+              </label>
+              <textarea
+                value={htp.adCode}
+                onChange={(e) => setHtp(prev => ({ ...prev, adCode: e.target.value }))}
+                placeholder={'<div id="htzoneid"></div>\n<script>...</script>'}
+                rows={4}
+                dir="ltr"
+                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-400/50 resize-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 text-[10px] text-slate-500 bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2">
+              <Info size={12} className="text-cyan-400 shrink-0" />
+              <span>
+                {isAr
+                  ? 'يتم حقن كود HilltopAds في الصفحة عند الحفظ (تفعيل/تعطيل فوري). الملف الثابت public/f27c49c20cb52e8d7233.txt يُحدَّث بإعادة النشر فقط.'
+                  : 'HilltopAds tags are injected on save (instant enable/disable). Static file public/f27c49c20cb52e8d7233.txt updates on redeploy only.'}
+              </span>
+            </div>
+
+            <div className="flex gap-2 pt-1 flex-wrap items-center">
+              <button
+                onClick={handleHtpSave}
+                disabled={htpSaving}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all shadow-lg ${
+                  htpDirty
+                    ? 'bg-cyan-400 hover:bg-cyan-500 text-black shadow-cyan-400/20 animate-pulse'
+                    : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                } disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                {htp.enabled ? <Link2 size={13} /> : <Save size={13} />}
+                {htpSaving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : htLinked ? (isAr ? 'تحديث الإعدادات' : 'Update Settings') : (isAr ? 'حفظ وتفعيل' : 'Save & Enable')}
+              </button>
+              <button
+                onClick={handleHtpDelete}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all bg-red-500/10 text-red-400 hover:bg-red-500/20"
+              >
+                <Unlink size={13} />
+                {isAr ? 'فك الربط وحذف' : 'Unlink & Delete'}
+              </button>
+              {htp.enabled && !htpLinked && (
+                <span className="text-[10px] text-amber-400 font-bold">
+                  {isAr ? '⚠️ أكمل Site ID + Zone ID + الكود الرئيسي' : '⚠️ Finish Site ID + Zone ID + Main Tag'}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Unsaved Changes Warning */}
       {hasUnsavedChanges && (
         <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
@@ -553,7 +785,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs — Ad Unit Type */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
         {[
           { key: 'all', label: isAr ? 'الكل' : 'All' },
@@ -573,13 +805,38 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
         ))}
       </div>
 
+      {/* Filter Tabs — Network */}
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {[
+          { key: 'all', label: isAr ? 'كل الشبكات' : 'All Networks', color: 'white' },
+          { key: 'adsterra', label: 'Adsterra', color: 'purple' },
+          { key: 'hilltopads', label: 'HilltopAds', color: 'cyan' },
+          { key: 'custom', label: isAr ? 'مخصص' : 'Custom', color: 'slate' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setFilterNetwork(tab.key)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              filterNetwork === tab.key
+                ? tab.key === 'adsterra' ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' :
+                  tab.key === 'hilltopads' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' :
+                  tab.key === 'custom' ? 'bg-slate-500 text-white shadow-lg shadow-slate-500/20' :
+                  'bg-primary text-black shadow-lg shadow-emerald-500/20'
+                : 'bg-white/5 text-slate-400 hover:bg-white/10'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Ad List */}
       {filteredAds.length === 0 ? (
         <div className="text-center py-16 bg-white/5 rounded-2xl border border-white/10">
           <Monitor size={48} className="mx-auto text-slate-500 mb-4" />
           <p className="text-slate-400 font-bold">{isAr ? 'لا توجد إعلانات' : 'No ads found'}</p>
           <p className="text-slate-500 text-xs mt-1">
-            {isAr ? 'اضغط "قالب سريع" لإضافة إعلان Adsterra' : 'Click "Quick Add" to add an Adsterra ad'}
+            {isAr ? 'اضغط "قالب سريع" لإضافة إعلان من Adsterra أو HilltopAds' : 'Click "Quick Add" to add an ad from Adsterra or HilltopAds'}
           </p>
         </div>
       ) : (
@@ -605,10 +862,11 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                     <span className="text-lg">{AD_UNIT_TYPE_ICONS[ad.adUnitType] || '📢'}</span>
                     <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
                       ad.type === 'adsterra' ? 'bg-purple-500/20 text-purple-400' :
+                      ad.type === 'hilltopads' ? 'bg-cyan-500/20 text-cyan-400' :
                       ad.type === 'adsense' ? 'bg-blue-500/20 text-blue-400' :
                       'bg-slate-500/20 text-slate-400'
                     }`}>
-                      {ad.type === 'adsterra' ? 'Adsterra' : ad.type === 'adsense' ? 'AdSense' : isAr ? 'مخصص' : 'Custom'}
+                      {ad.type === 'adsterra' ? 'Adsterra' : ad.type === 'hilltopads' ? 'HilltopAds' : ad.type === 'adsense' ? 'AdSense' : isAr ? 'مخصص' : 'Custom'}
                     </span>
                     {ad.size && (
                       <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-white/10 text-slate-300">
@@ -729,12 +987,12 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? 'رقم الوحدة' : 'Adsterra Unit ID'}</label>
+                      <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? 'رقم الوحدة' : 'Unit ID'}</label>
                       <input
                         type="text"
                         value={ad.adsterraId || ''}
                         onChange={(e) => updateAd(ad.id, { adsterraId: e.target.value })}
-                        placeholder="30121119"
+                        placeholder={ad.type === 'hilltopads' ? 'Zone ID' : '30121119'}
                         className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50"
                       />
                     </div>
@@ -744,7 +1002,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                     <textarea
                       value={ad.code}
                       onChange={(e) => updateAd(ad.id, { code: e.target.value })}
-                      placeholder={isAr ? 'الصق كود الإعلان من Adsterra هنا...' : 'Paste Adsterra ad code here...'}
+                      placeholder={ad.type === 'hilltopads' ? (isAr ? 'الصق كود HilltopAds هنا...' : 'Paste HilltopAds code here...') : (isAr ? 'الصق كود الإعلان من Adsterra هنا...' : 'Paste Adsterra ad code here...')}
                       rows={4}
                       className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-primary/50 resize-none"
                     />
@@ -774,44 +1032,85 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             >
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-black text-white">{isAr ? 'قالب إعلان Adsterra' : 'Adsterra Ad Templates'}</h3>
-                  <p className="text-xs text-slate-400 mt-1">{isAr ? 'اختر نوع الإعلان ثم الصق الكود من لوحة Adsterra' : 'Choose ad type then paste code from Adsterra panel'}</p>
+                  <h3 className="text-lg font-black text-white">{isAr ? 'قوالب إعلانات سريعة' : 'Quick Ad Templates'}</h3>
+                  <p className="text-xs text-slate-400 mt-1">{isAr ? 'اختر نوع الإعلان ثم الصق الكود من لوحة الناشر' : 'Choose ad type then paste code from publisher panel'}</p>
                 </div>
                 <button onClick={() => setShowPresetPicker(false)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 transition-all">
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                {PRESET_AD_UNITS.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => addFromPreset(preset)}
-                    className="flex items-start gap-3 p-4 bg-white/5 rounded-2xl border border-white/10 hover:border-primary/30 hover:bg-white/[0.07] transition-all text-left"
-                  >
-                    <span className="text-2xl">{AD_UNIT_TYPE_ICONS[preset.adUnitType || 'banner']}</span>
-                    <div className="flex-1">
-                      <div className="text-sm font-bold text-white">{preset.name}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        {AD_UNIT_TYPES[preset.adUnitType || 'banner']?.[isAr ? 'ar' : 'en']} • {preset.size}
+              {/* Adsterra presets */}
+              <div className="mb-4">
+                <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-2">Adsterra</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {PRESET_AD_UNITS.filter(p => p.type === 'adsterra').map((preset, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => addFromPreset(preset)}
+                      className="flex items-start gap-3 p-4 bg-purple-500/[0.06] rounded-2xl border border-purple-500/15 hover:border-purple-500/40 hover:bg-purple-500/[0.10] transition-all text-left"
+                    >
+                      <span className="text-2xl">{AD_UNIT_TYPE_ICONS[preset.adUnitType || 'banner']}</span>
+                      <div className="flex-1">
+                        <div className="text-sm font-bold text-white">{preset.name}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          {AD_UNIT_TYPES[preset.adUnitType || 'banner']?.[isAr ? 'ar' : 'en']} • {preset.size}
+                        </div>
+                        <div className="text-[9px] text-slate-500 mt-1">
+                          {isAr ? 'الموضع:' : 'Position:'} {POSITIONS[preset.position || 'header']?.[isAr ? 'ar' : 'en']}
+                        </div>
                       </div>
-                      <div className="text-[9px] text-slate-500 mt-1">
-                        {isAr ? 'الموضع:' : 'Position:'} {POSITIONS[preset.position || 'header']?.[isAr ? 'ar' : 'en']}
-                      </div>
-                    </div>
-                    <Plus size={16} className="text-primary mt-1 shrink-0" />
-                  </button>
-                ))}
+                      <Plus size={16} className="text-purple-400 mt-1 shrink-0" />
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="mt-4 p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
-                <p className="text-xs text-purple-300 font-bold mb-1">{isAr ? '💡 كيف تحصل على الأكواد:' : '💡 How to get the codes:'}</p>
-                <ol className="text-[10px] text-purple-400/70 space-y-1 list-decimal list-inside">
-                  <li>{isAr ? 'افتح لوحة ناشر Adsterra' : 'Open Adsterra Publisher Panel'}</li>
-                  <li>{isAr ? 'اختر موقعك Joseph.Trading.app' : 'Select your site Joseph.Trading.app'}</li>
-                  <li>{isAr ? 'اضغط "GET CODE" بجانب وحدة الإعلان' : 'Click "GET CODE" next to the ad unit'}</li>
-                  <li>{isAr ? 'الصق الكود هنا بعد إضافة الإعلان' : 'Paste the code here after adding the ad'}</li>
-                </ol>
+              {/* HilltopAds presets */}
+              <div className="mb-4">
+                <p className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-2">HilltopAds</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {PRESET_AD_UNITS.filter(p => p.type === 'hilltopads').map((preset, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => addFromPreset(preset)}
+                      className="flex items-start gap-3 p-4 bg-cyan-500/[0.06] rounded-2xl border border-cyan-500/15 hover:border-cyan-500/40 hover:bg-cyan-500/[0.10] transition-all text-left"
+                    >
+                      <span className="text-2xl">{AD_UNIT_TYPE_ICONS[preset.adUnitType || 'banner']}</span>
+                      <div className="flex-1">
+                        <div className="text-sm font-bold text-white">{preset.name}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          {AD_UNIT_TYPES[preset.adUnitType || 'banner']?.[isAr ? 'ar' : 'en']} • {preset.size}
+                        </div>
+                        <div className="text-[9px] text-slate-500 mt-1">
+                          {isAr ? 'الموضع:' : 'Position:'} {POSITIONS[preset.position || 'header']?.[isAr ? 'ar' : 'en']}
+                        </div>
+                      </div>
+                      <Plus size={16} className="text-cyan-400 mt-1 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
+                  <p className="text-xs text-purple-300 font-bold mb-1">Adsterra — {isAr ? 'كيف تحصل على الأكواد:' : 'How to get codes:'}</p>
+                  <ol className="text-[10px] text-purple-400/70 space-y-1 list-decimal list-inside">
+                    <li>{isAr ? 'افتح لوحة ناشر Adsterra' : 'Open Adsterra Publisher Panel'}</li>
+                    <li>{isAr ? 'اختر موقعك Joseph.Trading.app' : 'Select your site Joseph.Trading.app'}</li>
+                    <li>{isAr ? 'اضغط "GET CODE" بجانب وحدة الإعلان' : 'Click "GET CODE" next to the ad unit'}</li>
+                    <li>{isAr ? 'الصق الكود هنا بعد إضافة الإعلان' : 'Paste the code here after adding the ad'}</li>
+                  </ol>
+                </div>
+                <div className="p-3 bg-cyan-500/10 rounded-xl border border-cyan-500/20">
+                  <p className="text-xs text-cyan-300 font-bold mb-1">HilltopAds — {isAr ? 'كيف تحصل على الأكواد:' : 'How to get codes:'}</p>
+                  <ol className="text-[10px] text-cyan-400/70 space-y-1 list-decimal list-inside">
+                    <li>{isAr ? 'افتح لوحة ناشر HilltopAds' : 'Open HilltopAds Publisher Panel'}</li>
+                    <li>{isAr ? 'أضف موقعك وجاءك Site ID' : 'Add your site and get Site ID'}</li>
+                    <li>{isAr ? 'أنشئ Zone واختر نوع الإعلان' : 'Create a Zone and choose ad type'}</li>
+                    <li>{isAr ? 'اضغط "Get Code" بجانب الـ Zone والصقه هنا' : 'Click "Get Code" next to zone and paste here'}</li>
+                  </ol>
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -853,6 +1152,31 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                   />
                 </div>
 
+                <div>
+                  <label className="text-[11px] text-slate-400 font-bold block mb-1.5">{isAr ? 'الشبكة الإعلانية' : 'Ad Network'}</label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: 'adsterra', label: 'Adsterra', color: 'purple' },
+                      { value: 'hilltopads', label: 'HilltopAds', color: 'cyan' },
+                      { value: 'custom', label: isAr ? 'مخصص' : 'Custom', color: 'slate' },
+                    ].map(net => (
+                      <button
+                        key={net.value}
+                        onClick={() => setNewAd(prev => ({ ...prev, type: net.value as Ad['type'] }))}
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                          newAd.type === net.value
+                            ? net.color === 'purple' ? 'bg-purple-500/20 border-purple-500/40 text-purple-300' :
+                              net.color === 'cyan' ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300' :
+                              'bg-white/10 border-white/20 text-white'
+                            : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                        }`}
+                      >
+                        {net.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[11px] text-slate-400 font-bold block mb-1.5">{isAr ? 'النوع' : 'Type'}</label>
@@ -892,12 +1216,12 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-slate-400 font-bold block mb-1.5">{isAr ? 'رقم الوحدة' : 'Adsterra Unit ID'}</label>
+                    <label className="text-[11px] text-slate-400 font-bold block mb-1.5">{isAr ? 'رقم الوحدة (اختياري)' : 'Unit ID (optional)'}</label>
                     <input
                       type="text"
                       value={newAd.adsterraId}
                       onChange={(e) => setNewAd(prev => ({ ...prev, adsterraId: e.target.value }))}
-                      placeholder="30121119"
+                      placeholder={newAd.type === 'hilltopads' ? 'Zone ID' : '30121119'}
                       className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-primary/50"
                     />
                   </div>
@@ -908,7 +1232,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                   <textarea
                     value={newAd.code}
                     onChange={(e) => setNewAd(prev => ({ ...prev, code: e.target.value }))}
-                    placeholder={isAr ? 'الصق كود الإعلان هنا...' : 'Paste ad code here...'}
+                    placeholder={newAd.type === 'hilltopads' ? (isAr ? 'الصق كود HilltopAds هنا...' : 'Paste HilltopAds code here...') : (isAr ? 'الصق كود الإعلان هنا...' : 'Paste ad code here...')}
                     rows={5}
                     className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-slate-500 focus:outline-none focus:border-primary/50 resize-none"
                   />
