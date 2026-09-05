@@ -1,7 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Key, DollarSign, Wallet, Users, Zap, User, Crown, Info, Lightbulb, Monitor, BarChart3, Smartphone, Tablet, TrendingUp, MessageCircle } from 'lucide-react';
+import { Settings, Key, DollarSign, Wallet, Users, Zap, User, Crown, Info, Lightbulb, Monitor, BarChart3, Smartphone, Tablet, TrendingUp, MessageCircle, LogIn, LogOut } from 'lucide-react';
 import { Language } from '../lib/i18n';
+import { User as FirebaseUser } from 'firebase/auth';
 
 interface SidebarPanelProps {
   lang: Language;
@@ -10,9 +11,13 @@ interface SidebarPanelProps {
   isDeveloper?: boolean;
   freemiumDisabled?: boolean;
   onPreview?: (device: 'phone' | 'tablet') => void;
+  user?: FirebaseUser | null;
+  customAvatar?: string | null;
+  onLogin?: () => void;
+  onLogout?: () => void;
 }
 
-export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, freemiumDisabled, onPreview }: SidebarPanelProps) {
+export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, freemiumDisabled, onPreview, user, customAvatar, onLogin, onLogout }: SidebarPanelProps) {
   const isRTL = lang === 'ar';
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -99,6 +104,44 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
             </motion.button>
           );
         })}
+
+        {/* Login / Logout - mobile only */}
+        <div className="border-t border-black/10 my-1 md:hidden" />
+        {user ? (
+          <div className="flex items-center gap-3 px-3 py-3 rounded-2xl bg-white/10 border border-black/10 shadow-sm md:hidden">
+            <div className="w-10 h-10 rounded-full bg-[#F59E0B] border-2 border-black/20 flex items-center justify-center overflow-hidden shadow-lg shrink-0">
+              {customAvatar ? (
+                <img src={customAvatar} alt="profile" className="w-full h-full object-cover" />
+              ) : user.photoURL ? (
+                <img src={user.photoURL} alt="profile" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-sm font-black text-black">{user.email?.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            <div className="flex flex-col flex-1 min-w-0">
+              <span className="text-xs font-black text-black truncate">{user.displayName || user.email?.split('@')[0]}</span>
+              <span className="text-[10px] font-bold text-black/60 truncate">{user.email}</span>
+            </div>
+            {onLogout && (
+              <button
+                onClick={() => { onClose(); onLogout(); }}
+                className="p-2 rounded-lg bg-red-500/20 text-red-600 hover:bg-red-500/40 transition-all"
+              >
+                <LogOut size={16} />
+              </button>
+            )}
+          </div>
+        ) : (
+          onLogin && (
+            <button
+              onClick={() => { onClose(); onLogin(); }}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#F59E0B] text-black font-black text-sm uppercase tracking-wider shadow-lg hover:bg-[#d97706] active:scale-95 transition-all md:hidden"
+            >
+              <LogIn size={18} />
+              {lang === 'ar' ? 'تسجيل الدخول' : 'Login'}
+            </button>
+          )
+        )}
       </div>
 
       {isDeveloper && onPreview && (

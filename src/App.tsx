@@ -1764,6 +1764,10 @@ export default function App() {
             isDeveloper={isDeveloperSession()}
             freemiumDisabled={freemiumDisabled}
             onPreview={isDeveloperSession() ? (device) => setPreviewDevice(device) : undefined}
+            user={user}
+            customAvatar={localStorage.getItem('finalyze_custom_avatar')}
+            onLogin={handleLogin}
+            onLogout={handleLogout}
           />
         )}
       </AnimatePresence>

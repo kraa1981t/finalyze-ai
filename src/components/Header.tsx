@@ -120,6 +120,7 @@ export default function Header({
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [mobileLangOpen, setMobileLangOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
   const langMenuRef = useRef<HTMLDivElement>(null);
   const langButtonRef = useRef<HTMLButtonElement>(null);
   const [langMenuPos, setLangMenuPos] = useState<{top: number; left: number} | null>(null);
@@ -138,10 +139,10 @@ export default function Header({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       setTimeout(() => {
-        if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node) && !profileButtonRef.current?.contains(e.target as Node)) {
           setShowProfileMenu(false);
         }
-        if (langMenuRef.current && !langMenuRef.current.contains(e.target as Node)) {
+        if (langMenuRef.current && !langMenuRef.current.contains(e.target as Node) && !langButtonRef.current?.contains(e.target as Node)) {
           setShowLangMenu(false);
         }
       }, 0);
@@ -766,6 +767,7 @@ export default function Header({
               {user ? (
                 <div className="relative flex-shrink-0 hidden md:flex" ref={profileMenuRef}>
                   <button 
+                    ref={profileButtonRef}
                     onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
                     className="w-[48px] h-[48px] rounded-full bg-[#F59E0B] border-2 border-white/30 flex items-center justify-center overflow-hidden shadow-lg hover:scale-105 transition-all"
                   >
