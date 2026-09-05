@@ -131,8 +131,8 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
               <span className="text-[10px] text-white/30 font-bold">({catSignals.length})</span>
             </div>
 
-            {strong.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
+{strong.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {strong.map((res, idx) => (
                   <SignalCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={(r) => {
                     if (selectedSymbol === r.symbol) {
@@ -147,8 +147,8 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
               </div>
             )}
 
-            {top3.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
+{top3.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {top3.map((res, idx) => (
                   <SignalCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={(r) => {
                     if (selectedSymbol === r.symbol) {
@@ -210,16 +210,16 @@ const isStrong = res.signal === SignalType.STRONG_BUY || res.signal === SignalTy
           </svg>
         </div>
       )}
-      {/* Main card content */}
-      <button onClick={() => { onSelect(res); }} className="w-full px-3 py-1.5 flex flex-col items-center gap-1">
-        <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
-          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tpPrice ? tpPrice.toFixed(decimals) : '—'}</span>
-          <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
-          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{slPrice ? slPrice.toFixed(decimals) : '—'}</span>
+{/* Main card content */}
+      <button onClick={() => { onSelect(res); }} className="w-full px-4 py-3 sm:py-1.5 flex flex-col items-center gap-1.5">
+        <div className="flex items-center justify-center w-full gap-2 overflow-hidden flex-wrap">
+          <span className="text-base sm:text-sm font-black font-mono" style={{color:'#00ff88'}}>{tpPrice ? tpPrice.toFixed(decimals) : '—'}</span>
+          <span className="text-2xl sm:text-xl font-black italic flex-shrink-0 text-center whitespace-nowrap" style={{ color: meta.symbolColor }}>{res.symbol}</span>
+          <span className="text-base sm:text-sm font-black font-mono" style={{color:'#ff4444'}}>{slPrice ? slPrice.toFixed(decimals) : '—'}</span>
         </div>
-        <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
-        <div className="flex items-center gap-2">
-          <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
+        <span className="text-lg sm:text-base font-black text-center px-2 break-words" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
+        <div className="flex items-center gap-2 flex-wrap justify-center">
+          <span className="text-2xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
           {res.isSideways !== undefined && (
             <span className={`text-xs font-black px-2 py-0.5 rounded-full border ${
               res.isSideways ? 'text-white bg-white/20 border-white/30' :

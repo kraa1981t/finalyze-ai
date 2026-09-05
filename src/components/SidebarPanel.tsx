@@ -1,12 +1,12 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Key, DollarSign, Wallet, Users, Zap, User, Crown, Info, Lightbulb, Monitor, BarChart3, Smartphone, Tablet } from 'lucide-react';
+import { Settings, Key, DollarSign, Wallet, Users, Zap, User, Crown, Info, Lightbulb, Monitor, BarChart3, Smartphone, Tablet, TrendingUp, MessageCircle } from 'lucide-react';
 import { Language } from '../lib/i18n';
 
 interface SidebarPanelProps {
   lang: Language;
   onClose: () => void;
-  onNavigate: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats') => void;
+  onNavigate: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis') => void;
   isDeveloper?: boolean;
   freemiumDisabled?: boolean;
   onPreview?: (device: 'phone' | 'tablet') => void;
@@ -54,6 +54,31 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-2 p-4">
+        {/* Mobile-only quick actions (hidden on desktop) */}
+        <button
+          onClick={() => onNavigate('trade')}
+          className="flex items-center gap-3 px-3 py-3 rounded-2xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all group shadow-md md:hidden"
+        >
+          <div className="shrink-0 p-2.5 rounded-xl bg-black text-[#F59E0B] border border-black/10 shadow-md group-hover:scale-105 transition-all">
+            <TrendingUp size={20} />
+          </div>
+          <span className="text-sm font-black text-black min-w-0 leading-snug">
+            {lang === 'ar' ? 'التداول' : 'Trade'}
+          </span>
+        </button>
+        <a
+          href="https://www.facebook.com/messages/e2ee/t/7630276620403742/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 px-3 py-3 rounded-2xl bg-[#0084FF] border border-black/10 text-white hover:bg-[#006ADB] transition-all group shadow-md md:hidden"
+        >
+          <div className="shrink-0 p-2.5 rounded-xl bg-black/30 text-white border border-black/10 shadow-md group-hover:scale-105 transition-all">
+            <MessageCircle size={20} />
+          </div>
+          <span className="text-sm font-black text-white min-w-0 leading-snug">
+            {lang === 'ar' ? 'تواصل معنا' : 'Contact Us'}
+          </span>
+        </a>
         {items.map((item, i) => {
           const Icon = item.icon;
           return (

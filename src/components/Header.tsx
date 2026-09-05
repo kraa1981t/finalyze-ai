@@ -287,6 +287,12 @@ export default function Header({
               </div>
 
               {/* Sidebar Navigation Items */}
+              {/* Trade - always accessible on mobile */}
+              <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('trade'); }}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl border border-black/10 bg-[#F59E0B]/30 hover:bg-[#F59E0B]/50 transition-all shadow-sm">
+                <TrendingUp size={18} className="text-[#F59E0B]" />
+                <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lang === 'ar' ? 'التداول' : 'Trade'}</span>
+              </button>
               {isDeveloper ? (
                 <>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('radar'); }}
@@ -525,7 +531,7 @@ export default function Header({
 
       <header className={cn(
         "fixed top-0 left-0 right-0 z-50 shadow-2xl shadow-emerald-500/20 transition-all duration-300",
-        compact ? 'h-[140px] md:h-[100px]' : 'h-[300px]'
+        compact ? 'h-[140px] md:h-[100px]' : 'h-[150px] md:h-[300px]'
       )}>
         {/* Trading Banner Background */}
         <div className="absolute inset-0 overflow-hidden">
@@ -592,10 +598,10 @@ export default function Header({
             {/* Icons - scrollable row | MOBILE: wrapped centered under logo (full-width), DESKTOP: single scrollable row */}
             {!isPWA && (
             <div className="flex items-center gap-2 md:gap-2 flex-wrap md:flex-nowrap md:overflow-x-auto flex-1 min-w-0 justify-center md:justify-end w-full md:w-auto mt-3 md:mt-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
-              {/* Trade Now */}
+              {/* Trade Now | MOBILE: moved to sidebar (hidden md:flex) */}
               <button
                 onClick={() => onNavigatePage?.('trade')}
-                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#F59E0B] hover:bg-[#d97706] text-black shadow-lg shadow-[#F59E0B]/30 active:scale-95 transition-all border border-black/10 flex-shrink-0"
+                className="hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#F59E0B] hover:bg-[#d97706] text-black shadow-lg shadow-[#F59E0B]/30 active:scale-95 transition-all border border-black/10 flex-shrink-0"
               >
                 <TrendingUp size={24} className="flex-shrink-0" />
                 <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
@@ -603,11 +609,11 @@ export default function Header({
                 </span>
               </button>
 
-              {/* Suggestions - developer only */}
+              {/* Suggestions - developer only | MOBILE: moved to sidebar */}
               {isDeveloper && (
                 <button
                   onClick={onNavigateSuggestions}
-                  className="relative p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
+                  className="hidden md:flex relative p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
                 >
                   <Bell size={22} />
                   {newSuggestionsCount > 0 && (
@@ -618,12 +624,12 @@ export default function Header({
                 </button>
               )}
 
-              {/* Contact */}
+              {/* Contact | MOBILE: moved to sidebar (hidden md:flex) */}
               <a
                 href="https://www.facebook.com/messages/e2ee/t/7630276620403742/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-3 rounded-xl bg-[#0084FF] text-white hover:bg-[#006ADB] transition-all shadow-md flex-shrink-0"
+                className="hidden md:flex p-3 rounded-xl bg-[#0084FF] text-white hover:bg-[#006ADB] transition-all shadow-md flex-shrink-0"
               >
                 <MessageCircle size={22} />
               </a>
@@ -697,11 +703,11 @@ export default function Header({
                 </div>
               )}
 
-              {/* Manual Analysis - developer only */}
+              {/* Manual Analysis - developer only | MOBILE: moved to sidebar */}
               {isDeveloper && (
                 <button
                   onClick={() => onNavigatePage?.('manualAnalysis')}
-                  className="flex items-center gap-2 px-5 py-3 rounded-2xl border shadow-md transition-all backdrop-blur-sm bg-red-700 border-red-800 text-white hover:bg-red-600 active:scale-95 flex-shrink-0"
+                  className="hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl border shadow-md transition-all backdrop-blur-sm bg-red-700 border-red-800 text-white hover:bg-red-600 active:scale-95 flex-shrink-0"
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 20h9" />
@@ -756,9 +762,9 @@ export default function Header({
                 )}
               </div>
 
-              {/* Profile / Logout */}
+              {/* Profile / Logout | MOBILE: moved to sidebar (hidden md:flex) */}
               {user ? (
-                <div className="relative flex-shrink-0" ref={profileMenuRef}>
+                <div className="relative flex-shrink-0 hidden md:flex" ref={profileMenuRef}>
                   <button 
                     onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
                     className="w-[48px] h-[48px] rounded-full bg-[#F59E0B] border-2 border-white/30 flex items-center justify-center overflow-hidden shadow-lg hover:scale-105 transition-all"
@@ -775,7 +781,7 @@ export default function Header({
               ) : (
                 <button 
                   onClick={onLogin}
-                  className="flex items-center gap-1.5 bg-[#F59E0B] text-black px-4 py-2.5 rounded-xl font-black text-sm uppercase shadow-md hover:bg-[#d97706] active:scale-95 transition-all flex-shrink-0"
+                  className="hidden md:flex items-center gap-1.5 bg-[#F59E0B] text-black px-4 py-2.5 rounded-xl font-black text-sm uppercase shadow-md hover:bg-[#d97706] active:scale-95 transition-all flex-shrink-0"
                 >
                   <LogIn size={22} />
                 </button>
