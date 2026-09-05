@@ -91,8 +91,8 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
         </h3>
       </div>
 
-      {/* 3. Compact Opportunity Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 items-start px-2 sm:px-0">
+      {/* 3. Compact Opportunity Cards | MOBILE: 2 per row rectangle, DESKTOP: unchanged (1→2→3 via sm/lg) */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-2 items-start px-1 md:px-2 lg:px-0">
         {sortedResults.map((res, idx) => {
           const meta = SIGNAL_CONFIG[res.signal] || SIGNAL_CONFIG[SignalType.NEUTRAL];
           const isJPY = res.symbol.includes('JPY');
@@ -106,25 +106,23 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.03 }}
-              style={{ alignSelf: 'start', backgroundColor: 'rgba(var(--card-bg),0.88)' }}
+              style={{ alignSelf: 'start', backgroundColor: 'rgba(var(--card-bg),0.88)', minHeight: 'auto' }}
               className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden"
             >
-              {/* Card content - same as TopSignals */}
+              {/* Card content - same as TopSignals | MOBILE: rectangle expanded, 2 per row, all text visible wrapped */}
               <button
                 onClick={() => { setSelectedIndex(idx); handleClick(); }}
-                className="w-full px-3 py-1.5 flex flex-col items-center gap-1"
+                className="w-full px-2 md:px-3 py-3 md:py-1.5 flex flex-col items-center gap-1.5 md:gap-1 min-h-[128px] md:min-h-0 justify-center"
               >
-                <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
-                  <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tp ? tp.toFixed(decimals) : '—'}</span>
-                  <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
-                  <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{sl ? sl.toFixed(decimals) : '—'}</span>
+                <div className="flex items-center justify-center w-full gap-1 md:gap-2 flex-wrap">
+                  <span className="text-[11px] md:text-sm font-black font-mono whitespace-nowrap" style={{color:'#00ff88'}}>{tp ? tp.toFixed(decimals) : '—'}</span>
+                  <span className="text-[14px] md:text-lg lg:text-xl font-black italic flex-shrink-0 text-center whitespace-nowrap" style={{ color: meta.symbolColor }}>{res.symbol}</span>
+                  <span className="text-[11px] md:text-sm font-black font-mono whitespace-nowrap" style={{color:'#ff4444'}}>{sl ? sl.toFixed(decimals) : '—'}</span>
                 </div>
-                <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
-                  <div className="flex items-center gap-0.5">
-                    <span className="text-[10px] sm:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp)}</span>
-                  </div>
+                <span className="text-[13px] md:text-base font-black text-center leading-tight px-1 whitespace-normal break-words" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
+                <div className="flex items-center gap-1.5 md:gap-2 flex-wrap justify-center">
+                  <span className="text-xl md:text-3xl font-black font-mono whitespace-nowrap" style={{color:'#ffffff'}}>{res.confidence}%</span>
+                  <span className="text-[10px] md:text-xs font-bold whitespace-nowrap" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp)}</span>
                 </div>
               </button>
 

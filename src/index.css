@@ -427,3 +427,18 @@ body {
     border-width: 12px;
   }
 }
+
+/* ── Mobile-only layout (≤767px) — NO impact on desktop (md: 768+) ── */
+@media (max-width: 767px) {
+  /* Header: ensure icons are larger touch targets on phones (desktop stays via md:) */
+  header button,
+  header a {
+    min-height: 44px;
+  }
+  /* Market category cards keep 2 per row but guarantee 2 lines of text fit without clipping */
+  /* (Tailwind already sets min-h-[88px] md:min-h-0; this just prevents clipping if font scales) */
+  /* Signal cards: already 2 per row via grid-cols-2; enforce rectangular full-info display */
+  .signal-card {
+    min-height: 132px !important;
+  }
+}

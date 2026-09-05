@@ -544,14 +544,14 @@ export default function Header({
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-black/60" />
         </div>
 
-        {/* Content Overlay - top row: logo left, icons right */}
+        {/* Content Overlay - top row: logo left, icons right | MOBILE: icons wrap below logo via flex-wrap, desktop unchanged via md: */}
         <div className={cn(
-          "relative max-w-7xl mx-auto px-4 h-full flex items-start transition-all duration-300",
+          "relative max-w-7xl mx-auto px-4 h-full flex flex-wrap md:flex-nowrap items-start transition-all duration-300",
           compact ? 'pt-2' : 'pt-3'
         )}>
-          <div className="flex items-center gap-3 w-full">
-            {/* Logo + Name - far left */}
-            <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex flex-wrap md:flex-nowrap items-center gap-3 w-full">
+            {/* Logo + Name - far left | MOBILE: full-width header row with hamburger top-right */}
+            <div className="flex items-center gap-3 flex-shrink-0 w-full md:w-auto justify-between md:justify-start">
               <div className={cn(
                 "bg-black rounded-2xl flex items-center justify-center overflow-hidden shadow-2xl border-2 border-white/30 transition-all duration-300",
                 compact ? 'w-[56px] h-[56px]' : 'w-[80px] h-[80px]'
@@ -569,11 +569,29 @@ export default function Header({
                   <span className="text-[14px] font-black uppercase tracking-[0.15em] text-white/70 leading-tight mt-1 block">For Financial<br/>Market Analysis</span>
                 )}
               </div>
+              {/* Mobile hamburger — stays top-right on phones, hidden on desktop (desktop uses bottom-row hamburger) */}
+              {!isPWA && (
+                <button
+                  onMouseDown={(e) => { e.stopPropagation(); onToggleSidebar(); }}
+                  className="flex md:hidden p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
+                  title={lang === 'ar' ? 'القائمة' : 'Menu'}
+                >
+                  <Menu size={22} />
+                </button>
+              )}
+              {isPWA && (
+                <button
+                  onClick={() => setShowMobileMenu(true)}
+                  className="flex md:hidden p-2 rounded-lg bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
+                >
+                  <Menu size={22} />
+                </button>
+              )}
             </div>
 
-            {/* Icons - scrollable row */}
+            {/* Icons - scrollable row | MOBILE: wrapped centered under logo (full-width), DESKTOP: single scrollable row */}
             {!isPWA && (
-            <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0 justify-end" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex items-center gap-2 md:gap-2 flex-wrap md:flex-nowrap md:overflow-x-auto flex-1 min-w-0 justify-center md:justify-end w-full md:w-auto mt-3 md:mt-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
               {/* Trade Now */}
               <button
                 onClick={() => onNavigatePage?.('trade')}
@@ -763,11 +781,11 @@ export default function Header({
                 </button>
               )}
 
-              {/* Menu toggle */}
+              {/* Menu toggle — desktop only (mobile uses top-row hamburger) */}
               {!isPWA && (
                 <button
                   onMouseDown={(e) => { e.stopPropagation(); onToggleSidebar(); }}
-                  className="p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
+                  className="hidden md:flex p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0 items-center justify-center"
                   title={lang === 'ar' ? 'القائمة' : 'Menu'}
                 >
                   <Menu size={24} />
@@ -776,11 +794,11 @@ export default function Header({
             </div>
             )}
 
-            {/* PWA: hamburger only */}
+            {/* PWA: hamburger only — desktop only (mobile uses top-row hamburger) */}
             {isPWA && (
               <button
                 onClick={() => setShowMobileMenu(true)}
-                className="p-2 rounded-lg bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
+                className="hidden md:flex p-2 rounded-lg bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0 items-center justify-center"
               >
                 <Menu size={22} />
               </button>

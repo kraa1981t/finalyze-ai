@@ -316,7 +316,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             </div>
           )}
           <label className="text-base font-black text-brand-text opacity-100 uppercase tracking-widest pl-2">{t.selectMarket}</label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             {MARKET_CATEGORIES.map((cat) => (
               <div key={cat.id} className="relative">
                 <button
@@ -326,7 +326,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                     setActiveDropdown(activeDropdown === cat.id ? null : cat.id);
                   }}
                   className={cn(
-                    "w-full flex items-center justify-between p-4 md:p-5 rounded-[2rem] border-2 transition-all group relative overflow-hidden",
+                    "w-full flex items-center justify-between p-4 md:p-5 rounded-[1.5rem] md:rounded-[2rem] border-2 transition-all group relative overflow-hidden min-h-[88px] md:min-h-0",
                     selectedType === cat.id 
                       ? "border-emerald-400 bg-emerald-100 text-black shadow-[0_0_30px_rgba(16,185,129,0.15)] scale-[1.02]" 
                       : "border-black/10 bg-[#F59E0B] text-black hover:bg-[#d97706]"
@@ -338,16 +338,16 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                       className="absolute inset-0 bg-primary/5 -z-10"
                     />
                   )}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
                     <div className={cn(
-                      "p-2.5 rounded-xl transition-all", 
+                      "p-2.5 md:p-2.5 rounded-xl transition-all flex-shrink-0", 
                       selectedType === cat.id ? "bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-black/10 text-black"
                     )}>
                       {ICON_MAP[cat.icon]}
                     </div>
-                    <div className="flex flex-col items-start">
-                      <span className="text-base font-black uppercase tracking-widest text-black">{t[cat.id as keyof typeof t]}</span>
-                      <span className="text-xs font-bold text-black/60 uppercase">{t.popularSymbols}</span>
+                    <div className="flex flex-col items-start min-w-0 flex-1">
+                      <span className="text-[13px] md:text-base font-black uppercase tracking-widest text-black leading-tight whitespace-normal break-words">{t[cat.id as keyof typeof t]}</span>
+                      <span className="text-[10px] md:text-xs font-bold text-black/60 uppercase leading-tight whitespace-normal">{t.popularSymbols}</span>
                     </div>
                   </div>
                   
