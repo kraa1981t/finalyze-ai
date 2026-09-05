@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Eye, EyeOff, Pause, Play, Monitor, Code, X, Copy, Check, Globe, Users, Tag, ArrowLeft, ExternalLink, Clipboard, RotateCcw, Save, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, Pause, Play, Monitor, Code, X, Copy, Check, Globe, Users, Tag, ArrowLeft, ExternalLink, Clipboard, RotateCcw, Save, AlertTriangle, Link2, Unlink, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import {
+  loadMoneytizerConfig, saveMoneytizerConfig, deleteMoneytizerConfig,
+  applyMoneytizer, MoneytizerConfig
+} from '../lib/moneytizer';
 
 export interface Ad {
   id: string;
@@ -190,6 +194,59 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
   useEffect(() => { setClientEmails(loadClientEmails()); }, []);
 
+  // ── Moneytizer (موقع إعلانات) ──
+  const [mtz, setMtz] = useState<MoneytizerConfig>({
+    enabled: false,
+    publisherId: '',
+    adsTxtContent: '',
+    headCode: '',
+  });
+  const [mtzLoaded, setMtzLoaded] = useState(false);
+  const [mtzDirty, setMtzDirty] = useState(false);
+  const [mtzSaving, setMtzSaving] = useState(false);
+
+  useEffect(() => {
+    loadMoneytizerConfig().then(cfg => {
+      if (cfg) setMtz(cfg);
+      setMtzLoaded(true);
+    }).catch(() => setMtzLoaded(true));
+  }, []);
+
+  const updateMtz = (updates: Partial<MoneytizerConfig>) => {
+    setMtz(prev => ({ ...prev, ...updates }));
+    setMtzDirty(true);
+  };
+
+  const handleMtzSave = async () => {
+    setMtzSaving(true);
+    try {
+      await saveMoneytizerConfig(mtz);
+      applyMoneytizer(mtz);
+      setMtzDirty(false);
+      showToast(
+        mtz.enabled
+          ? (isAr ? 'تم ربط موقع إعلانات وتفعيله بنجاح' : 'Ad network linked & enabled successfully')
+          : (isAr ? 'تم حفظ إعدادات موقع إعلانات (معطل)' : 'Ad network settings saved (disabled)'),
+        'ok'
+      );
+    } catch (e: any) {
+      console.error('Moneytizer save error:', e);
+      showToast(isAr ? `خطأ: ${e.message}` : `Error: ${e.message}`, 'err');
+    }
+    setMtzSaving(false);
+  };
+
+  const handleMtzDelete = async () => {
+    if (!confirm(isAr ? 'فك ربط موقع إعلانات وحذف كل إعداداته؟' : 'Unlink ad network and delete all its settings?')) return;
+    await deleteMoneytizerConfig();
+    applyMoneytizer(null);
+    setMtz({ enabled: false, publisherId: '', adsTxtContent: '', headCode: '' });
+    setMtzDirty(false);
+    showToast(isAr ? 'تم فك الربط بنجاح — لن تظهر إعلاناته' : 'Unlinked successfully — no more ads from it', 'ok');
+  };
+
+  const mtzLinked = mtzLoaded && mtz.enabled && !!(mtz.headCode?.trim()) && !!(mtz.adsTxtContent?.trim());
+
   const addAd = () => {
     if (!newAd.name.trim()) return;
     const ad: Ad = {
@@ -329,6 +386,146 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             {isAr ? 'إعلان مخصص' : 'Custom Ad'}
           </button>
         </div>
+      </div>
+
+      {/* ── موقع إعلانات (The Moneytizer) ── */}
+      <div className="rounded-3xl border border-indigo-500/20 bg-indigo-500/[0.04] p-5 md:p-6 space-y-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 flex items-center justify-center">
+              <Globe size={20} className="text-indigo-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-white flex items-center gap-2">
+                {isAr ? 'موقع إعلانات' : 'Ad Network'}
+                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-indigo-500/20 text-indigo-300">The Moneytizer</span>
+              </h2>
+              <p className="text-[11px] text-slate-400">{isAr ? 'ربط شبكة إعلانات خارجية (Header Bidding) بموقعك' : 'Link an external ad network (Header Bidding) to your site'}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {mtzLoaded && (
+              <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black ${
+                mtzLinked ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' :
+                mtz.enabled ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25' :
+                'bg-white/5 text-slate-500 border border-white/10'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${mtzLinked ? 'bg-emerald-400 animate-pulse' : mtz.enabled ? 'bg-amber-400' : 'bg-slate-500'}`} />
+                {mtzLinked ? (isAr ? 'مرتبط ومفعل' : 'Linked & Active') : mtz.enabled ? (isAr ? 'مفعل — أكمل الأكواد' : 'Enabled — finish codes') : (isAr ? 'غير مرتبط' : 'Not linked')}
+              </span>
+            )}
+            <button
+              onClick={() => updateMtz({ enabled: !mtz.enabled })}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1.5 transition-all ${
+                mtz.enabled ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25' : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+              }`}
+              title={mtz.enabled ? (isAr ? 'تعطيل' : 'Disable') : (isAr ? 'تفعيل' : 'Enable')}
+            >
+              {mtz.enabled ? <EyeOff size={12} /> : <Eye size={12} />}
+              {isAr ? (mtz.enabled ? 'تعطيل' : 'تفعيل') : (mtz.enabled ? 'Disable' : 'Enable')}
+            </button>
+          </div>
+        </div>
+
+        {!mtzLoaded ? (
+          <div className="text-center py-6 text-xs text-slate-500">{isAr ? 'جاري التحميل...' : 'Loading...'}</div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? 'معرّف الناشر (Publisher ID)' : 'Publisher ID'}</label>
+                <input
+                  type="text"
+                  value={mtz.publisherId}
+                  onChange={(e) => updateMtz({ publisherId: e.target.value.replace(/[^0-9]/g, '') })}
+                  placeholder="142894"
+                  dir="ltr"
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-400/50"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? 'حالة الربط' : 'Link Status'}</label>
+                <a
+                  href="/ads.txt"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center gap-2 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-indigo-300 hover:border-indigo-400/50 transition-all break-all"
+                >
+                  <ExternalLink size={11} />
+                  /ads.txt
+                </a>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                {isAr ? 'محتوى ملف ads.txt' : 'ads.txt content'}
+                <span className="text-amber-400"> *</span>
+                <span className="text-slate-600"> — {isAr ? 'من لوحة "معدلة" عندهم' : 'from their "Edit" panel'}</span>
+              </label>
+              <textarea
+                value={mtz.adsTxtContent}
+                onChange={(e) => updateMtz({ adsTxtContent: e.target.value })}
+                placeholder={"google.com, pub-xxxxxxxx, DIRECT, ...\nimprove-digital.com, 142894, DIRECT\n..."}
+                rows={4}
+                dir="ltr"
+                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-400/50 resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                {isAr ? 'كود الرأس الرئيسي' : 'Main head code'}
+                <span className="text-amber-400"> *</span>
+                <span className="text-slate-600"> — {isAr ? 'الذي يعطيك إياه بعد التحقق (خطوة 3+)' : 'they give after verification (step 3+)'}</span>
+              </label>
+              <textarea
+                value={mtz.headCode}
+                onChange={(e) => updateMtz({ headCode: e.target.value })}
+                placeholder={'<script src="//cdn.themoneytizer.com/lib/form_manager.js" data-ad="142894" async></script>'}
+                rows={3}
+                dir="ltr"
+                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-400/50 resize-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 text-[10px] text-slate-500 bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2">
+              <Info size={12} className="text-indigo-400 shrink-0" />
+              <span>
+                {isAr
+                  ? 'بعد الحفظ: /ads.txt يُحدَّث فوراً، وكود الرأس يُحقن في موقعك. فك الربط يحذف الإعدادات ويوقف الإعلانات.'
+                  : 'After save: /ads.txt updates instantly and the head code is injected. Unlink deletes settings and stops the ads.'}
+              </span>
+            </div>
+
+            <div className="flex gap-2 pt-1 flex-wrap items-center">
+              <button
+                onClick={handleMtzSave}
+                disabled={mtzSaving}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all shadow-lg ${
+                  mtzDirty
+                    ? 'bg-indigo-400 hover:bg-indigo-500 text-black shadow-indigo-400/20 animate-pulse'
+                    : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                } disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                {mtz.enabled ? <Link2 size={13} /> : <Save size={13} />}
+                {mtzSaving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : mtz.enabled ? (isAr ? 'حفظ وتفعيل الربط' : 'Save & Link') : (isAr ? 'حفظ الإعدادات' : 'Save Settings')}
+              </button>
+              <button
+                onClick={handleMtzDelete}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all bg-red-500/10 text-red-400 hover:bg-red-500/20"
+              >
+                <Unlink size={13} />
+                {isAr ? 'فك الربط وحذف' : 'Unlink & Delete'}
+              </button>
+              {mtz.enabled && !mtzLinked && (
+                <span className="text-[10px] text-amber-400 font-bold">
+                  {isAr ? '⚠️ أكمل معرّف الناشر + ads.txt + كود الرأس ليكتمل الربط' : '⚠️ Finish Publisher ID + ads.txt + head code to complete linking'}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Unsaved Changes Warning */}

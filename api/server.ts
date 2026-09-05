@@ -14,6 +14,36 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", version: "4.0-Institutional", node: process.version });
 });
 
+// API Route: Dynamic /ads.txt for The Moneytizer (served via vercel rewrite from /ads.txt)
+// Reads the config doc from Firestore (public read per rules). When the link is
+// enabled and ads.txt content is saved, it is served as-is. When disabled/deleted,
+// an empty placeholder is served so the site is immediately unlinked.
+const MTZ_FIRESTORE_DOC =
+  "https://firestore.googleapis.com/v1/projects/trading-made-easy-e8450/databases/(default)/documents/config/site_moneytizer?key=AIzaSyCvMayEuNTlQ5CWbjrrqw3aft_H044-uQM";
+
+app.get("/api/ads-txt", async (_req, res) => {
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  try {
+    const resp = await fetch(MTZ_FIRESTORE_DOC);
+    if (!resp.ok) {
+      res.send("# ads.txt not configured yet\n");
+      return;
+    }
+    const data: any = await resp.json();
+    const fields = data.fields || {};
+    const enabled = fields.enabled?.booleanValue === true;
+    const content = fields.adsTxtContent?.stringValue || "";
+    if (enabled && content.trim()) {
+      res.send(content);
+      return;
+    }
+    res.send("# ads.txt empty - Moneytizer not linked or disabled\n");
+  } catch (e) {
+    res.send("# ads.txt temporarily unavailable\n");
+  }
+});
+
 // API Route: Send verification email
 const transporter = nodemailer.createTransport({
   service: 'gmail',
