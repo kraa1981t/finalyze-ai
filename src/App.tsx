@@ -2078,6 +2078,9 @@ export default function App() {
       {/* Adsterra Banner 728x90 - Only for clients */}
       <AdBanner position="footer" isDeveloper={isDeveloperSession()} className="py-4" />
 
+      {/* All ads - footer position (always at bottom) */}
+      <AdSlot position="footer" lang={lang} />
+
       <footer className="py-8 border-t border-white/5 bg-brand-alt/30">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">
           <p>┬⌐ {new Date().getFullYear()} Joseph.Trading. {t.allRightsReserved}.</p>
