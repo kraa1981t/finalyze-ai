@@ -525,7 +525,7 @@ export default function Header({
 
       <header className={cn(
         "fixed top-0 left-0 right-0 z-50 shadow-2xl shadow-emerald-500/20 transition-all duration-300",
-        compact ? 'h-[100px]' : 'h-[300px]'
+        compact ? 'h-[140px] md:h-[100px]' : 'h-[300px]'
       )}>
         {/* Trading Banner Background */}
         <div className="absolute inset-0 overflow-hidden">
