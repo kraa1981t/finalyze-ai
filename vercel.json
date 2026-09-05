@@ -68,10 +68,6 @@
       "destination": "/robots.txt"
     },
     {
-      "source": "/ads.txt",
-      "destination": "/api/ads-txt"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

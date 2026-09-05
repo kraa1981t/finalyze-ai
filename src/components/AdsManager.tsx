@@ -488,8 +488,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
               <Info size={12} className="text-indigo-400 shrink-0" />
               <span>
                 {isAr
-                  ? 'بعد الحفظ: /ads.txt يُحدَّث فوراً، وكود الرأس يُحقن في موقعك. فك الربط يحذف الإعدادات ويوقف الإعلانات.'
-                  : 'After save: /ads.txt updates instantly and the head code is injected. Unlink deletes settings and stops the ads.'}
+                  ? 'كود الرأس يُحقن في موقعك فوراً عند الحفظ (تفعيل/تعطيل فوري). ملاحظة: ملف ads.txt يُخدَم من ملف ثابت في الموقع ويُحدَّث بإعادة النشر فقط — محتواه مُثبَّت حالياً ويجب أن يطابق لوحة "معدلة".'
+                  : 'Head code is injected instantly on save (instant enable/disable). Note: ads.txt is served as a static file and only refreshes on redeploy — it is pre-filled to match their "Edit" panel.'}
               </span>
             </div>
 
