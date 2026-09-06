@@ -441,8 +441,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             <ArrowLeft size={18} className="text-white" />
           </button>
           <div>
-            <h1 className="text-4xl font-black text-white">{isAr ? 'إدارة الإعلانات' : 'Ads Manager'}</h1>
-            <p className="text-3xl text-slate-400">{isAr ? 'إدارة إعلانات Adsterra لحسابات العملاء' : 'Manage Adsterra ads for client accounts'}</p>
+            <h1 className="text-3xl font-black text-white">{isAr ? 'إدارة الإعلانات' : 'Ads Manager'}</h1>
+            <p className="text-2xl text-slate-400">{isAr ? 'إدارة إعلانات Adsterra لحسابات العملاء' : 'Manage Adsterra ads for client accounts'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -450,7 +450,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             href="https://beta.publishers.adsterra.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-3 py-2 rounded-xl text-3xl font-bold transition-all"
+            className="flex items-center gap-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-3 py-2 rounded-xl text-2xl font-bold transition-all"
           >
             <ExternalLink size={12} />
             {isAr ? 'لوحة Adsterra' : 'Adsterra Panel'}
@@ -458,7 +458,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
           <button
             onClick={handleSave}
             disabled={!hasUnsavedChanges || saving}
-            className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl text-3xl transition-all shadow-lg ${
+            className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl text-2xl transition-all shadow-lg ${
               hasUnsavedChanges
                 ? 'bg-amber-400 hover:bg-amber-500 text-black shadow-amber-400/20 animate-pulse'
                 : 'bg-white/5 text-slate-500 cursor-not-allowed'
@@ -469,14 +469,14 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
           </button>
           <button
             onClick={() => setShowPresetPicker(true)}
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white font-bold px-4 py-2.5 rounded-xl text-3xl transition-all"
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white font-bold px-4 py-2.5 rounded-xl text-2xl transition-all"
           >
             <Plus size={16} />
             {isAr ? 'قالب سريع' : 'Quick Add'}
           </button>
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 bg-primary hover:bg-emerald-500 text-black font-bold px-4 py-2.5 rounded-xl text-3xl transition-all shadow-lg shadow-emerald-500/20"
+            className="flex items-center gap-2 bg-primary hover:bg-emerald-500 text-black font-bold px-4 py-2.5 rounded-xl text-2xl transition-all shadow-lg shadow-emerald-500/20"
           >
             <Plus size={16} />
             {isAr ? 'إعلان مخصص' : 'Custom Ad'}
@@ -492,16 +492,16 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
               <Globe size={20} className="text-indigo-400" />
             </div>
             <div>
-              <h2 className="text-4xl font-black text-white flex items-center gap-2">
+              <h2 className="text-3xl font-black text-white flex items-center gap-2">
                 {isAr ? 'موقع إعلانات' : 'Ad Network'}
-                <span className="text-3xl px-2 py-0.5 rounded-full font-bold bg-indigo-500/20 text-indigo-300">The Moneytizer</span>
+                <span className="text-2xl px-2 py-0.5 rounded-full font-bold bg-indigo-500/20 text-indigo-300">The Moneytizer</span>
               </h2>
-              <p className="text-3xl text-slate-400">{isAr ? 'ربط شبكة إعلانات خارجية (Header Bidding) بموقعك' : 'Link an external ad network (Header Bidding) to your site'}</p>
+              <p className="text-2xl text-slate-400">{isAr ? 'ربط شبكة إعلانات خارجية (Header Bidding) بموقعك' : 'Link an external ad network (Header Bidding) to your site'}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {mtzLoaded && (
-              <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-3xl font-black ${
+              <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-2xl font-black ${
                 mtzLinked ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' :
                 mtz.enabled ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25' :
                 'bg-white/5 text-slate-500 border border-white/10'
@@ -512,7 +512,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             )}
             <button
               onClick={() => updateMtz({ enabled: !mtz.enabled })}
-              className={`px-3 py-1.5 rounded-xl text-3xl font-black flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-2xl font-black flex items-center gap-1.5 transition-all ${
                 mtz.enabled ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25' : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
               }`}
               title={mtz.enabled ? (isAr ? 'تعطيل' : 'Disable') : (isAr ? 'تفعيل' : 'Enable')}
@@ -524,28 +524,28 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
         </div>
 
         {!mtzLoaded ? (
-          <div className="text-center py-6 text-3xl text-slate-500">{isAr ? 'جاري التحميل...' : 'Loading...'}</div>
+          <div className="text-center py-6 text-2xl text-slate-500">{isAr ? 'جاري التحميل...' : 'Loading...'}</div>
         ) : (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-3xl text-slate-500 font-bold block mb-1">{isAr ? 'معرّف الناشر (Publisher ID)' : 'Publisher ID'}</label>
+                <label className="text-2xl text-slate-500 font-bold block mb-1">{isAr ? 'معرّف الناشر (Publisher ID)' : 'Publisher ID'}</label>
                 <input
                   type="text"
                   value={mtz.publisherId}
                   onChange={(e) => updateMtz({ publisherId: e.target.value.replace(/[^0-9]/g, '') })}
                   placeholder="142894"
                   dir="ltr"
-                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-3xl text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-400/50"
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-2xl text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-400/50"
                 />
               </div>
               <div>
-                <label className="text-3xl text-slate-500 font-bold block mb-1">{isAr ? 'حالة الربط' : 'Link Status'}</label>
+                <label className="text-2xl text-slate-500 font-bold block mb-1">{isAr ? 'حالة الربط' : 'Link Status'}</label>
                 <a
                   href="/ads.txt"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full flex items-center gap-2 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-3xl text-indigo-300 hover:border-indigo-400/50 transition-all break-all"
+                  className="w-full flex items-center gap-2 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-2xl text-indigo-300 hover:border-indigo-400/50 transition-all break-all"
                 >
                   <ExternalLink size={11} />
                   /ads.txt
@@ -554,7 +554,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             </div>
 
             <div>
-              <label className="text-3xl text-slate-500 font-bold block mb-1">
+              <label className="text-2xl text-slate-500 font-bold block mb-1">
                 {isAr ? 'محتوى ملف ads.txt' : 'ads.txt content'}
                 <span className="text-amber-400"> *</span>
                 <span className="text-slate-600"> — {isAr ? 'من لوحة "معدلة" عندهم' : 'from their "Edit" panel'}</span>
@@ -565,12 +565,12 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                 placeholder={"google.com, pub-xxxxxxxx, DIRECT, ...\nimprove-digital.com, 142894, DIRECT\n..."}
                 rows={4}
                 dir="ltr"
-                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-3xl text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-400/50 resize-none"
+                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-2xl text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-400/50 resize-none"
               />
             </div>
 
             <div>
-              <label className="text-3xl text-slate-500 font-bold block mb-1">
+              <label className="text-2xl text-slate-500 font-bold block mb-1">
                 {isAr ? 'كود الرأس الرئيسي' : 'Main head code'}
                 <span className="text-amber-400"> *</span>
                 <span className="text-slate-600"> — {isAr ? 'الذي يعطيك إياه بعد التحقق (خطوة 3+)' : 'they give after verification (step 3+)'}</span>
@@ -581,11 +581,11 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                 placeholder={'<script src="//cdn.themoneytizer.com/lib/form_manager.js" data-ad="142894" async></script>'}
                 rows={3}
                 dir="ltr"
-                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-3xl text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-400/50 resize-none"
+                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-2xl text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-400/50 resize-none"
               />
             </div>
 
-            <div className="flex items-center gap-2 text-3xl text-slate-500 bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 text-2xl text-slate-500 bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2">
               <Info size={12} className="text-indigo-400 shrink-0" />
               <span>
                 {isAr
@@ -598,7 +598,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
               <button
                 onClick={handleMtzSave}
                 disabled={mtzSaving}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-3xl font-black transition-all shadow-lg ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-2xl font-black transition-all shadow-lg ${
                   mtzDirty
                     ? 'bg-indigo-400 hover:bg-indigo-500 text-black shadow-indigo-400/20 animate-pulse'
                     : 'bg-white/5 text-slate-400 hover:bg-white/10'
@@ -609,13 +609,13 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
               </button>
               <button
                 onClick={handleMtzDelete}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-3xl font-black transition-all bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-2xl font-black transition-all bg-red-500/10 text-red-400 hover:bg-red-500/20"
               >
                 <Unlink size={13} />
                 {isAr ? 'فك الربط وحذف' : 'Unlink & Delete'}
               </button>
               {mtz.enabled && !mtzLinked && (
-                <span className="text-3xl text-amber-400 font-bold">
+                <span className="text-2xl text-amber-400 font-bold">
                   {isAr ? '⚠️ أكمل معرّف الناشر + ads.txt + كود الرأس ليكتمل الربط' : '⚠️ Finish Publisher ID + ads.txt + head code to complete linking'}
                 </span>
               )}
@@ -628,7 +628,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
       {hasUnsavedChanges && (
         <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
           <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-          <p className="text-3xl text-amber-300 font-bold">
+          <p className="text-2xl text-amber-300 font-bold">
             {isAr ? 'لديك تغييرات غير محفوظة. اضغط "حفظ التغييرات" لتطبيقها.' : 'You have unsaved changes. Click "Save Changes" to apply them.'}
           </p>
         </div>
@@ -637,20 +637,20 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3">
         <div className="bg-white/5 rounded-2xl p-4 border border-white/10 text-center">
-          <div className="text-5xl font-black text-white">{ads.length}</div>
-          <div className="text-3xl text-slate-400 uppercase tracking-wider">{isAr ? 'إجمالي' : 'Total'}</div>
+          <div className="text-[38px] font-black text-white">{ads.length}</div>
+          <div className="text-2xl text-slate-400 uppercase tracking-wider">{isAr ? 'إجمالي' : 'Total'}</div>
         </div>
         <div className="bg-emerald-500/10 rounded-2xl p-4 border border-emerald-500/20 text-center">
-          <div className="text-5xl font-black text-emerald-400">{ads.filter(a => a.enabled && !a.paused).length}</div>
-          <div className="text-3xl text-emerald-400 uppercase tracking-wider">{isAr ? 'نشط' : 'Active'}</div>
+          <div className="text-[38px] font-black text-emerald-400">{ads.filter(a => a.enabled && !a.paused).length}</div>
+          <div className="text-2xl text-emerald-400 uppercase tracking-wider">{isAr ? 'نشط' : 'Active'}</div>
         </div>
         <div className="bg-amber-500/10 rounded-2xl p-4 border border-amber-500/20 text-center">
-          <div className="text-5xl font-black text-amber-400">{ads.filter(a => !a.enabled || a.paused).length}</div>
-          <div className="text-3xl text-amber-400 uppercase tracking-wider">{isAr ? 'معطل' : 'Disabled'}</div>
+          <div className="text-[38px] font-black text-amber-400">{ads.filter(a => !a.enabled || a.paused).length}</div>
+          <div className="text-2xl text-amber-400 uppercase tracking-wider">{isAr ? 'معطل' : 'Disabled'}</div>
         </div>
         <div className="bg-blue-500/10 rounded-2xl p-4 border border-blue-500/20 text-center">
-          <div className="text-5xl font-black text-blue-400">{ads.filter(a => a.code).length}</div>
-          <div className="text-3xl text-blue-400 uppercase tracking-wider">{isAr ? 'جاهز' : 'Ready'}</div>
+          <div className="text-[38px] font-black text-blue-400">{ads.filter(a => a.code).length}</div>
+          <div className="text-2xl text-blue-400 uppercase tracking-wider">{isAr ? 'جاهز' : 'Ready'}</div>
         </div>
       </div>
 
@@ -663,7 +663,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
           <button
             key={tab.key}
             onClick={() => setFilterType(tab.key)}
-            className={`px-4 py-2 rounded-xl text-3xl font-bold whitespace-nowrap transition-all ${
+            className={`px-4 py-2 rounded-xl text-2xl font-bold whitespace-nowrap transition-all ${
               filterType === tab.key
                 ? 'bg-primary text-black shadow-lg shadow-emerald-500/20'
                 : 'bg-white/5 text-slate-400 hover:bg-white/10'
@@ -684,7 +684,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
           <button
             key={tab.key}
             onClick={() => setFilterNetwork(tab.key)}
-            className={`px-4 py-2 rounded-xl text-3xl font-bold whitespace-nowrap transition-all ${
+            className={`px-4 py-2 rounded-xl text-2xl font-bold whitespace-nowrap transition-all ${
               filterNetwork === tab.key
                 ? tab.key === 'all' ? 'bg-primary text-black shadow-lg shadow-emerald-500/20' :
                   'bg-slate-500 text-white shadow-lg shadow-slate-500/20'
@@ -701,7 +701,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
         <div className="text-center py-16 bg-white/5 rounded-2xl border border-white/10">
           <Monitor size={48} className="mx-auto text-slate-500 mb-4" />
           <p className="text-slate-400 font-bold">{isAr ? 'لا توجد إعلانات' : 'No ads found'}</p>
-          <p className="text-slate-500 text-3xl mt-1">
+          <p className="text-slate-500 text-2xl mt-1">
             {isAr ? 'اضغط "قالب سريع" لإضافة إعلان Adsterra' : 'Click "Quick Add" to add an Adsterra ad'}
           </p>
         </div>
@@ -724,23 +724,23 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="text-3xl font-black text-white">{ad.name}</span>
-                    <span className="text-4xl">{AD_UNIT_TYPE_ICONS[ad.adUnitType] || '📢'}</span>
-                    <span className={`text-3xl px-2 py-0.5 rounded-full font-bold uppercase ${networkBadgeClass(getNetworkInfo(ad.type).color)}`}>
+                    <span className="text-2xl font-black text-white">{ad.name}</span>
+                    <span className="text-3xl">{AD_UNIT_TYPE_ICONS[ad.adUnitType] || '📢'}</span>
+                    <span className={`text-2xl px-2 py-0.5 rounded-full font-bold uppercase ${networkBadgeClass(getNetworkInfo(ad.type).color)}`}>
                       {getNetworkInfo(ad.type).label}
                     </span>
                     {ad.size && (
-                      <span className="text-3xl px-2 py-0.5 rounded-full font-bold bg-white/10 text-slate-300">
+                      <span className="text-2xl px-2 py-0.5 rounded-full font-bold bg-white/10 text-slate-300">
                         {ad.size}
                       </span>
                     )}
                     {!ad.code && (
-                      <span className="text-3xl px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-400">
+                      <span className="text-2xl px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-400">
                         {isAr ? '⚠️ يحتاج كود' : '⚠️ Needs Code'}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-3xl text-slate-500 flex-wrap">
+                  <div className="flex items-center gap-2 text-2xl text-slate-500 flex-wrap">
                     <span>{isAr ? 'الموضع:' : 'Position:'} {POSITIONS[ad.position]?.[isAr ? 'ar' : 'en']}</span>
                     <span>•</span>
                     <span>{isAr ? 'النوع:' : 'Type:'} {AD_UNIT_TYPES[ad.adUnitType]?.[isAr ? 'ar' : 'en']}</span>
@@ -817,20 +817,20 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                 >
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-3xl text-slate-500 font-bold block mb-1">{isAr ? 'الاسم' : 'Name'}</label>
+                      <label className="text-2xl text-slate-500 font-bold block mb-1">{isAr ? 'الاسم' : 'Name'}</label>
                       <input
                         type="text"
                         value={ad.name}
                         onChange={(e) => updateAd(ad.id, { name: e.target.value })}
-                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-3xl text-white focus:outline-none focus:border-primary/50"
+                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-2xl text-white focus:outline-none focus:border-primary/50"
                       />
                     </div>
                     <div>
-                      <label className="text-3xl text-slate-500 font-bold block mb-1">{isAr ? 'الموضع' : 'Position'}</label>
+                      <label className="text-2xl text-slate-500 font-bold block mb-1">{isAr ? 'الموضع' : 'Position'}</label>
                       <select
                         value={ad.position}
                         onChange={(e) => updateAd(ad.id, { position: e.target.value as Ad['position'] })}
-                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-3xl text-white focus:outline-none focus:border-primary/50"
+                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-2xl text-white focus:outline-none focus:border-primary/50"
                       >
                         {Object.entries(POSITIONS).map(([key, val]) => (
                           <option key={key} value={key}>{val[isAr ? 'ar' : 'en']}</option>
@@ -838,28 +838,28 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                       </select>
                     </div>
                     <div>
-                      <label className="text-3xl text-slate-500 font-bold block mb-1">{isAr ? 'الحجم' : 'Size'}</label>
+                      <label className="text-2xl text-slate-500 font-bold block mb-1">{isAr ? 'الحجم' : 'Size'}</label>
                       <input
                         type="text"
                         value={ad.size || ''}
                         onChange={(e) => updateAd(ad.id, { size: e.target.value })}
                         placeholder="728x90, 300x250..."
-                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-3xl text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50"
+                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-2xl text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50"
                       />
                     </div>
                     <div>
-                      <label className="text-3xl text-slate-500 font-bold block mb-1">{isAr ? 'رقم الوحدة' : 'Unit ID'}</label>
+                      <label className="text-2xl text-slate-500 font-bold block mb-1">{isAr ? 'رقم الوحدة' : 'Unit ID'}</label>
                       <input
                         type="text"
                         value={ad.adsterraId || ''}
                         onChange={(e) => updateAd(ad.id, { adsterraId: e.target.value })}
                         placeholder="30121119"
-                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-3xl text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50"
+                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-2xl text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-3xl text-slate-500 font-bold block mb-1">{isAr ? 'كود الإعلان' : 'Ad Code'}</label>
+                    <label className="text-2xl text-slate-500 font-bold block mb-1">{isAr ? 'كود الإعلان' : 'Ad Code'}</label>
                     <textarea
                       value={ad.code}
                       onChange={(e) => {
@@ -872,11 +872,11 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                       }}
                       placeholder={isAr ? 'الصق كود الإعلان من أي شركة هنا...' : 'Paste ad code from any network here...'}
                       rows={4}
-                      className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-3xl text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-primary/50 resize-none"
+                      className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-2xl text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-primary/50 resize-none"
                     />
                     {ad.code.trim() && (
                       <div className="flex items-center gap-2 mt-1.5">
-                        <span className={`text-3xl px-2 py-0.5 rounded-full font-bold uppercase ${networkBadgeClass(getNetworkInfo(ad.type).color)}`}>
+                        <span className={`text-2xl px-2 py-0.5 rounded-full font-bold uppercase ${networkBadgeClass(getNetworkInfo(ad.type).color)}`}>
                           <span className={`w-1.5 h-1.5 rounded-full inline-block mr-1 align-middle ${networkDotClass(getNetworkInfo(ad.type).color)}`} />
                           {isAr ? 'تم كشف الشبكة تلقائياً:' : 'Auto-detected network:'} {getNetworkInfo(ad.type).label}
                         </span>
@@ -908,8 +908,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             >
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-4xl font-black text-white">{isAr ? 'قوالب إعلانات سريعة' : 'Quick Ad Templates'}</h3>
-                  <p className="text-3xl text-slate-400 mt-1">{isAr ? 'اختر نوع الإعلان ثم الصق الكود من لوحة الناشر' : 'Choose ad type then paste code from publisher panel'}</p>
+                  <h3 className="text-3xl font-black text-white">{isAr ? 'قوالب إعلانات سريعة' : 'Quick Ad Templates'}</h3>
+                  <p className="text-2xl text-slate-400 mt-1">{isAr ? 'اختر نوع الإعلان ثم الصق الكود من لوحة الناشر' : 'Choose ad type then paste code from publisher panel'}</p>
                 </div>
                 <button onClick={() => setShowPresetPicker(false)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 transition-all">
                   <X size={18} />
@@ -918,7 +918,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
               {/* Adsterra presets */}
               <div className="mb-4">
-                <p className="text-3xl font-bold text-purple-400 uppercase tracking-wider mb-2">Adsterra</p>
+                <p className="text-2xl font-bold text-purple-400 uppercase tracking-wider mb-2">Adsterra</p>
                 <div className="grid grid-cols-2 gap-3">
                   {PRESET_AD_UNITS.filter(p => p.type === 'adsterra').map((preset, idx) => (
                     <button
@@ -926,13 +926,13 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                       onClick={() => addFromPreset(preset)}
                       className="flex items-start gap-3 p-4 bg-purple-500/[0.06] rounded-2xl border border-purple-500/15 hover:border-purple-500/40 hover:bg-purple-500/[0.10] transition-all text-left"
                     >
-                      <span className="text-5xl">{AD_UNIT_TYPE_ICONS[preset.adUnitType || 'banner']}</span>
+                      <span className="text-[38px]">{AD_UNIT_TYPE_ICONS[preset.adUnitType || 'banner']}</span>
                       <div className="flex-1">
-                        <div className="text-3xl font-bold text-white">{preset.name}</div>
-                        <div className="text-3xl text-slate-400 mt-0.5">
+                        <div className="text-2xl font-bold text-white">{preset.name}</div>
+                        <div className="text-2xl text-slate-400 mt-0.5">
                           {AD_UNIT_TYPES[preset.adUnitType || 'banner']?.[isAr ? 'ar' : 'en']} • {preset.size}
                         </div>
-                        <div className="text-3xl text-slate-500 mt-1">
+                        <div className="text-2xl text-slate-500 mt-1">
                           {isAr ? 'الموضع:' : 'Position:'} {POSITIONS[preset.position || 'header']?.[isAr ? 'ar' : 'en']}
                         </div>
                       </div>
@@ -944,8 +944,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
               <div className="mt-4">
                 <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
-                  <p className="text-3xl text-purple-300 font-bold mb-1">Adsterra — {isAr ? 'كيف تحصل على الأكواد:' : 'How to get codes:'}</p>
-                  <ol className="text-3xl text-purple-400/70 space-y-1 list-decimal list-inside">
+                  <p className="text-2xl text-purple-300 font-bold mb-1">Adsterra — {isAr ? 'كيف تحصل على الأكواد:' : 'How to get codes:'}</p>
+                  <ol className="text-2xl text-purple-400/70 space-y-1 list-decimal list-inside">
                     <li>{isAr ? 'افتح لوحة ناشر Adsterra' : 'Open Adsterra Publisher Panel'}</li>
                     <li>{isAr ? 'اختر موقعك Joseph.Trading.app' : 'Select your site Joseph.Trading.app'}</li>
                     <li>{isAr ? 'اضغط "GET CODE" بجانب وحدة الإعلان' : 'Click "GET CODE" next to the ad unit'}</li>
@@ -975,7 +975,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
               dir={isAr ? 'rtl' : 'ltr'}
             >
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-4xl font-black text-white">{isAr ? 'إضافة إعلان مخصص' : 'Add Custom Ad'}</h3>
+                <h3 className="text-3xl font-black text-white">{isAr ? 'إضافة إعلان مخصص' : 'Add Custom Ad'}</h3>
                 <button onClick={() => setShowAdd(false)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 transition-all">
                   <X size={18} />
                 </button>
@@ -983,18 +983,18 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-3xl text-slate-400 font-bold block mb-1.5">{isAr ? 'اسم الإعلان' : 'Ad Name'}</label>
+                  <label className="text-2xl text-slate-400 font-bold block mb-1.5">{isAr ? 'اسم الإعلان' : 'Ad Name'}</label>
                   <input
                     type="text"
                     value={newAd.name}
                     onChange={(e) => setNewAd(prev => ({ ...prev, name: e.target.value }))}
                     placeholder={isAr ? 'مثال: بانر الرئيسية' : 'e.g. Homepage Banner'}
-                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-3xl text-white placeholder:text-slate-500 focus:outline-none focus:border-primary/50"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white placeholder:text-slate-500 focus:outline-none focus:border-primary/50"
                   />
                 </div>
 
                 <div>
-                  <label className="text-3xl text-slate-400 font-bold block mb-1.5">{isAr ? 'الشبكة الإعلانية' : 'Ad Network'}</label>
+                  <label className="text-2xl text-slate-400 font-bold block mb-1.5">{isAr ? 'الشبكة الإعلانية' : 'Ad Network'}</label>
                   <div className="flex gap-2 flex-wrap">
                     {[
                       ...AD_NETWORKS.map(net => ({ value: net.key, label: net.label, color: net.color })),
@@ -1003,7 +1003,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                       <button
                         key={net.value}
                         onClick={() => setNewAd(prev => ({ ...prev, type: net.value }))}
-                        className={`flex-1 min-w-[100px] py-2.5 rounded-xl text-3xl font-bold transition-all border ${
+                        className={`flex-1 min-w-[100px] py-2.5 rounded-xl text-2xl font-bold transition-all border ${
                           newAd.type === net.value
                             ? 'network-net-selected'
                             : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
@@ -1013,18 +1013,18 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                       </button>
                     ))}
                   </div>
-                  <p className="text-3xl text-slate-600 mt-1.5">
+                  <p className="text-2xl text-slate-600 mt-1.5">
                     {isAr ? '💡 ألصق كود الإعلان وسيكتشف الموقع الشركة تلقائياً' : '💡 Paste the ad code and the site detects the network automatically'}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-3xl text-slate-400 font-bold block mb-1.5">{isAr ? 'النوع' : 'Type'}</label>
+                    <label className="text-2xl text-slate-400 font-bold block mb-1.5">{isAr ? 'النوع' : 'Type'}</label>
                     <select
                       value={newAd.adUnitType}
                       onChange={(e) => setNewAd(prev => ({ ...prev, adUnitType: e.target.value as Ad['adUnitType'] }))}
-                      className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-3xl text-white focus:outline-none focus:border-primary/50"
+                      className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white focus:outline-none focus:border-primary/50"
                     >
                       {Object.entries(AD_UNIT_TYPES).map(([key, val]) => (
                         <option key={key} value={key}>{AD_UNIT_TYPE_ICONS[key]} {val[isAr ? 'ar' : 'en']}</option>
@@ -1032,11 +1032,11 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                     </select>
                   </div>
                   <div>
-                    <label className="text-3xl text-slate-400 font-bold block mb-1.5">{isAr ? 'الموضع' : 'Position'}</label>
+                    <label className="text-2xl text-slate-400 font-bold block mb-1.5">{isAr ? 'الموضع' : 'Position'}</label>
                     <select
                       value={newAd.position}
                       onChange={(e) => setNewAd(prev => ({ ...prev, position: e.target.value as Ad['position'] }))}
-                      className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-3xl text-white focus:outline-none focus:border-primary/50"
+                      className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white focus:outline-none focus:border-primary/50"
                     >
                       {Object.entries(POSITIONS).map(([key, val]) => (
                         <option key={key} value={key}>{val[isAr ? 'ar' : 'en']}</option>
@@ -1047,43 +1047,43 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-3xl text-slate-400 font-bold block mb-1.5">{isAr ? 'الحجم' : 'Size'}</label>
+                    <label className="text-2xl text-slate-400 font-bold block mb-1.5">{isAr ? 'الحجم' : 'Size'}</label>
                     <input
                       type="text"
                       value={newAd.size}
                       onChange={(e) => setNewAd(prev => ({ ...prev, size: e.target.value }))}
                       placeholder="728x90, 300x250..."
-                      className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-3xl text-white placeholder:text-slate-500 focus:outline-none focus:border-primary/50"
+                      className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white placeholder:text-slate-500 focus:outline-none focus:border-primary/50"
                     />
                   </div>
                   <div>
-                    <label className="text-3xl text-slate-400 font-bold block mb-1.5">{isAr ? 'رقم الوحدة (اختياري)' : 'Unit ID (optional)'}</label>
+                    <label className="text-2xl text-slate-400 font-bold block mb-1.5">{isAr ? 'رقم الوحدة (اختياري)' : 'Unit ID (optional)'}</label>
                     <input
                       type="text"
                       value={newAd.adsterraId}
                       onChange={(e) => setNewAd(prev => ({ ...prev, adsterraId: e.target.value }))}
                       placeholder="30121119"
-                      className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-3xl text-white placeholder:text-slate-500 focus:outline-none focus:border-primary/50"
+                      className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white placeholder:text-slate-500 focus:outline-none focus:border-primary/50"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-3xl text-slate-400 font-bold block mb-1.5">{isAr ? 'كود الإعلان' : 'Ad Code'}</label>
+                  <label className="text-2xl text-slate-400 font-bold block mb-1.5">{isAr ? 'كود الإعلان' : 'Ad Code'}</label>
                   <textarea
                     value={newAd.code}
                     onChange={(e) => handleNewAdCodeChange(e.target.value)}
                     placeholder={isAr ? 'الصق كود الإعلان هنا من أي شركة...' : 'Paste ad code here from any network...'}
                     rows={5}
-                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-3xl text-white font-mono placeholder:text-slate-500 focus:outline-none focus:border-primary/50 resize-none"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white font-mono placeholder:text-slate-500 focus:outline-none focus:border-primary/50 resize-none"
                   />
                   {newAd.code.trim() && (
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className={`text-3xl px-2 py-1 rounded-full font-bold uppercase ${networkBadgeClass(getNetworkInfo(newAd.type).color)}`}>
+                      <span className={`text-2xl px-2 py-1 rounded-full font-bold uppercase ${networkBadgeClass(getNetworkInfo(newAd.type).color)}`}>
                         <span className={`w-1.5 h-1.5 rounded-full inline-block mr-1 align-middle ${networkDotClass(getNetworkInfo(newAd.type).color)}`} />
                         {isAr ? 'تم الكشف تلقائياً:' : 'Auto-detected:'} {getNetworkInfo(newAd.type).label}
                       </span>
-                      <span className="text-3xl text-slate-500">
+                      <span className="text-2xl text-slate-500">
                         {AD_UNIT_TYPES[detectAdUnitType(newAd.code)]?.[isAr ? 'ar' : 'en']}
                       </span>
                     </div>
@@ -1093,14 +1093,14 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setShowAdd(false)}
-                    className="flex-1 py-3 bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 font-bold rounded-xl text-3xl transition-all"
+                    className="flex-1 py-3 bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 font-bold rounded-xl text-2xl transition-all"
                   >
                     {isAr ? 'إلغاء' : 'Cancel'}
                   </button>
                   <button
                     onClick={addAd}
                     disabled={!newAd.name.trim()}
-                    className="flex-1 py-3 bg-primary hover:bg-emerald-500 text-black font-bold rounded-xl text-3xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex-1 py-3 bg-primary hover:bg-emerald-500 text-black font-bold rounded-xl text-2xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {isAr ? 'إضافة' : 'Add'}
                   </button>
@@ -1129,8 +1129,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             >
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-4xl font-black text-white">{isAr ? 'تعيين إعلان لعملاء' : 'Assign Ad to Clients'}</h3>
-                  <p className="text-3xl text-slate-400 mt-1">{assignModal.name}</p>
+                  <h3 className="text-3xl font-black text-white">{isAr ? 'تعيين إعلان لعملاء' : 'Assign Ad to Clients'}</h3>
+                  <p className="text-2xl text-slate-400 mt-1">{assignModal.name}</p>
                 </div>
                 <button onClick={() => setAssignModal(null)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 transition-all">
                   <X size={18} />
@@ -1140,8 +1140,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
               {clientEmails.length === 0 ? (
                 <div className="text-center py-8 bg-white/5 rounded-2xl">
                   <Users size={32} className="mx-auto text-slate-500 mb-3" />
-                  <p className="text-slate-400 text-3xl font-bold">{isAr ? 'لا يوجد عملاء مسجلين' : 'No registered clients'}</p>
-                  <p className="text-slate-500 text-3xl mt-1">{isAr ? 'سيظهر القائمة عندما يسجل عملاء جدد' : 'List will appear when new clients register'}</p>
+                  <p className="text-slate-400 text-2xl font-bold">{isAr ? 'لا يوجد عملاء مسجلين' : 'No registered clients'}</p>
+                  <p className="text-slate-500 text-2xl mt-1">{isAr ? 'سيظهر القائمة عندما يسجل عملاء جدد' : 'List will appear when new clients register'}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1161,7 +1161,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                         : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
                     }`}
                   >
-                    <span className="text-3xl font-bold">{isAr ? 'تحديد الكل' : 'Select All'}</span>
+                    <span className="text-2xl font-bold">{isAr ? 'تحديد الكل' : 'Select All'}</span>
                     <Check size={16} className={clientEmails.every(e => assignModal.assignedClients.includes(e)) ? 'text-primary' : 'text-slate-600'} />
                   </button>
 
@@ -1178,10 +1178,10 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-3xl font-bold">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-2xl font-bold">
                             {email.charAt(0).toUpperCase()}
                           </div>
-                          <span className="text-3xl truncate">{email}</span>
+                          <span className="text-2xl truncate">{email}</span>
                         </div>
                         <Check size={16} className={isAssigned ? 'text-blue-400' : 'text-slate-600'} />
                       </button>
@@ -1192,7 +1192,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
               <button
                 onClick={() => setAssignModal(null)}
-                className="w-full mt-4 py-3 bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 font-bold rounded-xl text-3xl transition-all"
+                className="w-full mt-4 py-3 bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 font-bold rounded-xl text-2xl transition-all"
               >
                 {isAr ? 'إغلاق' : 'Close'}
               </button>
@@ -1219,8 +1219,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             >
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-4xl font-black text-white">{isAr ? 'كود الإعلان' : 'Ad Code'}</h3>
-                  <p className="text-3xl text-slate-400 mt-1">{codeModal.name}</p>
+                  <h3 className="text-3xl font-black text-white">{isAr ? 'كود الإعلان' : 'Ad Code'}</h3>
+                  <p className="text-2xl text-slate-400 mt-1">{codeModal.name}</p>
                 </div>
                 <button onClick={() => setCodeModal(null)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 transition-all">
                   <X size={18} />
@@ -1230,22 +1230,22 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
               {codeModal.code ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-3xl text-slate-500 uppercase tracking-wider">{isAr ? 'كود الإعلان' : 'Ad Code'}</span>
+                    <span className="text-2xl text-slate-500 uppercase tracking-wider">{isAr ? 'كود الإعلان' : 'Ad Code'}</span>
                     <button
                       onClick={() => copyCode(codeModal.code)}
-                      className="flex items-center gap-1 text-3xl text-primary hover:text-emerald-400 transition-colors font-bold"
+                      className="flex items-center gap-1 text-2xl text-primary hover:text-emerald-400 transition-colors font-bold"
                     >
                       {copied ? <Check size={14} /> : <Copy size={14} />}
                       {copied ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ الكود' : 'Copy Code')}
                     </button>
                   </div>
-                  <pre className="bg-black/40 rounded-xl p-4 text-3xl text-slate-300 overflow-x-auto max-h-48 font-mono whitespace-pre-wrap break-all">{codeModal.code}</pre>
+                  <pre className="bg-black/40 rounded-xl p-4 text-2xl text-slate-300 overflow-x-auto max-h-48 font-mono whitespace-pre-wrap break-all">{codeModal.code}</pre>
                 </div>
               ) : (
                 <div className="text-center py-8 bg-white/5 rounded-2xl">
                   <Code size={32} className="mx-auto text-amber-400 mb-3" />
-                  <p className="text-amber-300 text-3xl font-bold">{isAr ? 'لم يتم إضافة الكود بعد' : 'Code not added yet'}</p>
-                  <p className="text-slate-500 text-3xl mt-1">{isAr ? 'اضغطتعديل لإضافة كود الإعلان' : 'Click edit to add the ad code'}</p>
+                  <p className="text-amber-300 text-2xl font-bold">{isAr ? 'لم يتم إضافة الكود بعد' : 'Code not added yet'}</p>
+                  <p className="text-slate-500 text-2xl mt-1">{isAr ? 'اضغطتعديل لإضافة كود الإعلان' : 'Click edit to add the ad code'}</p>
                 </div>
               )}
             </motion.div>
@@ -1259,7 +1259,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-6 py-3 rounded-2xl font-bold text-3xl shadow-2xl backdrop-blur-xl border ${
+            className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-6 py-3 rounded-2xl font-bold text-2xl shadow-2xl backdrop-blur-xl border ${
               toast.type === 'ok'
                 ? 'bg-emerald-500/90 text-white border-emerald-400/30'
                 : 'bg-red-500/90 text-white border-red-400/30'
