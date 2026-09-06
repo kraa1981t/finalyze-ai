@@ -1312,11 +1312,12 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
     if (!containerRef.current || ads.length === 0) return;
 
     const currentUserEmail = getCurrentUserEmail();
-    if (!currentUserEmail || isDeveloperEmail(currentUserEmail)) return;
+    if (isDeveloperEmail(currentUserEmail)) return;
 
     const visibleAds = ads.filter(a => {
       if (!a.enabled || a.paused || !a.code || a.position !== position) return false;
       if (a.assignedClients.length === 0) return true;
+      if (!currentUserEmail) return true;
       return a.assignedClients.includes(currentUserEmail);
     });
 
@@ -1361,11 +1362,12 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
   }, [ads, position]);
 
   const currentUserEmail = getCurrentUserEmail();
-  if (!currentUserEmail || isDeveloperEmail(currentUserEmail)) return null;
+  if (isDeveloperEmail(currentUserEmail)) return null;
 
   const visibleAds = ads.filter(a => {
     if (!a.enabled || a.paused || !a.code || a.position !== position) return false;
     if (a.assignedClients.length === 0) return true;
+    if (!currentUserEmail) return true;
     return a.assignedClients.includes(currentUserEmail);
   });
 
