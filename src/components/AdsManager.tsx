@@ -1275,6 +1275,25 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 }
 
 // Public component to render ads on pages
+function getCurrentUserEmail(): string {
+  for (const key of ['finalyze_auth_user', 'finalyze_user']) {
+    try {
+      const user = JSON.parse(localStorage.getItem(key) || '{}');
+      if (user && user.email) return user.email;
+    } catch {}
+  }
+  return '';
+}
+
+function isDeveloperEmail(email: string): boolean {
+  if (!email) return false;
+  const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+  return email === activeDevEmail ||
+    email === 'bachasalman69@gmail.com' ||
+    email === 'taybekraa@gmail.com' ||
+    email.includes('dev');
+}
+
 export function AdSlot({ position, lang }: { position: Ad['position']; lang: Language }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [ads, setAds] = useState<Ad[]>([]);
@@ -1297,16 +1316,13 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
   useEffect(() => {
     if (!containerRef.current || ads.length === 0) return;
 
-    let currentUserEmail = '';
-    try {
-      const user = JSON.parse(localStorage.getItem('finalyze_user') || '{}');
-      currentUserEmail = user.email || '';
-    } catch {}
+    const currentUserEmail = getCurrentUserEmail();
+    if (!currentUserEmail || isDeveloperEmail(currentUserEmail)) return;
 
     const visibleAds = ads.filter(a => {
       if (!a.enabled || a.paused || !a.code || a.position !== position) return false;
       if (a.assignedClients.length === 0) return true;
-      return currentUserEmail && a.assignedClients.includes(currentUserEmail);
+      return a.assignedClients.includes(currentUserEmail);
     });
 
     const container = containerRef.current;
@@ -1349,16 +1365,13 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
     return () => { if (container) container.innerHTML = ''; };
   }, [ads, position]);
 
-  let currentUserEmail = '';
-  try {
-    const user = JSON.parse(localStorage.getItem('finalyze_user') || '{}');
-    currentUserEmail = user.email || '';
-  } catch {}
+  const currentUserEmail = getCurrentUserEmail();
+  if (!currentUserEmail || isDeveloperEmail(currentUserEmail)) return null;
 
   const visibleAds = ads.filter(a => {
     if (!a.enabled || a.paused || !a.code || a.position !== position) return false;
     if (a.assignedClients.length === 0) return true;
-    return currentUserEmail && a.assignedClients.includes(currentUserEmail);
+    return a.assignedClients.includes(currentUserEmail);
   });
 
   if (visibleAds.length === 0) return null;
