@@ -366,6 +366,17 @@ body {
   background-color: #A7F3D0 !important;
 }
 
+/* ── Selected ad-network button (Add Custom Ad): bright Gauloises blue ── */
+.network-net-selected {
+  background-color: #1E90FF !important;
+  border-color: #1E90FF !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(30, 144, 255, 0.55), 0 6px 18px -4px rgba(30, 144, 255, 0.6) !important;
+}
+.light .network-net-selected {
+  color: #000000 !important;
+}
+
 .market-card {
   @apply relative overflow-hidden bg-brand-alt border border-slate-700 rounded-xl transition-all duration-300 hover:shadow-lg hover:border-primary/30;
 }
