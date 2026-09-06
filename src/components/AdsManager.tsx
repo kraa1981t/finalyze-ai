@@ -242,12 +242,7 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    loadAdsFromFirestore().then(async firestoreAds => {
-      const hasHtp = firestoreAds.some(a => a.type === 'hilltopads');
-      if (hasHtp) {
-        firestoreAds = firestoreAds.filter(a => a.type !== 'hilltopads');
-        await saveAdsToFirestore(firestoreAds);
-      }
+    loadAdsFromFirestore().then(firestoreAds => {
       setAds(firestoreAds);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(firestoreAds));
     }).catch(() => {
