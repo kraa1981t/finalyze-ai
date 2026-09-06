@@ -2020,6 +2020,7 @@ export default function App() {
         {/* Ads for all users */}
         <AdSlot position="inline" lang={lang} />
         <AdSlot position="between" lang={lang} />
+        <AdSlot position="popup" lang={lang} />
 
         {/* CLIENT DASHBOARD - shows for non-developers on main page */}
         {!isDeveloperSession() && !analysisResults && !isAnalyzing && effectivePage === 'main' && (
