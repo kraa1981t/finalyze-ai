@@ -1371,5 +1371,12 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
 
   if (visibleAds.length === 0) return null;
 
-  return <div ref={containerRef} className="max-w-full overflow-hidden" />;
+  return (
+    <div>
+      {position === 'footer' && (
+        <div className="w-full h-[30px] bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]" />
+      )}
+      <div ref={containerRef} className="max-w-full overflow-hidden" />
+    </div>
+  );
 }

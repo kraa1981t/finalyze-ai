@@ -15,7 +15,6 @@ import DevicePreview from './components/DevicePreview';
 import SettingsModal from './components/SettingsModal';
 import SidebarPanel from './components/SidebarPanel';
 import TopSignals from './components/TopSignals';
-import AdBanner from './components/AdBanner';
 import PortfolioPanel from './components/PortfolioPanel';
 import ClientDashboard from './components/ClientDashboard';
 import AnalysisDetailPage from './components/AnalysisDetailPage';
@@ -2077,10 +2076,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Adsterra Banner 728x90 - Only for clients */}
-      <AdBanner position="footer" isDeveloper={isDeveloperSession()} className="py-4" />
-
-      {/* Default footer ads - from Ads Manager (banners at bottom) */}
+      {/* Footer ads with green bar - from Ads Manager */}
       <AdSlot position="footer" lang={lang} />
 
       <footer className="py-8 border-t border-white/5 bg-brand-alt/30">
