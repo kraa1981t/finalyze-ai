@@ -1001,8 +1001,8 @@ export async function analyzeMarket(params: {
     return cached.result;
   }
 
-  // Block stock/ETF analysis when the exchange is closed
-  if (type === MarketType.STOCKS || type === MarketType.METALS) {
+  // Block stock/ETF analysis when the exchange is closed (metals trade 24/5 like forex — not gated)
+  if (type === MarketType.STOCKS) {
     const now = new Date();
     
     // Detect exchange from symbol suffix
