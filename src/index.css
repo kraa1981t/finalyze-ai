@@ -48,6 +48,21 @@ body.light .panel-strip {
   color: #ffffff !important;
 }
 
+/* Open side-panel header titles: clearly readable in both modes */
+.panel-title {
+  color: var(--color-brand-text);
+  opacity: 0.9;
+}
+.panel-title:hover {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+body.light .panel-title {
+  color: #047857 !important;
+  opacity: 1 !important;
+}
+
 .light {
   --color-brand-bg: #D1FAE5;
   --color-brand-alt: #A7F3D0;
