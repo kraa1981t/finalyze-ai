@@ -173,7 +173,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [toast, setToast] = useState<string | null>(null);
   const [platform, setPlatform] = useState<'chart' | 'mt5'>('chart');
   const [symbolsCollapsed, setSymbolsCollapsed] = useState(false);
-  const [ticketCollapsed, setTicketCollapsed] = useState(false);
+  const [ticketCollapsed, setTicketCollapsed] = useState(true);
 
   // Persist work place across manual refresh (sessionStorage) - clears when browser/tab closed
   useEffect(() => {
@@ -861,11 +861,25 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         </div>
       </div>
 
-      <div className="space-y-1">
-        {/* Symbol Selector (full width) */}
-        <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm p-2 space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-black uppercase tracking-wider text-brand-text/60">{isAr ? 'الرموز' : 'Symbols'}</span>
+      <div className="flex items-stretch gap-2 overflow-x-auto">
+        {/* LEFT: Symbol Selector panel (400px, collapsible) */}
+        <div className={`order-1 flex-shrink-0 rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm transition-all duration-300 ease-in-out ${symbolsCollapsed ? 'w-12 flex flex-col justify-center' : 'w-[400px] max-sm:w-[280px] p-2 space-y-1 flex flex-col'}`}>
+          <div className={`flex items-center gap-1 ${symbolsCollapsed ? 'flex-col justify-center px-1' : 'justify-between'}`}>
+            {symbolsCollapsed && (
+              <span className="text-sm font-black uppercase tracking-wider text-brand-text/60" style={{ writingMode: 'vertical-rl' }}>{isAr ? 'الرموز' : 'Symbols'}</span>
+            )}
+            {!symbolsCollapsed && (
+              <span className="text-sm font-black uppercase tracking-wider text-brand-text/60">{isAr ? 'الرموز' : 'Symbols'}</span>
+            )}
+            <button
+              onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
+              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
+              title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <path d={symbolsCollapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} />
+              </svg>
+            </button>
           </div>
           {!symbolsCollapsed && (
           <>
@@ -898,7 +912,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             </div>
 
             {/* Symbols grid */}
-            <div className="flex flex-wrap gap-1.5 max-h-[130px] overflow-y-auto">
+            <div className="flex flex-wrap gap-1.5 flex-1 overflow-y-auto content-start min-h-0">
               {symbols.length === 0 && category !== 'custom' && (
                 <span className="text-sm font-bold text-brand-text/40 py-2">
                   {isAr ? 'لا رموز ظاهرة' : 'No visible symbols'}
@@ -1005,28 +1019,33 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
 
           </>
           )}
-          <div className="flex justify-center -mt-1">
+          </div>
+
+            {/* RIGHT: Order Ticket panel (400px, collapsible) */}
+          <div className={`order-3 flex-shrink-0 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-sm transition-all duration-300 ease-in-out ${ticketCollapsed ? 'w-12 flex flex-col justify-center' : 'w-[400px] max-sm:w-[280px] p-4 space-y-3'}`}>
+            <div className={`flex items-center gap-2 ${ticketCollapsed ? 'flex-col justify-center py-2' : 'justify-between'}`}>
+              {ticketCollapsed && (
+                <span className="text-sm font-black uppercase tracking-wider text-brand-text/60" style={{ writingMode: 'vertical-rl' }}>{isAr ? 'فتح صفقات' : 'Order Ticket'}</span>
+              )}
+              {!ticketCollapsed && (
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-black text-brand-text uppercase tracking-wide text-xl truncate">{symbol || '—'}</span>
+                  {priceLoading ? (
+                    <Loader2 size={18} className="animate-spin text-brand-text/50" />
+                  ) : (
+                    <span dir="ltr" className="font-black text-emerald-400 text-2xl">{fmtPrice(livePrice)}</span>
+                  )}
+                </div>
+              )}
               <button
-                onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
+                onClick={() => setTicketCollapsed(!ticketCollapsed)}
                 className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
-                title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
+                title={ticketCollapsed ? (isAr ? 'توسيع فتح الصفقات' : 'Expand order ticket') : (isAr ? 'طي فتح الصفقات' : 'Collapse order ticket')}
               >
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${symbolsCollapsed ? '' : 'rotate-180'}`}>
-                  <path d="M6 9l6 6 6-6" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <path d={ticketCollapsed ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
                 </svg>
               </button>
-            </div>
-            </div>
-
-            {/* Order Ticket (full width) */}
-          <div className={`rounded-2xl border border-white/10 bg-black/30 backdrop-blur-sm space-y-2 ${ticketCollapsed ? 'p-2 py-2' : 'p-4 space-y-3'}`}>
-            <div className={`flex items-center justify-between gap-2 ${ticketCollapsed ? 'py-0' : ''}`}>
-              <span className={`font-black text-brand-text uppercase tracking-wide ${ticketCollapsed ? 'text-base' : 'text-xl'}`}>{symbol || '—'}</span>
-              {priceLoading ? (
-                <Loader2 size={ticketCollapsed ? 14 : 18} className="animate-spin text-brand-text/50" />
-              ) : (
-                <span dir="ltr" className={`font-black text-emerald-400 ${ticketCollapsed ? 'text-lg' : 'text-2xl'}`}>{fmtPrice(livePrice)}</span>
-              )}
             </div>
             {!ticketCollapsed && (
             <>
@@ -1144,23 +1163,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
           </>
           )}
-          <div className={`flex justify-center ${ticketCollapsed ? '-mt-1' : ''}`}>
-            <button
-              onClick={() => setTicketCollapsed(!ticketCollapsed)}
-              className={`${ticketCollapsed ? 'w-8 h-8' : 'w-10 h-10'} rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90`}
-              title={ticketCollapsed ? (isAr ? 'توسيع فتح الصفقات' : 'Expand order ticket') : (isAr ? 'طي فتح الصفقات' : 'Collapse order ticket')}
-            >
-              <svg width={ticketCollapsed ? "28" : "37"} height={ticketCollapsed ? "28" : "37"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${ticketCollapsed ? '' : 'rotate-180'}`}>
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-          </div>
           </div>
 
           {/* Chart / MT5 - يبقى خط التاريخ السفلي ظاهراً مهما فُتحت الأقسام */}
-          <div ref={chartPanelRef} className={`rounded-2xl overflow-hidden border border-white/10 bg-black/20 pb-3 relative flex flex-col flex-shrink-0 ${
-            symbolsCollapsed && ticketCollapsed ? 'h-[72vh] min-h-[500px] -mt-1' : symbolsCollapsed || ticketCollapsed ? 'h-[62vh] min-h-[440px]' : 'h-[50vh] min-h-[380px]'
-          }`}>
+          <div ref={chartPanelRef} className="order-2 flex-1 min-w-[420px] rounded-2xl overflow-hidden border border-white/10 bg-black/20 pb-3 relative flex flex-col h-[82vh] min-h-[580px] transition-all duration-300 ease-in-out">
             {/* Toggle bar */}
             <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
               {platform === 'chart' && (
