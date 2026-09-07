@@ -33,6 +33,21 @@ body {
   --color-brand-muted: var(--color-brand-muted);
 }
 
+/* Collapsed side-panel strips: green in dark mode, black in light mode (opposite of site) */
+.panel-strip {
+  background: linear-gradient(180deg, #10B981, #059669) !important;
+  border-color: rgba(16, 185, 129, 0.6) !important;
+  color: #ffffff !important;
+}
+.panel-strip .strip-title {
+  color: #ffffff !important;
+}
+body.light .panel-strip {
+  background: linear-gradient(180deg, #0F172A, #1E293B) !important;
+  border-color: rgba(15, 23, 42, 0.6) !important;
+  color: #ffffff !important;
+}
+
 .light {
   --color-brand-bg: #D1FAE5;
   --color-brand-alt: #A7F3D0;

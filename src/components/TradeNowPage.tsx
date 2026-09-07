@@ -863,10 +863,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
 
       <div className="flex items-stretch gap-2 overflow-x-auto">
         {/* LEFT: Symbol Selector panel (400px, collapsible) */}
-        <div className={`order-1 flex-shrink-0 rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm transition-all duration-300 ease-in-out ${symbolsCollapsed ? 'w-12 flex flex-col justify-center' : 'w-[400px] max-sm:w-[280px] p-2 space-y-1 flex flex-col'}`}>
+        <div className={`order-1 flex-shrink-0 rounded-2xl border backdrop-blur-sm transition-all duration-300 ease-in-out ${symbolsCollapsed ? 'panel-strip w-12 flex flex-col justify-center' : 'w-[400px] max-sm:w-[280px] p-2 space-y-1 flex flex-col border-white/10 bg-black/20'}`}>
           <div className={`flex items-center gap-1 ${symbolsCollapsed ? 'flex-col justify-center px-1' : 'justify-between'}`}>
             {symbolsCollapsed && (
-              <span className="text-sm font-black uppercase tracking-wider text-brand-text/60" style={{ writingMode: 'vertical-rl' }}>{isAr ? 'الرموز' : 'Symbols'}</span>
+              <span className="strip-title text-sm font-black uppercase tracking-wider" style={{ writingMode: 'vertical-rl' }}>{isAr ? 'الرموز' : 'Symbols'}</span>
             )}
             {!symbolsCollapsed && (
               <span className="text-sm font-black uppercase tracking-wider text-brand-text/60">{isAr ? 'الرموز' : 'Symbols'}</span>
@@ -1022,10 +1022,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
 
             {/* RIGHT: Order Ticket panel (400px, collapsible) */}
-          <div className={`order-3 flex-shrink-0 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-sm transition-all duration-300 ease-in-out ${ticketCollapsed ? 'w-12 flex flex-col justify-center' : 'w-[400px] max-sm:w-[280px] p-4 space-y-3'}`}>
+          <div className={`order-3 flex-shrink-0 rounded-2xl border backdrop-blur-sm transition-all duration-300 ease-in-out ${ticketCollapsed ? 'panel-strip w-12 flex flex-col justify-center' : 'w-[400px] max-sm:w-[280px] p-4 space-y-3 border-white/10 bg-black/30'}`}>
             <div className={`flex items-center gap-2 ${ticketCollapsed ? 'flex-col justify-center py-2' : 'justify-between'}`}>
               {ticketCollapsed && (
-                <span className="text-sm font-black uppercase tracking-wider text-brand-text/60" style={{ writingMode: 'vertical-rl' }}>{isAr ? 'فتح صفقات' : 'Order Ticket'}</span>
+                <span className="strip-title text-sm font-black uppercase tracking-wider" style={{ writingMode: 'vertical-rl' }}>{isAr ? 'فتح صفقات' : 'Order Ticket'}</span>
               )}
               {!ticketCollapsed && (
                 <div className="flex items-center gap-2 min-w-0">
