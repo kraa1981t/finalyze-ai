@@ -1292,9 +1292,11 @@ function isDeveloperEmail(email: string): boolean {
 export function AdSlot({ position, lang }: { position: Ad['position']; lang: Language }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [ads, setAds] = useState<Ad[]>([]);
+  const prevJsonRef = React.useRef<string>('');
 
   useEffect(() => {
     loadAdsFromFirestore().then(firestoreAds => {
+      prevJsonRef.current = JSON.stringify(firestoreAds);
       setAds(firestoreAds);
     }).catch(() => {
       setAds([]);
@@ -1302,7 +1304,11 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
 
     const interval = setInterval(() => {
       loadAdsFromFirestore().then(firestoreAds => {
-        setAds(firestoreAds);
+        const json = JSON.stringify(firestoreAds);
+        if (json !== prevJsonRef.current) {
+          prevJsonRef.current = json;
+          setAds(firestoreAds);
+        }
       }).catch(() => {});
     }, 30000);
     return () => clearInterval(interval);
@@ -1320,6 +1326,8 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
       if (!currentUserEmail) return true;
       return a.assignedClients.includes(currentUserEmail);
     });
+
+    if (visibleAds.length === 0) return;
 
     const container = containerRef.current;
     container.innerHTML = '';
@@ -1340,6 +1348,10 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
           content.innerHTML = nonScript;
           wrapper.appendChild(content);
         }
+
+        const marker = document.createElement('script');
+        marker.textContent = '//';
+        wrapper.appendChild(marker);
 
         scripts.forEach(oldScript => {
           const script = document.createElement('script');
