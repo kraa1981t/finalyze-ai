@@ -59,8 +59,11 @@ body.light .panel-strip {
   text-underline-offset: 3px;
 }
 body.light .panel-title {
-  color: #047857 !important;
+  color: #FACC15 !important;
   opacity: 1 !important;
+}
+body.light .panel-strip .strip-title {
+  color: #FACC15 !important;
 }
 
 .light {

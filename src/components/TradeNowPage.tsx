@@ -873,10 +873,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             )}
             <button
               onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
-              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
+              className="w-12 h-12 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90 shrink-0"
               title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
                 <path d={symbolsCollapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} />
               </svg>
             </button>
@@ -1040,10 +1040,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               )}
               <button
                 onClick={() => setTicketCollapsed(!ticketCollapsed)}
-                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90"
+                className="w-12 h-12 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90 shrink-0"
                 title={ticketCollapsed ? (isAr ? 'توسيع فتح الصفقات' : 'Expand order ticket') : (isAr ? 'طي فتح الصفقات' : 'Collapse order ticket')}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
                   <path d={ticketCollapsed ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
                 </svg>
               </button>
