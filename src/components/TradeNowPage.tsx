@@ -1029,7 +1029,6 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               )}
               {!ticketCollapsed && (
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="panel-title cursor-pointer text-sm font-black uppercase tracking-wider flex-shrink-0" onClick={() => setTicketCollapsed(true)}>{isAr ? 'فتح صفقات' : 'Order Ticket'}</span>
                   <span className="font-black text-brand-text uppercase tracking-wide text-xl truncate">{symbol || '—'}</span>
                   {priceLoading ? (
                     <Loader2 size={18} className="animate-spin text-brand-text/50" />
@@ -1182,8 +1181,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   </button>
                   <div className="ml-auto flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-xs font-black text-white chart-symbol-name">{symbol}</span>
-                    {!priceLoading && <span className="text-xs font-bold text-emerald-400">{fmtPrice(livePrice)}</span>}
+                    <span className="text-4xl font-black text-white chart-symbol-name chart-symbol-trade leading-none">{symbol}</span>
+                    {!priceLoading && <span className="text-xl font-bold text-emerald-400">{fmtPrice(livePrice)}</span>}
                   </div>
                 </>
               )}

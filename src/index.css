@@ -257,6 +257,16 @@ body.light .panel-strip .strip-title {
   text-shadow: 0 0 10px rgba(14, 165, 233, 0.35) !important;
 }
 
+/* Trading platform chart: symbol name enlarged 3x (12px → 36px dark, 2em → 6em light) */
+.chart-symbol-trade {
+  font-size: 36px !important;
+  line-height: 1.1;
+}
+.light .chart-symbol-trade {
+  font-size: 6em !important;
+  line-height: 1.1;
+}
+
 /* ── Category tab buttons: visible icons + blue when selected ── */
 .light .bg-sky-500\/10 {
   background-color: rgba(14, 116, 144, 0.18) !important;
