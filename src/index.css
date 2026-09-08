@@ -257,13 +257,13 @@ body.light .panel-strip .strip-title {
   text-shadow: 0 0 10px rgba(14, 165, 233, 0.35) !important;
 }
 
-/* Trading platform chart: symbol name enlarged 3x (12px → 36px dark, 2em → 6em light) */
+/* Trading platform chart: symbol name enlarged (24px) */
 .chart-symbol-trade {
-  font-size: 36px !important;
+  font-size: 24px !important;
   line-height: 1.1;
 }
 .light .chart-symbol-trade {
-  font-size: 6em !important;
+  font-size: 24px !important;
   line-height: 1.1;
 }
 
