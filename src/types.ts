@@ -52,6 +52,7 @@ export interface AnalysisResult {
   maAlignment?: string;
   volumeQuality?: number;
   volumeQualityThreshold?: number;
+  volumeQualityMaxThreshold?: number;
   volumeAbsorbed?: boolean;
 }
 
@@ -108,6 +109,7 @@ export interface StrategySettings {
   candleMatchMonthlyThreshold?: number;
   useVolumeGuard?: boolean;
   volumeGuardThreshold?: number;
+  volumeGuardMaxThreshold?: number;
 }
 
 export interface AutoAnalysisSettings {

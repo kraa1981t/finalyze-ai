@@ -93,9 +93,10 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
   // Volume Quality badge — 4th top card
   const volScore = (result as any).volumeQuality as number | undefined;
   const volThreshold = ((result as any).volumeQualityThreshold as number | undefined) ?? 45;
+  const volMaxThreshold = ((result as any).volumeQualityMaxThreshold as number | undefined) ?? 85;
   const volAbsorbed = (result as any).volumeAbsorbed as boolean | undefined;
   const hasVol = typeof volScore === 'number' && Number.isFinite(volScore);
-  const volColor = !hasVol ? 'text-white/30' : volAbsorbed ? 'text-red-400' : (volScore! >= volThreshold ? 'text-cyan-400' : 'text-red-400');
+  const volColor = !hasVol ? 'text-white/30' : volAbsorbed ? 'text-red-400' : (volScore! >= volThreshold && volScore! <= volMaxThreshold ? 'text-cyan-400' : 'text-red-400');
   const volDisplay = hasVol ? `${fmt(volScore!)}%` : '—';
 
   const generateAnalysisText = () => {

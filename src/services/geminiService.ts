@@ -1940,6 +1940,7 @@ Return ONLY valid JSON:
     //   - absorption detected → SEPARATE suppression (the most dangerous trap, even if score ≥45)
     const volumeGuardOn = settings?.useVolumeGuard !== false;
     const volThreshold = settings?.volumeGuardThreshold ?? 45;
+    const volMaxThreshold = settings?.volumeGuardMaxThreshold ?? 85;
     var volumeQualityBlocked = false;
     var volumeBoost = 0;
     if (volumeGuardOn && volumeQuality.detected) {
@@ -1950,6 +1951,14 @@ Return ONLY valid JSON:
           value: `Score ${volumeQuality.score}/100 ${volumeQuality.reasons.join('; ')}`,
           status: 'negative',
           impact: 'ABSORPTION TRAP: high volume is being absorbed / rejected against the trend — forced neutral'
+        });
+      } else if (volumeQuality.score > volMaxThreshold) {
+        volumeQualityBlocked = true;
+        detailedReasons.push({
+          check: 'Volume Guard (Climax Ceiling)',
+          value: `${volumeQuality.score}/100 (>${volMaxThreshold}) ${volumeQuality.reasons.join('; ')}`,
+          status: 'negative',
+          impact: 'score above the max ceiling — extreme speculative spike, executes only one-way against safety — forced neutral'
         });
       } else if (volumeQuality.score >= volThreshold) {
         volumeBoost = Math.round(finalConfidence * 0.08);
@@ -2170,6 +2179,7 @@ Return ONLY valid JSON:
       maAlignment: metrics?.maAlignment,
       volumeQuality: volumeQuality.detected ? volumeQuality.score : undefined,
       volumeQualityThreshold: volThreshold,
+      volumeQualityMaxThreshold: volMaxThreshold,
       volumeAbsorbed: volumeQuality.absorbed,
     };
 

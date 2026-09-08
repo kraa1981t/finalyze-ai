@@ -458,6 +458,18 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
               suffix=""
               color='text-amber-400'
             />
+            <NumberInput
+              label={isAr ? 'عتبة الذروة القصوى' : 'Climax Ceiling'}
+              desc={isAr
+                ? 'أقصى درجة مسموحة قبل اعتبار الحجم ذروة مضاربية شاذة (حجب الإشارة). القيم بين العتبة والسقف = النطاق الصحي.'
+                : 'Max allowed score before volume is treated as an abnormal speculative spike (signal suppressed). Values between threshold and ceiling = healthy band.'}
+              value={settings?.volumeGuardMaxThreshold ?? 85}
+              onChange={(v) => updateSetting('volumeGuardMaxThreshold', v)}
+              min={71}
+              max={100}
+              suffix=""
+              color='text-amber-400'
+            />
           </div>
         </div>
       )}

@@ -41,6 +41,7 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   candleMatchMonthlyEnabled: true,
   useVolumeGuard: true,
   volumeGuardThreshold: 45,
+  volumeGuardMaxThreshold: 85,
 };
 
 export const DEFAULT_AUTO_SETTINGS = {
