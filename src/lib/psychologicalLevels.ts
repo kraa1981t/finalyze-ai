@@ -45,7 +45,8 @@ function detectSymbolCategory(symbol: string): 'forex' | 'crypto' | 'stocks' | '
   
   // Metals
   if (s.includes('GOLD') || s.includes('XAU') || s.includes('XAG') || s.includes('SILVER') || 
-      s.includes('PLATINUM') || s.includes('PALLADIUM') || s.includes('XPT') || s.includes('XPD')) {
+      s.includes('PLATINUM') || s.includes('PALLADIUM') || s.includes('XPT') || s.includes('XPD') ||
+      s.includes('XCU') || s.includes('XAL')) {
     return 'metals';
   }
   

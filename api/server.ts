@@ -651,7 +651,7 @@ app.get("/api/quote", async (req, res) => {
 
     const customMappings: Record<string, string> = {
       'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F', 'XPDUSD': 'PA=F',
-      'XCUUSD': 'HG=F',
+      'XCUUSD': 'HG=F', 'XALUSD': 'ALI=F',
     };
     const indexCfds: Record<string, string> = {
       'US500': '^GSPC', 'US30': '^DJI', 'US100': '^NDX',
@@ -751,7 +751,7 @@ app.get("/api/market-data", async (req, res) => {
     const rawSymbol = symbol.toUpperCase().replace(/ /g, '');
     const customMappings: Record<string, string> = {
       'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F', 'XPDUSD': 'PA=F',
-      'XCUUSD': 'HG=F',
+      'XCUUSD': 'HG=F', 'XALUSD': 'ALI=F',
     };
 
     // Index CFDs → Yahoo Finance tickers

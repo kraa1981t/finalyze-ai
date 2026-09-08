@@ -83,6 +83,7 @@ function symbolToQuery(symbol: string): string {
   if (upper.includes('XPT')) return 'Platinum market';
   if (upper.includes('XPD')) return 'Palladium market';
   if (upper.includes('XCU')) return 'Copper market';
+  if (upper.includes('XAL')) return 'Aluminum market';
   return `${symbol} financial market`;
 }
 

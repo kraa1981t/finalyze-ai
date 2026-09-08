@@ -86,7 +86,7 @@ export const SYMBOL_CATEGORIES = {
     'ROG.SW', 'NOVO-B.CO', 'MBG.DE', 'BARC.L', 'BNP.PA',
   ],
   metals: [
-    'XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD',
+    'XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD', 'XALUSD',
   ]
 };
 
@@ -150,7 +150,7 @@ export const FREE_SYMBOLS: Record<string, string[]> = {
     '7203.T', '6758.T', '8306.T', '9984.T', '7974.T',
     'ASML.AS', 'MC.PA', 'SAP.DE', 'SHEL.L', 'NVO',
   ],
-  metals: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD'],
+  metals: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD', 'XALUSD'],
 };
 
 export const TIMEFRAMES = [
@@ -209,7 +209,7 @@ export const SYMBOL_GROUPS: Record<string, { label: string, symbols: string[] }[
   ],
   metals: [
     { label: 'preciousMetals', symbols: ['XAUUSD', 'XAGUSD', 'XPTUSD'] },
-    { label: 'industrialMetals', symbols: ['XCUUSD', 'XPDUSD'] },
+    { label: 'industrialMetals', symbols: ['XCUUSD', 'XPDUSD', 'XALUSD'] },
   ]
 };
 
@@ -294,6 +294,6 @@ export const ALL_SYMBOLS_DB: Record<string, string[]> = {
     'US500', 'US30', 'US100', 'UK100', 'DE40', 'JP225', 'HK50', 'AU200',
   ].sort(),
   metals: [
-    'XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'XCUUSD',
+    'XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'XCUUSD', 'XALUSD',
   ].sort()
 };

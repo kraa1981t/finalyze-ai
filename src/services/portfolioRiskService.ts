@@ -34,7 +34,7 @@ const CLUSTERS: { key: string; symbols: string[] }[] = [
   { key: 'stocks_tech', symbols: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX', 'AMD', 'INTC', 'QCOM'] },
   { key: 'stocks_finance', symbols: ['JPM', 'BAC', 'WFC', 'C', 'GS', 'MS', 'BLK', 'SCHW', 'AXP', 'V', 'MA', 'PYPL'] },
   { key: 'stocks_energy', symbols: ['XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO', 'OXY', 'DVN', 'SHEL', 'TTE', 'BP'] },
-  { key: 'metals', symbols: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'XCUUSD'] },
+  { key: 'metals', symbols: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'XCUUSD', 'XALUSD'] },
 ];
 
 const INVERSE_PAIRS: [string, string][] = [

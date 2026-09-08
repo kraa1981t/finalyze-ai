@@ -249,7 +249,7 @@ function symbolToYahooForex(symbol: string): string | null {
   // Metals mapping
   const metalMap: Record<string, string> = {
     'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F',
-    'XPDUSD': 'PA=F', 'XCUUSD': 'HG=F',
+    'XPDUSD': 'PA=F', 'XCUUSD': 'HG=F', 'XALUSD': 'ALI=F',
     'GOLD': 'GC=F', 'SILVER': 'SI=F', 'COPPER': 'HG=F',
   };
   if (metalMap[upper]) return metalMap[upper];

@@ -71,6 +71,7 @@ export const SYMBOL_DB: SuggestedSymbol[] = [
   S('XPTUSD', 'OANDA:XPTUSD', 'Platinum Spot / US Dollar', 'metals'),
   S('XPDUSD', 'OANDA:XPDUSD', 'Palladium Spot / US Dollar', 'metals'),
   S('XCUUSD', 'COMEX:HG1!', 'Copper Futures', 'metals'),
+  S('XALUSD', 'COMEX:ALI1!', 'Aluminum Futures', 'metals'),
   S('WTIUSD', 'TVC:USOIL', 'Crude Oil WTI', 'metals'),
   S('BRENTUSD', 'TVC:UKOIL', 'Brent Oil', 'metals'),
   S('NATGAS', 'NYMEX:NG1!', 'Natural Gas Futures', 'metals'),

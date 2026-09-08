@@ -38,7 +38,7 @@ const SYMBOL_CATEGORIES: Record<string, string[]> = {
     '7203.T', '6758.T', '8306.T', '9984.T', '7974.T',
     '7267.T', '9432.T', '6861.T', '6501.T', '8035.T'
   ],
-  metals: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD']
+  metals: ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XCUUSD', 'XPDUSD', 'XALUSD']
 };
 
 export default function SignalSummary({ signals, lang }: SignalSummaryProps) {
