@@ -240,6 +240,22 @@ export async function saveAdsToFirestore(ads: Ad[]): Promise<void> {
   await setDoc(doc(db, ADS_DOC), { ads: clean, updatedAt: Date.now() }, { merge: true });
 }
 
+// Force-write the current footer ad set (banner right / banner left / invisible popunder) to
+// Firestore, replacing any leftover older ads. Called from AdsManager and once per dev session.
+export async function forceFooterAdSeed(): Promise<void> {
+  try {
+    const firestoreAds = await loadAdsFromFirestore();
+    const needSeed =
+      firestoreAds.length !== FOOTER_SEED_ADS.length ||
+      !FOOTER_SEED_ADS.every(fs => firestoreAds.some(a => a.id === fs.id && a.code === fs.code));
+    if (needSeed) {
+      await saveAdsToFirestore(FOOTER_SEED_ADS);
+    }
+  } catch {
+    // ignore — will retry on next session
+  }
+}
+
 function loadAds(): Ad[] {
   return loadAdsLocal();
 }
@@ -287,10 +303,11 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
   useEffect(() => {
     loadAdsFromFirestore().then(async firestoreAds => {
-      const seedVersion = localStorage.getItem('finalyze_footer_seed_v3');
-      if (seedVersion !== 'applied') {
+      const needSeed =
+        firestoreAds.length !== FOOTER_SEED_ADS.length ||
+        !FOOTER_SEED_ADS.every(fs => firestoreAds.some(a => a.id === fs.id && a.code === fs.code));
+      if (needSeed) {
         await saveAdsToFirestore(FOOTER_SEED_ADS);
-        localStorage.setItem('finalyze_footer_seed_v3', 'applied');
         setAds(FOOTER_SEED_ADS);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(FOOTER_SEED_ADS));
       } else {
@@ -1393,10 +1410,9 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
       const wrapper = document.createElement('div');
       wrapper.setAttribute('data-ad-id', ad.id);
       if (position === 'footer') {
-        // Banner Right (idx 0) renders at the far-right, Banner Left (idx 1) at the far-left, same row.
-        wrapper.className = idx === 0
-          ? 'order-2 flex items-center'
-          : 'order-1 flex items-center';
+        // By identity: *_right renders far-right, *_left far-left; anything else falls back by order.
+        const isRight = ad.id.includes('_right') || (!ad.id.includes('_left') && idx === 0);
+        wrapper.className = isRight ? 'order-2 flex items-center' : 'order-1 flex items-center';
       } else {
         wrapper.className = 'my-3 flex justify-center';
       }
