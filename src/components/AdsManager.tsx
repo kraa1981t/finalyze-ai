@@ -138,6 +138,49 @@ function generateId(): string {
 
 const ADS_DOC = 'config/site_ads';
 
+// v2 footer ad set — force-seeds to Firestore in place of any older ads (always shown at page bottom).
+const FOOTER_SEED_ADS: Ad[] = [
+  {
+    id: 'footer_seed_1',
+    name: 'Footer Ad 1',
+    code: '<script>\n(function(gon){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = gon || {};\ns.src = "\\/\\/funny-tooth.com\\/cdDB9\\/6.b\\/2G5qlESbWRQm9lNQzQQUwUMBjsQAzmMeyg0w3ANJD\\/AyyfNXD\\/M\\/3S";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
+    type: 'custom',
+    adUnitType: 'inpage',
+    position: 'footer',
+    size: 'Responsive',
+    enabled: true,
+    paused: false,
+    assignedClients: [],
+    createdAt: Date.now(),
+  },
+  {
+    id: 'footer_seed_2',
+    name: 'Footer Ad 2',
+    code: '<script>\n(function(vaphuw){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = vaphuw || {};\ns.src = "\\/\\/prizefamily.com\\/bYXaVTs.d\\/GVlB0\\/YPWqcL\\/cepmY9BuhZ\\/U\\/lakhPDT-cx0MMWD-Ib0hNKDcEit\\/NxziQbwXMvjEQm0xNhQi";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
+    type: 'custom',
+    adUnitType: 'inpage',
+    position: 'footer',
+    size: 'Responsive',
+    enabled: true,
+    paused: false,
+    assignedClients: [],
+    createdAt: Date.now(),
+  },
+  {
+    id: 'footer_seed_3',
+    name: 'Footer Ad 3',
+    code: '<script>\n(function(bzbcjt){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = bzbcjt || {};\ns.src = "\\/\\/prizefamily.com\\/bGX\\/V.sSdTGqly0gYdWYcV\\/Aeem\\/9RuKZmUSlAkpPuTYcf0\\/MwDaIj0cNDT\\/MntxNkzKQtwaMrjhQ\\/1YNwwZ";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
+    type: 'custom',
+    adUnitType: 'inpage',
+    position: 'footer',
+    size: 'Responsive',
+    enabled: true,
+    paused: false,
+    assignedClients: [],
+    createdAt: Date.now(),
+  },
+];
+
 function loadAdsLocal(): Ad[] {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -242,9 +285,17 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    loadAdsFromFirestore().then(firestoreAds => {
-      setAds(firestoreAds);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(firestoreAds));
+    loadAdsFromFirestore().then(async firestoreAds => {
+      const seedVersion = localStorage.getItem('finalyze_footer_seed_v2');
+      if (seedVersion !== 'applied') {
+        await saveAdsToFirestore(FOOTER_SEED_ADS);
+        localStorage.setItem('finalyze_footer_seed_v2', 'applied');
+        setAds(FOOTER_SEED_ADS);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(FOOTER_SEED_ADS));
+      } else {
+        setAds(firestoreAds);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(firestoreAds));
+      }
     }).catch(() => {
       setAds(loadAds());
     });
