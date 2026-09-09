@@ -1239,7 +1239,7 @@ export default function App() {
     if (!wasOn) {
       loop();
     }
-  }, [autoSettings.isEnabled]);
+  }, [autoSettings.isEnabled, user]);
 
   // Build version check: force cache bust on new deploy
   useEffect(() => {
