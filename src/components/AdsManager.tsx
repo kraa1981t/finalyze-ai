@@ -156,10 +156,10 @@ const FOOTER_SEED_ADS: Ad[] = [
   },
   {
     id: 'footer_banner_right',
-    name: 'Banner Right',
-    code: '<script>\n(function(vaphuw){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = vaphuw || {};\ns.src = "\\/\\/prizefamily.com\\/bYXaVTs.d\\/GVlB0\\/YPWqcL\\/cepmY9BuhZ\\/U\\/lakhPDT-cx0MMWD-Ib0hNKDcEit\\/NxziQbwXMvjEQm0xNhQi";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
+    name: 'taybe (In-Page Push)',
+    code: '<script>\n(function(pyxdg){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = pyxdg || {};\ns.src = "\\/\\/prizefamily.com\\/b.XOVtsWddGLlG0QY\\/WLcK\\/meBmg9VuzZAUMlBkjPuT_cm0NMZDdMJ1YMvjNketJNqzIQ-wzMyz\\/UbzPM\\/wA";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
     type: 'custom',
-    adUnitType: 'banner',
+    adUnitType: 'inpage',
     position: 'footer',
     size: 'Responsive',
     enabled: true,
