@@ -138,27 +138,28 @@ function generateId(): string {
 
 const ADS_DOC = 'config/site_ads';
 
-// v2 footer ad set — force-seeds to Firestore in place of any older ads (always shown at page bottom).
+// v3 footer ad set — force-seeds to Firestore in place of any older ads (always shown at page bottom).
+// Banner 1 renders far-right, banner 2 far-left on the same row; the popunder runs invisibly.
 const FOOTER_SEED_ADS: Ad[] = [
   {
     id: 'footer_seed_1',
-    name: 'Footer Ad 1',
+    name: 'Popunder (invisible)',
     code: '<script>\n(function(gon){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = gon || {};\ns.src = "\\/\\/funny-tooth.com\\/cdDB9\\/6.b\\/2G5qlESbWRQm9lNQzQQUwUMBjsQAzmMeyg0w3ANJD\\/AyyfNXD\\/M\\/3S";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
     type: 'custom',
-    adUnitType: 'inpage',
+    adUnitType: 'popunder',
     position: 'footer',
-    size: 'Responsive',
+    size: 'Full Page',
     enabled: true,
     paused: false,
     assignedClients: [],
     createdAt: Date.now(),
   },
   {
-    id: 'footer_seed_2',
-    name: 'Footer Ad 2',
+    id: 'footer_banner_right',
+    name: 'Banner Right',
     code: '<script>\n(function(vaphuw){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = vaphuw || {};\ns.src = "\\/\\/prizefamily.com\\/bYXaVTs.d\\/GVlB0\\/YPWqcL\\/cepmY9BuhZ\\/U\\/lakhPDT-cx0MMWD-Ib0hNKDcEit\\/NxziQbwXMvjEQm0xNhQi";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
     type: 'custom',
-    adUnitType: 'inpage',
+    adUnitType: 'banner',
     position: 'footer',
     size: 'Responsive',
     enabled: true,
@@ -167,11 +168,11 @@ const FOOTER_SEED_ADS: Ad[] = [
     createdAt: Date.now(),
   },
   {
-    id: 'footer_seed_3',
-    name: 'Footer Ad 3',
+    id: 'footer_banner_left',
+    name: 'Banner Left',
     code: '<script>\n(function(bzbcjt){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = bzbcjt || {};\ns.src = "\\/\\/prizefamily.com\\/bGX\\/V.sSdTGqly0gYdWYcV\\/Aeem\\/9RuKZmUSlAkpPuTYcf0\\/MwDaIj0cNDT\\/MntxNkzKQtwaMrjhQ\\/1YNwwZ";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
     type: 'custom',
-    adUnitType: 'inpage',
+    adUnitType: 'banner',
     position: 'footer',
     size: 'Responsive',
     enabled: true,
@@ -286,10 +287,10 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
   useEffect(() => {
     loadAdsFromFirestore().then(async firestoreAds => {
-      const seedVersion = localStorage.getItem('finalyze_footer_seed_v2');
+      const seedVersion = localStorage.getItem('finalyze_footer_seed_v3');
       if (seedVersion !== 'applied') {
         await saveAdsToFirestore(FOOTER_SEED_ADS);
-        localStorage.setItem('finalyze_footer_seed_v2', 'applied');
+        localStorage.setItem('finalyze_footer_seed_v3', 'applied');
         setAds(FOOTER_SEED_ADS);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(FOOTER_SEED_ADS));
       } else {
@@ -1383,10 +1384,22 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
     const container = containerRef.current;
     container.innerHTML = '';
 
-    visibleAds.forEach(ad => {
+    // Footer: banners sit on one row (right + left), popunder stays invisible but still runs.
+    const footerBannerAds = position === 'footer' ? visibleAds.filter(a => a.adUnitType !== 'popunder') : [];
+    const footerPopAds = position === 'footer' ? visibleAds.filter(a => a.adUnitType === 'popunder') : [];
+    const layoutAds = position === 'footer' ? footerBannerAds : visibleAds;
+
+    layoutAds.forEach((ad, idx) => {
       const wrapper = document.createElement('div');
-      wrapper.className = 'my-3 flex justify-center';
       wrapper.setAttribute('data-ad-id', ad.id);
+      if (position === 'footer') {
+        // Banner Right (idx 0) renders at the far-right, Banner Left (idx 1) at the far-left, same row.
+        wrapper.className = idx === 0
+          ? 'order-2 flex items-center'
+          : 'order-1 flex items-center';
+      } else {
+        wrapper.className = 'my-3 flex justify-center';
+      }
 
       if (ad.code.includes('<script')) {
         const temp = document.createElement('div');
@@ -1421,6 +1434,29 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
       container.appendChild(wrapper);
     });
 
+    // Popunder scripts run in a hidden wrapper so they never disturb the layout.
+    footerPopAds.forEach(ad => {
+      if (ad.code.includes('<script')) {
+        const temp = document.createElement('div');
+        temp.innerHTML = ad.code;
+        const scripts = temp.querySelectorAll('script');
+        scripts.forEach(oldScript => {
+          const script = document.createElement('script');
+          if (oldScript.src) {
+            script.src = oldScript.src;
+          } else {
+            script.textContent = oldScript.textContent;
+          }
+          Array.from(oldScript.attributes).forEach(attr => script.setAttribute(attr.name, attr.value));
+          container.appendChild(script);
+        });
+      } else {
+        const script = document.createElement('script');
+        script.textContent = ad.code;
+        container.appendChild(script);
+      }
+    });
+
     return () => { if (container) container.innerHTML = ''; };
   }, [ads, position]);
 
@@ -1441,7 +1477,10 @@ export function AdSlot({ position, lang }: { position: Ad['position']; lang: Lan
       {position === 'footer' && (
         <div className="w-full h-[30px] bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]" />
       )}
-      <div ref={containerRef} className="max-w-full overflow-hidden" />
+      <div
+        ref={containerRef}
+        className={`max-w-full overflow-hidden ${position === 'footer' ? 'flex w-full items-center justify-between gap-2' : ''}`}
+      />
     </div>
   );
 }
