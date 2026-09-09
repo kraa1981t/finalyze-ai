@@ -84,8 +84,8 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
     : 'flex-1 inline-flex items-center justify-center h-14 rounded-full text-sm font-black border transition-colors';
 
   const colorClass = (open: boolean) => open
-    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-    : 'bg-red-500/20 text-red-400 border-red-500/40';
+    ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-500/30'
+    : 'bg-red-500 text-white border-red-600 shadow-lg shadow-red-500/30';
 
   if (compact) {
     return (
