@@ -660,7 +660,7 @@ export default function Header({
 
               {/* Auto Analysis + Sync Status + Timeframe Indicator */}
               {isDeveloper ? (
-            <div className="flex flex-col gap-1.5 flex-shrink-0 items-center">
+            <div className="relative flex-shrink-0">
             <button
               onClick={() => {
                 initAudio();
@@ -713,7 +713,7 @@ export default function Header({
                 </button>
                 <button
                   onClick={() => onNavigatePage?.('radar')}
-                  className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#002395] hover:bg-[#001A6B] border border-[#001A6B] text-white shadow-md transition-all backdrop-blur-sm flex-shrink-0 active:scale-95"
+                  className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#002395] hover:bg-[#001A6B] border border-[#001A6B] text-white shadow-md transition-all backdrop-blur-sm active:scale-95"
                 >
                   <CalendarDays size={24} className="flex-shrink-0" />
                   <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
@@ -722,7 +722,7 @@ export default function Header({
                 </button>
             </div>
               ) : (
-            <div className="flex flex-col gap-1.5 flex-shrink-0 items-center">
+            <div className="relative flex-shrink-0">
                 <div className={cn(
                   "flex items-center gap-2 px-4 py-3 rounded-xl border shadow-md backdrop-blur-sm flex-shrink-0",
                   clientRadarRunning
@@ -736,7 +736,7 @@ export default function Header({
                     {clientRadarRunning ? 'SCANNING' : showRadarComplete ? 'DONE' : 'ACTIVE'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#002395] border border-[#001A6B] text-white shadow-md justify-center">
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#002395] border border-[#001A6B] text-white shadow-md justify-center">
                   <CalendarDays size={24} className="flex-shrink-0" />
                   <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
                     {lang === 'ar' ? tfLabel.ar : tfLabel.en}
