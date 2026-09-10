@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell, ExternalLink, Smartphone, Tablet, X, Settings, Key, DollarSign, Wallet, Users, User, Crown, Info, Lightbulb, Monitor } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell, ExternalLink, Smartphone, Tablet, X, Settings, Key, DollarSign, Wallet, Users, User, Crown, Info, Lightbulb, Monitor, CalendarDays } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings } from '../types';
 import { initAudio } from '../lib/audioEngine';
@@ -111,6 +111,17 @@ export default function Header({
   // staying frozen on the last SYNCED/progress state until a scan finishes.
   const liveAnalysisActive = !!(analysisProgress && autoSettings.isEnabled);
 
+  const TIMEFRAME_LABELS: Record<string, { ar: string; en: string }> = {
+    '15m': { ar: '15 دقيقة', en: '15min' },
+    '1h':  { ar: 'ساعة',     en: '1hr' },
+    '4h':  { ar: '4 ساعات',  en: '4hr' },
+    '1d':  { ar: 'يومي',     en: 'Daily' },
+    '1w':  { ar: 'أسبوعي',   en: 'Weekly' },
+    '1M':  { ar: 'شهري',     en: 'Monthly' },
+    '1Y':  { ar: 'سنوي',     en: 'Yearly' },
+  };
+  const tfLabel = TIMEFRAME_LABELS[autoSettings.timeframe] || { ar: autoSettings.timeframe, en: autoSettings.timeframe };
+
   const [customAvatar, setCustomAvatar] = useState<string | null>(null);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -204,7 +215,7 @@ export default function Header({
             </div>
             <div className="flex flex-col gap-2 p-4">
               {/* Radar Status - Client */}
-              {!isDeveloper && (
+              {!isDeveloper && (<>
                 <div className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-xl border-2 shadow-lg transition-all",
                   clientRadarRunning
@@ -236,10 +247,16 @@ export default function Header({
                     </span>
                   </div>
                 </div>
-              )}
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#002395] border border-[#001A6B] shadow-sm">
+                  <CalendarDays size={16} className="text-white flex-shrink-0" />
+                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                    {lang === 'ar' ? tfLabel.ar : tfLabel.en}
+                  </span>
+                </div>
+              </>)}
 
               {/* Auto Analysis Toggle - Developer */}
-              {isDeveloper && (
+              {isDeveloper && (<>
                 <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-white/20 bg-white/10 shadow-sm">
                   <div className="flex items-center gap-2">
                     <Zap size={18} className={autoSettings.isEnabled ? 'text-emerald-400' : 'text-black/50'} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
@@ -265,7 +282,13 @@ export default function Header({
                     )} />
                   </button>
                 </div>
-              )}
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#002395] border border-[#001A6B] shadow-sm">
+                  <CalendarDays size={16} className="text-white flex-shrink-0" />
+                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                    {lang === 'ar' ? tfLabel.ar : tfLabel.en}
+                  </span>
+                </div>
+              </>)}
 
               {/* Analysis Progress - Developer */}
               {isDeveloper && analysisProgress && (
@@ -635,8 +658,9 @@ export default function Header({
                 <MessageCircle size={22} />
               </a>
 
-              {/* Auto Analysis + Sync Status */}
+              {/* Auto Analysis + Sync Status + Timeframe Indicator */}
               {isDeveloper ? (
+            <div className="flex flex-col gap-1.5 flex-shrink-0 items-center">
             <button
               onClick={() => {
                 initAudio();
@@ -672,7 +696,6 @@ export default function Header({
                     <span className="text-[16px] font-black text-yellow-300 leading-none">{lastSyncStatus.count}</span>
                   )}
                   {liveAnalysisActive && (() => {
-                    // Show the currently-open exchange name when analyzing stocks, else the category chip
                     if (analysisProgress.exchange) {
                       return (
                         <span className="text-[16px] font-black text-yellow-300 whitespace-nowrap leading-none">
@@ -688,7 +711,15 @@ export default function Header({
                     );
                   })()}
                 </button>
+                <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#002395] border border-[#001A6B] text-white shadow-md justify-center">
+                  <CalendarDays size={16} className="flex-shrink-0" />
+                  <span className="text-[13px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                    {lang === 'ar' ? tfLabel.ar : tfLabel.en}
+                  </span>
+                </div>
+            </div>
               ) : (
+            <div className="flex flex-col gap-1.5 flex-shrink-0 items-center">
                 <div className={cn(
                   "flex items-center gap-2 px-4 py-3 rounded-xl border shadow-md backdrop-blur-sm flex-shrink-0",
                   clientRadarRunning
@@ -702,6 +733,13 @@ export default function Header({
                     {clientRadarRunning ? 'SCANNING' : showRadarComplete ? 'DONE' : 'ACTIVE'}
                   </span>
                 </div>
+                <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#002395] border border-[#001A6B] text-white shadow-md justify-center">
+                  <CalendarDays size={16} className="flex-shrink-0" />
+                  <span className="text-[13px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                    {lang === 'ar' ? tfLabel.ar : tfLabel.en}
+                  </span>
+                </div>
+            </div>
               )}
 
               {/* Manual Analysis - developer only | MOBILE: moved to sidebar */}
