@@ -632,7 +632,7 @@ export default function Header({
 
             {/* Icons - scrollable row | MOBILE: wrapped centered under logo (full-width), DESKTOP: single scrollable row */}
             {!isPWA && (
-            <div className="flex items-center gap-2 md:gap-2 flex-wrap md:flex-nowrap md:overflow-x-auto flex-1 min-w-0 justify-center md:justify-end w-full md:w-auto mt-3 md:mt-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex items-center gap-2 md:gap-2 flex-wrap md:flex-nowrap flex-1 min-w-0 justify-center md:justify-end w-full md:w-auto mt-3 md:mt-0">
               {/* Trade Now | MOBILE: moved to sidebar (hidden md:flex) */}
               <button
                 onClick={() => onNavigatePage?.('trade')}
