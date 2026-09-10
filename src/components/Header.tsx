@@ -587,7 +587,7 @@ export default function Header({
 
         {/* Content Overlay - top row: logo left, icons right | MOBILE: icons wrap below logo via flex-wrap, desktop unchanged via md: */}
         <div className={cn(
-          "relative max-w-7xl mx-auto px-4 h-full flex flex-wrap md:flex-nowrap items-start transition-all duration-300",
+          "relative max-w-7xl mx-auto px-4 h-full flex flex-wrap items-start transition-all duration-300",
           compact ? 'pt-2' : 'pt-3'
         )}>
           <div className="flex flex-wrap md:flex-nowrap items-center gap-3 w-full">
