@@ -63,14 +63,14 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
       return (
         <span className="flex flex-col items-center text-sm">
           {label}
-          <div className="mt-1 text-[9px]">{status}</div>
+          <div className="mt-1 text-[10px]">{status}</div>
         </span>
       );
     }
     return (
-      <div className="flex flex-col items-center text-base">
+      <div className="flex flex-col items-center text-lg">
         {label}
-        <div className="mt-1 text-xs">{status}</div>
+        <div className="mt-1 text-sm">{status}</div>
       </div>
     );
   });
