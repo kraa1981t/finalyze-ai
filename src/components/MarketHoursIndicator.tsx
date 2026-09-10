@@ -68,9 +68,9 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
       );
     }
     return (
-      <div className="flex flex-col items-center text-lg">
+      <div className="flex flex-col items-center text-xl">
         {label}
-        <div className="mt-1 text-sm">{status}</div>
+        <div className="mt-1 text-base">{status}</div>
       </div>
     );
   });
@@ -81,7 +81,7 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
 
   const circleClass = compact
     ? 'inline-flex items-center justify-center min-w-[80px] h-14 rounded-full text-sm font-black border transition-colors'
-    : 'flex-1 inline-flex items-center justify-center h-16 rounded-full text-base font-black border transition-colors';
+    : 'flex-1 inline-flex items-center justify-center h-20 rounded-full text-base font-black border transition-colors';
 
   const colorClass = (open: boolean) => open
     ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-500/30'
