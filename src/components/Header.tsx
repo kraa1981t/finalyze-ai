@@ -839,21 +839,6 @@ export default function Header({
             </div>
             )}
 
-            {/* Timeframe Indicator - full-width row below the icon row */}
-            {!isPWA && (
-              <div className="w-full flex justify-center md:justify-end md:pr-1">
-                <button
-                  onClick={() => onNavigatePage?.('radar')}
-                  className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#002395] hover:bg-[#001A6B] border border-[#001A6B] text-white shadow-md transition-all flex-shrink-0 active:scale-95"
-                >
-                  <CalendarDays size={24} className="flex-shrink-0" />
-                  <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                    {lang === 'ar' ? analysisLabel.ar : analysisLabel.en}
-                  </span>
-                </button>
-              </div>
-            )}
-
             {/* PWA: hamburger only — desktop only (mobile uses top-row hamburger) */}
             {isPWA && (
               <button
@@ -864,6 +849,21 @@ export default function Header({
               </button>
             )}
           </div>
+
+          {/* Timeframe Indicator - own row below logo+icons (avoids md:flex-nowrap squeeze) */}
+          {!isPWA && (
+            <div className="w-full flex justify-center md:justify-end md:pr-1 -mt-1 md:-mt-2">
+              <button
+                onClick={() => onNavigatePage?.('radar')}
+                className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#002395] hover:bg-[#001A6B] border border-[#001A6B] text-white shadow-md transition-all flex-shrink-0 active:scale-95"
+              >
+                <CalendarDays size={24} className="flex-shrink-0" />
+                <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                  {lang === 'ar' ? analysisLabel.ar : analysisLabel.en}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       </header>
     </div>
