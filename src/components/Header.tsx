@@ -722,6 +722,16 @@ export default function Header({
                     );
                   })()}
                 </button>
+                {!isPWA && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-50">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#002395] border border-[#001A6B] text-white shadow-md flex-shrink-0 whitespace-nowrap">
+                      <CalendarDays size={16} className="flex-shrink-0" />
+                      <span className="text-[12px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                        {lang === 'ar' ? analysisLabel.ar : analysisLabel.en}
+                      </span>
+                    </div>
+                  </div>
+                )}
             </div>
               ) : (
             <div className="relative flex-shrink-0">
@@ -738,6 +748,16 @@ export default function Header({
                     {clientRadarRunning ? 'SCANNING' : showRadarComplete ? 'DONE' : 'ACTIVE'}
                   </span>
                 </div>
+                {!isPWA && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-50">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#002395] border border-[#001A6B] text-white shadow-md flex-shrink-0 whitespace-nowrap">
+                      <CalendarDays size={16} className="flex-shrink-0" />
+                      <span className="text-[12px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                        {lang === 'ar' ? analysisLabel.ar : analysisLabel.en}
+                      </span>
+                    </div>
+                  </div>
+                )}
             </div>
               )}
 
@@ -849,18 +869,6 @@ export default function Header({
               </button>
             )}
           </div>
-
-          {/* Timeframe Indicator - informational only, not clickable */}
-          {!isPWA && (
-            <div className="w-full flex justify-center md:justify-end md:pr-1 -mt-1 md:-mt-2">
-              <div className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#002395] border border-[#001A6B] text-white shadow-md flex-shrink-0">
-                <CalendarDays size={24} className="flex-shrink-0" />
-                <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                  {lang === 'ar' ? analysisLabel.ar : analysisLabel.en}
-                </span>
-              </div>
-            </div>
-          )}
         </div>
       </header>
     </div>
