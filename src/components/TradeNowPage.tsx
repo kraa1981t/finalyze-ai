@@ -762,12 +762,12 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const periodStats = React.useMemo(() => {
     const allClosed = trades.filter((t) => t.status === 'closed');
     const now = Date.now();
-    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-    const startOfWeek = new Date(); startOfWeek.setHours(0, 0, 0, 0);
-    const dow = (startOfWeek.getDay() + 6) % 7; // Monday = 0
-    startOfWeek.setDate(startOfWeek.getDate() - dow);
-    const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
-    const startOfYear = new Date(); startOfYear.setMonth(0, 1); startOfYear.setHours(0, 0, 0, 0);
+    const startOfDay = new Date(); startOfDay.setUTCHours(0, 0, 0, 0); startOfDay.setMinutes(0, 0, 0);
+    const startOfWeek = new Date(); startOfWeek.setUTCHours(0, 0, 0, 0); startOfWeek.setMinutes(0, 0, 0);
+    const dow = (startOfWeek.getUTCDay() + 6) % 7; // Monday = 0
+    startOfWeek.setUTCDate(startOfWeek.getUTCDate() - dow);
+    const startOfMonth = new Date(); startOfMonth.setUTCDate(1); startOfMonth.setUTCHours(0, 0, 0, 0); startOfMonth.setMinutes(0, 0, 0);
+    const startOfYear = new Date(); startOfYear.setUTCMonth(0, 1); startOfYear.setUTCHours(0, 0, 0, 0); startOfYear.setMinutes(0, 0, 0);
     const bounds: Record<string, number> = {
       day: startOfDay.getTime(),
       week: startOfWeek.getTime(),
@@ -1451,11 +1451,11 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         <td className="px-4 py-3 text-lg font-bold text-brand-text/60" dir="ltr">
                           {(() => {
                             const d = new Date(t.openedAt);
-                            const y = d.getFullYear();
-                            const mo = String(d.getMonth() + 1).padStart(2, '0');
-                            const day = String(d.getDate()).padStart(2, '0');
-                            const hh = String(d.getHours()).padStart(2, '0');
-                            const mm = String(d.getMinutes()).padStart(2, '0');
+                            const y = d.getUTCFullYear();
+                            const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+                            const day = String(d.getUTCDate()).padStart(2, '0');
+                            const hh = String(d.getUTCHours()).padStart(2, '0');
+                            const mm = String(d.getUTCMinutes()).padStart(2, '0');
                             return `${y}-${mo}-${day} ${hh}:${mm}`;
                           })()}
                         </td>
@@ -1509,8 +1509,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                       </td>
                       <td className="px-4 py-3 text-xl font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
                       <td className="px-4 py-3 text-xl font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.exitPrice)}</td>
-                      <td className="px-4 py-3 text-lg font-bold text-brand-text/60" dir="ltr">{(() => { const d = new Date(t.openedAt); const y = d.getFullYear(); const mo = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); const hh = String(d.getHours()).padStart(2, '0'); const mm = String(d.getMinutes()).padStart(2, '0'); const ss = String(d.getSeconds()).padStart(2, '0'); return `${y}-${mo}-${day} ${hh}:${mm}:${ss}`; })()}</td>
-                      <td className="px-4 py-3 text-lg font-bold text-brand-text/60" dir="ltr">{t.closedAt ? (() => { const d = new Date(t.closedAt); const y = d.getFullYear(); const mo = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); const hh = String(d.getHours()).padStart(2, '0'); const mm = String(d.getMinutes()).padStart(2, '0'); const ss = String(d.getSeconds()).padStart(2, '0'); return `${y}-${mo}-${day} ${hh}:${mm}:${ss}`; })() : '—'}</td>
+                      <td className="px-4 py-3 text-lg font-bold text-brand-text/60" dir="ltr">{(() => { const d = new Date(t.openedAt); const y = d.getUTCFullYear(); const mo = String(d.getUTCMonth() + 1).padStart(2, '0'); const day = String(d.getUTCDate()).padStart(2, '0'); const hh = String(d.getUTCHours()).padStart(2, '0'); const mm = String(d.getUTCMinutes()).padStart(2, '0'); const ss = String(d.getUTCSeconds()).padStart(2, '0'); return `${y}-${mo}-${day} ${hh}:${mm}:${ss}`; })()}</td>
+                      <td className="px-4 py-3 text-lg font-bold text-brand-text/60" dir="ltr">{t.closedAt ? (() => { const d = new Date(t.closedAt); const y = d.getUTCFullYear(); const mo = String(d.getUTCMonth() + 1).padStart(2, '0'); const day = String(d.getUTCDate()).padStart(2, '0'); const hh = String(d.getUTCHours()).padStart(2, '0'); const mm = String(d.getUTCMinutes()).padStart(2, '0'); const ss = String(d.getUTCSeconds()).padStart(2, '0'); return `${y}-${mo}-${day} ${hh}:${mm}:${ss}`; })() : '—'}</td>
                       <td className="px-4 py-3 text-lg font-black uppercase text-brand-text/50">
                         {t.closeReason === 'tp' ? 'TP' : t.closeReason === 'sl' ? 'SL' : (isAr ? 'يدوي' : 'Manual')}
                       </td>

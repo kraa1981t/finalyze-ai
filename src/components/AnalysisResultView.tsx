@@ -38,7 +38,7 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
   }, []);
 
   const formatPublishDate = (timestamp: string) => {
-    try { const d = new Date(timestamp); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+    try { const d = new Date(timestamp); return `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; }
     catch { return timestamp; }
   };
 

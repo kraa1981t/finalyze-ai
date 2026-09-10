@@ -49,9 +49,9 @@ const formatPublishDate = (timestamp: string, lang: string) => {
     const isAr = lang === 'ar';
     const daysAr = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayName = isAr ? daysAr[date.getDay()] : daysEn[date.getDay()];
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+const dayName = isAr ? daysAr[date.getUTCDay()] : daysEn[date.getUTCDay()];
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
     return `${dayName} ${hours}:${minutes}`;
   } catch {
     return timestamp;

@@ -163,7 +163,7 @@ export default function Header({
   }, []);
 
   const isMarketClosedToday = () => {
-    const day = new Date().getDay();
+    const day = new Date().getUTCDay();
     return day === 0 || day === 6;
   };
 
@@ -247,9 +247,9 @@ export default function Header({
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#002395] border border-[#001A6B] shadow-sm">
-                  <CalendarDays size={16} className="text-white flex-shrink-0" />
-                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#002395] border border-[#001A6B] shadow-sm">
+                  <CalendarDays size={20} className="text-white flex-shrink-0" />
+                  <span className="text-sm font-black text-white uppercase tracking-wider">
                     {lang === 'ar' ? tfLabel.ar : tfLabel.en}
                   </span>
                 </div>
@@ -282,9 +282,9 @@ export default function Header({
                     )} />
                   </button>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#002395] border border-[#001A6B] shadow-sm">
-                  <CalendarDays size={16} className="text-white flex-shrink-0" />
-                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#002395] border border-[#001A6B] shadow-sm">
+                  <CalendarDays size={20} className="text-white flex-shrink-0" />
+                  <span className="text-sm font-black text-white uppercase tracking-wider">
                     {lang === 'ar' ? tfLabel.ar : tfLabel.en}
                   </span>
                 </div>
@@ -711,12 +711,15 @@ export default function Header({
                     );
                   })()}
                 </button>
-                <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#002395] border border-[#001A6B] text-white shadow-md justify-center">
-                  <CalendarDays size={16} className="flex-shrink-0" />
-                  <span className="text-[13px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                <button
+                  onClick={() => onNavigatePage?.('radar')}
+                  className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#002395] hover:bg-[#001A6B] border border-[#001A6B] text-white shadow-md transition-all backdrop-blur-sm flex-shrink-0 active:scale-95"
+                >
+                  <CalendarDays size={24} className="flex-shrink-0" />
+                  <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
                     {lang === 'ar' ? tfLabel.ar : tfLabel.en}
                   </span>
-                </div>
+                </button>
             </div>
               ) : (
             <div className="flex flex-col gap-1.5 flex-shrink-0 items-center">
@@ -733,9 +736,9 @@ export default function Header({
                     {clientRadarRunning ? 'SCANNING' : showRadarComplete ? 'DONE' : 'ACTIVE'}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#002395] border border-[#001A6B] text-white shadow-md justify-center">
-                  <CalendarDays size={16} className="flex-shrink-0" />
-                  <span className="text-[13px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#002395] border border-[#001A6B] text-white shadow-md justify-center">
+                  <CalendarDays size={24} className="flex-shrink-0" />
+                  <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
                     {lang === 'ar' ? tfLabel.ar : tfLabel.en}
                   </span>
                 </div>

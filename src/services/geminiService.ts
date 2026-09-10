@@ -62,7 +62,7 @@ function symbolAffectedByCountry(symbol: string, country: string): boolean {
 // Returns the next Friday (end of the current trading week) as a Date.
 function endOfCurrentWeek(): Date {
   const now = new Date();
-  const day = now.getDay(); // 0=Sun..6=Sat
+  const day = now.getUTCDay(); // 0=Sun..6=Sat
   let diffToFri = (5 - day + 7) % 7; // days until Friday
   if (diffToFri === 0) diffToFri = 0; // already Friday
   const end = new Date(now.getTime() + diffToFri * 24 * 3600 * 1000);

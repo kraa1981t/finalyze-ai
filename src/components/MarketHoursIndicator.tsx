@@ -12,7 +12,7 @@ const CAT_KEYS = ['forex', 'crypto', 'stocks', 'metals'] as const;
 function isCategoryOpen(key: string, now: Date): boolean {
   if (key === 'crypto') return true;
   if (key === 'stocks') return getOpenStockExchanges(now).length > 0;
-  const day = now.getDay();
+  const day = now.getUTCDay();
   return day !== 0 && day !== 6;
 }
 

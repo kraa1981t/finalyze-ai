@@ -941,7 +941,7 @@ export default function App() {
 
   const isMarketOpen = (category: string) => {
     if (category === 'crypto') return true;
-    const day = new Date().getDay();
+    const day = new Date().getUTCDay();
     // Strictly closed on Saturday (6) and Sunday (0)
     if (day === 0 || day === 6) return false;
     return true;
@@ -951,7 +951,7 @@ export default function App() {
   const lastPurgeDateRef = useRef<string>('');
   useEffect(() => {
     const checkAndPurgeNewDay = async () => {
-      const today = new Date().toDateString();
+      const today = new Date().toISOString().slice(0, 10);
       if (lastPurgeDateRef.current === today) return;
       const lastPurgeStored = localStorage.getItem('finalyze_last_purge_date');
       if (lastPurgeStored === today) {
@@ -959,12 +959,12 @@ export default function App() {
         return;
       }
 
-      const day = new Date().getDay();
+      const day = new Date().getUTCDay();
       const isWeekend = day === 0 || day === 6;
       const allCryptos = ALL_SYMBOLS_DB.crypto || [];
 
       if (!isDeveloperSession()) {
-        const today2 = new Date().toDateString();
+        const today2 = new Date().toISOString().slice(0, 10);
         const clientLastDate = localStorage.getItem('finalyze_client_results_date');
         if (clientLastDate !== today2) {
           setClientSignals([]);
@@ -2005,7 +2005,7 @@ export default function App() {
                   onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); try { playStart(autoSettings.volume || 0.5); } catch {} }}
                   onProgress={(current, total, index, failed) => setProgress({ current, total, index, failed })}
                   onResult={(results) => {
-                    const day = new Date().getDay();
+                    const day = new Date().getUTCDay();
                     const allCryptos = ALL_SYMBOLS_DB.crypto || [];
                     const filtered = (day === 0 || day === 6)
                       ? results.filter(r => {

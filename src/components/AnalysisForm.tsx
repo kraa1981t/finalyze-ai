@@ -158,7 +158,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
   const isMarketOpen = (category: string) => {
     if (category === 'crypto') return true;
     if (category === 'stocks') return getOpenStockExchanges().length > 0;
-    const day = new Date().getDay();
+    const day = new Date().getUTCDay();
     if (day === 0 || day === 6) return false;
     return true;
   };
