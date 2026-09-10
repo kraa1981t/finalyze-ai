@@ -1206,7 +1206,17 @@ export default function App() {
         await runRadarScan();
       } catch (e) {
         console.error('Radar error:', e);
-      } finally {
+      }       finally {
+        // Save UTC timestamp so catch-up works after tab throttling
+        const nowTs = Date.now();
+        try {
+          setAutoSettings(prev => {
+            const next = { ...prev, lastFinishedAt: nowTs };
+            localStorage.setItem('auto_settings', JSON.stringify(next));
+            return next;
+          });
+        } catch {}
+
         setIsScanningFinished(true);
         setFoundAnyStrong(signalsRef.current.length > 0);
         try { initAudio(); } catch {}
@@ -1223,23 +1233,57 @@ export default function App() {
       }
     };
 
-    // First render: schedule first scan after interval, don't scan now
+    // First render: check UTC-based catch-up, or schedule after interval
     if (radarFirstRenderRef.current) {
       radarFirstRenderRef.current = false;
-      setIsScanningFinished(true);
       const ms = (autoSettings.interval || 15) * 60000;
-      radarTimerRef.current = setTimeout(() => {
-        radarTimerRef.current = null;
+      const lastTs = autoSettings.lastFinishedAt || 0;
+      const elapsed = lastTs ? Date.now() - lastTs : Infinity;
+      if (elapsed >= ms) {
+        // Overdue — scan immediately
         setIsScanningFinished(false);
         loop();
-      }, ms);
+      } else {
+        // Schedule with remaining time
+        setIsScanningFinished(true);
+        radarTimerRef.current = setTimeout(() => {
+          radarTimerRef.current = null;
+          setIsScanningFinished(false);
+          loop();
+        }, ms - elapsed);
+      }
       return;
     }
 
-    // Toggled from OFF to ON ΓÇö scan immediately
+    // Toggled from OFF to ON — scan immediately
     if (!wasOn) {
       loop();
     }
+
+    // Catch up on missed scans when tab becomes visible again
+    const onVisibilityChange = () => {
+      if (document.hidden || !autoSettingsRef.current.isEnabled) return;
+      if (radarTimerRef.current) return;
+      const lastTs = autoSettingsRef.current.lastFinishedAt || 0;
+      const ms = (autoSettingsRef.current.interval || 15) * 60000;
+      const elapsed = lastTs ? Date.now() - lastTs : Infinity;
+      if (elapsed >= ms) {
+        setIsScanningFinished(false);
+        loop();
+      } else {
+        setIsScanningFinished(true);
+        radarTimerRef.current = setTimeout(() => {
+          radarTimerRef.current = null;
+          setIsScanningFinished(false);
+          loop();
+        }, ms - elapsed);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [autoSettings.isEnabled, user]);
 
   // Build version check: force cache bust on new deploy
