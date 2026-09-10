@@ -122,6 +122,17 @@ export default function Header({
   };
   const tfLabel = TIMEFRAME_LABELS[autoSettings.timeframe] || { ar: autoSettings.timeframe, en: autoSettings.timeframe };
 
+  const ANALYSIS_LABELS: Record<string, { ar: string; en: string }> = {
+    '15m': { ar: 'التحليل الربع ساعي', en: '15-Min Analysis' },
+    '1h':  { ar: 'التحليل الساعي',     en: 'Hourly Analysis' },
+    '4h':  { ar: 'التحليل الربعاوي',   en: '4-Hour Analysis' },
+    '1d':  { ar: 'التحليل اليومي',     en: 'Daily Analysis' },
+    '1w':  { ar: 'التحليل الأسبوعي',   en: 'Weekly Analysis' },
+    '1M':  { ar: 'التحليل الشهري',     en: 'Monthly Analysis' },
+    '1Y':  { ar: 'التحليل السنوي',     en: 'Yearly Analysis' },
+  };
+  const analysisLabel = ANALYSIS_LABELS[autoSettings.timeframe] || tfLabel;
+
   const [customAvatar, setCustomAvatar] = useState<string | null>(null);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -555,7 +566,7 @@ export default function Header({
 
       <header className={cn(
         "fixed top-0 left-0 right-0 z-50 shadow-2xl shadow-emerald-500/20 transition-all duration-300",
-        compact ? 'h-[140px] md:h-[100px]' : 'h-[150px] md:h-[300px]'
+        compact ? 'h-[150px] md:h-[132px]' : 'h-[150px] md:h-[300px]'
       )}>
         {/* Trading Banner Background */}
         <div className="absolute inset-0 overflow-hidden">
@@ -711,15 +722,6 @@ export default function Header({
                     );
                   })()}
                 </button>
-                <button
-                  onClick={() => onNavigatePage?.('radar')}
-                  className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#002395] hover:bg-[#001A6B] border border-[#001A6B] text-white shadow-md transition-all backdrop-blur-sm active:scale-95"
-                >
-                  <CalendarDays size={24} className="flex-shrink-0" />
-                  <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                    {lang === 'ar' ? tfLabel.ar : tfLabel.en}
-                  </span>
-                </button>
             </div>
               ) : (
             <div className="relative flex-shrink-0">
@@ -734,12 +736,6 @@ export default function Header({
                   <Zap size={20} className="text-white" fill="currentColor" />
                   <span className="text-[16px] font-black uppercase tracking-wider">
                     {clientRadarRunning ? 'SCANNING' : showRadarComplete ? 'DONE' : 'ACTIVE'}
-                  </span>
-                </div>
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#002395] border border-[#001A6B] text-white shadow-md justify-center">
-                  <CalendarDays size={24} className="flex-shrink-0" />
-                  <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                    {lang === 'ar' ? tfLabel.ar : tfLabel.en}
                   </span>
                 </div>
             </div>
@@ -841,6 +837,21 @@ export default function Header({
                 </button>
               )}
             </div>
+            )}
+
+            {/* Timeframe Indicator - full-width row below the icon row */}
+            {!isPWA && (
+              <div className="w-full flex justify-center md:justify-end md:pr-1">
+                <button
+                  onClick={() => onNavigatePage?.('radar')}
+                  className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#002395] hover:bg-[#001A6B] border border-[#001A6B] text-white shadow-md transition-all flex-shrink-0 active:scale-95"
+                >
+                  <CalendarDays size={24} className="flex-shrink-0" />
+                  <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                    {lang === 'ar' ? analysisLabel.ar : analysisLabel.en}
+                  </span>
+                </button>
+              </div>
             )}
 
             {/* PWA: hamburger only — desktop only (mobile uses top-row hamburger) */}
