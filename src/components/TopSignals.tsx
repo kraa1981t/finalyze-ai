@@ -14,6 +14,7 @@ interface TopSignalsProps {
   onDetail: (result: AnalysisResult) => void;
   onClearAll: () => void;
   lang: Language;
+  onTrade?: (symbol: string) => void;
 }
 
 const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelAr: string; labelEn: string; symbolColor: string }> = {
@@ -58,7 +59,7 @@ const dayName = isAr ? daysAr[date.getUTCDay()] : daysEn[date.getUTCDay()];
   }
 };
 
-export default function TopSignals({ signals, onRemove, onSelect, onDetail, onClearAll, lang }: TopSignalsProps) {
+export default function TopSignals({ signals, onRemove, onSelect, onDetail, onClearAll, lang, onTrade }: TopSignalsProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -187,10 +188,11 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
   );
 }
 
-function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate, cardKey, isSelected }: {
+function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate, cardKey, isSelected, onTrade }: {
   res: AnalysisResult; isAr: boolean;
   onSelect: (r: AnalysisResult) => void; onDetail: (r: AnalysisResult) => void; onRemove: (s: string) => void;
   formatPublishDate: (ts: string, lang: string) => string; cardKey: string; isSelected?: boolean;
+  onTrade?: (symbol: string) => void;
 }) {
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.BUY];
   const isJPY = res.symbol.includes('JPY');
@@ -238,6 +240,17 @@ const isStrong = res.signal === SignalType.STRONG_BUY || res.signal === SignalTy
         <button onClick={(e) => { e.stopPropagation(); onDetail(res); }} className="w-full py-2.5 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2">
           <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
           <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[9px]">{res.detailedReasons.length}</span>
+        </button>
+      )}
+
+      {/* Trade button - small candlestick icon */}
+      {onTrade && (
+        <button onClick={(e) => { e.stopPropagation(); onTrade(res.symbol); }} className="w-full py-2 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 border-t border-[#F59E0B]/30 transition-all flex items-center justify-center gap-2" title={isAr ? `تداول ${res.symbol}` : `Trade ${res.symbol}`}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 17l6-6 4 4 8-8" />
+            <path d="M17 7h4v4" />
+          </svg>
+          <span className="text-[11px] font-black text-[#F59E0B] uppercase tracking-wider">{isAr ? 'تداول' : 'Trade'}</span>
         </button>
       )}
 

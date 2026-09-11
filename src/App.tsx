@@ -2056,6 +2056,7 @@ export default function App() {
               signals={topSignals} onRemove={removeSignal} 
               onSelect={handleSelectSignal} onDetail={setDetailResult} onClearAll={handleClearAll}
               lang={lang} 
+              onTrade={(sym) => { try { sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol: sym })); } catch {} navigateTo('trade'); }}
             />
             <div className="w-full bg-[#D1FAE5]/40 backdrop-blur-xl rounded-full h-3 border border-[#D1FAE5]/60 shadow-[0_0_25px_rgba(209,250,229,0.3)]" />
           </div>
@@ -2070,7 +2071,7 @@ export default function App() {
         {!isDeveloperSession() && !analysisResults && !isAnalyzing && effectivePage === 'main' && (
           <div className="max-w-7xl mx-auto px-4">
             <AdSlot position="header" lang={lang} />
-            <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} onDetail={setClientDetailResult} />
+            <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} onDetail={setClientDetailResult} onTrade={(sym) => { try { sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol: sym })); } catch {} navigateTo('trade'); }} />
           </div>
         )}
 
@@ -2105,7 +2106,7 @@ export default function App() {
                 </button>
               </div>
             )}
-            <AnalysisResultView results={analysisResults} lang={lang} settings={settings} onDetail={setDetailResult} />
+            <AnalysisResultView results={analysisResults} lang={lang} settings={settings} onDetail={setDetailResult} onTrade={(sym) => { try { sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol: sym })); } catch {} navigateTo('trade'); }} />
           </motion.div>
         )}
 

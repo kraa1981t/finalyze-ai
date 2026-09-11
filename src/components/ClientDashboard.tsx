@@ -12,6 +12,7 @@ interface ClientDashboardProps {
   lang: Language;
   hasActivePlan?: boolean;
   onDetail?: (result: AnalysisResult) => void;
+  onTrade?: (symbol: string) => void;
 }
 
 const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelAr: string; labelEn: string; symbolColor: string }> = {
@@ -56,7 +57,7 @@ const formatPublishDate = (timestamp: string, lang: string) => {
   }
 };
 
-export default function ClientDashboard({ results, lang, hasActivePlan = false, onDetail }: ClientDashboardProps) {
+export default function ClientDashboard({ results, lang, hasActivePlan = false, onDetail, onTrade }: ClientDashboardProps) {
   const isAr = lang === 'ar';
   const t = translations[lang];
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -183,11 +184,11 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
   );
 }
 
-function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail, hasActivePlan, formatPublishDate, cardKey, onClick }: {
+function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail, hasActivePlan, formatPublishDate, cardKey, onClick, onTrade }: {
   res: AnalysisResult; isAr: boolean; lang: Language; selectedSymbol: string | null;
   onSelect: (sym: string) => void; onDetail?: (r: AnalysisResult) => void; hasActivePlan: boolean;
   formatPublishDate: (ts: string, lang: string) => string; cardKey: string;
-  onClick?: () => void;
+  onClick?: () => void; onTrade?: (symbol: string) => void;
 }) {
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.BUY];
   const isSelected = selectedSymbol === res.symbol;
@@ -235,6 +236,17 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
         <button onClick={(e) => { e.stopPropagation(); onDetail?.(res); }} className="w-full py-2.5 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2">
           <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
           <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[10px]">{res.detailedReasons.length}</span>
+        </button>
+      )}
+
+      {/* Trade button - small candlestick icon */}
+      {onTrade && (
+        <button onClick={(e) => { e.stopPropagation(); onTrade(res.symbol); }} className="w-full py-2 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 border-t border-[#F59E0B]/30 transition-all flex items-center justify-center gap-2" title={isAr ? `تداول ${res.symbol}` : `Trade ${res.symbol}`}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 17l6-6 4 4 8-8" />
+            <path d="M17 7h4v4" />
+          </svg>
+          <span className="text-[11px] font-black text-[#F59E0B] uppercase tracking-wider">{isAr ? 'تداول' : 'Trade'}</span>
         </button>
       )}
     </div>

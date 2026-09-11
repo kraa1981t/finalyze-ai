@@ -12,6 +12,7 @@ interface AnalysisResultViewProps {
   lang: Language;
   settings?: StrategySettings;
   onDetail?: (result: AnalysisResult) => void;
+  onTrade?: (symbol: string) => void;
 }
 
 const SIGNAL_CONFIG: Record<SignalType, { labelKey: keyof typeof translations.en, color: string, bg: string, border: string, icon: any, labelAr: string, labelEn: string, symbolColor: string }> = {
@@ -23,7 +24,7 @@ const SIGNAL_CONFIG: Record<SignalType, { labelKey: keyof typeof translations.en
     [SignalType.NO_ENTRY]: { labelKey: "no_entry" as any, color: "text-slate-500", bg: "bg-slate-500/10", border: "border-slate-500/10", icon: null, labelAr: "لا توجد فرصة", labelEn: "No Entry", symbolColor: '#ffffff' },
 };
 
-export default function AnalysisResultView({ results, lang, settings, onDetail }: AnalysisResultViewProps) {
+export default function AnalysisResultView({ results, lang, settings, onDetail, onTrade }: AnalysisResultViewProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -134,6 +135,21 @@ export default function AnalysisResultView({ results, lang, settings, onDetail }
                 >
                   <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
                   <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[9px]">{res.detailedReasons.length}</span>
+                </button>
+              )}
+
+              {/* Trade button */}
+              {onTrade && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onTrade(res.symbol); }}
+                  className="w-full py-2 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 border-t border-[#F59E0B]/30 transition-all flex items-center justify-center gap-2"
+                  title={isAr ? `تداول ${res.symbol}` : `Trade ${res.symbol}`}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 17l6-6 4 4 8-8" />
+                    <path d="M17 7h4v4" />
+                  </svg>
+                  <span className="text-[11px] font-black text-[#F59E0B] uppercase tracking-wider">{isAr ? 'تداول' : 'Trade'}</span>
                 </button>
               )}
             </motion.div>
