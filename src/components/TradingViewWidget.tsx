@@ -588,13 +588,13 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   return (
     <div className="relative h-full w-full flex flex-col">
       {/* top toolbar: timeframe x2 + drawing tools */}
-      <div className="flex items-center justify-between gap-2 px-1 py-1 bg-[#0b0e14] border-b border-white/5">
-        <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 bg-[#0b0e14] border-b border-white/5">
+        <div className="flex flex-wrap items-center gap-1">
           {TIMEFRAMES.map((t) => (
             <button
               key={t}
               onClick={() => { playClickSound(); setTf(t); }}
-              className={`px-6 py-2.5 rounded-lg text-base font-black uppercase tracking-wide transition-all active:scale-95 hover:scale-[1.02] ${
+              className={`px-3 py-2 md:px-6 md:py-2.5 rounded-lg text-sm md:text-base font-black uppercase tracking-wide transition-all active:scale-95 hover:scale-[1.02] ${
                 tf === t ? 'bg-[#F59E0B] text-black' : 'bg-white/5 text-brand-text/60 hover:bg-white/15 hover:text-white'
               }`}
             >
@@ -602,7 +602,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 justify-end">
           {DRAW_TOOLS.map((tl) => (
             <button
               key={tl.id}

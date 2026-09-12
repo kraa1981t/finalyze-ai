@@ -861,12 +861,12 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         </div>
       </div>
 
-      <div className="flex items-stretch gap-2 overflow-x-auto">
+      <div className="flex flex-col lg:flex-row items-stretch gap-2 lg:overflow-x-auto">
         {/* LEFT: Symbol Selector panel (400px, collapsible) */}
-        <div className={`order-1 flex-shrink-0 rounded-2xl border backdrop-blur-sm transition-all duration-300 ease-in-out ${symbolsCollapsed ? 'panel-strip w-12 flex flex-col justify-center' : 'flex-[0_0_26%] min-w-[240px] max-w-[400px] h-[82vh] min-h-[580px] p-2 space-y-1 flex flex-col border-white/10 bg-black/20'}`}>
-          <div className={`flex items-center gap-1 ${symbolsCollapsed ? 'flex-col justify-center px-1' : 'justify-between'}`}>
+        <div className={`order-1 flex-shrink-0 rounded-2xl border backdrop-blur-sm transition-all duration-300 ease-in-out ${symbolsCollapsed ? 'panel-strip w-full h-14 lg:w-12 lg:h-auto flex flex-row lg:flex-col items-center justify-center gap-2 px-3 lg:px-0' : 'w-full h-[260px] p-2 space-y-1 flex flex-col border-white/10 bg-black/20 lg:w-auto lg:flex-[0_0_26%] lg:min-w-[240px] lg:max-w-[400px] lg:h-[82vh] lg:min-h-[580px]'}`}>
+          <div className={`flex items-center gap-1 ${symbolsCollapsed ? 'flex-row lg:flex-col justify-center gap-2' : 'justify-between'}`}>
             {symbolsCollapsed && (
-              <span className="strip-title cursor-pointer text-sm font-black uppercase tracking-wider" style={{ writingMode: 'vertical-rl' }} onClick={() => setSymbolsCollapsed(false)}>{isAr ? 'الرموز' : 'Symbols'}</span>
+              <span className="strip-title cursor-pointer text-sm font-black uppercase tracking-wider lg:[writingMode:vertical-rl]" onClick={() => setSymbolsCollapsed(false)}>{isAr ? 'الرموز' : 'Symbols'}</span>
             )}
             {!symbolsCollapsed && (
               <span className="panel-title cursor-pointer text-sm font-black uppercase tracking-wider" onClick={() => setSymbolsCollapsed(true)}>{isAr ? 'الرموز' : 'Symbols'}</span>
@@ -1022,10 +1022,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
 
             {/* RIGHT: Order Ticket panel (400px, collapsible) */}
-          <div className={`order-3 flex-shrink-0 rounded-2xl border backdrop-blur-sm transition-all duration-300 ease-in-out ${ticketCollapsed ? 'panel-strip w-12 flex flex-col justify-center' : 'flex-[0_0_26%] min-w-[240px] max-w-[400px] h-[82vh] min-h-[580px] p-4 space-y-3 border-white/10 bg-black/30'}`}>
-            <div className={`flex items-center gap-2 ${ticketCollapsed ? 'flex-col justify-center py-2' : 'justify-between'}`}>
+          <div className={`order-3 flex-shrink-0 rounded-2xl border backdrop-blur-sm transition-all duration-300 ease-in-out ${ticketCollapsed ? 'panel-strip w-full h-14 lg:w-12 lg:h-auto flex flex-row lg:flex-col items-center justify-center gap-2 px-3 lg:px-0' : 'w-full p-4 space-y-3 border-white/10 bg-black/30 lg:w-auto lg:flex-[0_0_26%] lg:min-w-[240px] lg:max-w-[400px] lg:h-[82vh] lg:min-h-[580px]'}`}>
+            <div className={`flex items-center gap-2 ${ticketCollapsed ? 'flex-row lg:flex-col justify-center gap-2' : 'justify-between'}`}>
               {ticketCollapsed && (
-                <span className="strip-title cursor-pointer text-sm font-black uppercase tracking-wider" style={{ writingMode: 'vertical-rl' }} onClick={() => setTicketCollapsed(false)}>{isAr ? 'فتح صفقات' : 'Order Ticket'}</span>
+                <span className="strip-title cursor-pointer text-sm font-black uppercase tracking-wider lg:[writingMode:vertical-rl]" onClick={() => setTicketCollapsed(false)}>{isAr ? 'فتح صفقات' : 'Order Ticket'}</span>
               )}
               {!ticketCollapsed && (
                 <div className="flex items-center gap-2 min-w-0">
@@ -1166,7 +1166,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
 
           {/* Chart / MT5 - يبقى خط التاريخ السفلي ظاهراً مهما فُتحت الأقسام */}
-          <div ref={chartPanelRef} className="order-2 flex-1 min-w-[420px] rounded-2xl overflow-hidden border border-white/10 bg-black/20 pb-3 relative flex flex-col h-[82vh] min-h-[580px] transition-all duration-300 ease-in-out">
+          <div ref={chartPanelRef} className="order-2 flex-none lg:flex-1 rounded-2xl overflow-hidden border border-white/10 bg-black/20 pb-3 relative flex flex-col h-[55vh] min-h-[300px] lg:h-[82vh] lg:min-h-[580px] lg:min-w-[420px] transition-all duration-300 ease-in-out">
             {/* Toggle bar */}
             <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
               {platform === 'chart' && (
@@ -1181,8 +1181,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   </button>
                   <div className="ml-auto flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-2xl font-black text-white chart-symbol-name chart-symbol-trade leading-none">{symbol}</span>
-                    {!priceLoading && <span className="text-xl font-bold text-emerald-400">{fmtPrice(livePrice)}</span>}
+                    <span className="text-lg md:text-2xl font-black text-white chart-symbol-name chart-symbol-trade leading-none">{symbol}</span>
+                    {!priceLoading && <span className="text-lg md:text-xl font-bold text-emerald-400">{fmtPrice(livePrice)}</span>}
                   </div>
                 </>
               )}

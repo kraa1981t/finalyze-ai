@@ -46,7 +46,7 @@ export default function TradingViewEmbed({ symbol, interval = '60' }: Props) {
   }, [tvSymbol, interval]);
 
   return (
-    <div className="w-full h-[380px] rounded-xl overflow-hidden border border-white/10 bg-[#0b0e14]">
+    <div className="w-full h-full rounded-xl overflow-hidden border border-white/10 bg-[#0b0e14]">
       <div ref={containerRef} className="w-full h-full" />
     </div>
   );
