@@ -53,24 +53,26 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
     } else {
       status = open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed');
     }
-    return { label, status, open };
+    const statusShort = open ? (isAr ? 'مفتوح' : 'Open') : (isAr ? 'مغلق' : 'Closed');
+    return { label, status, statusShort, open };
   };
 
   const getLabel = (key: string): string => getLabelAndStatus(key).label;
 
-  const circleContent = (({ label, status }: { label: string; status: string }) => {
+  const circleContent = (({ label, status, statusShort }: { label: string; status: string; statusShort: string }) => {
     if (compact) {
       return (
         <span className="flex flex-col items-center text-sm">
           {label}
-          <div className="mt-1 text-[10px]">{status}</div>
+          <div className="mt-1 text-[10px]">{statusShort}</div>
         </span>
       );
     }
     return (
-      <div className="flex flex-col items-center text-xl">
-        {label}
-        <div className="mt-1 text-base">{status}</div>
+      <div className="flex flex-col items-center leading-tight">
+        <span className="text-sm md:text-xl font-black whitespace-nowrap leading-tight">{label}</span>
+        <span className="mt-1 text-[10px] md:hidden font-black whitespace-nowrap leading-tight">{statusShort}</span>
+        <span className="hidden md:block mt-1 text-base font-black whitespace-nowrap leading-tight">{status}</span>
       </div>
     );
   });
@@ -81,7 +83,7 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
 
   const circleClass = compact
     ? 'inline-flex items-center justify-center min-w-[80px] h-14 rounded-full text-sm font-black border transition-colors'
-    : 'flex-1 inline-flex items-center justify-center h-20 rounded-full text-base font-black border transition-colors';
+    : 'flex-1 min-w-[64px] md:min-w-0 inline-flex items-center justify-center h-14 md:h-20 rounded-full text-base font-black border transition-colors px-2 md:px-0 whitespace-nowrap';
 
   const colorClass = (open: boolean) => open
     ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-500/30'
@@ -91,14 +93,14 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
     return (
       <div className="flex items-center justify-between gap-2">
         {CAT_KEYS.map(key => {
-          const { label, status, open } = getLabelAndStatus(key);
+          const { label, status, statusShort, open } = getLabelAndStatus(key);
           return (
             <span
               key={key}
               className={`${circleClass} ${colorClass(open)}`}
               title={getOpenTitle(label, status)}
             >
-              {circleContent({ label, status })}
+              {circleContent({ label, status, statusShort })}
             </span>
           );
         })}
@@ -107,16 +109,16 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 w-full">
+    <div className="flex items-center justify-between gap-2 md:gap-3 w-full overflow-x-auto md:overflow-visible" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
       {CAT_KEYS.map(key => {
-        const { label, status, open } = getLabelAndStatus(key);
+        const { label, status, statusShort, open } = getLabelAndStatus(key);
         return (
           <span
             key={key}
             className={`${circleClass} ${colorClass(open)}`}
             title={getOpenTitle(label, status)}
           >
-            {circleContent({ label, status })}
+            {circleContent({ label, status, statusShort })}
           </span>
         );
       })}

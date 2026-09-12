@@ -1838,7 +1838,7 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <main className={`flex-grow w-full relative transition-all duration-300 ${effectivePage === 'trade' ? 'pt-[110px] md:pt-[132px] pb-3 px-0 max-w-none' : 'max-w-7xl mx-auto px-4 pt-[190px] md:pt-[340px] pb-8'}`}>
+      <main className={`flex-grow w-full relative transition-all duration-300 ${effectivePage === 'trade' ? 'pt-[104px] md:pt-[132px] pb-3 px-0 max-w-none' : 'max-w-7xl mx-auto px-4 pt-[144px] md:pt-[340px] pb-8'}`}>
         {/* Dedicated pages (from dashboard) */}
         {effectivePage !== 'main' && !needsApiKey && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>

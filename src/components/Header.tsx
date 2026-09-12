@@ -208,8 +208,8 @@ export default function Header({
         </div>
       )}
 
-      {/* PWA Mobile Menu Overlay - only in standalone mode */}
-      {isPWA && showMobileMenu && (
+      {/* Mobile Menu Overlay - phones (both PWA standalone and normal browser) */}
+      {showMobileMenu && (
         <div className="fixed inset-0 z-[80]">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)} />
           <div className="absolute top-0 left-0 bottom-0 w-[85%] max-w-[340px] bg-[#D1FAE5] shadow-2xl overflow-y-auto custom-scrollbar">
@@ -258,12 +258,6 @@ export default function Header({
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#002395] border border-[#001A6B] shadow-sm">
-                  <CalendarDays size={20} className="text-white flex-shrink-0" />
-                  <span className="text-sm font-black text-white uppercase tracking-wider">
-                    {lang === 'ar' ? tfLabel.ar : tfLabel.en}
-                  </span>
-                </div>
               </>)}
 
               {/* Auto Analysis Toggle - Developer */}
@@ -292,12 +286,6 @@ export default function Header({
                       autoSettings.isEnabled ? 'left-6' : 'left-0.5'
                     )} />
                   </button>
-                </div>
-                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#002395] border border-[#001A6B] shadow-sm">
-                  <CalendarDays size={20} className="text-white flex-shrink-0" />
-                  <span className="text-sm font-black text-white uppercase tracking-wider">
-                    {lang === 'ar' ? tfLabel.ar : tfLabel.en}
-                  </span>
                 </div>
               </>)}
 
@@ -334,6 +322,14 @@ export default function Header({
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Zap size={18} className="text-[#F59E0B]" />
                     <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lang === 'ar' ? 'إعدادات التحليل التلقائي' : 'Auto Analysis Settings'}</span>
+                  </button>
+                  <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('manualAnalysis'); }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-all shadow-sm">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-red-600">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                    <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lang === 'ar' ? 'التحليل اليدوي' : 'Manual Analysis'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('apiKey'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
@@ -566,7 +562,7 @@ export default function Header({
 
       <header className={cn(
         "fixed top-0 left-0 right-0 z-50 shadow-2xl shadow-emerald-500/20 transition-all duration-300",
-        compact ? 'h-[150px] md:h-[132px]' : 'h-[150px] md:h-[300px]'
+        compact ? 'h-[104px] md:h-[132px]' : 'h-[104px] md:h-[300px]'
       )}>
         {/* Trading Banner Background */}
         <div className="absolute inset-0 overflow-hidden">
@@ -610,29 +606,19 @@ export default function Header({
                   <span className="text-[14px] font-black uppercase tracking-[0.15em] text-white/70 leading-tight mt-1 block">For Financial<br/>Market Analysis</span>
                 )}
               </div>
-              {/* Mobile hamburger — stays top-right on phones, hidden on desktop (desktop uses bottom-row hamburger) */}
-              {!isPWA && (
-                <button
-                  onMouseDown={(e) => { e.stopPropagation(); onToggleSidebar(); }}
-                  className="flex md:hidden p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
-                  title={lang === 'ar' ? 'القائمة' : 'Menu'}
-                >
-                  <Menu size={22} />
-                </button>
-              )}
-              {isPWA && (
-                <button
-                  onClick={() => setShowMobileMenu(true)}
-                  className="flex md:hidden p-2 rounded-lg bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
-                >
-                  <Menu size={22} />
-                </button>
-              )}
+              {/* Mobile hamburger — stays top-right on phones, hidden on desktop (desktop uses icon-row menu) */}
+              <button
+                onClick={() => setShowMobileMenu(true)}
+                className="flex md:hidden p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
+                title={lang === 'ar' ? 'القائمة' : 'Menu'}
+              >
+                <Menu size={22} />
+              </button>
             </div>
 
-            {/* Icons - scrollable row | MOBILE: wrapped centered under logo (full-width), DESKTOP: single scrollable row */}
+            {/* Icons - desktop only | MOBILE: all icons moved into sidebar menu */}
             {!isPWA && (
-            <div className="flex items-center gap-2 md:gap-2 flex-wrap md:flex-nowrap flex-1 min-w-0 justify-center md:justify-end w-full md:w-auto mt-3 md:mt-0">
+            <div className="hidden md:flex items-center gap-2 flex-1 min-w-0 justify-end">
               {/* Trade Now | MOBILE: moved to sidebar (hidden md:flex) */}
               <button
                 onClick={() => onNavigatePage?.('trade')}

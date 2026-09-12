@@ -153,7 +153,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
                 <span className={`text-sm font-black ${cfg.color}`}>{isAr ? cfg.labelAr : cfg.labelEn}</span>
                 <span className="text-xs text-white/40 font-bold">({displaySignals.length})</span>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {displaySignals.map((res, idx) => (
                   <ClientSignalCard key={`all_${res.symbol}_${idx}`} res={res} isAr={isAr} lang={lang} selectedSymbol={selectedSymbol} onSelect={(sym) => { if (selectedSymbol === sym) { setSelectedSymbol(null); setSymbolExplicitlySelected(false); } else { setSelectedSymbol(sym); setSymbolExplicitlySelected(true); } handleClick(); }} onDetail={onDetail} hasActivePlan={hasActivePlan} formatPublishDate={formatPublishDate} cardKey={`all_${res.symbol}_${idx}`} onClick={handleClick} />
                 ))}
@@ -207,7 +207,34 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
           </svg>
         </div>
       )}
-      <button onClick={() => { onSelect(res.symbol); onClick?.(); }} className="w-full px-3 py-1.5 flex flex-col items-center gap-1">
+
+      {/* MOBILE: horizontal card - symbol on left, key info on right */}
+      <button onClick={() => { onSelect(res.symbol); onClick?.(); }} className="md:hidden w-full px-3 py-2.5 flex items-center gap-3">
+        <div className="flex flex-col items-start min-w-0 flex-1">
+          <span className="text-lg font-black italic leading-none truncate max-w-full" style={{ color: meta.symbolColor }}>{res.symbol}</span>
+          <span className="text-[10px] font-black leading-tight mt-1 truncate max-w-full" style={{ color: meta.symbolColor }}>{isAr ? meta.labelAr : meta.labelEn}</span>
+          <span className="text-[9px] font-bold leading-tight mt-1 text-white/50">{formatPublishDate(res.timestamp, lang)}</span>
+        </div>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className="text-xl font-black font-mono leading-none text-white">{res.confidence}%</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black font-mono leading-none text-[#00ff88]">{tp ? tp.toFixed(decimals) : '\u2014'}</span>
+            <span className="text-xs font-black font-mono leading-none text-[#ff4444]">{sl ? sl.toFixed(decimals) : '\u2014'}</span>
+          </div>
+          {res.isSideways !== undefined && (
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border leading-none ${
+              res.isSideways ? 'text-white bg-white/20 border-white/30' :
+              res.sidewaysDirection === 'uptrend' ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' :
+              res.sidewaysDirection === 'downtrend' ? 'text-red-300 bg-red-500/20 border-red-500/30' : ''
+            }`}>
+              {res.isSideways ? (isAr ? 'عرضي' : 'Side') : res.sidewaysDirection === 'uptrend' ? (isAr ? 'صاعد' : 'Up') : res.sidewaysDirection === 'downtrend' ? (isAr ? 'هابط' : 'Down') : ''}
+            </span>
+          )}
+        </div>
+      </button>
+
+      {/* DESKTOP: original vertical card (unchanged) */}
+      <button onClick={() => { onSelect(res.symbol); onClick?.(); }} className="hidden md:flex w-full px-3 py-1.5 flex-col items-center gap-1">
         <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
           <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tp ? tp.toFixed(decimals) : '\u2014'}</span>
           <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
@@ -231,24 +258,24 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
         </div>
       </button>
 
-      {/* Bright yellow Analysis Reasons button - attached to card bottom */}
-      {res.detailedReasons && res.detailedReasons.length > 0 && (
-        <button onClick={(e) => { e.stopPropagation(); onDetail?.(res); }} className="w-full py-2.5 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2">
-          <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
-          <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[10px]">{res.detailedReasons.length}</span>
-        </button>
-      )}
-
-      {/* Trade button - small candlestick icon */}
-      {onTrade && (
-        <button onClick={(e) => { e.stopPropagation(); onTrade(res.symbol); }} className="w-full py-2 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 border-t border-[#F59E0B]/30 transition-all flex items-center justify-center gap-2" title={isAr ? `تداول ${res.symbol}` : `Trade ${res.symbol}`}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 17l6-6 4 4 8-8" />
-            <path d="M17 7h4v4" />
-          </svg>
-          <span className="text-[11px] font-black text-[#F59E0B] uppercase tracking-wider">{isAr ? 'تداول' : 'Trade'}</span>
-        </button>
-      )}
+      {/* Buttons row | MOBILE: side-by-side, DESKTOP: full-width stacked */}
+      <div className="flex gap-1.5 p-1.5 md:p-0 md:gap-0 md:block">
+        {res.detailedReasons && res.detailedReasons.length > 0 && (
+          <button onClick={(e) => { e.stopPropagation(); onDetail?.(res); }} className="flex-1 md:flex-none md:w-full py-1.5 md:py-2.5 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-[10px] md:text-xs uppercase tracking-wider flex items-center justify-center gap-2 rounded-md md:rounded-none">
+            <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+            <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px]">{res.detailedReasons.length}</span>
+          </button>
+        )}
+        {onTrade && (
+          <button onClick={(e) => { e.stopPropagation(); onTrade(res.symbol); }} className="flex-1 md:flex-none md:w-full py-1.5 md:py-2 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 transition-all text-[#F59E0B] text-[10px] md:text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 rounded-md md:rounded-none border-t-0 md:border-t md:border-[#F59E0B]/30" title={isAr ? `تداول ${res.symbol}` : `Trade ${res.symbol}`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 17l6-6 4 4 8-8" />
+              <path d="M17 7h4v4" />
+            </svg>
+            <span>{isAr ? 'تداول' : 'Trade'}</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
