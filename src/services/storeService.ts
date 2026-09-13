@@ -10,6 +10,7 @@ export interface StoreBot {
   fileType: string;
   fileSize: number;
   fileData: string;
+  imageData?: string;
   createdAt: number;
 }
 
@@ -35,6 +36,7 @@ export async function addStoreBot(bot: Omit<StoreBot, 'id'>): Promise<void> {
     fileType: bot.fileType,
     fileSize: bot.fileSize,
     fileData: bot.fileData,
+    imageData: bot.imageData || '',
     createdAt: Date.now(),
   });
 }

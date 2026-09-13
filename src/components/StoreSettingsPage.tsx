@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus } from 'lucide-react';
 import { StoreBot, fetchStoreBots, addStoreBot, deleteStoreBot, formatFileSize } from '../services/storeService';
 
 interface StoreSettingsPageProps {
@@ -8,7 +8,8 @@ interface StoreSettingsPageProps {
   onBack: () => void;
 }
 
-const MAX_FILE_BYTES = 600 * 1024;
+const MAX_FILE_BYTES = 400 * 1024;
+const MAX_IMAGE_BYTES = 200 * 1024;
 
 export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPageProps) {
   const isAr = lang === 'ar';
@@ -18,11 +19,13 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
   const [description, setDescription] = useState('');
   const [priceInput, setPriceInput] = useState('');
   const [file, setFile] = useState<{ fileName: string; fileType: string; fileSize: number; fileData: string } | null>(null);
+  const [image, setImage] = useState<{ fileName: string; fileData: string } | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [adding, setAdding] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => {
     fetchStoreBots().then((list) => { setBots(list); setLoading(false); });
@@ -32,12 +35,25 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
 
   const handleFile = (f: File) => {
     if (f.size > MAX_FILE_BYTES) {
-      setError(isAr ? 'الملف أكبر من 600 كيلوبايت. يرجى اختيار ملف أصغر.' : 'File exceeds 600 KB. Please choose a smaller file.');
+      setError(isAr ? 'الملف أكبر من 400 كيلوبايت. يرجى اختيار ملف أصغر.' : 'File exceeds 400 KB. Please choose a smaller file.');
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
       setFile({ fileName: f.name, fileType: f.type || 'application/octet-stream', fileSize: f.size, fileData: reader.result as string });
+      setError('');
+    };
+    reader.readAsDataURL(f);
+  };
+
+  const handleImage = (f: File) => {
+    if (f.size > MAX_IMAGE_BYTES) {
+      setError(isAr ? 'الصورة أكبر من 200 كيلوبايت. يرجى اختيار صورة أصغر.' : 'Image exceeds 200 KB. Please choose a smaller image.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImage({ fileName: f.name, fileData: reader.result as string });
       setError('');
     };
     reader.readAsDataURL(f);
@@ -57,11 +73,13 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         fileType: file.fileType,
         fileSize: file.fileSize,
         fileData: file.fileData,
+        imageData: image?.fileData || '',
         createdAt: Date.now(),
       });
       setSuccess(isAr ? '✅ تمت إضافة البوت بنجاح' : '✅ Bot added successfully');
-      setName(''); setDescription(''); setPriceInput(''); setFile(null);
+      setName(''); setDescription(''); setPriceInput(''); setFile(null); setImage(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      if (imageInputRef.current) imageInputRef.current.value = '';
       refresh();
       setTimeout(() => setSuccess(''), 3000);
     } catch {
@@ -171,7 +189,39 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                   </button>
                 </span>
               )}
-              {!file && <span className="text-[10px] text-slate-500">{isAr ? 'حتى 600 كيلوبايت' : 'Up to 600 KB'}</span>}
+              {!file && <span className="text-[10px] text-slate-500">{isAr ? 'حتى 400 كيلوبايت' : 'Up to 400 KB'}</span>}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'صورة تعكس آلية عمل البوت (اختياري)' : 'Image showing how the bot works (optional)'}</label>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => imageInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 transition-all text-xs font-black"
+              >
+                <ImagePlus size={16} />
+                {isAr ? 'اختر صورة' : 'Choose Image'}
+              </button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImage(f); }}
+              />
+              {image && (
+                <div className="flex items-center gap-2">
+                  <img src={image.fileData} alt="preview" className="w-16 h-16 object-cover rounded-xl border border-white/10" />
+                  <button
+                    onClick={() => { setImage(null); if (imageInputRef.current) imageInputRef.current.value = ''; }}
+                    className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-red-400 transition-all"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              {!image && <span className="text-[10px] text-slate-500">{isAr ? 'png / jpg حتى 200 كيلوبايت' : 'png / jpg up to 200 KB'}</span>}
             </div>
           </div>
 
@@ -229,6 +279,9 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                     {confirmId === bot.id ? (<><Check size={12} /> {isAr ? 'تأكيد' : 'Confirm'}</>) : (<><Trash2 size={12} /> {isAr ? 'حذف' : 'Delete'}</>)}
                   </button>
                 </div>
+                {bot.imageData && (
+                  <img src={bot.imageData} alt={bot.name} className="w-full h-24 object-cover rounded-xl border border-white/10 mt-3" />
+                )}
                 {bot.description && <p className="text-xs text-slate-400 mt-3 leading-relaxed">{bot.description}</p>}
               </motion.div>
             ))}

@@ -37,6 +37,14 @@ export default function StorePage({ lang, onBack, onBuyBot }: StorePageProps) {
         isFree ? 'border-emerald-500/40 hover:shadow-emerald-500/10' : 'border-white/10 hover:shadow-amber-500/10'
       }`}
     >
+      {bot.imageData && (
+        <div className="relative -mt-5 -mx-5 mb-1">
+          <img src={bot.imageData} alt={bot.name} className="w-full h-40 object-cover rounded-t-2xl rounded-b-xl" />
+          <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 text-white text-[9px] font-black uppercase tracking-wider">
+            {isAr ? 'آلية العمل' : 'How it works'}
+          </span>
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center shadow-md ${isFree ? 'bg-gradient-to-br from-emerald-400 to-emerald-600' : 'bg-gradient-to-br from-amber-400 to-orange-600'}`}>
