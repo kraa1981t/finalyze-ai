@@ -93,6 +93,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
   const [selectedCoinId, setSelectedCoinId] = useState<string | null>(null);
+  const [faucetpaySelected, setFaucetpaySelected] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [timerMinutes, setTimerMinutes] = useState(() => {
     const saved = localStorage.getItem(TIMER_STORAGE_KEY);
@@ -130,6 +131,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setCopiedId(null);
       setNewAddress({ id: '', name: '', address: '' });
       setSelectedCoinId(null);
+      setFaucetpaySelected(false);
       setPaymentConfirmed(false);
       setTimerRunning(false);
       setTimerSeconds(0);
@@ -258,6 +260,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     if (!faucetpayEmail) return;
     navigator.clipboard.writeText(faucetpayEmail).catch(() => {});
     setCopiedFaucetpay(true);
+    setFaucetpaySelected(true);
+    if (!timerRunning) startTimer();
     setTimeout(() => setCopiedFaucetpay(false), 2000);
   };
 
@@ -362,7 +366,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
       {showAddresses && (
       <div className="relative">
-        {faucetpayEmail && !manageMode && !selectedCoinId && (
+        {faucetpayEmail && !manageMode && !selectedCoinId && !faucetpaySelected && (
           <div className="bg-blue-500/10 border-2 border-blue-500/40 rounded-2xl p-4 mb-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg">
@@ -539,6 +543,15 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 <p className="text-[10px] text-amber-400 text-center animate-pulse mb-2">{pollingStatus}</p>
               )}
 
+              {!BLOCKCYPHER_CHAINS[item.id] && !paymentConfirmed && (
+                <button
+                  onClick={() => setPaymentConfirmed(true)}
+                  className="w-full mb-2 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/40 text-blue-400 hover:bg-blue-500/20 font-black text-xs uppercase tracking-widest transition-all active:scale-95"
+                >
+                  {isAr ? '✅ لقد أرسلت المبلغ — تأكيد الدفع' : '✅ I sent the amount — Confirm Payment'}
+                </button>
+              )}
+
               <button
                 onClick={() => {
                   if (!paymentConfirmed) return;
@@ -576,6 +589,110 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                     className="text-xs text-slate-400 hover:text-white underline"
                   >
                     {isAr ? 'اختر عملة أخرى' : 'Choose another coin'}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          );
+        })()}
+
+        {/* FaucetPay confirmation OVERLAY — mirrors crypto flow with countdown */}
+        {!manageMode && !selectedCoinId && faucetpaySelected && (() => {
+          const formatTime = (secs: number) => {
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+          };
+          return (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="absolute inset-0 z-10 bg-brand-bg/95 backdrop-blur-xl rounded-2xl border-2 border-blue-500/40 p-5 flex flex-col justify-center shadow-[0_0_60px_-12px_rgba(59,130,246,0.4)]"
+            >
+              <button
+                onClick={() => { setFaucetpaySelected(false); setTimerRunning(false); setPaymentConfirmed(false); }}
+                className="absolute top-3 right-3 p-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+              >
+                <X size={16} />
+              </button>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-black text-xs shadow-lg">
+                    FP
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-white">FaucetPay</span>
+                    <span className="text-[10px] text-slate-400 block">{isAr ? 'تحويل بالبريد الإلكتروني' : 'Transfer via email'}</span>
+                  </div>
+                </div>
+                <span className="text-xs font-black text-blue-400 uppercase tracking-widest">{isBotSection ? botPurchase!.name : currentLabel}</span>
+              </div>
+
+              <div className="bg-black/40 rounded-2xl px-5 py-4 text-center border border-blue-500/20 mb-4">
+                <code className="text-sm font-mono text-blue-200 break-all select-all">{faucetpayEmail}</code>
+                <p className="text-2xl font-black text-white font-mono mt-2">${amount.toFixed(2)} USD</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">{isAr ? 'المبلغ المطلوب تحويله' : 'Amount to transfer'} (FaucetPay)</p>
+                <button
+                  onClick={() => copyFaucetpayEmail()}
+                  className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all text-xs font-black"
+                >
+                  {copiedFaucetpay ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedFaucetpay ? (isAr ? 'تم النسخ!' : 'Copied!') : (isAr ? 'نسخ البريد' : 'Copy Email')}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-center mb-4">
+                <div className="text-center">
+                  <div className={`text-5xl font-black font-mono tabular-nums ${timerSeconds <= 60 ? 'text-red-400' : 'text-white'}`}>
+                    {formatTime(timerSeconds)}
+                  </div>
+                  <p className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">{isAr ? 'الوقت المتبقي' : 'Time Remaining'}</p>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-blue-300/70 text-center mb-3">
+                {isAr
+                  ? 'أرسل المبلغ من محفظتك على FaucetPay إلى هذا البريد ثم اضغط "تأكيد الدفع"'
+                  : 'Send the amount from your FaucetPay wallet to this email, then press "Confirm Payment"'}
+              </p>
+
+              <button
+                onClick={() => { if (!paymentConfirmed) return; setFaucetpaySelected(false); if (section === 'bot' && botPurchase) { downloadBot(botPurchase); recordBotPurchase(botPurchase, buyerEmail || notificationEmail).then(() => onBotPaid?.(botPurchase)); } else { onConfirm?.(); } }}
+                disabled={!paymentConfirmed}
+                className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
+                  paymentConfirmed
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
+                    : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
+                }`}
+              >
+                {paymentConfirmed
+                  ? (section === 'bot' && botPurchase ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : '🟢 Activate Plan')
+                  : (isAr ? '🔴 في انتظار تأكيد الدفع...' : '🔴 Awaiting payment...')}
+              </button>
+
+              {!paymentConfirmed && (
+                <button
+                  onClick={() => setPaymentConfirmed(true)}
+                  className="w-full mt-2 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/40 text-blue-400 hover:bg-blue-500/20 font-black text-xs uppercase tracking-widest transition-all active:scale-95"
+                >
+                  {isAr ? '✅ لقد أرسلت المبلغ — تأكيد الدفع' : '✅ I sent the amount — Confirm Payment'}
+                </button>
+              )}
+
+              {paymentConfirmed && (
+                <p className="text-[10px] text-emerald-400 text-center font-bold mt-2">
+                  {isAr ? '✅ تم تأكيد الدفع! اضغط "تحميل البوت الآن" لتحميل ملف البوت تلقائياً.' : '✅ Payment confirmed! Press "Download Bot Now" to auto-download the bot file.'}
+                </p>
+              )}
+              {timerSeconds <= 0 && !paymentConfirmed && (
+                <div className="text-center mt-2">
+                  <p className="text-[10px] text-red-400 mb-2">{isAr ? 'انتهت المهلة. يمكنك إعادة المحاولة.' : 'Time expired. You can try again.'}</p>
+                  <button
+                    onClick={() => { setFaucetpaySelected(false); setTimerRunning(false); }}
+                    className="text-xs text-slate-400 hover:text-white underline"
+                  >
+                    {isAr ? 'نسخ البريد مرة أخرى' : 'Copy email again'}
                   </button>
                 </div>
               )}

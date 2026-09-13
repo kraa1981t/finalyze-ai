@@ -1850,7 +1850,7 @@ export default function App() {
       
       <main className={`flex-grow w-full relative transition-all duration-300 ${effectivePage === 'trade' ? 'pt-[104px] md:pt-[132px] pb-3 px-0 max-w-none' : 'max-w-7xl mx-auto px-4 pt-[144px] md:pt-[340px] pb-8'}`}>
         {/* Dedicated pages (from dashboard) */}
-        {effectivePage !== 'main' && !needsApiKey && (
+        {effectivePage !== 'main' && (!needsApiKey || effectivePage === 'store' || effectivePage === 'plans' || effectivePage === 'storeSettings' || effectivePage === 'paymentSettings') && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
 
              {effectivePage === 'settings' && (
@@ -1882,7 +1882,7 @@ export default function App() {
               />
             )}
 
-            {effectivePage === 'plans' && !paymentPlan && !(freemiumDisabled && !isDeveloperSession()) && (
+            {effectivePage === 'plans' && !paymentPlan && !botPurchase && !(freemiumDisabled && !isDeveloperSession()) && (
               <SubscriptionModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
@@ -1892,7 +1892,7 @@ export default function App() {
               />
             )}
 
-            {effectivePage === 'plans' && paymentPlan && !(freemiumDisabled && !isDeveloperSession()) && (
+            {effectivePage === 'plans' && paymentPlan && (botPurchase || !(freemiumDisabled && !isDeveloperSession())) && (
               <PaymentModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
