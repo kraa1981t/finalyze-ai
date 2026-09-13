@@ -365,6 +365,11 @@ export default function Header({
                     <Store size={18} className="text-[#F59E0B]" />
                     <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'إعدادات المتجر' : 'Store Settings'}</span>
                   </button>
+                  <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('store'); }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all shadow-sm">
+                    <Store size={18} className="text-emerald-500" />
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'عرض المتجر (اختبار)' : 'View Store (test)'}</span>
+                  </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('clientMonitor'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Users size={18} className="text-[#F59E0B]" />

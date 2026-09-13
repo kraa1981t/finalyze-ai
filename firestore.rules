@@ -54,6 +54,18 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Bots store — developers write bots, anyone reads and buys
+    match /store_bots/{botId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Bot purchases ledger — clients record purchases, developer reads
+    match /store_purchases/{purchaseId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Site ads config — developer writes, anyone reads
     match /config/{docId} {
       allow read: if true;

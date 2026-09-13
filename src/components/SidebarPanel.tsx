@@ -31,6 +31,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
     ] : []),
     { icon: Wallet, label: lang === 'ar' ? 'عناوين الدفع' : 'Payment Addresses', page: 'paymentSettings' as const, color: 'from-amber-400 to-amber-600' },
     { icon: Store, label: lang === 'ar' ? 'إعدادات المتجر' : 'Store Settings', page: 'storeSettings' as const, color: 'from-sky-400 to-sky-600' },
+    { icon: Store, label: lang === 'ar' ? 'عرض المتجر (اختبار)' : 'View Store (test)', page: 'store' as const, color: 'from-emerald-400 to-emerald-600' },
     { icon: Users, label: lang === 'ar' ? 'مراقبة العملاء' : 'Client Monitor', page: 'clientMonitor' as const, color: 'from-amber-400 to-amber-600' },
     { icon: BarChart3, label: lang === 'ar' ? 'إحصائيات الموقع' : 'Site Statistics', page: 'siteStats' as const, color: 'from-emerald-400 to-emerald-600' },
     { icon: Monitor, label: lang === 'ar' ? 'إعلاناتي' : 'My Ads', page: 'ads' as const, color: 'from-purple-400 to-purple-600' },
