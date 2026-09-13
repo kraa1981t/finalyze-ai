@@ -38,6 +38,7 @@ const POPULAR_COINS = [
 ];
 
 const STORAGE_KEY = 'crypto_payment_addresses';
+const FAUCETPAY_EMAIL_KEY = 'faucetpay_email';
 
 interface CryptoAddress {
   id: string;
@@ -111,6 +112,9 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   });
   const [editSubPrices, setEditSubPrices] = useState({ ...subPrices });
   const [freemiumDisabled, setFreemiumDisabled] = useState(externalFreemium ?? localStorage.getItem('finalyze_freemium_disabled') === 'true');
+  const [faucetpayEmail, setFaucetpayEmail] = useState(() => localStorage.getItem(FAUCETPAY_EMAIL_KEY) || '');
+  const [editFaucetpayEmail, setEditFaucetpayEmail] = useState(faucetpayEmail);
+  const [copiedFaucetpay, setCopiedFaucetpay] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -245,6 +249,18 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setNewAddress({ id: '', name: '', address: '' });
   };
 
+  const saveFaucetpayEmail = () => {
+    setFaucetpayEmail(editFaucetpayEmail);
+    localStorage.setItem(FAUCETPAY_EMAIL_KEY, editFaucetpayEmail);
+  };
+
+  const copyFaucetpayEmail = () => {
+    if (!faucetpayEmail) return;
+    navigator.clipboard.writeText(faucetpayEmail).catch(() => {});
+    setCopiedFaucetpay(true);
+    setTimeout(() => setCopiedFaucetpay(false), 2000);
+  };
+
   const calcCryptoAmount = (coinId: string, coinName?: string): string => {
     // Try direct coin ID lookup first
     let coin = COINGECKO_MAP[coinId];
@@ -346,6 +362,35 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
       {showAddresses && (
       <div className="relative">
+        {faucetpayEmail && !manageMode && !selectedCoinId && (
+          <div className="bg-blue-500/10 border-2 border-blue-500/40 rounded-2xl p-4 mb-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg">
+                <span className="text-white font-black text-[10px]">FP</span>
+              </div>
+              <div>
+                <span className="text-sm font-black text-blue-400">FaucetPay</span>
+                <span className="text-[10px] text-blue-300/60 block">{isAr ? 'تحويل مباشر بالبريد الإلكتروني' : 'Direct transfer via email'}</span>
+              </div>
+            </div>
+            <div className="bg-black/40 rounded-xl px-4 py-3">
+              <div className="flex items-center justify-between">
+                <code className="text-xs font-mono text-blue-200 break-all select-all">{faucetpayEmail}</code>
+                <button
+                  onClick={copyFaucetpayEmail}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all text-xs font-black ml-2 shrink-0"
+                >
+                  {copiedFaucetpay ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedFaucetpay ? (isAr ? 'تم النسخ!' : 'Copied!') : (isAr ? 'نسخ' : 'Copy')}
+                </button>
+              </div>
+            </div>
+            <p className="text-[10px] text-blue-300/50 mt-2 text-center">
+              {isAr ? `أرسل $${amount} إلى هذا البريد عبر FaucetPay ثم اضغط "تم الدفع"` : `Send $${amount} to this email via FaucetPay then click "Payment Done"`}
+            </p>
+          </div>
+        )}
+
         <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
         {addresses.length === 0 && !isAdmin && (
           <p className="text-center text-slate-500 py-8">No payment addresses configured.</p>
@@ -698,6 +743,30 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
             >
               Save
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4">
+          <h5 className="text-xs font-black uppercase text-blue-400 tracking-widest mb-3">
+            {isAr ? 'بريد FaucetPay' : 'FaucetPay Email'}
+          </h5>
+          <p className="text-[10px] text-blue-300/60 mb-3">
+            {isAr ? 'بريد حسابك على FaucetPay — يظهر للعملاء كوسيلة دفع إضافية لتحويل المبلغ مباشرة' : 'Your FaucetPay account email — shown to clients as an extra payment method to transfer directly'}
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="email"
+              value={editFaucetpayEmail}
+              onChange={(e) => setEditFaucetpayEmail(e.target.value)}
+              placeholder={isAr ? 'email@faucetpay.io' : 'email@faucetpay.io'}
+              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+            />
+            <button
+              onClick={saveFaucetpayEmail}
+              className="px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all text-xs font-black"
+            >
+              {isAr ? 'حفظ' : 'Save'}
             </button>
           </div>
         </div>
