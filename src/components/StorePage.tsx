@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Download, ShoppingCart, FileText, Tag } from 'lucide-react';
+import { ArrowLeft, Download, ShoppingCart, FileText, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 import { StoreBot, fetchStoreBots, downloadBot, formatFileSize } from '../services/storeService';
 
 interface StorePageProps {
   lang: 'ar' | 'en';
   onBack: () => void;
+  isDark: boolean;
   onBuyBot: (bot: StoreBot) => void;
 }
 
-export default function StorePage({ lang, onBack, onBuyBot }: StorePageProps) {
+const MAX_DESC_LEN = 55;
+
+export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageProps) {
   const isAr = lang === 'ar';
   const [bots, setBots] = useState<StoreBot[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<StoreBot | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchStoreBots().then((list) => { setBots(list); setLoading(false); });
@@ -28,125 +32,175 @@ export default function StorePage({ lang, onBack, onBuyBot }: StorePageProps) {
     setTimeout(() => { downloadBot(bot); setDownloading(null); }, 1100);
   };
 
-  const renderCard = (bot: StoreBot, isFree: boolean) => (
-    <motion.div
-      key={bot.id}
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`bg-white/[0.04] border rounded-2xl p-5 flex flex-col gap-3 transition-all hover:border-white/25 shadow-lg ${
-        isFree ? 'border-emerald-500/40 hover:shadow-emerald-500/10' : 'border-white/10 hover:shadow-amber-500/10'
-      }`}
-    >
-      {bot.imageData && (
-        <div className="relative -mt-5 -mx-5 mb-1">
-          <img src={bot.imageData} alt={bot.name} className="w-full h-40 object-cover rounded-t-2xl rounded-b-xl" />
-          <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 text-white text-[9px] font-black uppercase tracking-wider">
-            {isAr ? 'آلية العمل' : 'How it works'}
+  // Theme-inverted cards: black box in light mode, white box in dark mode
+  const cardBg = isDark ? 'bg-white' : 'bg-[#0B0F17]';
+  const cardBorder = isDark ? 'border-black/10' : 'border-white/15';
+  const pageTitle = isDark ? 'text-slate-900' : 'text-white';
+  const pageSub = isDark ? 'text-slate-500' : 'text-slate-400';
+  const divider = isDark ? 'bg-black/10' : 'bg-white/10';
+  const panelBg = isDark ? 'bg-black/5' : 'bg-white/5';
+
+  const renderCard = (bot: StoreBot, isFree: boolean) => {
+    const needToggle = bot.description.length > MAX_DESC_LEN;
+    const isOpen = !!expanded[bot.id ?? ''];
+    const shown = isOpen || !needToggle ? bot.description : bot.description.slice(0, MAX_DESC_LEN) + '…';
+    return (
+      <motion.div
+        key={bot.id}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`${cardBg} ${cardBorder} border rounded-xl p-3 flex flex-col gap-2 transition-all shadow-lg ${
+          isFree
+            ? isDark ? 'hover:shadow-emerald-500/20' : 'hover:shadow-emerald-500/10'
+            : isDark ? 'hover:shadow-amber-500/20' : 'hover:shadow-amber-500/10'
+        }`}
+      >
+        {bot.imageData && (
+          <div className="relative -mt-3 -mx-3 mb-0">
+            <img src={bot.imageData} alt={bot.name} className="w-full h-28 object-cover rounded-t-xl rounded-b-lg" />
+            <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 text-white text-[9px] font-black uppercase tracking-wider">
+              {isAr ? 'آلية العمل' : 'How it works'}
+            </span>
+          </div>
+        )}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center shadow-md ${isFree ? 'bg-gradient-to-br from-emerald-400 to-emerald-600' : 'bg-gradient-to-br from-amber-400 to-orange-600'}`}>
+              {isFree ? <Tag size={16} className="text-black" /> : <Download size={16} className="text-black" />}
+            </div>
+            <div className="min-w-0">
+              <h3 className={`text-sm font-black truncate ${isDark ? 'text-slate-900' : 'text-white'}`}>{bot.name}</h3>
+              {bot.fileName && (
+                <span className={`text-[9px] flex items-center gap-1 mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <FileText size={9} /> {bot.fileName} {bot.fileSize ? `(${formatFileSize(bot.fileSize)})` : ''}
+                </span>
+              )}
+            </div>
+          </div>
+          <span className={`shrink-0 px-2 py-1 rounded-lg text-[10px] font-black uppercase border-2 ${
+            isFree
+              ? isDark
+                ? 'text-emerald-600 border-emerald-600/60 bg-emerald-500/10'
+                : 'text-emerald-400 border-emerald-400/60 bg-emerald-500/10'
+              : isDark
+                ? 'text-amber-600 border-amber-600/60 bg-amber-500/10'
+                : 'text-amber-400 border-amber-400/40 bg-amber-500/10'
+          }`}>
+            {isFree ? (isAr ? 'مجاني' : 'FREE') : formatPrice(bot.price)}
           </span>
         </div>
-      )}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center shadow-md ${isFree ? 'bg-gradient-to-br from-emerald-400 to-emerald-600' : 'bg-gradient-to-br from-amber-400 to-orange-600'}`}>
-            {isFree ? <Tag size={22} className="text-black" /> : <Download size={22} className="text-black" />}
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-base font-black text-white truncate">{bot.name}</h3>
-            {bot.fileName && (
-              <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                <FileText size={10} /> {bot.fileName} {bot.fileSize ? `(${formatFileSize(bot.fileSize)})` : ''}
-              </span>
+
+        {bot.description && (
+          <div>
+            <p className={`text-xs leading-relaxed break-words ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>{shown}</p>
+            {needToggle && (
+              <button
+                onClick={() => setExpanded((prev) => ({ ...prev, [bot.id ?? '']: !isOpen }))}
+                className={`mt-0.5 flex items-center gap-0.5 text-[10px] font-black uppercase tracking-wide transition-all ${isDark ? 'text-emerald-600 hover:text-emerald-700' : 'text-emerald-400 hover:text-emerald-300'}`}
+              >
+                {isOpen ? (isAr ? 'عرض أقل' : 'Read Less') : (isAr ? 'اقرأ المزيد' : 'Read More')}
+                {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              </button>
             )}
           </div>
+        )}
+
+        {isFree ? (
+          <button
+            onClick={() => handleFreeDownload(bot)}
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg bg-emerald-500 text-black font-black text-xs uppercase tracking-wider shadow-md shadow-emerald-500/30 hover:bg-emerald-400 active:scale-95 transition-all"
+          >
+            <Download size={14} />
+            {isAr ? 'تحميل مجاني' : 'Free Download'}
+          </button>
+        ) : (
+          <button
+            onClick={() => onBuyBot(bot)}
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg bg-[#F59E0B] text-black font-black text-xs uppercase tracking-wider shadow-md shadow-[#F59E0B]/30 hover:bg-[#d97706] active:scale-95 transition-all"
+          >
+            <ShoppingCart size={14} />
+            {isAr ? 'شراء الآن' : 'Buy Now'}
+          </button>
+        )}
+      </motion.div>
+    );
+  };
+
+  const renderSection = (list: StoreBot[], isFree: boolean, headerLabel: string, badgeTone: string) => {
+    const shown = list.slice(0, 2);
+    return (
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black uppercase border-2 ${badgeTone}`}>{headerLabel}</span>
+          <div className={`flex-1 h-px ${divider}`} />
         </div>
-        <span className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-black uppercase border-2 ${
-          isFree
-            ? 'text-emerald-400 border-emerald-400/60 bg-emerald-500/10'
-            : 'text-amber-400 border-amber-400/40 bg-amber-500/10'
-        }`}>
-          {isFree ? 'مجاني' : formatPrice(bot.price)}
-        </span>
-      </div>
+        <div className="grid gap-3">
+          {shown.map((bot) => renderCard(bot, isFree))}
+        </div>
+        {list.length > 2 && (
+          <p className={`text-[10px] text-center font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {isAr ? `و ${list.length - 2} أخرى` : `and ${list.length - 2} more`}
+          </p>
+        )}
+      </section>
+    );
+  };
 
-      {bot.description && (
-        <p className="text-sm text-slate-300 leading-relaxed">{bot.description}</p>
-      )}
+  const freeSection = freeBots.length > 0
+    ? renderSection(
+        freeBots,
+        true,
+        isAr ? 'بوتات مجانية' : 'Free Bots',
+        isDark ? 'text-emerald-600 border-emerald-600/60 bg-emerald-500/10' : 'text-emerald-400 border-emerald-400 bg-emerald-500/10'
+      )
+    : null;
 
-      {isFree ? (
-        <button
-          onClick={() => handleFreeDownload(bot)}
-          className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-black text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 active:scale-95 transition-all"
-        >
-          <Download size={18} />
-          {isAr ? 'تحميل مجاني' : 'Free Download'}
-        </button>
-      ) : (
-        <button
-          onClick={() => onBuyBot(bot)}
-          className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-[#F59E0B] text-black font-black text-sm uppercase tracking-wider shadow-lg shadow-[#F59E0B]/30 hover:bg-[#d97706] active:scale-95 transition-all"
-        >
-          <ShoppingCart size={18} />
-          {isAr ? 'شراء الآن' : 'Buy Now'}
-        </button>
-      )}
-    </motion.div>
-  );
+  const paidSection = paidBots.length > 0
+    ? renderSection(
+        paidBots,
+        false,
+        isAr ? 'بوتات مدفوعة' : 'Paid Bots',
+        isDark ? 'text-amber-600 border-amber-600/60 bg-amber-500/10' : 'text-amber-400 border-amber-400/50 bg-amber-500/10'
+      )
+    : null;
+
+  // Free on the LEFT, paid on the RIGHT (physical) — in RTL the DOM order flips
+  const sections = (isAr ? [paidSection, freeSection] : [freeSection, paidSection]).filter(Boolean) as React.ReactNode[];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 pb-16">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={onBack} className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all">
+    <div className="max-w-4xl mx-auto px-4 pb-10">
+      <div className="flex items-center gap-3 mb-4">
+        <button
+          onClick={onBack}
+          className={`p-2 rounded-xl border transition-all ${isDark ? 'bg-black/5 border-black/10 text-slate-600 hover:text-black' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
+        >
           <ArrowLeft size={18} />
         </button>
       </div>
 
       {/* Title */}
-      <div className="text-center mb-10">
-        <h2 className="text-2xl sm:text-3xl font-black text-white">
+      <div className="text-center mb-6">
+        <h2 className={`text-xl sm:text-2xl font-black ${pageTitle}`}>
           {isAr ? 'متجر بوتات التداول' : 'Trading Bots Store'}
         </h2>
-        <p className="text-sm text-slate-400 mt-3">{isAr ? 'بوتات ومؤشرات ذكية لتحليل التداول — انتبه للقسم المجاني' : 'Smart bots & indicators for trading analysis — check the FREE section'}</p>
+        <p className={`text-xs sm:text-sm mt-2 font-bold ${pageSub}`}>
+          {isAr ? 'بوتات ومؤشرات ذكية لتحليل التداول — انتبه للقسم المجاني' : 'Smart bots & indicators for trading analysis — check the FREE section'}
+        </p>
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24">
-          <div className="w-12 h-12 rounded-full border-4 border-emerald-500/30 border-t-emerald-500 animate-spin" />
-          <p className="text-sm text-slate-400 mt-4">{isAr ? 'جاري تحميل المتجر...' : 'Loading store...'}</p>
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-10 h-10 rounded-full border-4 border-emerald-500/30 border-t-emerald-500 animate-spin" />
+          <p className={`text-xs mt-3 font-bold ${pageSub}`}>{isAr ? 'جاري تحميل المتجر...' : 'Loading store...'}</p>
         </div>
       ) : bots.length === 0 ? (
-        <div className="text-center py-24">
-          <p className="text-lg font-bold text-slate-300">{isAr ? 'لا توجد بوتات في المتجر بعد' : 'No bots in the store yet'}</p>
-          <p className="text-sm text-slate-500 mt-2">{isAr ? 'ترقبوا الإضافات الجديدة قريباً' : 'New additions coming soon'}</p>
+        <div className="text-center py-20">
+          <p className={`text-base font-black ${isDark ? 'text-slate-700' : 'text-slate-300'}`}>{isAr ? 'لا توجد بوتات في المتجر بعد' : 'No bots in the store yet'}</p>
+          <p className={`text-xs mt-1 font-bold ${pageSub}`}>{isAr ? 'ترقبوا الإضافات الجديدة قريباً' : 'New additions coming soon'}</p>
         </div>
       ) : (
-        <div className="space-y-10">
-          {freeBots.length > 0 && (
-            <section>
-              <div className="flex items-center gap-3 mb-4">
-                <span className="px-3 py-1 rounded-xl text-xs font-black uppercase text-emerald-400 border-2 border-emerald-400 bg-emerald-500/10">
-                  {isAr ? 'بوتات مجانية' : 'Free Bots'}
-                </span>
-                <div className="flex-1 h-px bg-white/10" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {freeBots.map((bot) => renderCard(bot, true))}
-              </div>
-            </section>
-          )}
-
-          {paidBots.length > 0 && (
-            <section>
-              <div className="flex items-center gap-3 mb-4">
-                <span className="px-3 py-1 rounded-xl text-xs font-black uppercase text-amber-400 border-2 border-amber-400/50 bg-amber-500/10">
-                  {isAr ? 'بوتات مدفوعة' : 'Paid Bots'}
-                </span>
-                <div className="flex-1 h-px bg-white/10" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {paidBots.map((bot) => renderCard(bot, false))}
-              </div>
-            </section>
-          )}
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-5 items-start rounded-2xl p-4 border ${isDark ? 'border-black/10 bg-black/5' : 'border-white/10 bg-white/5'}`}>
+          {sections.map((section, idx) => <React.Fragment key={idx}>{section}</React.Fragment>)}
         </div>
       )}
 
@@ -156,13 +210,13 @@ export default function StorePage({ lang, onBack, onBuyBot }: StorePageProps) {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative max-w-md w-full bg-brand-alt border border-emerald-500/40 rounded-[32px] p-8 text-center shadow-[0_32px_128px_-12px_rgba(16,185,129,0.4)]"
+            className={`relative max-w-md w-full rounded-[28px] p-8 text-center shadow-[0_32px_128px_-12px_rgba(16,185,129,0.4)] ${panelBg} border border-emerald-500/40`}
           >
             <div className="text-5xl mb-4 animate-bounce">📥</div>
-            <h3 className="text-xl font-black text-white">{isAr ? 'جاري تحميل البوت...' : 'Downloading bot...'}</h3>
-            <p className="text-sm text-slate-300 mt-2 font-bold">{downloading.name}</p>
-            <p className="text-xs text-slate-500 mt-1">{downloading.fileName}</p>
-            <div className="w-full h-2 bg-white/10 rounded-full mt-6 overflow-hidden">
+            <h3 className={`text-lg font-black ${pageTitle}`}>{isAr ? 'جاري تحميل البوت...' : 'Downloading bot...'}</h3>
+            <p className={`text-xs mt-2 font-bold ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>{downloading.name}</p>
+            <p className={`text-[10px] mt-1 ${pageSub}`}>{downloading.fileName}</p>
+            <div className="w-full h-1.5 bg-white/10 rounded-full mt-5 overflow-hidden">
               <div className="h-full w-full bg-emerald-500 animate-pulse rounded-full" />
             </div>
           </motion.div>

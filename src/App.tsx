@@ -2013,6 +2013,7 @@ export default function App() {
               <StorePage
                 lang={lang}
                 onBack={goBack}
+                isDark={isDark}
                 onBuyBot={(bot) => {
                   setBotPurchase(bot);
                   setPaymentPlan({ amount: bot.price / 100, label: '', durationDays: 0 });
