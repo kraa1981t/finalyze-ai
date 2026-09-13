@@ -154,8 +154,8 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
   })();
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pb-10">
-      <div className="flex items-center gap-3 mb-4">
+    <div className="w-full px-2 pb-10">
+      <div className="max-w-4xl mx-auto flex items-center gap-3 mb-4">
         <button
           onClick={onBack}
           className={`p-2 rounded-xl border transition-all ${isDark ? 'bg-black/5 border-black/10 text-slate-600 hover:text-black' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
@@ -165,7 +165,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
       </div>
 
       {/* Title */}
-      <div className="text-center mb-6">
+      <div className="text-center mb-6 px-4">
         <h2 className={`text-xl sm:text-2xl font-black ${pageTitle}`}>
           {isAr ? 'متجر بوتات التداول' : 'Trading Bots Store'}
         </h2>
@@ -185,7 +185,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
           <p className={`text-xs mt-1 font-bold ${pageSub}`}>{isAr ? 'ترقبوا الإضافات الجديدة قريباً' : 'New additions coming soon'}</p>
         </div>
       ) : (
-        <div className="flex flex-col md:flex-row md:items-stretch md:justify-between md:gap-1">
+        <div className="flex flex-col md:flex-row md:items-stretch md:justify-between md:gap-0">
           {columns.map((col, idx) => <React.Fragment key={idx}>{col}</React.Fragment>)}
         </div>
       )}
