@@ -87,3 +87,38 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
+
+// Standard elegant horizontal rectangle used for all bot preview images (16:9)
+const STORE_IMAGE_WIDTH = 800;
+const STORE_IMAGE_HEIGHT = 450;
+
+export function resizeImageToStandard(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const W = STORE_IMAGE_WIDTH;
+        const H = STORE_IMAGE_HEIGHT;
+        const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+        const sx = (img.naturalWidth - W / scale) / 2;
+        const sy = (img.naturalHeight - H / scale) / 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { URL.revokeObjectURL(url); reject(new Error('canvas')); return; }
+        ctx.fillStyle = '#0F172A';
+        ctx.fillRect(0, 0, W, H);
+        ctx.drawImage(img, sx, sy, W / scale, H / scale, 0, 0, W, H);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('invalid image')); };
+    img.src = url;
+  });
+}

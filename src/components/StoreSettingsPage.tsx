@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus } from 'lucide-react';
-import { StoreBot, fetchStoreBots, addStoreBot, deleteStoreBot, formatFileSize } from '../services/storeService';
+import { StoreBot, fetchStoreBots, addStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
 
 interface StoreSettingsPageProps {
   lang: 'ar' | 'en';
@@ -9,7 +9,6 @@ interface StoreSettingsPageProps {
 }
 
 const MAX_FILE_BYTES = 400 * 1024;
-const MAX_IMAGE_BYTES = 200 * 1024;
 
 export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPageProps) {
   const isAr = lang === 'ar';
@@ -46,17 +45,19 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
     reader.readAsDataURL(f);
   };
 
-  const handleImage = (f: File) => {
-    if (f.size > MAX_IMAGE_BYTES) {
-      setError(isAr ? 'الصورة أكبر من 200 كيلوبايت. يرجى اختيار صورة أصغر.' : 'Image exceeds 200 KB. Please choose a smaller image.');
+  const handleImage = async (f: File) => {
+    if (!f.type.startsWith('image/')) {
+      setError(isAr ? 'الملف المختار ليس صورة. اختر صورة صالحة.' : 'Selected file is not an image. Choose a valid image.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImage({ fileName: f.name, fileData: reader.result as string });
+    setSuccess('');
+    try {
+      const dataUrl = await resizeImageToStandard(f);
+      setImage({ fileName: f.name, fileData: dataUrl });
       setError('');
-    };
-    reader.readAsDataURL(f);
+    } catch {
+      setError(isAr ? 'تعذر قراءة الصورة. اختر صورة صالحة.' : 'Could not read the image. Choose a valid image.');
+    }
   };
 
   const handleAdd = async () => {
@@ -212,7 +213,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
               />
               {image && (
                 <div className="flex items-center gap-2">
-                  <img src={image.fileData} alt="preview" className="w-16 h-16 object-cover rounded-xl border border-white/10" />
+                  <img src={image.fileData} alt="preview" className="w-28 h-16 object-cover rounded-xl border border-white/10" />
                   <button
                     onClick={() => { setImage(null); if (imageInputRef.current) imageInputRef.current.value = ''; }}
                     className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-red-400 transition-all"
@@ -221,7 +222,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                   </button>
                 </div>
               )}
-              {!image && <span className="text-[15px] text-slate-500">{isAr ? 'png / jpg حتى 200 كيلوبايت' : 'png / jpg up to 200 KB'}</span>}
+              {!image && <span className="text-[15px] text-slate-500">{isAr ? 'جميع الصور تُحجَّم تلقائياً لحجم موحّد بأبعاد أفقية أنيقة' : 'All images are auto-resized to one elegant horizontal size'}</span>}
             </div>
           </div>
 
