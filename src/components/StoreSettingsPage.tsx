@@ -1,0 +1,240 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X } from 'lucide-react';
+import { StoreBot, fetchStoreBots, addStoreBot, deleteStoreBot, formatFileSize } from '../services/storeService';
+
+interface StoreSettingsPageProps {
+  lang: 'ar' | 'en';
+  onBack: () => void;
+}
+
+const MAX_FILE_BYTES = 600 * 1024;
+
+export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPageProps) {
+  const isAr = lang === 'ar';
+  const [bots, setBots] = useState<StoreBot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [priceInput, setPriceInput] = useState('');
+  const [file, setFile] = useState<{ fileName: string; fileType: string; fileSize: number; fileData: string } | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const refresh = () => {
+    fetchStoreBots().then((list) => { setBots(list); setLoading(false); });
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const handleFile = (f: File) => {
+    if (f.size > MAX_FILE_BYTES) {
+      setError(isAr ? 'الملف أكبر من 600 كيلوبايت. يرجى اختيار ملف أصغر.' : 'File exceeds 600 KB. Please choose a smaller file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFile({ fileName: f.name, fileType: f.type || 'application/octet-stream', fileSize: f.size, fileData: reader.result as string });
+      setError('');
+    };
+    reader.readAsDataURL(f);
+  };
+
+  const handleAdd = async () => {
+    if (!name.trim()) { setError(isAr ? 'أدخل اسم البوت' : 'Enter the bot name'); return; }
+    if (!file) { setError(isAr ? 'اختر ملف البوت (أي نوع)' : 'Choose the bot file (any type)'); return; }
+    const cents = Math.max(0, Math.round((parseFloat(priceInput) || 0) * 100));
+    setAdding(true);
+    try {
+      await addStoreBot({
+        name: name.trim(),
+        description: description.trim(),
+        price: cents,
+        fileName: file.fileName,
+        fileType: file.fileType,
+        fileSize: file.fileSize,
+        fileData: file.fileData,
+        createdAt: Date.now(),
+      });
+      setSuccess(isAr ? '✅ تمت إضافة البوت بنجاح' : '✅ Bot added successfully');
+      setName(''); setDescription(''); setPriceInput(''); setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      refresh();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch {
+      setError(isAr ? 'فشل الإضافة. حاول مجدداً.' : 'Failed to add. Try again.');
+    }
+    setAdding(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirmId !== id) { setConfirmId(id); setTimeout(() => setConfirmId(null), 3000); return; }
+    try {
+      await deleteStoreBot(id);
+      setBots((prev) => prev.filter((b) => b.id !== id));
+      setConfirmId(null);
+    } catch {}
+  };
+
+  const formatPrice = (price: number) => (price <= 0 ? 'مجاني' : `$${(price / 100).toFixed(2)}`);
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 pb-16">
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={onBack} className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all">
+          <ArrowLeft size={18} />
+        </button>
+        <h2 className="text-xl font-black text-white">{isAr ? 'إعدادات متجر البوتات والمؤشرات' : 'Bots & Indicators Store Settings'}</h2>
+      </div>
+
+      {/* Add form */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8"
+      >
+        <h3 className="text-sm font-black uppercase text-amber-400 tracking-widest mb-4">{isAr ? 'إضافة بوت جديد' : 'Add New Bot'}</h3>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>
+        )}
+        {success && (
+          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm rounded-xl px-4 py-3 mb-4">{success}</div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'اسم البوت' : 'Bot Name'}</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={isAr ? 'مثال: بوت الاتجاه الذكي' : 'e.g. Smart Trend Bot'}
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'وصف قصير' : 'Short Description'}</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder={isAr ? 'وصف مختصر لما يقدمه البوت...' : 'Short description of what the bot does...'}
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-amber-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'السعر (اضبط 0 للمجاني)' : 'Price (0 = Free)'}</label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black text-white">$</span>
+              <input
+                type="number"
+                value={priceInput}
+                onChange={(e) => setPriceInput(e.target.value)}
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                className="w-40 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-amber-500"
+              />
+              <span className="text-[10px] text-slate-500">{isAr ? 'أدنى سعر 1 سنت' : 'Minimum price 1 cent'}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'ملف البوت (أي نوع ملف)' : 'Bot File (any file type)'}</label>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all text-xs font-black"
+              >
+                <Upload size={16} />
+                {isAr ? 'اختر ملف' : 'Choose File'}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+              />
+              {file && (
+                <span className="flex items-center gap-2 text-xs text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                  <FileText size={14} className="text-emerald-400" />
+                  <span className="font-bold truncate max-w-[180px]">{file.fileName}</span>
+                  <span className="text-slate-500">({formatFileSize(file.fileSize)})</span>
+                  <button onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-slate-500 hover:text-red-400">
+                    <X size={14} />
+                  </button>
+                </span>
+              )}
+              {!file && <span className="text-[10px] text-slate-500">{isAr ? 'حتى 600 كيلوبايت' : 'Up to 600 KB'}</span>}
+            </div>
+          </div>
+
+          <button
+            onClick={handleAdd}
+            disabled={adding}
+            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-[#F59E0B] text-black font-black text-sm uppercase tracking-wider shadow-lg shadow-[#F59E0B]/30 hover:bg-[#d97706] active:scale-95 transition-all disabled:opacity-50"
+          >
+            <Plus size={18} />
+            {adding ? (isAr ? 'جاري الإضافة...' : 'Adding...') : (isAr ? 'إضافة البوت' : 'Add Bot')}
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Existing bots */}
+      <h3 className="text-sm font-black uppercase text-slate-400 tracking-widest mb-4">
+        {isAr ? `البوتات في المتجر (${bots.length})` : `Bots in store (${bots.length})`}
+      </h3>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-10 h-10 rounded-full border-4 border-amber-500/30 border-t-amber-500 animate-spin" />
+        </div>
+      ) : bots.length === 0 ? (
+        <div className="text-center py-16 text-slate-500 text-sm">
+          {isAr ? 'لا توجد بوتات بعد. أضف أول بوت من الأعلى.' : 'No bots yet. Add the first one above.'}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <AnimatePresence>
+            {bots.map((bot) => (
+              <motion.div
+                key={bot.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white/5 border border-white/10 rounded-2xl p-5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h4 className="text-base font-black text-white truncate">{bot.name}</h4>
+                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase border ${bot.price <= 0 ? 'text-emerald-400 border-emerald-400/50 bg-emerald-500/10' : 'text-amber-400 border-amber-400/50 bg-amber-500/10'}`}>
+                      {formatPrice(bot.price)}
+                    </span>
+                    {bot.fileName && (
+                      <span className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-2">
+                        <FileText size={10} /> {bot.fileName} {bot.fileSize ? `(${formatFileSize(bot.fileSize)})` : ''}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDelete(bot.id!)}
+                    className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${confirmId === bot.id ? 'bg-red-500 text-white' : 'bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20'}`}
+                  >
+                    {confirmId === bot.id ? (<><Check size={12} /> {isAr ? 'تأكيد' : 'Confirm'}</>) : (<><Trash2 size={12} /> {isAr ? 'حذف' : 'Delete'}</>)}
+                  </button>
+                </div>
+                {bot.description && <p className="text-xs text-slate-400 mt-3 leading-relaxed">{bot.description}</p>}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+    </div>
+  );
+}

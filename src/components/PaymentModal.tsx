@@ -4,6 +4,7 @@ import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalL
 import { fetchCryptoPricesDirect } from '../services/apiDirect';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { StoreBot, downloadBot, recordBotPurchase } from '../services/storeService';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
@@ -55,6 +56,12 @@ interface PaymentModalProps {
   lang?: 'en' | 'ar';
   freemiumDisabled?: boolean;
   onFreemiumToggle?: (v: boolean) => void;
+  botPurchase?: StoreBot | null;
+  sectionTab?: 'bot' | 'plan';
+  onBotPaid?: (bot: StoreBot) => void;
+  onGoToStore?: () => void;
+  onGoToPlans?: () => void;
+  buyerEmail?: string;
 }
 
 const TIMER_STORAGE_KEY = 'payment_timer_minutes';
@@ -64,8 +71,9 @@ const BLOCKCYPHER_CHAINS: Record<string, string> = {
   btc: 'btc/main', eth: 'eth/main', ltc: 'ltc/main',
 };
 
-export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle, botPurchase, sectionTab = 'bot', onBotPaid, onGoToStore, onGoToPlans, buyerEmail }: PaymentModalProps) {
   const isAr = lang === 'ar';
+  const [section, setSection] = useState<'bot' | 'plan'>(sectionTab || 'bot');
   const [addresses, setAddresses] = useState<CryptoAddress[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -113,6 +121,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
   useEffect(() => {
     if (isOpen) {
+      setSection(sectionTab || 'bot');
       setEditAddresses(JSON.parse(JSON.stringify(addresses)));
       setCopiedId(null);
       setNewAddress({ id: '', name: '', address: '' });
@@ -254,6 +263,13 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
   if (!isOpen) return null;
 
+  const isBotSection = section === 'bot' && !!botPurchase;
+  const isPlanSection = section === 'plan' && !botPurchase;
+  const showBotDummy = section === 'bot' && !botPurchase && !manageMode;
+  const showPlanDummy = section === 'plan' && !!botPurchase;
+  const showAddresses = !showBotDummy && !showPlanDummy;
+  const currentLabel = isBotSection ? botPurchase!.name : planLabel;
+
   const pageInner = (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -263,12 +279,56 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           </button>
           <div>
             <h3 className="text-xl font-bold text-white">{isAr ? (manageMode ? 'إدارة عناوين الدفع' : 'إتمام الدفع') : (manageMode ? 'Payment Settings' : 'Complete Payment')}</h3>
-            {!manageMode && <p className="text-sm text-slate-400">{planLabel} Plan - ${amount} USD</p>}
+            {!manageMode && <p className="text-sm text-slate-400">{isBotSection ? `${botPurchase!.name} - $${amount} USD` : `${currentLabel} Plan - $${amount} USD`}</p>}
           </div>
         </div>
       </div>
 
-      {!manageMode && !selectedCoinId && (
+      {/* Section switcher — Bots (default) vs Plans */}
+      {!manageMode && (
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <button
+            onClick={() => setSection('bot')}
+            className={`flex items-center justify-center gap-2 py-3 rounded-2xl border-2 text-xs font-black uppercase tracking-wider transition-all ${
+              section === 'bot'
+                ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400 shadow-[0_0_25px_-6px_rgba(16,185,129,0.7)]'
+                : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
+            }`}
+          >
+            🛒 {isAr ? 'بوتات التداول' : 'Trading Bots'}
+          </button>
+          <button
+            onClick={() => setSection('plan')}
+            className={`flex items-center justify-center gap-2 py-3 rounded-2xl border-2 text-xs font-black uppercase tracking-wider transition-all ${
+              section === 'plan'
+                ? 'border-amber-500 bg-amber-500/15 text-amber-400 shadow-[0_0_25px_-6px_rgba(245,158,11,0.7)]'
+                : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
+            }`}
+          >
+            ⚡ {isAr ? 'الخطط' : 'Plans'}
+          </button>
+        </div>
+      )}
+
+      {/* Dummy panels when the section has no product selected */}
+      {(showBotDummy || showPlanDummy) && (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+          <p className="text-lg mb-4">{showBotDummy ? '🛒' : '⚡'}</p>
+          <p className="text-sm font-bold text-slate-300 mb-5">
+            {showBotDummy
+              ? (isAr ? 'هذه الصفحة لإتمام شراء البوتات. اختر بوتاً من المتجر أولاً.' : 'This page completes bot purchases. First pick a bot from the store.')
+              : (isAr ? 'هذه الصفحة لشراء الخطط. اختر خطة من صفحة الخطط أولاً.' : 'This page is for plans. Pick a plan from the plans page first.')}
+          </p>
+          <button
+            onClick={showBotDummy ? onGoToStore : onGoToPlans}
+            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-black transition-all active:scale-95 shadow-lg ${showBotDummy ? 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/30' : 'bg-amber-500 hover:bg-amber-400 shadow-amber-500/30'}`}
+          >
+            {showBotDummy ? (isAr ? 'الذهاب للمتجر' : 'Go to Store') : (isAr ? 'الذهاب للخطط' : 'Go to Plans')}
+          </button>
+        </div>
+      )}
+
+      {!manageMode && showAddresses && !selectedCoinId && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6">
           <p className="text-sm text-amber-400 font-bold text-center">
             {isAr ? 'اختر عملة وانسخ العنوان للدفع. سيظهر العداد والمبلغ بعد النسخ.' : 'Choose a coin and copy the address to pay. The timer and amount will appear after copying.'}
@@ -284,6 +344,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         </div>
       )}
 
+      {showAddresses && (
       <div className="relative">
         <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
         {addresses.length === 0 && !isAdmin && (
@@ -403,7 +464,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                     <span className="text-[10px] text-slate-400 block">{item.address.slice(0, 16)}...</span>
                   </div>
                 </div>
-                <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">{planLabel}</span>
+                <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">{isBotSection ? botPurchase!.name : currentLabel}</span>
               </div>
 
               <div className="bg-black/40 rounded-2xl px-5 py-4 text-center border border-emerald-500/20 mb-4">
@@ -434,7 +495,15 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               )}
 
               <button
-                onClick={() => { if (paymentConfirmed) onConfirm?.(); }}
+                onClick={() => {
+                  if (!paymentConfirmed) return;
+                  if (section === 'bot' && botPurchase) {
+                    downloadBot(botPurchase);
+                    recordBotPurchase(botPurchase, buyerEmail || notificationEmail).then(() => onBotPaid?.(botPurchase));
+                  } else {
+                    onConfirm?.();
+                  }
+                }}
                 disabled={!paymentConfirmed}
                 className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
                   paymentConfirmed
@@ -442,12 +511,16 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                     : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
                 }`}
               >
-                {paymentConfirmed ? '🟢 Activate Plan' : (isAr ? '🔴 في انتظار الدفع...' : '🔴 Awaiting payment...')}
+                {paymentConfirmed
+                  ? (section === 'bot' && botPurchase ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : '🟢 Activate Plan')
+                  : (isAr ? '🔴 في انتظار الدفع...' : '🔴 Awaiting payment...')}
               </button>
 
               {paymentDetected && (
                 <p className="text-[10px] text-emerald-400 text-center font-bold mt-2">
-                  {isAr ? '✅ تم اكتشاف وصول المبلغ! اضغط "Activate Plan" لتفعيل خطتك.' : '✅ Payment received! Press "Activate Plan" to activate your plan.'}
+                  {isAr
+                    ? (section === 'bot' && botPurchase ? '✅ تم اكتشاف وصول المبلغ! اضغط "تحميل البوت الآن" لتحميل ملف البوت تلقائياً.' : '✅ تم اكتشاف وصول المبلغ! اضغط "Activate Plan" لتفعيل خطتك.')
+                    : (section === 'bot' && botPurchase ? '✅ Payment received! Press "Download Bot Now" to auto-download the bot file.' : '✅ Payment received! Press "Activate Plan" to activate your plan.')}
                 </p>
               )}
               {timerSeconds <= 0 && !paymentDetected && (
@@ -465,6 +538,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           );
         })()}
       </div>
+      )}
 
         <AnimatePresence>
           {isAdmin && (
@@ -629,7 +703,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         </div>
       </>)}
 
-      {!manageMode && (
+      {!manageMode && showAddresses && (
         <p className="text-center text-[10px] text-slate-500 mt-4">
           {isAr ? `بعد النسخ، أرسل المبلغ إلى العنوان. الوقت المتبقي: ${Math.floor(timerSeconds / 60)} دقيقة` : `After copying, send the amount to the address. Time remaining: ${Math.floor(timerSeconds / 60)} min`}
         </p>

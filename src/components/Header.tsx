@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell, ExternalLink, Smartphone, Tablet, X, Settings, Key, DollarSign, Wallet, Users, User, Crown, Info, Lightbulb, Monitor, CalendarDays } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell, ExternalLink, Smartphone, Tablet, X, Settings, Key, DollarSign, Wallet, Users, User, Crown, Info, Lightbulb, Monitor, CalendarDays, Store } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings } from '../types';
 import { initAudio } from '../lib/audioEngine';
@@ -61,7 +61,7 @@ interface HeaderProps {
   showRadarComplete?: boolean;
   onPreview?: (device: 'phone' | 'tablet') => void;
   isPWA?: boolean;
-  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis') => void;
+  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings') => void;
   freemiumDisabled?: boolean;
   compact?: boolean;
 }
@@ -358,6 +358,11 @@ export default function Header({
                     <Wallet size={18} className="text-[#F59E0B]" />
                     <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'عناوين الدفع' : 'Payment Addresses'}</span>
                   </button>
+                  <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('storeSettings'); }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
+                    <Store size={18} className="text-[#F59E0B]" />
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'إعدادات المتجر' : 'Store Settings'}</span>
+                  </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('clientMonitor'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Users size={18} className="text-[#F59E0B]" />
@@ -411,6 +416,11 @@ export default function Header({
                       <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'شراء خطة' : 'Buy Plan'}</span>
                     </button>
                   )}
+                  <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('store'); }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-sky-500/20 hover:bg-sky-500/40 transition-all shadow-sm">
+                    <Store size={18} className="text-sky-500" />
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'متجر البوتات' : 'Bots Store'}</span>
+                  </button>
                 </>
               )}
 
@@ -619,6 +629,18 @@ export default function Header({
             {/* Icons - desktop only | MOBILE: all icons moved into sidebar menu */}
             {!isPWA && (
             <div className="hidden md:flex items-center gap-2 flex-1 min-w-0 justify-end">
+              {/* Store | MOBILE: moved to sidebar (hidden md:flex) — placed LEFT of Trade */}
+              <button
+                onClick={() => onNavigatePage?.('store')}
+                className="hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/30 active:scale-95 transition-all border border-black/10 flex-shrink-0"
+                title={lang === 'ar' ? 'متجر البوتات' : 'Bots Store'}
+              >
+                <Store size={24} className="flex-shrink-0" />
+                <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                  {lang === 'ar' ? 'المتجر' : 'Store'}
+                </span>
+              </button>
+
               {/* Trade Now | MOBILE: moved to sidebar (hidden md:flex) */}
               <button
                 onClick={() => onNavigatePage?.('trade')}

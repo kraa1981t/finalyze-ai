@@ -33,6 +33,9 @@ import ProfilePage from './components/ProfilePage';
 import AboutPage from './components/AboutPage';
 import SuggestionsPage from './components/SuggestionsPage';
 import TradeNowPage from './components/TradeNowPage';
+import StorePage from './components/StorePage';
+import StoreSettingsPage from './components/StoreSettingsPage';
+import { StoreBot } from './services/storeService';
 
 function hasAnyStoredKey(): boolean {
   try {
@@ -56,6 +59,7 @@ export default function App() {
   const [redirecting, setRedirecting] = useState(false);
   const [manualAuthUrl, setManualAuthUrl] = useState<string | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string; durationDays: number } | null>(null);
+  const [botPurchase, setBotPurchase] = useState<StoreBot | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => {
     const k1 = localStorage.getItem('finalyze_key1_value');
     const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
@@ -120,12 +124,12 @@ export default function App() {
     }
     setNeedsApiKeyState(email);
   };
-  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' => {
+  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' => {
     const hash = window.location.hash.slice(1);
-    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis'].includes(hash)) return hash as any;
+    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings'].includes(hash)) return hash as any;
     return 'main';
   };
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis'>(getPageFromHash);
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings'>(getPageFromHash);
   const navStackRef = useRef<string[]>([]);
 
   const navigateTo = (page: any) => {
@@ -625,8 +629,8 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis'];
-    const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis'];
+    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings'];
+    const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis', 'storeSettings'];
     const onHashChange = () => {
       const hash = window.location.hash.slice(1);
       if (!VALID_PAGES.includes(hash)) { setActivePage('main'); return; }
@@ -1886,11 +1890,17 @@ export default function App() {
               <PaymentModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => { setPaymentPlan(null); goBack(); }}
+                onClose={() => { setPaymentPlan(null); setBotPurchase(null); goBack(); }}
                 planLabel={paymentPlan?.label || ''}
                 amount={paymentPlan?.amount || 0}
                 asPage
                 lang={lang}
+                botPurchase={botPurchase}
+                sectionTab={botPurchase ? 'bot' : 'plan'}
+                buyerEmail={user?.email || ''}
+                onBotPaid={() => { setBotPurchase(null); setPaymentPlan(null); goBack(); }}
+                onGoToStore={() => { setPaymentPlan(null); setBotPurchase(null); navigateTo('store'); }}
+                onGoToPlans={() => { setPaymentPlan(null); setBotPurchase(null); navigateTo('plans'); }}
                 onConfirm={() => {
                   const plan = paymentPlan!;
                   const expiryDate = new Date();
@@ -1991,6 +2001,25 @@ export default function App() {
 
             {effectivePage === 'trade' && (
               <TradeNowPage lang={lang} user={user} signals={topSignals} />
+            )}
+
+            {effectivePage === 'store' && (
+              <StorePage
+                lang={lang}
+                onBack={goBack}
+                onBuyBot={(bot) => {
+                  setBotPurchase(bot);
+                  setPaymentPlan({ amount: bot.price / 100, label: '', durationDays: 0 });
+                  navigateTo('plans');
+                }}
+              />
+            )}
+
+            {effectivePage === 'storeSettings' && isDeveloperSession() && (
+              <StoreSettingsPage
+                lang={lang}
+                onBack={goBack}
+              />
             )}
 
             {effectivePage === 'manualAnalysis' && isDeveloperSession() && (

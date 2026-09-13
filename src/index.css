@@ -497,3 +497,12 @@ body.light .panel-strip .strip-title {
     width: 100% !important;
   }
 }
+
+/* Bots store: flashing "مجاني" badge */
+@keyframes flash-fast {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+.animate-flash-fast {
+  animation: flash-fast 0.8s ease-in-out infinite;
+}
