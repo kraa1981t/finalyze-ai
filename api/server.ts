@@ -1175,4 +1175,40 @@ async function callGoogle(apiKey: string, prompt: string) {
   return { error: lastError };
 }
 
+// FaucetPay Payment Status (in-memory cache for callbacks within same instance)
+const faucetPayPayments = new Map<string, { confirmed: boolean; confirmedAt: number; amount: number }>();
+
+// API Route: FaucetPay callback (FaucetPay calls this when payment is received)
+app.get("/api/faucetpayCallback", (req, res) => {
+  const { payment_id, transaction_id, amount, currency, custom } = req.query;
+  if (!payment_id || !amount) {
+    return res.status(400).send("Missing payment parameters");
+  }
+  faucetPayPayments.set(String(payment_id), {
+    confirmed: true,
+    confirmedAt: Date.now(),
+    amount: Number(amount),
+  });
+  // Clean old entries (>10 min)
+  const now = Date.now();
+  for (const [key, val] of faucetPayPayments) {
+    if (now - val.confirmedAt > 600000) faucetPayPayments.delete(key);
+  }
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "https://joseph-trading.vercel.app";
+  res.redirect(`${baseUrl}/#/store?payment_confirmed=${payment_id}`);
+});
+
+// API Route: Check if a FaucetPay payment is confirmed
+app.get("/api/faucetpayCheck", (req, res) => {
+  const { payment_id } = req.query;
+  if (!payment_id) return res.json({ confirmed: false });
+  const record = faucetPayPayments.get(String(payment_id));
+  if (record && record.confirmed) {
+    return res.json({ confirmed: true, amount: record.amount });
+  }
+  return res.json({ confirmed: false });
+});
+
 export default app;
