@@ -1799,6 +1799,7 @@ export default function App() {
         isPWA={isPWA || window.self !== window.top}
         onNavigatePage={(page) => { navigateTo(page); setIsSidebarOpen(false); }}
         freemiumDisabled={freemiumDisabled}
+        storeActive={effectivePage === 'store'}
         compact={effectivePage === 'trade'}
       />
 

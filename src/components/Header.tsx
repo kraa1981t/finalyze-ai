@@ -63,6 +63,7 @@ interface HeaderProps {
   isPWA?: boolean;
   onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings') => void;
   freemiumDisabled?: boolean;
+  storeActive?: boolean;
   compact?: boolean;
 }
 
@@ -101,6 +102,7 @@ export default function Header({
   isPWA: isPWAMode = false,
   onNavigatePage,
   freemiumDisabled = false,
+  storeActive = false,
   compact = false,
 }: HeaderProps) {
   const t = translations[lang];
@@ -640,7 +642,7 @@ export default function Header({
                 <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
                   {lang === 'ar' ? 'المتجر' : 'Store'}
                 </span>
-                <span className="animate-flash-fast px-2 py-0.5 rounded-lg bg-white text-sky-600 text-xs font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                <span className={cn("px-2 py-0.5 rounded-lg bg-white text-sky-600 text-xs font-black uppercase tracking-wider whitespace-nowrap leading-none", !storeActive && 'animate-flash-fast')}>
                   {lang === 'ar' ? 'مجاني' : 'Free'}
                 </span>
               </button>
