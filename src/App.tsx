@@ -201,6 +201,11 @@ export default function App() {
   const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis'];
   const effectivePage = (DEV_ONLY_PAGES.includes(activePage) && !isDeveloperSession()) ? 'main' : activePage;
 
+  const [storeVisited, setStoreVisited] = useState(false);
+  useEffect(() => {
+    if (effectivePage === 'store') setStoreVisited(true);
+  }, [effectivePage]);
+
   // CLIENT: Mirror results from developer via Firestore ΓÇö poll collection every 10s, NO orderBy
   useEffect(() => {
     if (isDeveloperSession()) return;
@@ -1799,7 +1804,7 @@ export default function App() {
         isPWA={isPWA || window.self !== window.top}
         onNavigatePage={(page) => { navigateTo(page); setIsSidebarOpen(false); }}
         freemiumDisabled={freemiumDisabled}
-        storeActive={effectivePage === 'store'}
+        storeVisited={storeVisited}
         compact={effectivePage === 'trade'}
       />
 
