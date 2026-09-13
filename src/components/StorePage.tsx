@@ -53,7 +53,7 @@ export default function StorePage({ lang, onBack, onBuyBot }: StorePageProps) {
         </div>
         <span className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-black uppercase border-2 ${
           isFree
-            ? 'text-emerald-400 border-emerald-400/60 bg-emerald-500/10 animate-flash-fast'
+            ? 'text-emerald-400 border-emerald-400/60 bg-emerald-500/10'
             : 'text-amber-400 border-amber-400/40 bg-amber-500/10'
         }`}>
           {isFree ? 'مجاني' : formatPrice(bot.price)}
@@ -92,21 +92,12 @@ export default function StorePage({ lang, onBack, onBuyBot }: StorePageProps) {
         </button>
       </div>
 
-      {/* Title: flashing bright "مجاني" badge + store title */}
+      {/* Title */}
       <div className="text-center mb-10">
-        <div className="flex items-center justify-center gap-3 flex-wrap">
-          <motion.span
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="animate-flash-fast px-5 py-1.5 rounded-2xl text-xl sm:text-2xl font-black uppercase text-emerald-400 border-2 border-emerald-400 bg-emerald-500/15 shadow-[0_0_35px_-4px_rgba(16,185,129,0.9)] tracking-widest"
-          >
-            مجاني
-          </motion.span>
-          <h2 className="text-2xl sm:text-3xl font-black text-white">
-            {isAr ? 'متجر بوتات التداول' : 'Trading Bots Store'}
-          </h2>
-        </div>
-        <p className="text-sm text-slate-400 mt-3">{isAr ? 'بوتات ومؤشرات ذكية لتحليل التداول'.concat(' — انتبه للقسم المجاني') : 'Smart bots & indicators for trading analysis — check the FREE section'}</p>
+        <h2 className="text-2xl sm:text-3xl font-black text-white">
+          {isAr ? 'متجر بوتات التداول' : 'Trading Bots Store'}
+        </h2>
+        <p className="text-sm text-slate-400 mt-3">{isAr ? 'بوتات ومؤشرات ذكية لتحليل التداول — انتبه للقسم المجاني' : 'Smart bots & indicators for trading analysis — check the FREE section'}</p>
       </div>
 
       {loading ? (
@@ -124,7 +115,7 @@ export default function StorePage({ lang, onBack, onBuyBot }: StorePageProps) {
           {freeBots.length > 0 && (
             <section>
               <div className="flex items-center gap-3 mb-4">
-                <span className="animate-flash-fast px-3 py-1 rounded-xl text-xs font-black uppercase text-emerald-400 border-2 border-emerald-400 bg-emerald-500/10">
+                <span className="px-3 py-1 rounded-xl text-xs font-black uppercase text-emerald-400 border-2 border-emerald-400 bg-emerald-500/10">
                   {isAr ? 'بوتات مجانية' : 'Free Bots'}
                 </span>
                 <div className="flex-1 h-px bg-white/10" />
