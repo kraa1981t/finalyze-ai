@@ -8,7 +8,8 @@ interface StoreSettingsPageProps {
   onBack: () => void;
 }
 
-const MAX_FILE_BYTES = 400 * 1024;
+const MAX_FILE_BYTES = 300 * 1024;
+const MAX_DOC_BYTES = 900 * 1024;
 
 export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPageProps) {
   const isAr = lang === 'ar';
@@ -66,6 +67,11 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
     const cents = Math.max(0, Math.round((parseFloat(priceInput) || 0) * 100));
     setAdding(true);
     try {
+      if (new Blob([file.fileData, image?.fileData || '']).size > MAX_DOC_BYTES) {
+        setError(isAr ? 'حجم الملف مع الصورة كبير جداً. اختر ملف أصغر أو صورة أخف.' : 'File + image total is too large. Choose a smaller file or lighter image.');
+        setAdding(false);
+        return;
+      }
       await addStoreBot({
         name: name.trim(),
         description: description.trim(),
@@ -83,8 +89,9 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
       if (imageInputRef.current) imageInputRef.current.value = '';
       refresh();
       setTimeout(() => setSuccess(''), 3000);
-    } catch {
-      setError(isAr ? 'فشل الإضافة. حاول مجدداً.' : 'Failed to add. Try again.');
+    } catch (err: any) {
+      const msg = err?.message || '';
+      setError(isAr ? 'فشل الإضافة: ' + msg : 'Failed to add: ' + msg);
     }
     setAdding(false);
   };
@@ -190,7 +197,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                   </button>
                 </span>
               )}
-              {!file && <span className="text-[15px] text-slate-500">{isAr ? 'حتى 400 كيلوبايت' : 'Up to 400 KB'}</span>}
+              {!file && <span className="text-[15px] text-slate-500">{isAr ? 'حتى 300 كيلوبايت' : 'Up to 300 KB'}</span>}
             </div>
           </div>
 

@@ -89,8 +89,8 @@ export function formatFileSize(bytes: number): string {
 }
 
 // Standard elegant horizontal rectangle used for all bot preview images (16:9)
-const STORE_IMAGE_WIDTH = 800;
-const STORE_IMAGE_HEIGHT = 450;
+const STORE_IMAGE_WIDTH = 640;
+const STORE_IMAGE_HEIGHT = 360;
 
 export function resizeImageToStandard(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -112,7 +112,7 @@ export function resizeImageToStandard(file: File): Promise<string> {
         ctx.fillRect(0, 0, W, H);
         ctx.drawImage(img, sx, sy, W / scale, H / scale, 0, 0, W, H);
         URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
       } catch (err) {
         URL.revokeObjectURL(url);
         reject(err);
