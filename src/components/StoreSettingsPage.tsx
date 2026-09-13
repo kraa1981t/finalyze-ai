@@ -105,7 +105,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         <button onClick={onBack} className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all">
           <ArrowLeft size={18} />
         </button>
-        <h2 className="text-xl font-black text-white">{isAr ? 'إعدادات متجر البوتات والمؤشرات' : 'Bots & Indicators Store Settings'}</h2>
+        <h2 className="text-[40px] font-black text-white">{isAr ? 'إعدادات متجر البوتات والمؤشرات' : 'Bots & Indicators Store Settings'}</h2>
       </div>
 
       {/* Add form */}
@@ -114,42 +114,42 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         animate={{ opacity: 1, y: 0 }}
         className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8"
       >
-        <h3 className="text-sm font-black uppercase text-amber-400 tracking-widest mb-4">{isAr ? 'إضافة بوت جديد' : 'Add New Bot'}</h3>
+        <h3 className="text-3xl font-black uppercase text-amber-400 tracking-widest mb-4">{isAr ? 'إضافة بوت جديد' : 'Add New Bot'}</h3>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-3xl rounded-xl px-4 py-3 mb-4">{error}</div>
         )}
         {success && (
-          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm rounded-xl px-4 py-3 mb-4">{success}</div>
+          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-3xl rounded-xl px-4 py-3 mb-4">{success}</div>
         )}
 
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'اسم البوت' : 'Bot Name'}</label>
+            <label className="text-2xl font-black text-slate-400 mb-1.5 block">{isAr ? 'اسم البوت' : 'Bot Name'}</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={isAr ? 'مثال: بوت الاتجاه الذكي' : 'e.g. Smart Trend Bot'}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-amber-500"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-3xl text-white outline-none focus:border-amber-500"
             />
           </div>
 
           <div>
-            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'وصف قصير' : 'Short Description'}</label>
+            <label className="text-2xl font-black text-slate-400 mb-1.5 block">{isAr ? 'وصف قصير' : 'Short Description'}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               placeholder={isAr ? 'وصف مختصر لما يقدمه البوت...' : 'Short description of what the bot does...'}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-amber-500 resize-none"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-3xl text-white outline-none focus:border-amber-500 resize-none"
             />
           </div>
 
           <div>
-            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'السعر (اضبط 0 للمجاني)' : 'Price (0 = Free)'}</label>
+            <label className="text-2xl font-black text-slate-400 mb-1.5 block">{isAr ? 'السعر (اضبط 0 للمجاني)' : 'Price (0 = Free)'}</label>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-white">$</span>
+              <span className="text-3xl font-black text-white">$</span>
               <input
                 type="number"
                 value={priceInput}
@@ -157,18 +157,18 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                 min="0"
                 step="0.01"
                 placeholder="0.00"
-                className="w-40 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-amber-500"
+                className="w-40 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-3xl text-white outline-none focus:border-amber-500"
               />
-              <span className="text-[10px] text-slate-500">{isAr ? 'أدنى سعر 1 سنت' : 'Minimum price 1 cent'}</span>
+              <span className="text-xl text-slate-500">{isAr ? 'أدنى سعر 1 سنت' : 'Minimum price 1 cent'}</span>
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'ملف البوت (أي نوع ملف)' : 'Bot File (any file type)'}</label>
+            <label className="text-2xl font-black text-slate-400 mb-1.5 block">{isAr ? 'ملف البوت (أي نوع ملف)' : 'Bot File (any file type)'}</label>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all text-xs font-black"
+                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all text-2xl font-black"
               >
                 <Upload size={16} />
                 {isAr ? 'اختر ملف' : 'Choose File'}
@@ -180,7 +180,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
               />
               {file && (
-                <span className="flex items-center gap-2 text-xs text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                <span className="flex items-center gap-2 text-2xl text-slate-300 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
                   <FileText size={14} className="text-emerald-400" />
                   <span className="font-bold truncate max-w-[180px]">{file.fileName}</span>
                   <span className="text-slate-500">({formatFileSize(file.fileSize)})</span>
@@ -189,16 +189,16 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                   </button>
                 </span>
               )}
-              {!file && <span className="text-[10px] text-slate-500">{isAr ? 'حتى 400 كيلوبايت' : 'Up to 400 KB'}</span>}
+              {!file && <span className="text-xl text-slate-500">{isAr ? 'حتى 400 كيلوبايت' : 'Up to 400 KB'}</span>}
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'صورة تعكس آلية عمل البوت (اختياري)' : 'Image showing how the bot works (optional)'}</label>
+            <label className="text-2xl font-black text-slate-400 mb-1.5 block">{isAr ? 'صورة تعكس آلية عمل البوت (اختياري)' : 'Image showing how the bot works (optional)'}</label>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => imageInputRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 transition-all text-xs font-black"
+                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 transition-all text-2xl font-black"
               >
                 <ImagePlus size={16} />
                 {isAr ? 'اختر صورة' : 'Choose Image'}
@@ -221,14 +221,14 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                   </button>
                 </div>
               )}
-              {!image && <span className="text-[10px] text-slate-500">{isAr ? 'png / jpg حتى 200 كيلوبايت' : 'png / jpg up to 200 KB'}</span>}
+              {!image && <span className="text-xl text-slate-500">{isAr ? 'png / jpg حتى 200 كيلوبايت' : 'png / jpg up to 200 KB'}</span>}
             </div>
           </div>
 
           <button
             onClick={handleAdd}
             disabled={adding}
-            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-[#F59E0B] text-black font-black text-sm uppercase tracking-wider shadow-lg shadow-[#F59E0B]/30 hover:bg-[#d97706] active:scale-95 transition-all disabled:opacity-50"
+            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-[#F59E0B] text-black font-black text-3xl uppercase tracking-wider shadow-lg shadow-[#F59E0B]/30 hover:bg-[#d97706] active:scale-95 transition-all disabled:opacity-50"
           >
             <Plus size={18} />
             {adding ? (isAr ? 'جاري الإضافة...' : 'Adding...') : (isAr ? 'إضافة البوت' : 'Add Bot')}
@@ -237,7 +237,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
       </motion.div>
 
       {/* Existing bots */}
-      <h3 className="text-sm font-black uppercase text-slate-400 tracking-widest mb-4">
+      <h3 className="text-3xl font-black uppercase text-slate-400 tracking-widest mb-4">
         {isAr ? `البوتات في المتجر (${bots.length})` : `Bots in store (${bots.length})`}
       </h3>
 
@@ -246,7 +246,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
           <div className="w-10 h-10 rounded-full border-4 border-amber-500/30 border-t-amber-500 animate-spin" />
         </div>
       ) : bots.length === 0 ? (
-        <div className="text-center py-16 text-slate-500 text-sm">
+        <div className="text-center py-16 text-slate-500 text-3xl">
           {isAr ? 'لا توجد بوتات بعد. أضف أول بوت من الأعلى.' : 'No bots yet. Add the first one above.'}
         </div>
       ) : (
@@ -262,19 +262,19 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h4 className="text-base font-black text-white truncate">{bot.name}</h4>
-                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase border ${bot.price <= 0 ? 'text-emerald-400 border-emerald-400/50 bg-emerald-500/10' : 'text-amber-400 border-amber-400/50 bg-amber-500/10'}`}>
+                    <h4 className="text-[32px] font-black text-white truncate">{bot.name}</h4>
+                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-lg text-xl font-black uppercase border ${bot.price <= 0 ? 'text-emerald-400 border-emerald-400/50 bg-emerald-500/10' : 'text-amber-400 border-amber-400/50 bg-amber-500/10'}`}>
                       {formatPrice(bot.price)}
                     </span>
                     {bot.fileName && (
-                      <span className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-2">
+                      <span className="flex items-center gap-1.5 text-xl text-slate-400 mt-2">
                         <FileText size={10} /> {bot.fileName} {bot.fileSize ? `(${formatFileSize(bot.fileSize)})` : ''}
                       </span>
                     )}
                   </div>
                   <button
                     onClick={() => handleDelete(bot.id!)}
-                    className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${confirmId === bot.id ? 'bg-red-500 text-white' : 'bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20'}`}
+                    className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-xl font-black uppercase transition-all ${confirmId === bot.id ? 'bg-red-500 text-white' : 'bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20'}`}
                   >
                     {confirmId === bot.id ? (<><Check size={12} /> {isAr ? 'تأكيد' : 'Confirm'}</>) : (<><Trash2 size={12} /> {isAr ? 'حذف' : 'Delete'}</>)}
                   </button>
@@ -282,7 +282,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                 {bot.imageData && (
                   <img src={bot.imageData} alt={bot.name} className="w-full h-24 object-cover rounded-xl border border-white/10 mt-3" />
                 )}
-                {bot.description && <p className="text-xs text-slate-400 mt-3 leading-relaxed">{bot.description}</p>}
+                {bot.description && <p className="text-2xl text-slate-400 mt-3 leading-relaxed">{bot.description}</p>}
               </motion.div>
             ))}
           </AnimatePresence>
