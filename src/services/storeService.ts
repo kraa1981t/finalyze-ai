@@ -1,5 +1,5 @@
 import { db } from '../lib/firebase';
-import { collection, getDocs, addDoc, deleteDoc, doc, setDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, setDoc, query, orderBy, updateDoc } from 'firebase/firestore';
 
 export interface StoreBot {
   id?: string;
@@ -39,6 +39,20 @@ export async function addStoreBot(bot: Omit<StoreBot, 'id'>): Promise<void> {
     imageData: bot.imageData || '',
     createdAt: Date.now(),
   });
+}
+
+export async function updateStoreBot(id: string, data: Partial<StoreBot>): Promise<void> {
+  const ref = doc(db, BOTS_COLLECTION, id);
+  const updateData: Record<string, unknown> = {};
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.price !== undefined) updateData.price = data.price;
+  if (data.fileName !== undefined) updateData.fileName = data.fileName;
+  if (data.fileType !== undefined) updateData.fileType = data.fileType;
+  if (data.fileSize !== undefined) updateData.fileSize = data.fileSize;
+  if (data.fileData !== undefined) updateData.fileData = data.fileData;
+  if (data.imageData !== undefined) updateData.imageData = data.imageData;
+  await updateDoc(ref, updateData);
 }
 
 export async function deleteStoreBot(id: string): Promise<void> {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus } from 'lucide-react';
-import { StoreBot, fetchStoreBots, addStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
+import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil } from 'lucide-react';
+import { StoreBot, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
 
 interface StoreSettingsPageProps {
   lang: 'ar' | 'en';
@@ -24,6 +24,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
   const [success, setSuccess] = useState('');
   const [adding, setAdding] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [editingBot, setEditingBot] = useState<StoreBot | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,21 +73,33 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         setAdding(false);
         return;
       }
-      await addStoreBot({
-        name: name.trim(),
-        description: description.trim(),
-        price: cents,
-        fileName: file.fileName,
-        fileType: file.fileType,
-        fileSize: file.fileSize,
-        fileData: file.fileData,
-        imageData: image?.fileData || '',
-        createdAt: Date.now(),
-      });
-      setSuccess(isAr ? '✅ تمت إضافة البوت بنجاح' : '✅ Bot added successfully');
-      setName(''); setDescription(''); setPriceInput(''); setFile(null); setImage(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      if (imageInputRef.current) imageInputRef.current.value = '';
+      if (editingBot) {
+        await updateStoreBot(editingBot.id!, {
+          name: name.trim(),
+          description: description.trim(),
+          price: cents,
+          fileName: file.fileName,
+          fileType: file.fileType,
+          fileSize: file.fileSize,
+          fileData: file.fileData,
+          imageData: image?.fileData || '',
+        });
+        setSuccess(isAr ? '✅ تم تحديث البوت بنجاح' : '✅ Bot updated successfully');
+      } else {
+        await addStoreBot({
+          name: name.trim(),
+          description: description.trim(),
+          price: cents,
+          fileName: file.fileName,
+          fileType: file.fileType,
+          fileSize: file.fileSize,
+          fileData: file.fileData,
+          imageData: image?.fileData || '',
+          createdAt: Date.now(),
+        });
+        setSuccess(isAr ? '✅ تمت إضافة البوت بنجاح' : '✅ Bot added successfully');
+      }
+      resetForm();
       refresh();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
@@ -94,6 +107,29 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
       setError(isAr ? 'فشل الإضافة: ' + msg : 'Failed to add: ' + msg);
     }
     setAdding(false);
+  };
+
+  const handleEdit = (bot: StoreBot) => {
+    setEditingBot(bot);
+    setName(bot.name);
+    setDescription(bot.description);
+    setPriceInput(bot.price > 0 ? (bot.price / 100).toString() : '');
+    setFile({ fileName: bot.fileName, fileType: bot.fileType, fileSize: bot.fileSize, fileData: bot.fileData });
+    setImage(bot.imageData ? { fileName: bot.fileName, fileData: bot.imageData } : null);
+    setError('');
+    setSuccess('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const resetForm = () => {
+    setName('');
+    setDescription('');
+    setPriceInput('');
+    setFile(null);
+    setImage(null);
+    setEditingBot(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
   const handleDelete = async (id: string) => {
@@ -122,7 +158,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         animate={{ opacity: 1, y: 0 }}
         className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8"
       >
-        <h3 className="text-2xl font-black uppercase text-amber-400 tracking-widest mb-4">{isAr ? 'إضافة بوت جديد' : 'Add New Bot'}</h3>
+        <h3 className="text-2xl font-black uppercase text-amber-400 tracking-widest mb-4">{editingBot ? (isAr ? 'تعديل بوت' : 'Edit Bot') : (isAr ? 'إضافة بوت جديد' : 'Add New Bot')}</h3>
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-2xl rounded-xl px-4 py-3 mb-4">{error}</div>
@@ -238,9 +274,22 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
             disabled={adding}
             className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-[#F59E0B] text-black font-black text-2xl uppercase tracking-wider shadow-lg shadow-[#F59E0B]/30 hover:bg-[#d97706] active:scale-95 transition-all disabled:opacity-50"
           >
-            <Plus size={18} />
-            {adding ? (isAr ? 'جاري الإضافة...' : 'Adding...') : (isAr ? 'إضافة البوت' : 'Add Bot')}
+            {editingBot ? <Check size={18} /> : <Plus size={18} />}
+            {adding
+              ? (isAr ? 'جاري الحفظ...' : 'Saving...')
+              : editingBot
+                ? (isAr ? 'حفظ التعديلات' : 'Save Changes')
+                : (isAr ? 'إضافة البوت' : 'Add Bot')}
           </button>
+          {editingBot && (
+            <button
+              onClick={resetForm}
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-400 font-black text-xl uppercase tracking-wider hover:bg-white/10 hover:text-white active:scale-95 transition-all"
+            >
+              <X size={16} />
+              {isAr ? 'إلغاء التعديل' : 'Cancel Edit'}
+            </button>
+          )}
         </div>
       </motion.div>
 
@@ -280,6 +329,13 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                       </span>
                     )}
                   </div>
+                  <button
+                    onClick={() => handleEdit(bot)}
+                    className="shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-[15px] font-black uppercase transition-all bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20"
+                  >
+                    <Pencil size={14} />
+                    {isAr ? 'تعديل' : 'Edit'}
+                  </button>
                   <button
                     onClick={() => handleDelete(bot.id!)}
                     className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-[15px] font-black uppercase transition-all ${confirmId === bot.id ? 'bg-red-500 text-white' : 'bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20'}`}
