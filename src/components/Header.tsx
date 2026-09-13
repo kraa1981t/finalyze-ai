@@ -629,7 +629,8 @@ export default function Header({
             {/* Icons - desktop only | MOBILE: all icons moved into sidebar menu */}
             {!isPWA && (
             <div className="hidden md:flex items-center gap-2 flex-1 min-w-0 justify-end">
-              {/* Store | MOBILE: moved to sidebar (hidden md:flex) — placed LEFT of Trade */}
+              {/* Store | Client desktop only (developer uses sidebar item) — flashing "مجاني" inside the icon, widens horizontally */}
+              {!isDeveloper && (
               <button
                 onClick={() => onNavigatePage?.('store')}
                 className="hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/30 active:scale-95 transition-all border border-black/10 flex-shrink-0"
@@ -639,7 +640,11 @@ export default function Header({
                 <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
                   {lang === 'ar' ? 'المتجر' : 'Store'}
                 </span>
+                <span className="animate-flash-fast px-2 py-0.5 rounded-lg bg-white text-sky-600 text-xs font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                  {lang === 'ar' ? 'مجاني' : 'Free'}
+                </span>
               </button>
+              )}
 
               {/* Trade Now | MOBILE: moved to sidebar (hidden md:flex) */}
               <button

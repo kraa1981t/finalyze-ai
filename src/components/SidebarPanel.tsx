@@ -38,7 +38,6 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
     { icon: User, label: lang === 'ar' ? 'الملف الشخصي' : 'Profile', page: 'profile' as const, color: 'from-amber-400 to-amber-600' },
     { icon: Info, label: lang === 'ar' ? 'نبذة عنا' : 'About Us', page: 'about' as const, color: 'from-amber-400 to-amber-600' },
     { icon: Lightbulb, label: lang === 'ar' ? 'اقتراحاتكم' : 'Your Suggestions', page: 'suggestions' as const, color: 'from-amber-400 to-amber-600' },
-    { icon: Store, label: lang === 'ar' ? 'متجر البوتات' : 'Bots Store', page: 'store' as const, color: 'from-sky-400 to-sky-600' },
     ...(!freemiumDisabled ? [
       { icon: Crown, label: lang === 'ar' ? 'شراء خطة' : 'Buy Plan', page: 'plans' as const, color: 'from-emerald-400 to-emerald-600' },
     ] : []),
