@@ -5,6 +5,7 @@ import { fetchCryptoPricesDirect } from '../services/apiDirect';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { StoreBot, downloadBot, recordBotPurchase } from '../services/storeService';
+import { loadPaymentSettings, savePaymentSettings } from '../services/paymentSettings';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
@@ -117,6 +118,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [editFaucetpayMerchantUser, setEditFaucetpayMerchantUser] = useState(faucetpayMerchantUser);
   const [copiedFaucetpay, setCopiedFaucetpay] = useState(false);
   const [faucetpayOfficialPending, setFaucetpayOfficialPending] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -139,6 +141,32 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       if (!manageMode) setIsAdmin(false);
       setEditSubPrices({ ...subPrices });
     }
+  }, [isOpen]);
+
+  // Load shared payment settings from Firestore so clients see exactly what the developer configured
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    const sync = async () => {
+      const data = await loadPaymentSettings();
+      if (cancelled || !data) return;
+      if (data.addresses && data.addresses.length) {
+        setAddresses(data.addresses);
+        setEditAddresses(JSON.parse(JSON.stringify(data.addresses)));
+      }
+      if (data.faucetpayEmail) {
+        setFaucetpayEmail(data.faucetpayEmail);
+        setEditFaucetpayEmail(data.faucetpayEmail);
+        localStorage.setItem(FAUCETPAY_EMAIL_KEY, data.faucetpayEmail);
+      }
+      if (data.faucetpayMerchantUser) {
+        setFaucetpayMerchantUser(data.faucetpayMerchantUser);
+        setEditFaucetpayMerchantUser(data.faucetpayMerchantUser);
+        localStorage.setItem(FAUCETPAY_MERCHANT_KEY, data.faucetpayMerchantUser);
+      }
+    };
+    sync();
+    return () => { cancelled = true; };
   }, [isOpen]);
 
   // Countdown timer
@@ -231,6 +259,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     const clean = editAddresses.filter(a => a.name && a.address);
     setAddresses(clean);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    savePaymentSettings({ addresses: clean });
     if (!manageMode) setIsAdmin(false);
   };
 
@@ -255,11 +284,13 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const saveFaucetpayEmail = () => {
     setFaucetpayEmail(editFaucetpayEmail);
     localStorage.setItem(FAUCETPAY_EMAIL_KEY, editFaucetpayEmail);
+    savePaymentSettings({ faucetpayEmail: editFaucetpayEmail });
   };
 
   const saveFaucetpayMerchantUser = () => {
     setFaucetpayMerchantUser(editFaucetpayMerchantUser);
     localStorage.setItem(FAUCETPAY_MERCHANT_KEY, editFaucetpayMerchantUser);
+    savePaymentSettings({ faucetpayMerchantUser: editFaucetpayMerchantUser });
   };
 
   const copyFaucetpayEmail = () => {
@@ -272,8 +303,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   };
 
   const startOfficialFaucetpayPayment = () => {
-    const merchantUsername = localStorage.getItem(FAUCETPAY_MERCHANT_KEY);
-    if (!merchantUsername) {
+    if (!faucetpayMerchantUser) {
       setError(isAr ? 'لم يتم ضبط اسم مستخدم FaucetPay المركزي. أضفه في إعدادات الدفع.' : 'Merchant username not configured. Add it in Payment Settings.');
       return;
     }
@@ -407,6 +437,11 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
       {showAddresses && (
       <div className="relative">
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/40 rounded-2xl p-4 mb-4">
+            <p className="text-xs font-black text-red-400 text-center">{error}</p>
+          </div>
+        )}
         {faucetpayEmail && !manageMode && !selectedCoinId && !faucetpaySelected && !faucetpayOfficialPending && (
           <div className="bg-blue-500/10 border-2 border-blue-500/40 rounded-2xl p-4 mb-4">
             <div className="flex items-center gap-3 mb-3">
@@ -430,7 +465,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 </button>
               </div>
             </div>
-            {localStorage.getItem(FAUCETPAY_MERCHANT_KEY) && (
+            {faucetpayMerchantUser && (
               <button
                 onClick={startOfficialFaucetpayPayment}
                 className="w-full mt-3 py-3 rounded-xl bg-emerald-500 text-black font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 active:scale-95 transition-all"
@@ -966,7 +1001,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         target="_blank"
         className="hidden"
       >
-        <input type="hidden" name="merchant_username" value={localStorage.getItem(FAUCETPAY_MERCHANT_KEY) || ''} />
+        <input type="hidden" name="merchant_username" value={faucetpayMerchantUser} />
         <input type="hidden" name="item_description" value={isBotSection ? `Bot: ${botPurchase?.name}` : `${currentLabel} Plan`} />
         <input type="hidden" name="amount1" value={String(amount)} />
         <input type="hidden" name="currency1" value="USD" />
