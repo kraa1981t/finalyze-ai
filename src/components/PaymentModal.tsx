@@ -121,7 +121,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [editFaucetpayMerchantUser, setEditFaucetpayMerchantUser] = useState(faucetpayMerchantUser);
   const [copiedFaucetpay, setCopiedFaucetpay] = useState(false);
   const [faucetpayEmailSelected, setFaucetpayEmailSelected] = useState(false);
-  const [faucetpayOfficialPending, setFaucetpayOfficialPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [botGrantTs, setBotGrantTs] = useState<number | null>(null);
   const [botDownloaded, setBotDownloaded] = useState(false);
@@ -142,7 +141,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setSelectedCoinId(null);
       setPaymentConfirmed(false);
       setFaucetpayEmailSelected(false);
-      setFaucetpayOfficialPending(null);
       setTimerRunning(false);
       setTimerSeconds(0);
       if (!manageMode) setIsAdmin(false);
@@ -421,48 +419,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setVerifying(false);
   };
 
-  const startOfficialFaucetpayPayment = () => {
-    if (!faucetpayMerchantUser) {
-      setError(isAr ? 'لم يتم ضبط اسم مستخدم FaucetPay المركزي. أضفه في إعدادات الدفع.' : 'Merchant username not configured. Add it in Payment Settings.');
-      return;
-    }
-    const paymentId = 'fp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    localStorage.setItem('faucetpay_pending_payment_id', paymentId);
-    setFaucetpayOfficialPending(paymentId);
-    if (!timerRunning) startTimer();
-    // Submit the hidden form to FaucetPay
-    const form = document.getElementById('faucetpay-official-form') as HTMLFormElement;
-    if (form) {
-      document.getElementById('faucetpay-payment-id-field')?.setAttribute('value', paymentId);
-      document.getElementById('faucetpay-custom-field')?.setAttribute('value', paymentId);
-      form.submit();
-    }
-  };
-
-  useEffect(() => {
-    if (!faucetpayOfficialPending) return;
-    const interval = setInterval(async () => {
-      try {
-        const resp = await fetch(`/api/faucetpayCheck?payment_id=${faucetpayOfficialPending}`);
-        const data = await resp.json();
-        if (data.confirmed) {
-          setPaymentConfirmed(true);
-          setTimerRunning(false);
-          localStorage.removeItem('faucetpay_pending_payment_id');
-          clearInterval(interval);
-        }
-      } catch {}
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [faucetpayOfficialPending]);
-
-  // Once a FaucetPay official payment is auto-confirmed, release the bot download automatically
-  useEffect(() => {
-    if (faucetpayOfficialPending && paymentConfirmed && section === 'bot' && botPurchase && botGrantTs && !botDownloaded) {
-      handleDownloadBot();
-    }
-  }, [paymentConfirmed, faucetpayOfficialPending, botGrantTs]);
-
   const calcCryptoAmount = (coinId: string, coinName?: string): string => {
     // Try direct coin ID lookup first
     let coin = COINGECKO_MAP[coinId];
@@ -584,7 +540,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             </p>
           </div>
         )}
-        {faucetpayEmail && !manageMode && !selectedCoinId && !faucetpayOfficialPending && (
+        {faucetpayEmail && !manageMode && !selectedCoinId && (
           <div className="bg-blue-500/5 border-2 border-blue-500/30 rounded-2xl p-4 mb-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg">
@@ -618,7 +574,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           </div>
         )}
 
-        {faucetpayEmailSelected && !manageMode && !selectedCoinId && !faucetpayOfficialPending && (
+        {faucetpayEmailSelected && !manageMode && !selectedCoinId && (
           <>
             <div className="bg-emerald-500/10 border-2 border-emerald-500/40 rounded-2xl p-6 mb-4 text-center">
               <div className="text-5xl mb-3">💸</div>
@@ -632,11 +588,17 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               {verifyStatus && <p className="text-xs text-emerald-400 font-bold mt-2">{verifyStatus}</p>}
             </div>
             <button
-              onClick={verifyPaymentNow}
-              disabled={verifying || paymentConfirmed || (isBotSection && !botGrantTs)}
+              onClick={() => {
+                if (paymentConfirmed) {
+                  if (section === 'bot' && botPurchase) handleDownloadBot(); else onConfirm?.();
+                } else {
+                  verifyPaymentNow();
+                }
+              }}
+              disabled={verifying || (isBotSection && paymentConfirmed && !botGrantTs)}
               className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg mb-4 ${
                 paymentConfirmed
-                  ? 'bg-emerald-500 text-white shadow-emerald-500/40 cursor-pointer'
+                  ? ((isBotSection && !botGrantTs) ? 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed' : 'bg-emerald-500 text-white shadow-emerald-500/40 hover:bg-emerald-400 cursor-pointer')
                   : verifying
                     ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400 cursor-wait'
                     : 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
@@ -654,62 +616,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           </>
         )}
 
-        {faucetpayMerchantUser && !manageMode && !selectedCoinId && !faucetpayOfficialPending && (
-          <div className="bg-blue-500/10 border-2 border-blue-500/40 rounded-2xl p-4 mb-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg">
-                <span className="text-white font-black text-[10px]">FP</span>
-              </div>
-              <div>
-                <span className="text-sm font-black text-blue-400">FaucetPay</span>
-                <span className="text-[10px] text-blue-300/60 block">{isAr ? 'دفع رسمي آمن — تأكيد تلقائي' : 'Official secure payment — auto-confirmed'}</span>
-              </div>
-            </div>
-            <button
-              onClick={startOfficialFaucetpayPayment}
-              className="w-full py-3 rounded-xl bg-emerald-500 text-black font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 active:scale-95 transition-all"
-            >
-              {isAr ? '💳 الدفع الرسمي عبر FaucetPay' : '💳 Pay via FaucetPay Official'}
-            </button>
-            <p className="text-[10px] text-blue-300/50 mt-2 text-center">
-              {isAr
-                ? `أكمل الدفع في صفحة FaucetPay الرسمية (${amount} USDT) وسيتم تأكيده تلقائياً ثم يُفتح التحميل.`
-                : `Complete the payment on the official FaucetPay page (${amount} USDT). It will be auto-confirmed and download unlocks.`}
-            </p>
-          </div>
-        )}
-
-        {faucetpayOfficialPending && !paymentConfirmed && (
-          <div className="bg-emerald-500/10 border-2 border-emerald-500/40 rounded-2xl p-6 mb-4 text-center">
-            <div className="text-5xl mb-3 animate-bounce">💳</div>
-            <h3 className="text-lg font-black text-emerald-400">{isAr ? 'بانتظار تأكيد الدفع...' : 'Awaiting Payment Confirmation...'}</h3>
-            <p className="text-xs text-slate-400 mt-2">{isAr ? 'يتم فحص الدفع تلقائياً...' : 'Checking payment automatically...'}</p>
-            <p className="text-[10px] text-slate-500 mt-1">Payment ID: {faucetpayOfficialPending}</p>
-          </div>
-        )}
-
-        {faucetpayOfficialPending && paymentConfirmed && (
-          <div className="bg-emerald-500/10 border-2 border-emerald-500/40 rounded-2xl p-6 mb-4 text-center">
-            <div className="text-5xl mb-3">✅</div>
-            <h3 className="text-lg font-black text-emerald-400">{isAr ? 'تم تأكيد الدفع!' : 'Payment confirmed!'}</h3>
-            {isBotSection && <p className="text-[10px] text-slate-400 mt-1 mb-3">{isAr ? 'نسخة واحدة لكل عملية دفع.' : 'One copy per payment.'}</p>}
-            <button
-              onClick={() => { if (section === 'bot' && botPurchase) handleDownloadBot(); else onConfirm?.(); }}
-              disabled={isBotSection && !botGrantTs}
-              className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
-                (!isBotSection || botGrantTs)
-                  ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
-                  : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
-              }`}
-            >
-              {isBotSection
-                ? (botGrantTs ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent'))
-                : '🟢 Activate Plan'}
-            </button>
-          </div>
-        )}
-
-        <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
         {addresses.length === 0 && !isAdmin && (
           <p className="text-center text-slate-500 py-8">No payment addresses configured.</p>
         )}
@@ -1084,30 +991,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           </div>
         </div>
 
-        <div className="mt-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4">
-          <h5 className="text-xs font-black uppercase text-blue-400 tracking-widest mb-3">
-            {isAr ? 'اسم مستخدم FaucetPay المركزي (Merchant)' : 'FaucetPay Merchant Username'}
-          </h5>
-          <p className="text-[10px] text-blue-300/60 mb-3">
-            {isAr ? 'اسم المستخدم الذي استخدمته عند التسجيل على FaucetPay — يُستخدم ل Direct Merchant Payment' : 'Your FaucetPay username — enables official merchant payment (auto-confirmed)'}
-          </p>
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={editFaucetpayMerchantUser}
-              onChange={(e) => setEditFaucetpayMerchantUser(e.target.value)}
-              placeholder={isAr ? 'اسم المستخدم على FaucetPay' : 'Your FaucetPay username'}
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
-            />
-            <button
-              onClick={saveFaucetpayMerchantUser}
-              className="px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all text-xs font-black"
-            >
-              {isAr ? 'حفظ' : 'Save'}
-            </button>
-          </div>
-        </div>
-      </>)}
+              </>)}
 
       {!manageMode && showAddresses && (
         <p className="text-center text-[10px] text-slate-500 mt-4">
@@ -1115,24 +999,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         </p>
       )}
 
-      {/* Hidden form for official FaucetPay Merchant payment */}
-      <form
-        id="faucetpay-official-form"
-        action="https://faucetpay.io/merchant/webscr"
-        method="POST"
-        target="_blank"
-        className="hidden"
-      >
-        <input type="hidden" name="merchant_username" value={faucetpayMerchantUser} />
-        <input type="hidden" name="item_description" value={isBotSection ? `Bot: ${botPurchase?.name}` : `${currentLabel} Plan`} />
-        <input type="hidden" name="amount1" value={String(amount)} />
-        <input type="hidden" name="currency1" value="USDT" />
-        <input id="faucetpay-custom-field" type="hidden" name="custom" value="" />
-        <input type="hidden" name="callback_url" value="https://joseph-trading.vercel.app/api/faucetpayCallback" />
-        <input type="hidden" name="success_url" value="https://joseph-trading.vercel.app/#/store" />
-        <input type="hidden" name="cancel_url" value="https://joseph-trading.vercel.app/#/store" />
-        <input id="faucetpay-payment-id-field" type="hidden" name="payment_id" value="" />
-      </form>
     </>
   );
 
