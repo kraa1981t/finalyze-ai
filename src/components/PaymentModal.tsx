@@ -142,6 +142,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setSelectedCoinId(null);
       setPaymentConfirmed(false);
       setFaucetpayEmailSelected(false);
+      setFaucetpayOfficialPending(null);
       setTimerRunning(false);
       setTimerSeconds(0);
       if (!manageMode) setIsAdmin(false);
@@ -198,14 +199,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     }, 1000);
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
-
-  // Restore FaucetPay pending payment from localStorage on open
-  useEffect(() => {
-    if (isOpen) {
-      const saved = localStorage.getItem('faucetpay_pending_payment_id');
-      if (saved && !faucetpayOfficialPending) setFaucetpayOfficialPending(saved);
-    }
-  }, [isOpen]);
 
   // Real on-chain balance lookup (main units) for the supported chains
   const fetchOnchainBalance = async (item: CryptoAddress): Promise<number | null> => {
@@ -379,6 +372,53 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setBotGrantTs(null);
     setBotDownloaded(true);
     recordBotPurchase(botPurchase, buyerEmail || '').then(() => onBotPaid?.(botPurchase));
+  };
+
+  // Manual "I confirm I paid" — triggers immediate on-chain verification then grants download
+  const [verifying, setVerifying] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState('');
+
+  const verifyPaymentNow = async () => {
+    // FaucetPay email: no API available — trust-based confirmation
+    if (faucetpayEmailSelected && !selectedCoinId) {
+      setVerifying(true);
+      setVerifyStatus(isAr ? 'جاري التحقق...' : 'Verifying...');
+      grantBotDownload(botPurchase?.id || '');
+      setBotGrantTs(Date.now());
+      setPaymentConfirmed(true);
+      setTimerRunning(false);
+      setVerifying(false);
+      setVerifyStatus(isAr ? '✅ تم تأكيد الدفع بنجاح' : '✅ Payment confirmed');
+      return;
+    }
+    // Crypto: verify on-chain
+    if (!selectedCoinId || !botPurchase) return;
+    const item = addresses.find(a => a.id === selectedCoinId);
+    if (!item) return;
+    setVerifying(true);
+    setVerifyStatus(isAr ? 'جاري التحقق من الدفع على البلوكتشين...' : 'Verifying payment on-chain...');
+    try {
+      const balance = await fetchOnchainBalance(item);
+      const coin = COINGECKO_MAP[item.id];
+      const usdPrice = coin ? prices[coin]?.usd : undefined;
+      if (balance !== null && usdPrice) {
+        const expectedCrypto = amount / usdPrice;
+        if (balance >= expectedCrypto * 0.9) {
+          grantBotDownload(botPurchase.id || '');
+          setBotGrantTs(Date.now());
+          setPaymentConfirmed(true);
+          setTimerRunning(false);
+          setVerifyStatus(isAr ? '✅ تم التحقق! الدفع وصل' : '✅ Verified! Payment received');
+        } else {
+          setVerifyStatus(isAr ? '⏳ الدفع لم يصل بعد — جرب بعد ثوانٍ' : '⏳ Payment not yet received — try again in a few seconds');
+        }
+      } else {
+        setVerifyStatus(isAr ? '⚠️ لا يمكن التحقق من هذه العملة' : '⚠️ Cannot verify this coin');
+      }
+    } catch {
+      setVerifyStatus(isAr ? '❌ خطأ في التحقق' : '❌ Verification error');
+    }
+    setVerifying(false);
   };
 
   const startOfficialFaucetpayPayment = () => {
@@ -589,12 +629,27 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               {timerRunning && (
                 <p className="text-sm font-black text-white mt-3">⏳ {formatTime(timerSeconds)}</p>
               )}
+              {verifyStatus && <p className="text-xs text-emerald-400 font-bold mt-2">{verifyStatus}</p>}
             </div>
             <button
-              onClick={() => { if (section === 'bot' && botPurchase) handleDownloadBot(); else onConfirm?.(); }}
-              className="w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40 mb-4"
+              onClick={verifyPaymentNow}
+              disabled={verifying || paymentConfirmed || (isBotSection && !botGrantTs)}
+              className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg mb-4 ${
+                paymentConfirmed
+                  ? 'bg-emerald-500 text-white shadow-emerald-500/40 cursor-pointer'
+                  : verifying
+                    ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400 cursor-wait'
+                    : 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
+              }`}
             >
-              {isAr ? '✅ أنا أرسلت المبلغ — التحميل الآن' : '✅ I sent the amount — Download now'}
+              {paymentConfirmed
+                ? (isBotSection
+                    ? (botGrantTs ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent'))
+                    : '🟢 Activate Plan')
+                : verifying
+                  ? (isAr ? '⏳ جاري التحقق...' : '⏳ Verifying...')
+                  : (isAr ? '✅ تأكدت من الدفع — تحقق الآن' : '✅ I confirm I paid — Verify now')
+              }
             </button>
           </>
         )}
@@ -797,23 +852,44 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 <p className="text-[10px] text-amber-400 text-center animate-pulse mb-2">{pollingStatus}</p>
               )}
 
-              <button
-                onClick={() => {
-                  if (section === 'bot' && botPurchase) {
-                    handleDownloadBot();
-                  } else {
-                    onConfirm?.();
+              {verifyStatus && <p className="text-[10px] text-emerald-400 font-bold text-center mb-2">{verifyStatus}</p>}
+
+              {!paymentConfirmed ? (
+                <button
+                  onClick={verifyPaymentNow}
+                  disabled={verifying || timerSeconds <= 0}
+                  className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
+                    verifying
+                      ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400 cursor-wait'
+                      : 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
+                  }`}
+                >
+                  {verifying
+                    ? (isAr ? '⏳ جاري التحقق من البلوكتشين...' : '⏳ Verifying on-chain...')
+                    : (isAr ? '✅ تأكدت من الدفع — تحقق الآن' : '✅ I confirm I paid — Verify now')
                   }
-                }}
-                disabled={!paymentConfirmed || (isBotSection && !botGrantTs)}
-                className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
-                  paymentConfirmed && (!isBotSection || botGrantTs)
-                    ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
-                    : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
-                }`}
-              >
-                {isBotSection ? (botGrantTs ? '🟢 تحميل البوت الآن' : botCopyLocked ? (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent') : (isAr ? '🔴 في انتظار وصول الدفع...' : '🔴 Awaiting payment...')) : paymentConfirmed ? '🟢 Activate Plan' : (isAr ? '🔴 في انتظار الدفع...' : '🔴 Awaiting payment...')}
-              </button>
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (section === 'bot' && botPurchase) {
+                      handleDownloadBot();
+                    } else {
+                      onConfirm?.();
+                    }
+                  }}
+                  disabled={isBotSection && !botGrantTs}
+                  className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
+                    (!isBotSection || botGrantTs)
+                      ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
+                      : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
+                  }`}
+                >
+                  {isBotSection
+                    ? (botGrantTs ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent'))
+                    : '🟢 Activate Plan'}
+                </button>
+              )}
 
               {paymentDetected && (
                 <p className="text-[10px] text-emerald-400 text-center font-bold mt-2">
