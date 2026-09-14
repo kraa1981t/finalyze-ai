@@ -138,7 +138,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setCopiedId(null);
       setNewAddress({ id: '', name: '', address: '' });
       setSelectedCoinId(null);
-      setFaucetpaySelected(false);
       setPaymentConfirmed(false);
       setTimerRunning(false);
       setTimerSeconds(0);
