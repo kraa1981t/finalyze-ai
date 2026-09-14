@@ -228,17 +228,17 @@ export async function fetchCryptoPricesDirect(): Promise<any> {
   try {
     const ac = new AbortController();
     const timeout = setTimeout(() => ac.abort(), 10000);
-    const r = await fetch(`${COINGECKO_BASE}/simple/price?ids=bitcoin,ethereum,litecoin,tron,solana&vs_currencies=usd`, { signal: ac.signal });
+    const r = await fetch(`${COINGECKO_BASE}/simple/price?ids=bitcoin,ethereum,litecoin,tron,solana,tether&vs_currencies=usd`, { signal: ac.signal });
     clearTimeout(timeout);
     if (r.ok) return await r.json();
     return {
       bitcoin: { usd: 67000 }, ethereum: { usd: 3200 },
-      litecoin: { usd: 85 }, tron: { usd: 0.12 }, solana: { usd: 150 },
+      litecoin: { usd: 85 }, tron: { usd: 0.12 }, solana: { usd: 150 }, tether: { usd: 1 },
     };
   } catch {
     return {
       bitcoin: { usd: 67000 }, ethereum: { usd: 3200 },
-      litecoin: { usd: 85 }, tron: { usd: 0.12 }, solana: { usd: 150 },
+      litecoin: { usd: 85 }, tron: { usd: 0.12 }, solana: { usd: 150 }, tether: { usd: 1 },
     };
   }
 }

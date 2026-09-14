@@ -20,7 +20,7 @@ const DEFAULT_ADDRESSES = [
 ];
 
 const COINGECKO_MAP: Record<string, string> = {
-  btc: 'bitcoin', eth: 'ethereum', ltc: 'litecoin', trx: 'tron', sol: 'solana',
+  btc: 'bitcoin', eth: 'ethereum', ltc: 'litecoin', trx: 'tron', sol: 'solana', usdt: 'tether',
 };
 
 const PRICE_ALIASES: Record<string, string> = {
@@ -29,7 +29,11 @@ const PRICE_ALIASES: Record<string, string> = {
   litecoin: 'litecoin', ltc: 'litecoin',
   tron: 'tron', trx: 'tron',
   solana: 'solana', sol: 'solana',
+  tether: 'tether', usdt: 'tether',
 };
+
+const USDT_TRC20_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+const SOL_RPC = 'https://api.mainnet-beta.solana.com';
 
 const POPULAR_COINS = [
   'Bitcoin (BTC)', 'Ethereum (ETH)', 'Litecoin (LTC)', 'TRON (TRX)',
@@ -84,7 +88,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   });
   const [prices, setPrices] = useState<Record<string, { usd: number }>>({
     bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 },
-    tron: { usd: 0.12 }, solana: { usd: 150 },
+    tron: { usd: 0.12 }, solana: { usd: 150 }, tether: { usd: 1 },
   });
   const [editAddresses, setEditAddresses] = useState<CryptoAddress[]>([]);
   const [isAdmin, setIsAdmin] = useState(manageMode || false);
@@ -94,7 +98,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
   const [selectedCoinId, setSelectedCoinId] = useState<string | null>(null);
-  const [faucetpaySelected, setFaucetpaySelected] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [timerMinutes, setTimerMinutes] = useState(() => {
     const saved = localStorage.getItem(TIMER_STORAGE_KEY);
@@ -116,7 +119,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [editFaucetpayEmail, setEditFaucetpayEmail] = useState(faucetpayEmail);
   const [faucetpayMerchantUser, setFaucetpayMerchantUser] = useState(() => localStorage.getItem(FAUCETPAY_MERCHANT_KEY) || '');
   const [editFaucetpayMerchantUser, setEditFaucetpayMerchantUser] = useState(faucetpayMerchantUser);
-  const [copiedFaucetpay, setCopiedFaucetpay] = useState(false);
   const [faucetpayOfficialPending, setFaucetpayOfficialPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [botGrantTs, setBotGrantTs] = useState<number | null>(null);
@@ -195,6 +197,50 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
 
+  // Real on-chain balance lookup (main units) for the supported chains
+  const fetchOnchainBalance = async (item: CryptoAddress): Promise<number | null> => {
+    try {
+      if (item.id === 'btc' || item.id === 'eth' || item.id === 'ltc') {
+        const apiUrl = BLOCKCYPHER_CHAINS[item.id];
+        const res = await fetch(`https://api.blockcypher.com/v1/${apiUrl}/addrs/${item.address}/balance`);
+        const data = await res.json();
+        if (data.error) return null;
+        const divisor = item.id === 'eth' ? 1e18 : 1e8;
+        return (data.final_balance + (data.unconfirmed_balance || 0)) / divisor;
+      }
+      if (item.id === 'trx') {
+        const res = await fetch(`https://api.trongrid.io/v1/accounts/${item.address}`);
+        const data = await res.json();
+        const account = data?.data?.[0];
+        if (!account) return null;
+        return (account.balance || 0) / 1e6;
+      }
+      if (item.id === 'usdt') {
+        const res = await fetch(`https://api.trongrid.io/v1/accounts/${item.address}`);
+        const data = await res.json();
+        const account = data?.data?.[0];
+        if (!account) return null;
+        const trc20 = Array.isArray(account.trc20) ? account.trc20 : [];
+        for (const entry of trc20) {
+          const value = entry?.[USDT_TRC20_CONTRACT];
+          if (value != null) return parseFloat(value) / 1e6;
+        }
+        return 0;
+      }
+      if (item.id === 'sol') {
+        const res = await fetch(SOL_RPC, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getBalance', params: [item.address] }),
+        });
+        const data = await res.json();
+        if (data?.result?.value == null) return null;
+        return data.result.value / 1e9;
+      }
+      return null;
+    } catch { return null; }
+  };
+
   // Poll blockchain for payment detection
   useEffect(() => {
     if (!selectedCoinId || paymentConfirmed || paymentDetected || !isOpen || manageMode) return;
@@ -207,15 +253,11 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
     const checkTx = async () => {
       try {
-        const apiUrl = BLOCKCYPHER_CHAINS[item.id];
-        if (!apiUrl) {
+        const balance = await fetchOnchainBalance(item);
+        if (balance === null) {
           setPollingStatus(isAr ? 'الفحص التلقائي غير متاح لهذه العملة' : 'Auto-check not available for this coin');
           return;
         }
-        const res = await fetch(`https://api.blockcypher.com/v1/${apiUrl}/addrs/${item.address}/balance`);
-        const data = await res.json();
-        if (data.error) { setPollingStatus(''); return; }
-        const balance = data.final_balance; // in smallest unit
         if (initialBalance === null) {
           initialBalance = balance;
           setPollingStatus(isAr ? 'في انتظار وصول الدفع...' : 'Awaiting payment...');
@@ -225,9 +267,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         const coin = COINGECKO_MAP[item.id];
         const usdPrice = coin ? prices[coin]?.usd : undefined;
         if (usdPrice) {
-          let divisor = 1e8;
-          if (item.id === 'eth') divisor = 1e18;
-          const balanceDiff = (balance - initialBalance) / divisor;
+          const balanceDiff = balance - initialBalance;
           const expectedCrypto = amount / usdPrice;
           if (balanceDiff >= expectedCrypto * 0.99) {
             setPaymentDetected(true);
@@ -237,11 +277,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             return;
           }
         }
-        // Also check unconfirmed
-        if (data.unconfirmed_balance > 0) {
-          setPollingStatus(isAr ? '⚠️ معاملة معلقة...' : '⚠️ Pending transaction...');
-        }
-      } catch { setPollingStatus(''); }
+        setPollingStatus(isAr ? 'في انتظار وصول الدفع...' : 'Awaiting payment...');
+      } catch { setPollingStatus(isAr ? 'الفحص التلقائي غير متاح لهذه العملة' : 'Auto-check not available for this coin'); }
     };
 
     const interval = setInterval(checkTx, 15000);
@@ -308,15 +345,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setFaucetpayMerchantUser(editFaucetpayMerchantUser);
     localStorage.setItem(FAUCETPAY_MERCHANT_KEY, editFaucetpayMerchantUser);
     savePaymentSettings({ faucetpayMerchantUser: editFaucetpayMerchantUser });
-  };
-
-  const copyFaucetpayEmail = () => {
-    if (!faucetpayEmail) return;
-    navigator.clipboard.writeText(faucetpayEmail).catch(() => {});
-    setCopiedFaucetpay(true);
-    setFaucetpaySelected(true);
-    if (!timerRunning) startTimer();
-    setTimeout(() => setCopiedFaucetpay(false), 2000);
   };
 
   const handleDownloadBot = () => {
@@ -483,7 +511,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             </p>
           </div>
         )}
-        {faucetpayEmail && !manageMode && !selectedCoinId && !faucetpaySelected && !faucetpayOfficialPending && (
+        {faucetpayMerchantUser && !manageMode && !selectedCoinId && !faucetpayOfficialPending && (
           <div className="bg-blue-500/10 border-2 border-blue-500/40 rounded-2xl p-4 mb-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg">
@@ -491,31 +519,19 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               </div>
               <div>
                 <span className="text-sm font-black text-blue-400">FaucetPay</span>
-                <span className="text-[10px] text-blue-300/60 block">{isAr ? 'تحويل مباشر بالبريد الإلكتروني' : 'Direct transfer via email'}</span>
+                <span className="text-[10px] text-blue-300/60 block">{isAr ? 'دفع رسمي آمن — تأكيد تلقائي' : 'Official secure payment — auto-confirmed'}</span>
               </div>
             </div>
-            <div className="bg-black/40 rounded-xl px-4 py-3">
-              <div className="flex items-center justify-between">
-                <code className="text-xs font-mono text-blue-200 break-all select-all">{faucetpayEmail}</code>
-                <button
-                  onClick={copyFaucetpayEmail}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all text-xs font-black ml-2 shrink-0"
-                >
-                  {copiedFaucetpay ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedFaucetpay ? (isAr ? 'تم النسخ!' : 'Copied!') : (isAr ? 'نسخ' : 'Copy')}
-                </button>
-              </div>
-            </div>
-            {faucetpayMerchantUser && (
-              <button
-                onClick={startOfficialFaucetpayPayment}
-                className="w-full mt-3 py-3 rounded-xl bg-emerald-500 text-black font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 active:scale-95 transition-all"
-              >
-                {isAr ? '💳 الدفع الرسمي عبر FaucetPay' : '💳 Pay via FaucetPay Official'}
-              </button>
-            )}
+            <button
+              onClick={startOfficialFaucetpayPayment}
+              className="w-full py-3 rounded-xl bg-emerald-500 text-black font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 active:scale-95 transition-all"
+            >
+              {isAr ? '💳 الدفع الرسمي عبر FaucetPay' : '💳 Pay via FaucetPay Official'}
+            </button>
             <p className="text-[10px] text-blue-300/50 mt-2 text-center">
-              {isAr ? `أرسل $${amount} إلى هذا البريد عبر FaucetPay ثم اضغط "تم الدفع"` : `Send $${amount} to this email via FaucetPay then click "Payment Done"`}
+              {isAr
+                ? `أكمل الدفع في صفحة FaucetPay الرسمية ($${amount} USD) وسيتم تأكيده تلقائياً ثم يُفتح التحميل.`
+                : `Complete the payment on the official FaucetPay page ($${amount} USD). It will be auto-confirmed and download unlocks.`}
             </p>
           </div>
         )}
@@ -526,6 +542,27 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             <h3 className="text-lg font-black text-emerald-400">{isAr ? 'بانتظار تأكيد الدفع...' : 'Awaiting Payment Confirmation...'}</h3>
             <p className="text-xs text-slate-400 mt-2">{isAr ? 'يتم فحص الدفع تلقائياً...' : 'Checking payment automatically...'}</p>
             <p className="text-[10px] text-slate-500 mt-1">Payment ID: {faucetpayOfficialPending}</p>
+          </div>
+        )}
+
+        {faucetpayOfficialPending && paymentConfirmed && (
+          <div className="bg-emerald-500/10 border-2 border-emerald-500/40 rounded-2xl p-6 mb-4 text-center">
+            <div className="text-5xl mb-3">✅</div>
+            <h3 className="text-lg font-black text-emerald-400">{isAr ? 'تم تأكيد الدفع!' : 'Payment confirmed!'}</h3>
+            {isBotSection && <p className="text-[10px] text-slate-400 mt-1 mb-3">{isAr ? 'نسخة واحدة لكل عملية دفع.' : 'One copy per payment.'}</p>}
+            <button
+              onClick={() => { if (section === 'bot' && botPurchase) handleDownloadBot(); else onConfirm?.(); }}
+              disabled={isBotSection && !botGrantTs}
+              className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
+                (!isBotSection || botGrantTs)
+                  ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
+                  : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
+              }`}
+            >
+              {isBotSection
+                ? (botGrantTs ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent'))
+                : '🟢 Activate Plan'}
+            </button>
           </div>
         )}
 
@@ -677,15 +714,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 <p className="text-[10px] text-amber-400 text-center animate-pulse mb-2">{pollingStatus}</p>
               )}
 
-              {!paymentConfirmed && (
-                <button
-                  onClick={() => setPaymentConfirmed(true)}
-                  className="w-full mb-2 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/40 text-blue-400 hover:bg-blue-500/20 font-black text-xs uppercase tracking-widest transition-all active:scale-95"
-                >
-                  {isAr ? '✅ لقد أرسلت المبلغ — تأكيد الدفع يدوياً' : '✅ I sent the amount — Confirm Manually'}
-                </button>
-              )}
-
               <button
                 onClick={() => {
                   if (section === 'bot' && botPurchase) {
@@ -701,7 +729,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                     : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
                 }`}
               >
-                {isBotSection && botGrantTs ? '🟢 تحميل البوت الآن' : isBotSection ? (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent') : paymentConfirmed ? '🟢 Activate Plan' : (isAr ? '🔴 في انتظار الدفع...' : '🔴 Awaiting payment...')}
+                {isBotSection ? (botGrantTs ? '🟢 تحميل البوت الآن' : botCopyLocked ? (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent') : (isAr ? '🔴 في انتظار وصول الدفع...' : '🔴 Awaiting payment...')) : paymentConfirmed ? '🟢 Activate Plan' : (isAr ? '🔴 في انتظار الدفع...' : '🔴 Awaiting payment...')}
               </button>
 
               {paymentDetected && (
@@ -726,107 +754,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           );
         })()}
 
-        {/* FaucetPay confirmation OVERLAY — mirrors crypto flow with countdown */}
-        {!manageMode && !selectedCoinId && faucetpaySelected && (() => {
-          const formatTime = (secs: number) => {
-            const m = Math.floor(secs / 60);
-            const s = secs % 60;
-            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-          };
-          return (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="absolute inset-0 z-10 bg-brand-bg/95 backdrop-blur-xl rounded-2xl border-2 border-blue-500/40 p-5 flex flex-col justify-center shadow-[0_0_60px_-12px_rgba(59,130,246,0.4)]"
-            >
-              <button
-                onClick={() => { setFaucetpaySelected(false); setTimerRunning(false); setPaymentConfirmed(false); }}
-                className="absolute top-3 right-3 p-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-              >
-                <X size={16} />
-              </button>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-black text-xs shadow-lg">
-                    FP
-                  </div>
-                  <div>
-                    <span className="text-sm font-black text-white">FaucetPay</span>
-                    <span className="text-[10px] text-slate-400 block">{isAr ? 'تحويل بالبريد الإلكتروني' : 'Transfer via email'}</span>
-                  </div>
-                </div>
-                <span className="text-xs font-black text-blue-400 uppercase tracking-widest">{isBotSection ? botPurchase!.name : currentLabel}</span>
-              </div>
-
-              <div className="bg-black/40 rounded-2xl px-5 py-4 text-center border border-blue-500/20 mb-4">
-                <code className="text-sm font-mono text-blue-200 break-all select-all">{faucetpayEmail}</code>
-                <p className="text-2xl font-black text-white font-mono mt-2">${amount.toFixed(2)} USD</p>
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">{isAr ? 'المبلغ المطلوب تحويله' : 'Amount to transfer'} (FaucetPay)</p>
-                <button
-                  onClick={() => copyFaucetpayEmail()}
-                  className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all text-xs font-black"
-                >
-                  {copiedFaucetpay ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedFaucetpay ? (isAr ? 'تم النسخ!' : 'Copied!') : (isAr ? 'نسخ البريد' : 'Copy Email')}
-                </button>
-              </div>
-
-              <div className="flex items-center justify-center mb-4">
-                <div className="text-center">
-                  <div className={`text-5xl font-black font-mono tabular-nums ${timerSeconds <= 60 ? 'text-red-400' : 'text-white'}`}>
-                    {formatTime(timerSeconds)}
-                  </div>
-                  <p className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">{isAr ? 'الوقت المتبقي' : 'Time Remaining'}</p>
-                </div>
-              </div>
-
-              <p className="text-[10px] text-blue-300/70 text-center mb-3">
-                {isAr
-                  ? 'أرسل المبلغ من محفظتك على FaucetPay إلى هذا البريد ثم اضغط "تأكيد الدفع"'
-                  : 'Send the amount from your FaucetPay wallet to this email, then press "Confirm Payment"'}
-              </p>
-
-              <button
-                onClick={() => { if (!paymentConfirmed) return; setFaucetpaySelected(false); if (section === 'bot' && botPurchase) { handleDownloadBot(); } else { onConfirm?.(); } }}
-                disabled={!paymentConfirmed || (isBotSection && !botGrantTs)}
-                className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
-                  paymentConfirmed && (!isBotSection || botGrantTs)
-                    ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
-                    : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
-                }`}
-              >
-                {isBotSection && botGrantTs ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : isBotSection ? (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent') : paymentConfirmed ? '🟢 Activate Plan' : (isAr ? '🔴 في انتظار تأكيد الدفع...' : '🔴 Awaiting payment...')}
-              </button>
-
-              {!paymentConfirmed && (
-                <button
-                  onClick={() => setPaymentConfirmed(true)}
-                  className="w-full mt-2 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/40 text-blue-400 hover:bg-blue-500/20 font-black text-xs uppercase tracking-widest transition-all active:scale-95"
-                >
-                  {isAr ? '✅ لقد أرسلت المبلغ — تأكيد الدفع' : '✅ I sent the amount — Confirm Payment'}
-                </button>
-              )}
-
-              {paymentConfirmed && (
-                <p className="text-[10px] text-emerald-400 text-center font-bold mt-2">
-                  {isAr ? '✅ تم تأكيد الدفع! اضغط "تحميل البوت الآن" لتحميل ملف البوت تلقائياً.' : '✅ Payment confirmed! Press "Download Bot Now" to auto-download the bot file.'}
-                </p>
-              )}
-              {timerSeconds <= 0 && !paymentConfirmed && (
-                <div className="text-center mt-2">
-                  <p className="text-[10px] text-red-400 mb-2">{isAr ? 'انتهت المهلة. يمكنك إعادة المحاولة.' : 'Time expired. You can try again.'}</p>
-                  <button
-                    onClick={() => { setFaucetpaySelected(false); setTimerRunning(false); }}
-                    className="text-xs text-slate-400 hover:text-white underline"
-                  >
-                    {isAr ? 'نسخ البريد مرة أخرى' : 'Copy email again'}
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          );
-        })()}
+        {/* FaucetPay official callback receives payment confirmation */}
       </div>
       )}
 
