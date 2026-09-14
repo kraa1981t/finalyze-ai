@@ -67,7 +67,6 @@ interface PaymentModalProps {
 }
 
 const TIMER_STORAGE_KEY = 'payment_timer_minutes';
-const NOTIFICATION_EMAIL_KEY = 'payment_notification_email';
 
 const BLOCKCYPHER_CHAINS: Record<string, string> = {
   btc: 'btc/main', eth: 'eth/main', ltc: 'ltc/main',
@@ -103,8 +102,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const [editTimer, setEditTimer] = useState(timerMinutes);
-  const [notificationEmail, setNotificationEmail] = useState(() => localStorage.getItem(NOTIFICATION_EMAIL_KEY) || 'taybemohamed10@gmail.com');
-  const [editEmail, setEditEmail] = useState(notificationEmail);
   const [pollingActive, setPollingActive] = useState(false);
   const [paymentDetected, setPaymentDetected] = useState(false);
   const [pollingStatus, setPollingStatus] = useState('');
@@ -604,12 +601,12 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 <p className="text-[10px] text-amber-400 text-center animate-pulse mb-2">{pollingStatus}</p>
               )}
 
-              {!BLOCKCYPHER_CHAINS[item.id] && !paymentConfirmed && (
+              {!paymentConfirmed && (
                 <button
                   onClick={() => setPaymentConfirmed(true)}
                   className="w-full mb-2 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/40 text-blue-400 hover:bg-blue-500/20 font-black text-xs uppercase tracking-widest transition-all active:scale-95"
                 >
-                  {isAr ? '✅ لقد أرسلت المبلغ — تأكيد الدفع' : '✅ I sent the amount — Confirm Payment'}
+                  {isAr ? '✅ لقد أرسلت المبلغ — تأكيد الدفع يدوياً' : '✅ I sent the amount — Confirm Manually'}
                 </button>
               )}
 
@@ -618,7 +615,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   if (!paymentConfirmed) return;
                   if (section === 'bot' && botPurchase) {
                     downloadBot(botPurchase);
-                    recordBotPurchase(botPurchase, buyerEmail || notificationEmail).then(() => onBotPaid?.(botPurchase));
+                    recordBotPurchase(botPurchase, buyerEmail || '').then(() => onBotPaid?.(botPurchase));
                   } else {
                     onConfirm?.();
                   }
@@ -719,7 +716,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               </p>
 
               <button
-                onClick={() => { if (!paymentConfirmed) return; setFaucetpaySelected(false); if (section === 'bot' && botPurchase) { downloadBot(botPurchase); recordBotPurchase(botPurchase, buyerEmail || notificationEmail).then(() => onBotPaid?.(botPurchase)); } else { onConfirm?.(); } }}
+                onClick={() => { if (!paymentConfirmed) return; setFaucetpaySelected(false); if (section === 'bot' && botPurchase) { downloadBot(botPurchase); recordBotPurchase(botPurchase, buyerEmail || '').then(() => onBotPaid?.(botPurchase)); } else { onConfirm?.(); } }}
                 disabled={!paymentConfirmed}
                 className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
                   paymentConfirmed
@@ -902,25 +899,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
             >
               Save Timer
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 bg-white/5 border border-white/10 rounded-2xl p-4">
-          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">{isAr ? 'إشعارات الدفع' : 'Payment Notifications'}</h5>
-          <p className="text-[10px] text-slate-500 mb-3">{isAr ? 'البريد الإلكتروني المرتبط بالمحفظة لاستقبال إشعارات وصول الدفع' : 'Email linked to your wallet for receiving payment arrival notifications'}</p>
-          <div className="flex items-center gap-3">
-            <input
-              type="email"
-              value={editEmail}
-              onChange={(e) => setEditEmail(e.target.value)}
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
-            />
-            <button
-              onClick={() => { setNotificationEmail(editEmail); localStorage.setItem(NOTIFICATION_EMAIL_KEY, editEmail); }}
-              className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
-            >
-              Save
             </button>
           </div>
         </div>
