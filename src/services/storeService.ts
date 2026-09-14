@@ -1,5 +1,5 @@
 import { db } from '../lib/firebase';
-import { collection, getDocs, addDoc, deleteDoc, doc, setDoc, query, orderBy, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, setDoc, query, orderBy, updateDoc, where, getDoc } from 'firebase/firestore';
 
 export interface StoreBot {
   id?: string;
@@ -16,6 +16,7 @@ export interface StoreBot {
 
 const BOTS_COLLECTION = 'store_bots';
 const PURCHASES_COLLECTION = 'store_purchases';
+const PENDING_PAYMENTS_COLLECTION = 'pending_payments';
 
 const DOWNLOAD_GRANTS_KEY = 'store_download_grants';
 const DOWNLOADED_KEY = 'store_downloaded_bots';
@@ -136,6 +137,66 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+// ── Pending payment requests (email method: client requests, admin approves) ──
+
+export interface PendingPayment {
+  id: string;
+  botId: string;
+  botName: string;
+  price: number;
+  buyerEmail: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: number;
+  reviewedAt?: number;
+}
+
+export async function createPendingPayment(bot: StoreBot, buyerEmail: string): Promise<string> {
+  const ref = await addDoc(collection(db, PENDING_PAYMENTS_COLLECTION), {
+    botId: bot.id || '',
+    botName: bot.name,
+    price: bot.price,
+    buyerEmail,
+    status: 'pending',
+    createdAt: Date.now(),
+  });
+  return ref.id;
+}
+
+export async function checkPendingPayment(docId: string): Promise<string> {
+  try {
+    const snap = await getDoc(doc(db, PENDING_PAYMENTS_COLLECTION, docId));
+    if (!snap.exists()) return 'pending';
+    const data = snap.data();
+    return data.status || 'pending';
+  } catch {
+    return 'pending';
+  }
+}
+
+export async function fetchPendingPayments(): Promise<PendingPayment[]> {
+  try {
+    const q = query(collection(db, PENDING_PAYMENTS_COLLECTION), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as PendingPayment));
+  } catch {
+    return [];
+  }
+}
+
+export async function approvePendingPayment(docId: string): Promise<void> {
+  await updateDoc(doc(db, PENDING_PAYMENTS_COLLECTION, docId), {
+    status: 'approved',
+    reviewedAt: Date.now(),
+  });
+}
+
+export async function rejectPendingPayment(docId: string): Promise<void> {
+  await updateDoc(doc(db, PENDING_PAYMENTS_COLLECTION, docId), {
+    status: 'rejected',
+    reviewedAt: Date.now(),
+  });
 }
 
 // Standard elegant horizontal rectangle used for all bot preview images (16:9)

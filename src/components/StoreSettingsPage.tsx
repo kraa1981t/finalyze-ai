@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil } from 'lucide-react';
-import { StoreBot, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
+import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { StoreBot, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard, PendingPayment, fetchPendingPayments, approvePendingPayment, rejectPendingPayment } from '../services/storeService';
 
 interface StoreSettingsPageProps {
   lang: 'ar' | 'en';
@@ -25,11 +25,13 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
   const [adding, setAdding] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [editingBot, setEditingBot] = useState<StoreBot | null>(null);
+  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => {
     fetchStoreBots().then((list) => { setBots(list); setLoading(false); });
+    fetchPendingPayments().then((list) => setPendingPayments(list));
   };
 
   useEffect(() => { refresh(); }, []);
@@ -151,6 +153,47 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         </button>
         <h2 className="text-[30px] font-black text-white">{isAr ? 'إعدادات متجر البوتات والمؤشرات' : 'Bots & Indicators Store Settings'}</h2>
       </div>
+
+      {/* Pending payment approvals */}
+      {pendingPayments.some((p) => p.status === 'pending') && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 mb-8"
+        >
+          <h3 className="text-2xl font-black uppercase text-amber-400 tracking-widest mb-4 flex items-center gap-2">
+            <Clock size={20} />
+            {isAr ? `طلبات انتظار الموافقة (${pendingPayments.filter((p) => p.status === 'pending').length})` : `Pending Approvals (${pendingPayments.filter((p) => p.status === 'pending').length})`}
+          </h3>
+          <div className="space-y-3">
+            {pendingPayments.filter((p) => p.status === 'pending').map((p) => (
+              <div key={p.id} className="bg-black/40 border border-amber-500/20 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[28px] font-black text-white truncate">{p.botName}</p>
+                  <p className="text-[15px] text-slate-400">💰 ${(p.price / 100).toFixed(2)}</p>
+                  <p className="text-[15px] text-slate-500">📧 {p.buyerEmail || '—'} · {new Date(p.createdAt).toLocaleString()}</p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={async () => { await approvePendingPayment(p.id); refresh(); }}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 text-black font-black text-[15px] uppercase transition-all hover:bg-emerald-400 active:scale-95"
+                  >
+                    <CheckCircle2 size={16} />
+                    {isAr ? 'موافقة' : 'Approve'}
+                  </button>
+                  <button
+                    onClick={async () => { await rejectPendingPayment(p.id); refresh(); }}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/40 text-red-400 font-black text-[15px] uppercase transition-all hover:bg-red-500/20 active:scale-95"
+                  >
+                    <XCircle size={16} />
+                    {isAr ? 'رفض' : 'Reject'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Add form */}
       <motion.div

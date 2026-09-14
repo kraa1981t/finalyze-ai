@@ -4,7 +4,7 @@ import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalL
 import { fetchCryptoPricesDirect } from '../services/apiDirect';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { StoreBot, downloadBot, recordBotPurchase, getDownloadGrant, grantBotDownload, consumeBotDownload, hasDownloadedBot } from '../services/storeService';
+import { StoreBot, downloadBot, recordBotPurchase, getDownloadGrant, grantBotDownload, consumeBotDownload, hasDownloadedBot, createPendingPayment, checkPendingPayment } from '../services/storeService';
 import { loadPaymentSettings, savePaymentSettings } from '../services/paymentSettings';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
@@ -141,6 +141,9 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setSelectedCoinId(null);
       setPaymentConfirmed(false);
       setFaucetpayEmailSelected(false);
+      setPendingPaymentId(null);
+      setAwaitingApproval(false);
+      setVerifyStatus('');
       setTimerRunning(false);
       setTimerSeconds(0);
       if (!manageMode) setIsAdmin(false);
@@ -375,18 +378,49 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   // Manual "I confirm I paid" — triggers immediate on-chain verification then grants download
   const [verifying, setVerifying] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState('');
+  const [pendingPaymentId, setPendingPaymentId] = useState<string | null>(null);
+  const [awaitingApproval, setAwaitingApproval] = useState(false);
+
+  // Poll for admin approval when awaiting
+  useEffect(() => {
+    if (!pendingPaymentId || !awaitingApproval) return;
+    const interval = setInterval(async () => {
+      const status = await checkPendingPayment(pendingPaymentId);
+      if (status === 'approved') {
+        setAwaitingApproval(false);
+        setPendingPaymentId(null);
+        grantBotDownload(botPurchase?.id || '');
+        setBotGrantTs(Date.now());
+        setPaymentConfirmed(true);
+        setTimerRunning(false);
+        setVerifyStatus(isAr ? '✅ تمت الموافقة! جاري التحميل...' : '✅ Approved! Downloading...');
+        clearInterval(interval);
+      } else if (status === 'rejected') {
+        setAwaitingApproval(false);
+        setPendingPaymentId(null);
+        setVerifyStatus(isAr ? '❌ تم رفض الطلب — تواصل مع الدعم' : '❌ Request rejected — contact support');
+        clearInterval(interval);
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [pendingPaymentId, awaitingApproval]);
 
   const verifyPaymentNow = async () => {
-    // FaucetPay email: no API available — trust-based confirmation
+    // FaucetPay email: create pending request → admin approves → download released
     if (faucetpayEmailSelected && !selectedCoinId) {
+      if (awaitingApproval) return;
       setVerifying(true);
-      setVerifyStatus(isAr ? 'جاري التحقق...' : 'Verifying...');
-      grantBotDownload(botPurchase?.id || '');
-      setBotGrantTs(Date.now());
-      setPaymentConfirmed(true);
-      setTimerRunning(false);
-      setVerifying(false);
-      setVerifyStatus(isAr ? '✅ تم تأكيد الدفع بنجاح' : '✅ Payment confirmed');
+      setVerifyStatus(isAr ? 'جاري إرسال طلب التأكيد...' : 'Submitting confirmation request...');
+      try {
+        const docId = await createPendingPayment(botPurchase!, buyerEmail || '');
+        setPendingPaymentId(docId);
+        setAwaitingApproval(true);
+        setVerifying(false);
+        setVerifyStatus(isAr ? '⏳ في انتظار موافقة المطور...' : '⏳ Awaiting developer approval...');
+      } catch {
+        setVerifying(false);
+        setVerifyStatus(isAr ? '❌ خطأ في إرسال الطلب' : '❌ Error submitting request');
+      }
       return;
     }
     // Crypto: verify on-chain
@@ -595,11 +629,11 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   verifyPaymentNow();
                 }
               }}
-              disabled={verifying || (isBotSection && paymentConfirmed && !botGrantTs)}
+              disabled={verifying || awaitingApproval || (isBotSection && paymentConfirmed && !botGrantTs)}
               className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg mb-4 ${
                 paymentConfirmed
                   ? ((isBotSection && !botGrantTs) ? 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed' : 'bg-emerald-500 text-white shadow-emerald-500/40 hover:bg-emerald-400 cursor-pointer')
-                  : verifying
+                  : (verifying || awaitingApproval)
                     ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400 cursor-wait'
                     : 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
               }`}
@@ -608,9 +642,9 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 ? (isBotSection
                     ? (botGrantTs ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent'))
                     : '🟢 Activate Plan')
-                : verifying
-                  ? (isAr ? '⏳ جاري التحقق...' : '⏳ Verifying...')
-                  : (isAr ? '✅ تأكدت من الدفع — تحقق الآن' : '✅ I confirm I paid — Verify now')
+                : (verifying || awaitingApproval)
+                  ? (isAr ? '⏳ في انتظار موافقة المطور...' : '⏳ Awaiting developer approval...')
+                  : (isAr ? '✅ تأكدت من الدفع — أرسل طلب التأكيد' : '✅ I confirm I paid — Submit request')
               }
             </button>
           </>
