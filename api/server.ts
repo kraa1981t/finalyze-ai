@@ -8,6 +8,7 @@ const FALLBACK_PRICES = {
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // API Route: Health check
 app.get("/api/health", (req, res) => {
@@ -1175,38 +1176,105 @@ async function callGoogle(apiKey: string, prompt: string) {
   return { error: lastError };
 }
 
-// FaucetPay Payment Status (in-memory cache for callbacks within same instance)
+// FaucetPay Payment Status (Firestore-persisted so it survives serverless cold starts)
 const faucetPayPayments = new Map<string, { confirmed: boolean; confirmedAt: number; amount: number }>();
+const FP_FIRESTORE_BASE =
+  "https://firestore.googleapis.com/v1/projects/trading-made-easy-e8450/databases/(default)/documents/store_purchases";
+const FB_API_KEY = "AIzaSyCvMayEuNTlQ5CWbjrrqw3aft_H044-uQM";
 
-// API Route: FaucetPay callback (FaucetPay calls this when payment is received)
-app.get("/api/faucetpayCallback", (req, res) => {
-  const { payment_id, transaction_id, amount, currency, custom } = req.query;
-  if (!payment_id || !amount) {
-    return res.status(400).send("Missing payment parameters");
+async function fpMarkConfirmed(paymentId: string, amount: number): Promise<void> {
+  try {
+    await fetch(`${FP_FIRESTORE_BASE}/fp_${paymentId}?key=${FB_API_KEY}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fields: {
+          type: { stringValue: "faucetpay" },
+          confirmed: { booleanValue: true },
+          amount: { numberValue: Number(amount) || 0 },
+          confirmedAt: { timestampValue: new Date().toISOString() },
+        },
+      }),
+    });
+  } catch (e) {
+    console.warn("[FaucetPay] Failed to persist confirmation:", e);
   }
-  faucetPayPayments.set(String(payment_id), {
-    confirmed: true,
-    confirmedAt: Date.now(),
-    amount: Number(amount),
-  });
-  // Clean old entries (>10 min)
+}
+
+async function fpReadConfirmed(paymentId: string): Promise<{ confirmed: boolean; amount: number }> {
+  try {
+    const resp = await fetch(`${FP_FIRESTORE_BASE}/fp_${paymentId}?key=${FB_API_KEY}`);
+    if (!resp.ok) return { confirmed: false, amount: 0 };
+    const data: any = await resp.json();
+    return {
+      confirmed: data?.fields?.confirmed?.booleanValue === true,
+      amount: Number(data?.fields?.amount?.numberValue || 0),
+    };
+  } catch {
+    return { confirmed: false, amount: 0 };
+  }
+}
+
+// API Route: FaucetPay callback (FaucetPay calls this with a form-encoded POST when the payment is received)
+const faucetpayCallbackHandler = async (req: any, res: any) => {
+  const body = { ...req.query, ...(req.body || {}) };
+  const token = String(body.token || "");
+  const paymentId = String(body.custom || body.payment_id || "");
+  const amount = Number(body.amount1 || body.amount || 0);
+  if (!paymentId) {
+    return res.status(400).send("Missing payment id");
+  }
+
+  // Best-effort server-side verification: only block when FaucetPay explicitly says the token is invalid.
+  let verified = true;
+  if (token) {
+    try {
+      const vr = await fetch(`https://faucetpay.io/merchant/get-payment/${encodeURIComponent(token)}`);
+      const vi = await vr.json();
+      if (vi && vi.valid === false) verified = false;
+    } catch (e) {
+      console.warn("[FaucetPay] Token verification failed (continuing):", e);
+    }
+  }
+
+  if (verified) {
+    faucetPayPayments.set(paymentId, {
+      confirmed: true,
+      confirmedAt: Date.now(),
+      amount: Number(amount) || 0,
+    });
+    await fpMarkConfirmed(paymentId, amount);
+  }
+
+  // Clean old in-memory entries (>10 min)
   const now = Date.now();
   for (const [key, val] of faucetPayPayments) {
     if (now - val.confirmedAt > 600000) faucetPayPayments.delete(key);
   }
+
+  if (req.method === "POST") {
+    return res.status(200).send("OK");
+  }
   const baseUrl = process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
     : "https://joseph-trading.vercel.app";
-  res.redirect(`${baseUrl}/#/store?payment_confirmed=${payment_id}`);
-});
+  return res.redirect(`${baseUrl}/#/store?payment_confirmed=${paymentId}`);
+};
+
+app.get("/api/faucetpayCallback", faucetpayCallbackHandler);
+app.post("/api/faucetpayCallback", faucetpayCallbackHandler);
 
 // API Route: Check if a FaucetPay payment is confirmed
-app.get("/api/faucetpayCheck", (req, res) => {
+app.get("/api/faucetpayCheck", async (req, res) => {
   const { payment_id } = req.query;
   if (!payment_id) return res.json({ confirmed: false });
   const record = faucetPayPayments.get(String(payment_id));
   if (record && record.confirmed) {
     return res.json({ confirmed: true, amount: record.amount });
+  }
+  const stored = await fpReadConfirmed(String(payment_id));
+  if (stored.confirmed) {
+    return res.json({ confirmed: true, amount: stored.amount });
   }
   return res.json({ confirmed: false });
 });
