@@ -417,9 +417,11 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         setAwaitingApproval(true);
         setVerifying(false);
         setVerifyStatus(isAr ? '⏳ في انتظار موافقة المطور...' : '⏳ Awaiting developer approval...');
-      } catch {
+      } catch (e: any) {
+        console.error('createPendingPayment error:', e);
         setVerifying(false);
-        setVerifyStatus(isAr ? '❌ خطأ في إرسال الطلب' : '❌ Error submitting request');
+        const msg = e?.message || String(e);
+        setVerifyStatus(isAr ? `❌ خطأ: ${msg}` : `❌ Error: ${msg}`);
       }
       return;
     }
