@@ -66,13 +66,6 @@ service cloud.firestore {
       allow write: if true;
     }
 
-    // Pending payment approvals — clients create requests, developer approves/rejects
-    match /pending_payments/{paymentId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if true;
-    }
-
     // Site ads config — developer writes, anyone reads
     match /config/{docId} {
       allow read: if true;

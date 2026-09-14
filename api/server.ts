@@ -1225,16 +1225,23 @@ const faucetpayCallbackHandler = async (req: any, res: any) => {
     return res.status(400).send("Missing payment id");
   }
 
-  // Best-effort server-side verification: only block when FaucetPay explicitly says the token is invalid.
-  let verified = true;
+  // Strict server-side verification: only confirm when FaucetPay explicitly confirms the token is valid
+  // AND the payment was made to our merchant account. Without this, anyone could forge a confirmation.
+  let verified = false;
   if (token) {
     try {
       const vr = await fetch(`https://faucetpay.io/merchant/get-payment/${encodeURIComponent(token)}`);
-      const vi = await vr.json();
-      if (vi && vi.valid === false) verified = false;
+      const vi: any = await vr.json();
+      if (vi && vi.valid === true) verified = true;
+      else console.warn("[FaucetPay] Token rejected or invalid:", vi?.message || "unknown response");
     } catch (e) {
-      console.warn("[FaucetPay] Token verification failed (continuing):", e);
+      console.error("[FaucetPay] Token verification failed:", e);
     }
+  }
+  // If no token was provided, refuse the payment entirely — security first.
+  if (!verified) {
+    console.warn("[FaucetPay] Rejected unverified callback for payment:", paymentId);
+    return res.status(400).send("Unverified payment rejected");
   }
 
   if (verified) {
