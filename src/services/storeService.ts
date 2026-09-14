@@ -17,6 +17,42 @@ export interface StoreBot {
 const BOTS_COLLECTION = 'store_bots';
 const PURCHASES_COLLECTION = 'store_purchases';
 
+const DOWNLOAD_GRANTS_KEY = 'store_download_grants';
+const DOWNLOADED_KEY = 'store_downloaded_bots';
+
+function readMap(key: string): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; }
+}
+
+function writeMap(key: string, map: Record<string, number>): void {
+  try { localStorage.setItem(key, JSON.stringify(map)); } catch {}
+}
+
+export function getDownloadGrant(botId: string): number | null {
+  const grants = readMap(DOWNLOAD_GRANTS_KEY);
+  return grants[botId] ?? null;
+}
+
+export function grantBotDownload(botId: string): void {
+  const grants = readMap(DOWNLOAD_GRANTS_KEY);
+  if (grants[botId]) return;
+  grants[botId] = Date.now();
+  writeMap(DOWNLOAD_GRANTS_KEY, grants);
+}
+
+export function consumeBotDownload(botId: string): void {
+  const grants = readMap(DOWNLOAD_GRANTS_KEY);
+  delete grants[botId];
+  writeMap(DOWNLOAD_GRANTS_KEY, grants);
+  const downloaded = readMap(DOWNLOADED_KEY);
+  downloaded[botId] = Date.now();
+  writeMap(DOWNLOADED_KEY, downloaded);
+}
+
+export function hasDownloadedBot(botId: string): boolean {
+  return !!readMap(DOWNLOADED_KEY)[botId];
+}
+
 export async function fetchStoreBots(): Promise<StoreBot[]> {
   try {
     const q = query(collection(db, BOTS_COLLECTION), orderBy('createdAt', 'desc'));

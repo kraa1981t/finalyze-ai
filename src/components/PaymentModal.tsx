@@ -4,7 +4,7 @@ import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalL
 import { fetchCryptoPricesDirect } from '../services/apiDirect';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { StoreBot, downloadBot, recordBotPurchase } from '../services/storeService';
+import { StoreBot, downloadBot, recordBotPurchase, getDownloadGrant, grantBotDownload, consumeBotDownload, hasDownloadedBot } from '../services/storeService';
 import { loadPaymentSettings, savePaymentSettings } from '../services/paymentSettings';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
@@ -119,6 +119,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [copiedFaucetpay, setCopiedFaucetpay] = useState(false);
   const [faucetpayOfficialPending, setFaucetpayOfficialPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [botGrantTs, setBotGrantTs] = useState<number | null>(null);
+  const [botDownloaded, setBotDownloaded] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -140,8 +142,23 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setTimerSeconds(0);
       if (!manageMode) setIsAdmin(false);
       setEditSubPrices({ ...subPrices });
+      if (botPurchase?.id) {
+        setBotGrantTs(getDownloadGrant(botPurchase.id));
+        setBotDownloaded(hasDownloadedBot(botPurchase.id));
+      } else {
+        setBotGrantTs(null);
+        setBotDownloaded(false);
+      }
     }
   }, [isOpen]);
+
+  // Each confirmed payment operation grants exactly ONE download for the bot
+  useEffect(() => {
+    if (paymentConfirmed && botPurchase?.id) {
+      grantBotDownload(botPurchase.id);
+      setBotGrantTs(getDownloadGrant(botPurchase.id));
+    }
+  }, [paymentConfirmed]);
 
   // Load shared payment settings from Firestore so clients see exactly what the developer configured
   useEffect(() => {
@@ -302,6 +319,15 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setTimeout(() => setCopiedFaucetpay(false), 2000);
   };
 
+  const handleDownloadBot = () => {
+    if (!botPurchase || !paymentConfirmed || !botGrantTs) return;
+    downloadBot(botPurchase);
+    consumeBotDownload(botPurchase.id || '');
+    setBotGrantTs(null);
+    setBotDownloaded(true);
+    recordBotPurchase(botPurchase, buyerEmail || '').then(() => onBotPaid?.(botPurchase));
+  };
+
   const startOfficialFaucetpayPayment = () => {
     if (!faucetpayMerchantUser) {
       setError(isAr ? 'لم يتم ضبط اسم مستخدم FaucetPay المركزي. أضفه في إعدادات الدفع.' : 'Merchant username not configured. Add it in Payment Settings.');
@@ -360,6 +386,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const showPlanDummy = section === 'plan' && !!botPurchase;
   const showAddresses = !showBotDummy && !showPlanDummy;
   const currentLabel = isBotSection ? botPurchase!.name : planLabel;
+  const botCopyLocked = !!botPurchase?.id && botDownloaded && !botGrantTs;
 
   const pageInner = (
     <>
@@ -440,6 +467,20 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         {error && (
           <div className="bg-red-500/10 border border-red-500/40 rounded-2xl p-4 mb-4">
             <p className="text-xs font-black text-red-400 text-center">{error}</p>
+          </div>
+        )}
+        {botCopyLocked && (
+          <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 mb-4 text-center">
+            <p className="text-xs font-black text-rose-400">
+              {isAr
+                ? '🔒 حمّلت نسخة من هذا البوت مسبقاً. كل عملية دفع تتيح تحميل نسخة واحدة فقط.'
+                : '🔒 You already downloaded a copy of this bot. Each payment allows downloading one copy only.'}
+            </p>
+            <p className="text-[10px] text-rose-300/60 mt-1">
+              {isAr
+                ? 'لتتمكن من التحميل مرة أخرى، يلزمك إتمام عملية دفع جديدة.'
+                : 'To download again, a new payment is required.'}
+            </p>
           </div>
         )}
         {faucetpayEmail && !manageMode && !selectedCoinId && !faucetpaySelected && !faucetpayOfficialPending && (
@@ -647,24 +688,20 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
               <button
                 onClick={() => {
-                  if (!paymentConfirmed) return;
                   if (section === 'bot' && botPurchase) {
-                    downloadBot(botPurchase);
-                    recordBotPurchase(botPurchase, buyerEmail || '').then(() => onBotPaid?.(botPurchase));
+                    handleDownloadBot();
                   } else {
                     onConfirm?.();
                   }
                 }}
-                disabled={!paymentConfirmed}
+                disabled={!paymentConfirmed || (isBotSection && !botGrantTs)}
                 className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
-                  paymentConfirmed
+                  paymentConfirmed && (!isBotSection || botGrantTs)
                     ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
                     : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
                 }`}
               >
-                {paymentConfirmed
-                  ? (section === 'bot' && botPurchase ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : '🟢 Activate Plan')
-                  : (isAr ? '🔴 في انتظار الدفع...' : '🔴 Awaiting payment...')}
+                {isBotSection && botGrantTs ? '🟢 تحميل البوت الآن' : isBotSection ? (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent') : paymentConfirmed ? '🟢 Activate Plan' : (isAr ? '🔴 في انتظار الدفع...' : '🔴 Awaiting payment...')}
               </button>
 
               {paymentDetected && (
@@ -751,17 +788,15 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               </p>
 
               <button
-                onClick={() => { if (!paymentConfirmed) return; setFaucetpaySelected(false); if (section === 'bot' && botPurchase) { downloadBot(botPurchase); recordBotPurchase(botPurchase, buyerEmail || '').then(() => onBotPaid?.(botPurchase)); } else { onConfirm?.(); } }}
-                disabled={!paymentConfirmed}
+                onClick={() => { if (!paymentConfirmed) return; setFaucetpaySelected(false); if (section === 'bot' && botPurchase) { handleDownloadBot(); } else { onConfirm?.(); } }}
+                disabled={!paymentConfirmed || (isBotSection && !botGrantTs)}
                 className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
-                  paymentConfirmed
+                  paymentConfirmed && (!isBotSection || botGrantTs)
                     ? 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
                     : 'bg-red-500/20 border border-red-500/40 text-red-400 cursor-not-allowed'
                 }`}
               >
-                {paymentConfirmed
-                  ? (section === 'bot' && botPurchase ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : '🟢 Activate Plan')
-                  : (isAr ? '🔴 في انتظار تأكيد الدفع...' : '🔴 Awaiting payment...')}
+                {isBotSection && botGrantTs ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : isBotSection ? (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent') : paymentConfirmed ? '🟢 Activate Plan' : (isAr ? '🔴 في انتظار تأكيد الدفع...' : '🔴 Awaiting payment...')}
               </button>
 
               {!paymentConfirmed && (
