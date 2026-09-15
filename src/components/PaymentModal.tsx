@@ -362,7 +362,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [verifyStatus, setVerifyStatus] = useState('');
 
   const verifyPaymentNow = async () => {
-    // Crypto: verify on-chain
     if (!selectedCoinId || !botPurchase) return;
     const item = addresses.find(a => a.id === selectedCoinId);
     if (!item) return;
