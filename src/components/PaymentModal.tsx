@@ -72,7 +72,17 @@ interface PaymentModalProps {
 const TIMER_STORAGE_KEY = 'payment_timer_minutes';
 
 const BLOCKCYPHER_CHAINS: Record<string, string> = {
-  btc: 'btc/main', eth: 'eth/main', ltc: 'ltc/main',
+  btc: 'btc/main', eth: 'eth/main',
+};
+
+const fetchWithTimeout = async (url: string, options?: RequestInit, ms = 10000): Promise<Response> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 };
 
 export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle, botPurchase, sectionTab = 'bot', onBotPaid, onGoToStore, onGoToPlans, buyerEmail }: PaymentModalProps) {
@@ -183,23 +193,37 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   // Real on-chain balance lookup (main units) for the supported chains
   const fetchOnchainBalance = async (item: CryptoAddress): Promise<number | null> => {
     try {
-      if (item.id === 'btc' || item.id === 'eth' || item.id === 'ltc') {
+      if (item.id === 'btc' || item.id === 'eth') {
         const apiUrl = BLOCKCYPHER_CHAINS[item.id];
-        const res = await fetch(`https://api.blockcypher.com/v1/${apiUrl}/addrs/${item.address}/balance`);
+        const res = await fetchWithTimeout(`https://api.blockcypher.com/v1/${apiUrl}/addrs/${item.address}/balance`);
         const data = await res.json();
         if (data.error) return null;
         const divisor = item.id === 'eth' ? 1e18 : 1e8;
         return (data.final_balance + (data.unconfirmed_balance || 0)) / divisor;
       }
+      if (item.id === 'ltc') {
+        try {
+          const res = await fetchWithTimeout(`https://api.blockchair.com/litecoin/dashboards/address/${item.address}`);
+          const data = await res.json();
+          const addr = data?.data?.[item.address];
+          if (addr?.address?.balance != null) {
+            return addr.address.balance / 1e8;
+          }
+        } catch { /* fallback below */ }
+        const res = await fetchWithTimeout(`https://api.blockcypher.com/v1/ltc/main/addrs/${item.address}/balance`);
+        const data = await res.json();
+        if (data.error) return null;
+        return (data.final_balance + (data.unconfirmed_balance || 0)) / 1e8;
+      }
       if (item.id === 'trx') {
-        const res = await fetch(`https://api.trongrid.io/v1/accounts/${item.address}`);
+        const res = await fetchWithTimeout(`https://api.trongrid.io/v1/accounts/${item.address}`);
         const data = await res.json();
         const account = data?.data?.[0];
         if (!account) return null;
         return (account.balance || 0) / 1e6;
       }
       if (item.id === 'usdt') {
-        const res = await fetch(`https://api.trongrid.io/v1/accounts/${item.address}`);
+        const res = await fetchWithTimeout(`https://api.trongrid.io/v1/accounts/${item.address}`);
         const data = await res.json();
         const account = data?.data?.[0];
         if (!account) return null;
@@ -211,7 +235,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         return 0;
       }
       if (item.id === 'sol') {
-        const res = await fetch(SOL_RPC, {
+        const res = await fetchWithTimeout(SOL_RPC, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getBalance', params: [item.address] }),
@@ -360,7 +384,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           setVerifyStatus(isAr ? '⏳ الدفع لم يصل بعد — جرب بعد ثوانٍ' : '⏳ Payment not yet received — try again in a few seconds');
         }
       } else {
-        setVerifyStatus(isAr ? '⚠️ لا يمكن التحقق من هذه العملة' : '⚠️ Cannot verify this coin');
+        setVerifyStatus(isAr ? '⚠️ لا يمكن التحقق — تأكد من العنوان أو انتظر قليلاً ثم أعد المحاولة' : '⚠️ Cannot verify — check address or wait and retry');
       }
     } catch {
       setVerifyStatus(isAr ? '❌ خطأ في التحقق' : '❌ Verification error');
