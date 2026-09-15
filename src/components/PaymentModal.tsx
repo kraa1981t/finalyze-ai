@@ -43,10 +43,6 @@ const POPULAR_COINS = [
 ];
 
 const STORAGE_KEY = 'crypto_payment_addresses';
-const FAUCETPAY_EMAIL_KEY = 'faucetpay_email';
-const FAUCETPAY_MERCHANT_KEY = 'faucetpay_merchant_username';
-const FAUCETPAY_PENDING_KEY = 'faucetpay_pending_purchase';
-const FAUCETPAY_WEBSCR = 'https://faucetpay.io/merchant/webscr';
 
 interface CryptoAddress {
   id: string;
@@ -117,10 +113,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   });
   const [editSubPrices, setEditSubPrices] = useState({ ...subPrices });
   const [freemiumDisabled, setFreemiumDisabled] = useState(externalFreemium ?? localStorage.getItem('finalyze_freemium_disabled') === 'true');
-  const [faucetpayEmail, setFaucetpayEmail] = useState(() => localStorage.getItem(FAUCETPAY_EMAIL_KEY) || '');
-  const [editFaucetpayEmail, setEditFaucetpayEmail] = useState(faucetpayEmail);
-  const [faucetpayMerchantUser, setFaucetpayMerchantUser] = useState(() => localStorage.getItem(FAUCETPAY_MERCHANT_KEY) || '');
-  const [editFaucetpayMerchantUser, setEditFaucetpayMerchantUser] = useState(faucetpayMerchantUser);
   const [error, setError] = useState<string | null>(null);
   const [botGrantTs, setBotGrantTs] = useState<number | null>(null);
   const [botDownloaded, setBotDownloaded] = useState(false);
@@ -163,7 +155,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     }
   }, [paymentConfirmed]);
 
-  // Load shared payment settings from Firestore so clients see exactly what the developer configured
+  // Load shared payment settings from Firestore (crypto addresses only)
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
@@ -173,16 +165,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       if (data.addresses && data.addresses.length) {
         setAddresses(data.addresses);
         setEditAddresses(JSON.parse(JSON.stringify(data.addresses)));
-      }
-      if (data.faucetpayEmail) {
-        setFaucetpayEmail(data.faucetpayEmail);
-        setEditFaucetpayEmail(data.faucetpayEmail);
-        localStorage.setItem(FAUCETPAY_EMAIL_KEY, data.faucetpayEmail);
-      }
-      if (data.faucetpayMerchantUser) {
-        setFaucetpayMerchantUser(data.faucetpayMerchantUser);
-        setEditFaucetpayMerchantUser(data.faucetpayMerchantUser);
-        localStorage.setItem(FAUCETPAY_MERCHANT_KEY, data.faucetpayMerchantUser);
       }
     };
     sync();
@@ -342,18 +324,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setNewAddress({ id: '', name: '', address: '' });
   };
 
-  const saveFaucetpayEmail = () => {
-    setFaucetpayEmail(editFaucetpayEmail);
-    localStorage.setItem(FAUCETPAY_EMAIL_KEY, editFaucetpayEmail);
-    savePaymentSettings({ faucetpayEmail: editFaucetpayEmail });
-  };
-
-  const saveFaucetpayMerchantUser = () => {
-    setFaucetpayMerchantUser(editFaucetpayMerchantUser);
-    localStorage.setItem(FAUCETPAY_MERCHANT_KEY, editFaucetpayMerchantUser);
-    savePaymentSettings({ faucetpayMerchantUser: editFaucetpayMerchantUser });
-  };
-
   const handleDownloadBot = () => {
     if (!botPurchase || !paymentConfirmed || !botGrantTs) return;
     downloadBot(botPurchase);
@@ -363,96 +333,9 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     recordBotPurchase(botPurchase, buyerEmail || '').then(() => onBotPaid?.(botPurchase));
   };
 
-  // On-chain verification state (crypto method only — fully automatic, no admin approval)
+  // On-chain verification state (crypto method only — fully automatic)
   const [verifying, setVerifying] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState('');
-
-  // Merchant hosted checkout (FaucetPay official link) — automatic & verified, no manual approval
-  const [merchantPaymentId, setMerchantPaymentId] = useState<string | null>(null);
-  const [merchantStatus, setMerchantStatus] = useState('');
-
-  // Restore an in-flight merchant payment when the buyer comes back from FaucetPay
-  useEffect(() => {
-    if (!isOpen || manageMode) return;
-    try {
-      const raw = localStorage.getItem(FAUCETPAY_PENDING_KEY);
-      if (!raw) return;
-      const pending = JSON.parse(raw);
-      if (pending?.paymentId && (!botPurchase || pending?.botId === (botPurchase.id || ''))) {
-        setMerchantPaymentId(pending.paymentId);
-        setVerifyStatus(isAr ? '⏳ جاري التحقق من الدفع عبر FaucetPay...' : '⏳ Verifying payment via FaucetPay...');
-      }
-    } catch {}
-  }, [isOpen, manageMode]);
-
-  // Poll the server for merchant payment confirmation (callback from FaucetPay marks it confirmed)
-  useEffect(() => {
-    if (!merchantPaymentId || paymentConfirmed) return;
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/faucetpayCheck?payment_id=${encodeURIComponent(merchantPaymentId)}`);
-        const data = await res.json();
-        if (data?.confirmed) {
-          setMerchantStatus(isAr ? '✅ تم تأكيد الدفع!' : '✅ Payment confirmed!');
-          setPaymentConfirmed(true);
-          setTimerRunning(false);
-          grantBotDownload(botPurchase?.id || '');
-          setBotGrantTs(Date.now());
-          setVerifyStatus(isAr ? '✅ الدفع وصل لـ FaucetPay! جاري التحميل...' : '✅ Payment received on FaucetPay! Downloading...');
-          try { localStorage.removeItem(FAUCETPAY_PENDING_KEY); } catch {}
-        }
-      } catch {}
-    };
-    poll();
-    const interval = setInterval(poll, 4000);
-    return () => clearInterval(interval);
-  }, [merchantPaymentId, paymentConfirmed, isAr]);
-
-  const startMerchantPayment = () => {
-    if (!faucetpayMerchantUser || !botPurchase || !amount) return;
-    const paymentId = `merchant_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const baseUrl = window.location.origin;
-    const isBot = section === 'bot' && !!botPurchase;
-    try {
-      localStorage.setItem(FAUCETPAY_PENDING_KEY, JSON.stringify({
-        paymentId,
-        botId: isBot ? (botPurchase.id || '') : '',
-        amount,
-        name: isBot ? botPurchase.name : planLabel,
-        ts: Date.now(),
-      }));
-    } catch {}
-
-    setMerchantPaymentId(paymentId);
-    setVerifyStatus(isAr ? 'انتقلت إلى FaucetPay...' : 'Redirecting to FaucetPay...');
-    setMerchantStatus('');
-
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = FAUCETPAY_WEBSCR;
-    form.target = '_blank';
-    const fields: Record<string, string> = {
-      merchant_username: faucetpayMerchantUser,
-      item_description: isBot ? botPurchase.name : planLabel,
-      amount1: amount.toFixed(2),
-      currency1: 'USDT',
-      currency2: '',
-      custom: paymentId,
-      callback_url: `${baseUrl}/api/faucetpayCallback`,
-      success_url: `${baseUrl}/#/store?payment_confirmed=${paymentId}`,
-      cancel_url: `${baseUrl}/#/store`,
-    };
-    for (const [k, v] of Object.entries(fields)) {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = k;
-      input.value = v;
-      form.appendChild(input);
-    }
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-  };
 
   const verifyPaymentNow = async () => {
     // Crypto: verify on-chain
@@ -604,47 +487,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 ? 'لتتمكن من التحميل مرة أخرى، يلزمك إتمام عملية دفع جديدة.'
                 : 'To download again, a new payment is required.'}
             </p>
-          </div>
-        )}
-        {faucetpayMerchantUser && !manageMode && !selectedCoinId && (
-          <div className="bg-emerald-500/5 border-2 border-emerald-500/30 rounded-2xl p-4 mb-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
-                <span className="text-white font-black text-[10px]">FP</span>
-              </div>
-              <div>
-                <span className="text-sm font-black text-emerald-400">FaucetPay</span>
-                <span className="text-[10px] text-emerald-300/60 block">{isAr ? 'دفع آمن عبر الرابط — تأكيد فوري' : 'Secure link payment — instant confirmation'}</span>
-              </div>
-            </div>
-            {!merchantPaymentId ? (
-              <button
-                onClick={startMerchantPayment}
-                className="w-full py-4 rounded-xl bg-emerald-500 text-black font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 active:scale-95 transition-all"
-              >
-                {isAr ? '💳 ادفع عبر FaucetPay' : '💳 Pay with FaucetPay'}
-              </button>
-            ) : (
-              <div className="bg-black/40 border border-emerald-500/20 rounded-2xl p-4 text-center">
-                <p className="text-sm font-black text-white mb-1">
-                  {paymentConfirmed ? (isAr ? '✅ تم استلام الدفع!' : '✅ Payment received!') : (isAr ? '🟠 في انتظار تأكيد FaucetPay...' : '🟠 Awaiting FaucetPay confirmation...')}
-                </p>
-                {!paymentConfirmed && (
-                  <>
-                    <p className="text-[10px] text-slate-400 mb-3">
-                      {isAr ? 'أتمم الدفع في نافذة FaucetPay. هذا التحقق تلقائي — لا حاجة لأي موافقة.' : 'Complete the payment in the FaucetPay window. Verification is automatic — no approval needed.'}
-                    </p>
-                    <button
-                      onClick={startMerchantPayment}
-                      className="px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-black uppercase tracking-wider hover:bg-emerald-500/20 transition-all"
-                    >
-                      {isAr ? '🔄 إعادة فتح رابط الدفع' : '🔄 Reopen payment link'}
-                    </button>
-                  </>
-                )}
-                {verifyStatus && <p className="text-[10px] text-emerald-400 font-bold mt-2">{verifyStatus}</p>}
-              </div>
-            )}
           </div>
         )}
 
@@ -852,7 +694,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           );
         })()}
 
-        {/* FaucetPay official callback receives payment confirmation */}
       </div>
       )}
 
@@ -995,30 +836,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
             >
               Save Timer
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4">
-          <h5 className="text-xs font-black uppercase text-blue-400 tracking-widest mb-3">
-            {isAr ? 'بريد FaucetPay' : 'FaucetPay Email'}
-          </h5>
-          <p className="text-[10px] text-blue-300/60 mb-3">
-            {isAr ? 'بريد حسابك على FaucetPay — يظهر للعملاء كوسيلة دفع إضافية لتحويل المبلغ مباشرة' : 'Your FaucetPay account email — shown to clients as an extra payment method to transfer directly'}
-          </p>
-          <div className="flex items-center gap-3">
-            <input
-              type="email"
-              value={editFaucetpayEmail}
-              onChange={(e) => setEditFaucetpayEmail(e.target.value)}
-              placeholder={isAr ? 'email@faucetpay.io' : 'email@faucetpay.io'}
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
-            />
-            <button
-              onClick={saveFaucetpayEmail}
-              className="px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all text-xs font-black"
-            >
-              {isAr ? 'حفظ' : 'Save'}
             </button>
           </div>
         </div>

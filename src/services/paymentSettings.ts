@@ -9,8 +9,6 @@ export interface PaymentAddress {
 
 export interface PaymentSettingsData {
   addresses: PaymentAddress[];
-  faucetpayEmail: string;
-  faucetpayMerchantUser: string;
   updatedAt: number;
 }
 
