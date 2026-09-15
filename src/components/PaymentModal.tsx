@@ -72,8 +72,12 @@ interface PaymentModalProps {
 const TIMER_STORAGE_KEY = 'payment_timer_minutes';
 
 const BLOCKCYPHER_CHAINS: Record<string, string> = {
-  btc: 'btc/main', eth: 'eth/main',
+  btc: 'btc/main', eth: 'eth/main', ltc: 'ltc/main',
 };
+
+// How far back we scan the address for incoming payments.
+// Works even when exchanges sweep deposit addresses (balance stays 0).
+const ONCHAIN_LOOKBACK_MS = 6 * 60 * 60 * 1000;
 
 const fetchWithTimeout = async (url: string, options?: RequestInit, ms = 10000): Promise<Response> => {
   const controller = new AbortController();
@@ -190,30 +194,27 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
 
-  // Real on-chain balance lookup (main units) for the supported chains
+  // Real on-chain payment check (main units). For BTC/LTC we sum INCOMING txrefs
+  // in the last 6h instead of the final balance, because exchanges sweep deposit
+  // addresses (balance = 0 even after receiving money).
   const fetchOnchainBalance = async (item: CryptoAddress): Promise<number | null> => {
     try {
-      if (item.id === 'btc' || item.id === 'eth') {
+      if (item.id === 'btc' || item.id === 'eth' || item.id === 'ltc') {
         const apiUrl = BLOCKCYPHER_CHAINS[item.id];
-        const res = await fetchWithTimeout(`https://api.blockcypher.com/v1/${apiUrl}/addrs/${item.address}/balance`);
+        const res = await fetchWithTimeout(`https://api.blockcypher.com/v1/${apiUrl}/addrs/${item.address}?unspentOnly=false&limit=50`);
         const data = await res.json();
-        if (data.error) return null;
+        if (data.error || !Array.isArray(data.txrefs)) return null;
+        const cutoff = Date.now() - ONCHAIN_LOOKBACK_MS;
+        let received = 0;
+        for (const ref of data.txrefs) {
+          if (ref.tx_input_n !== -1) continue; // only output → money received by this address
+          if (ref.tx_output_n === -1) continue;
+          // Unconfirmed (no `confirmed` field) = just arrived → count as recent
+          const t = ref.confirmed ? new Date(ref.confirmed).getTime() : Date.now();
+          if (t >= cutoff && ref.value != null) received += ref.value;
+        }
         const divisor = item.id === 'eth' ? 1e18 : 1e8;
-        return (data.final_balance + (data.unconfirmed_balance || 0)) / divisor;
-      }
-      if (item.id === 'ltc') {
-        try {
-          const res = await fetchWithTimeout(`https://api.blockchair.com/litecoin/dashboards/address/${item.address}`);
-          const data = await res.json();
-          const addr = data?.data?.[item.address];
-          if (addr?.address?.balance != null) {
-            return addr.address.balance / 1e8;
-          }
-        } catch { /* fallback below */ }
-        const res = await fetchWithTimeout(`https://api.blockcypher.com/v1/ltc/main/addrs/${item.address}/balance`);
-        const data = await res.json();
-        if (data.error) return null;
-        return (data.final_balance + (data.unconfirmed_balance || 0)) / 1e8;
+        return received / divisor;
       }
       if (item.id === 'trx') {
         const res = await fetchWithTimeout(`https://api.trongrid.io/v1/accounts/${item.address}`);
