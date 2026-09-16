@@ -74,13 +74,13 @@ function FAQItem({ qAr, qEn, aAr, aEn, isAr, open, onToggle }: { qAr: string; qE
   return (
     <div className="bg-brand-alt rounded-2xl border border-white/10 overflow-hidden">
       <button onClick={onToggle} className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left">
-        <span className="text-sm font-black text-white">{isAr ? qAr : qEn}</span>
+        <span className="text-base font-black text-white">{isAr ? qAr : qEn}</span>
         <ChevronDown size={18} className={`text-[#F59E0B] transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       <AnimatePresence initial={false}>
         {open && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }}>
-            <div className="px-5 pb-5 text-sm text-white/60 leading-relaxed">{isAr ? aAr : aEn}</div>
+            <div className="px-5 pb-5 text-base text-white/70 leading-relaxed">{isAr ? aAr : aEn}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -283,39 +283,39 @@ export default function SeoPricesPage({ lang, onBack }: SeoPricesPageProps) {
         <div className="w-16 h-16 mx-auto bg-[#F59E0B]/20 rounded-3xl flex items-center justify-center border border-[#F59E0B]/30">
           <TrendingUp size={32} className="text-[#F59E0B]" />
         </div>
-        <h1 className="text-2xl sm:text-4xl font-black text-white">
+        <h1 className="text-3xl sm:text-4xl font-black text-white">
           {isAr ? 'أسعار الذهب والبيتكوين والعملات اليوم مباشرة' : 'Live Gold, Bitcoin & Crypto Prices Today'}
         </h1>
-        <p className="text-white/60 text-sm max-w-2xl mx-auto leading-relaxed">
+        <p className="text-white/60 text-base max-w-2xl mx-auto leading-relaxed">
           {isAr
             ? 'تابع سعر الذهب والفضة والدولار والعملات الرقمية لحظة بلحظة. أسعار حية تتحدث تلقائياً كل دقيقة مع التحويل إلى الدينار الجزائري.'
             : 'Follow gold, silver, forex and crypto prices in real time. Live prices refresh every minute with automatic conversion to Algerian Dinar.'}
         </p>
         <div className="flex items-center justify-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-black px-3 py-1 rounded-full">
+          <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-black px-3 py-1 rounded-full">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             {isAr ? 'أسعار حية' : 'LIVE'}
           </span>
-          <span className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 text-white/60 text-[11px] font-black px-3 py-1 rounded-full">
-            <Timer size={12} className="text-[#F59E0B]" />
+          <span className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 text-white/60 text-xs font-black px-3 py-1 rounded-full">
+            <Timer size={13} className="text-[#F59E0B]" />
             {isAr ? `تحديث تلقائي خلال ${countdown}ث` : `Auto-refresh in ${countdown}s`}
           </span>
           <button
             onClick={() => refresh(true)}
             disabled={refreshing}
-            className="inline-flex items-center gap-1.5 bg-[#F59E0B] text-black text-[11px] font-black px-3 py-1 rounded-full hover:bg-[#d97706] transition-all disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 bg-[#F59E0B] text-black text-xs font-black px-3 py-1 rounded-full hover:bg-[#d97706] transition-all disabled:opacity-50"
           >
-            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+            <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
             {isAr ? 'تحديث الآن' : 'Refresh'}
           </button>
         </div>
-        <p className="text-[11px] text-white/40">
+        <p className="text-sm text-white/40">
           {live.XAUUSD?.ts ? new Date(live.XAUUSD.ts).toLocaleString(isAr ? 'ar-DZ' : 'en-US', { dateStyle: 'medium', timeStyle: 'medium' }) : '—'}
         </p>
       </motion.div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold rounded-xl px-4 py-3 text-center">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-bold rounded-xl px-4 py-3 text-center">
           {isAr ? 'تعذر الوصول إلى بعض مصادر الأسعار — يتم عرض آخر الأسعار المعروفة.' : 'Some price sources are unreachable — showing the last known prices.'}
         </div>
       )}
@@ -341,38 +341,38 @@ export default function SeoPricesPage({ lang, onBack }: SeoPricesPageProps) {
                   <Icon size={20} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-white/80">{isAr ? m.nameAr : m.nameEn}</p>
-                  <p className="text-[10px] font-bold text-white/40 font-mono">{m.sym}</p>
+                  <p className="text-sm font-black text-white/80">{isAr ? m.nameAr : m.nameEn}</p>
+                  <p className="text-xs font-bold text-white/40 font-mono">{m.sym}</p>
                 </div>
               </div>
               <div className="flex items-end justify-between gap-2">
                 <div>
-                  <p className="text-2xl font-black text-white tabular-nums leading-none">
+                  <p className="text-3xl font-black text-white tabular-nums leading-none">
                     {p != null ? `$${fmt(p, m.digits)}` : '—'}
                   </p>
-                  <p className="text-[11px] font-bold text-white/40 mt-1">
+                  <p className="text-sm font-bold text-white/40 mt-1">
                     {isAr ? 'دولار أمريكي' : 'US Dollar'}
                   </p>
                 </div>
                 <div className="text-right">
                   {chg != null ? (
-                    <span className={`inline-flex items-center gap-1 text-xs font-black ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {positive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                    <span className={`inline-flex items-center gap-1 text-sm font-black ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {positive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                       {fmtSigned(chg)}
                     </span>
                   ) : (
-                    <span className="text-xs font-bold text-white/30">{isAr ? '—' : '—'}</span>
+                    <span className="text-sm font-bold text-white/30">{isAr ? '—' : '—'}</span>
                   )}
                 </div>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <Sparkline points={pts} positive={positive} />
                 {dzdVal != null ? (
-                  <p className="text-[11px] font-black text-[#F59E0B] text-right leading-tight">
+                  <p className="text-sm font-black text-[#F59E0B] text-right leading-tight">
                     {isAr ? '≈' : '≈'} {fmt(dzdVal, m.digits === 0 ? 0 : 2)} {isAr ? 'دج' : 'DZD'}
                   </p>
                 ) : (
-                  <p className="text-[11px] font-bold text-white/25 text-right">{isAr ? 'دينار جزائري' : 'Algerian Dinar'}</p>
+                  <p className="text-sm font-bold text-white/25 text-right">{isAr ? 'دينار جزائري' : 'Algerian Dinar'}</p>
                 )}
               </div>
             </motion.div>
@@ -385,11 +385,11 @@ export default function SeoPricesPage({ lang, onBack }: SeoPricesPageProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-brand-alt rounded-2xl border border-white/10 p-4">
           <div className="flex items-center gap-2 mb-3">
-            <CircleDollarSign size={18} className="text-[#F59E0B]" />
-            <h2 className="text-sm font-black text-white">{isAr ? 'الدولار مقابل الدينار الجزائري' : 'USD / Algerian Dinar'}</h2>
+            <CircleDollarSign size={20} className="text-[#F59E0B]" />
+            <h2 className="text-base font-black text-white">{isAr ? 'الدولار مقابل الدينار الجزائري' : 'USD / Algerian Dinar'}</h2>
           </div>
-          <p className="text-3xl font-black text-white tabular-nums">{dzd != null ? dzd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</p>
-          <p className="text-xs font-bold text-white/50 mt-2 leading-relaxed">
+          <p className="text-4xl font-black text-white tabular-nums">{dzd != null ? dzd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</p>
+          <p className="text-sm font-bold text-white/50 mt-2 leading-relaxed">
             {isAr
               ? 'معدل الصرف الرسمي التقريبي من مصادر البنوك المركزية، يتغير يومياً. استخدمه لحساب قيمة الذهب والعملات الرقمية بالدينار الجزائري.'
               : 'Approximate official exchange rate from central bank sources, updated daily. Use it to value gold and crypto in Algerian Dinar.'}
@@ -397,22 +397,22 @@ export default function SeoPricesPage({ lang, onBack }: SeoPricesPageProps) {
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-brand-alt rounded-2xl border border-white/10 p-4">
           <div className="flex items-center gap-2 mb-3">
-            <Info size={18} className="text-[#F59E0B]" />
-            <h2 className="text-sm font-black text-white">{isAr ? 'معلومات سريعة عن الأسعار' : 'Quick Price Facts'}</h2>
+            <Info size={20} className="text-[#F59E0B]" />
+            <h2 className="text-base font-black text-white">{isAr ? 'معلومات سريعة عن الأسعار' : 'Quick Price Facts'}</h2>
           </div>
-          <ul className="space-y-1.5 text-xs font-bold text-white/60 leading-relaxed">
-            <li className="flex items-start gap-2"><CheckCircle2 size={14} className="text-emerald-400 mt-0.5 shrink-0" />{isAr ? `غرام الذهب عالمياً ≈ ${xau != null ? '$' + fmt(xau / 31.1035, 2) : '—'}` : `World gold per gram ≈ ${xau != null ? '$' + fmt(xau / 31.1035, 2) : '—'}`}</li>
-            <li className="flex items-start gap-2"><CheckCircle2 size={14} className="text-emerald-400 mt-0.5 shrink-0" />{isAr ? `أونصة الذهب باليورو ≈ €${goldEur != null ? fmt(goldEur, 0) : '—'}` : `Gold per ounce in EUR ≈ €${goldEur != null ? fmt(goldEur, 0) : '—'}`}</li>
-            <li className="flex items-start gap-2"><CheckCircle2 size={14} className="text-emerald-400 mt-0.5 shrink-0" />{isAr ? `أونصة الفضة بالدينار ≈ ${silverDzd != null ? fmt(silverDzd, 0) : '—'} دج` : `Silver per ounce in DZD ≈ ${silverDzd != null ? fmt(silverDzd, 0) : '—'}`}</li>
-            <li className="flex items-start gap-2"><CheckCircle2 size={14} className="text-emerald-400 mt-0.5 shrink-0" />{isAr ? `البيتكوين بالدينار ≈ ${btcDzd != null ? fmt(btcDzd, 0) : '—'} دج` : `Bitcoin in DZD ≈ ${btcDzd != null ? fmt(btcDzd, 0) : '—'}`}</li>
+          <ul className="space-y-2 text-sm font-bold text-white/60 leading-relaxed">
+            <li className="flex items-start gap-2"><CheckCircle2 size={16} className="text-emerald-400 mt-0.5 shrink-0" />{isAr ? `غرام الذهب عالمياً ≈ ${xau != null ? '$' + fmt(xau / 31.1035, 2) : '—'}` : `World gold per gram ≈ ${xau != null ? '$' + fmt(xau / 31.1035, 2) : '—'}`}</li>
+            <li className="flex items-start gap-2"><CheckCircle2 size={16} className="text-emerald-400 mt-0.5 shrink-0" />{isAr ? `أونصة الذهب باليورو ≈ €${goldEur != null ? fmt(goldEur, 0) : '—'}` : `Gold per ounce in EUR ≈ €${goldEur != null ? fmt(goldEur, 0) : '—'}`}</li>
+            <li className="flex items-start gap-2"><CheckCircle2 size={16} className="text-emerald-400 mt-0.5 shrink-0" />{isAr ? `أونصة الفضة بالدينار ≈ ${silverDzd != null ? fmt(silverDzd, 0) : '—'} دج` : `Silver per ounce in DZD ≈ ${silverDzd != null ? fmt(silverDzd, 0) : '—'}`}</li>
+            <li className="flex items-start gap-2"><CheckCircle2 size={16} className="text-emerald-400 mt-0.5 shrink-0" />{isAr ? `البيتكوين بالدينار ≈ ${btcDzd != null ? fmt(btcDzd, 0) : '—'} دج` : `Bitcoin in DZD ≈ ${btcDzd != null ? fmt(btcDzd, 0) : '—'}`}</li>
           </ul>
         </motion.div>
       </div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-base sm:text-lg font-black text-white">{isAr ? 'مخطط الذهب الفوري' : 'Live Gold Chart'}</h2>
-          <span className="text-[10px] font-black text-white/40">{isAr ? 'مصدر: TradingView' : 'Source: TradingView'}</span>
+          <h2 className="text-lg sm:text-xl font-black text-white">{isAr ? 'مخطط الذهب الفوري' : 'Live Gold Chart'}</h2>
+          <span className="text-xs font-black text-white/40">{isAr ? 'مصدر: TradingView' : 'Source: TradingView'}</span>
         </div>
         <div className="h-[340px] sm:h-[420px]">
           <TradingViewEmbed symbol="XAUUSD" interval="60" />
@@ -424,8 +424,8 @@ export default function SeoPricesPage({ lang, onBack }: SeoPricesPageProps) {
       <AdSlot position="between" lang={lang} />
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-brand-alt rounded-2xl border border-white/10 p-5 sm:p-6 space-y-4">
-        <h2 className="text-lg sm:text-xl font-black text-white">{isAr ? 'تحليل أسواق الذهب والعملات اليوم' : 'Today Gold & Crypto Market Outlook'}</h2>
-        <div className="space-y-3 text-sm text-white/60 leading-relaxed">
+        <h2 className="text-xl sm:text-2xl font-black text-white">{isAr ? 'تحليل أسواق الذهب والعملات اليوم' : 'Today Gold & Crypto Market Outlook'}</h2>
+        <div className="space-y-3.5 text-base text-white/70 leading-relaxed">
           {isAr ? (
             <>
               <p><strong className="text-white/80">سعر الذهب اليوم:</strong> يعد الذهب من أهم الأصول الآمنة في العالم، ويتأثر سعره بمجموعة من العوامل أهمها قرارات البنوك الفيدرالية الأمريكية، بيانات التضخم، قوة الدولار، والطلب العالمي من البنوك المركزية وصناديق الاستثمار. عندما يتراجع الدولار، يرتفع الذهب عادة والعكس صحيح.</p>
@@ -444,7 +444,7 @@ export default function SeoPricesPage({ lang, onBack }: SeoPricesPageProps) {
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="space-y-3">
-        <h2 className="text-lg sm:text-xl font-black text-white">{isAr ? 'أسئلة شائعة عن أسعار الذهب والعملات' : 'Frequently Asked Questions'}</h2>
+        <h2 className="text-xl sm:text-2xl font-black text-white">{isAr ? 'أسئلة شائعة عن أسعار الذهب والعملات' : 'Frequently Asked Questions'}</h2>
         <div className="space-y-2">
           {faqs.map((f, i) => (
             <FAQItem key={i} qAr={f.qAr} qEn={f.qEn} aAr={f.aAr} aEn={f.aEn} isAr={isAr} open={openFaq === i} onToggle={() => setOpenFaq(openFaq === i ? null : i)} />
@@ -453,7 +453,7 @@ export default function SeoPricesPage({ lang, onBack }: SeoPricesPageProps) {
       </motion.div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
-        <p className="text-[11px] text-white/40 leading-relaxed">
+        <p className="text-sm text-white/50 leading-relaxed">
           {isAr
             ? 'إخلاء مسؤولية: الأسعار المعروضة هي أسعار السوق الفورية العالمية لأغراض معلوماتية وتعليمية فقط، ولا تمثل توصية بيع أو شراء. التداول في الأسواق المالية يحمل مخاطر خسارة كبيرة، وقد تختلف الأسعار المحلية عند التجار بحسب الرسوم والعرض والطلب.'
             : 'Disclaimer: Prices shown are global live spot rates for informational and educational purposes only and are not buy/sell recommendations. Trading financial markets carries high risk and local dealer prices may differ due to fees, supply and demand.'}
