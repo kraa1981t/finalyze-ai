@@ -71,14 +71,6 @@ interface PaymentModalProps {
 
 const TIMER_STORAGE_KEY = 'payment_timer_minutes';
 
-const BLOCKCYPHER_CHAINS: Record<string, string> = {
-  btc: 'btc/main', eth: 'eth/main', ltc: 'ltc/main',
-};
-
-// How far back we scan the address for incoming payments.
-// Works even when exchanges sweep deposit addresses (balance stays 0).
-const ONCHAIN_LOOKBACK_MS = 6 * 60 * 60 * 1000;
-
 const fetchWithTimeout = async (url: string, options?: RequestInit, ms = 10000): Promise<Response> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
@@ -194,69 +186,21 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
 
-  // Fetch BlockCypher txrefs — sum incoming tx values in the last 6h.
-  // Works even when exchanges sweep deposit addresses (balance = 0).
-  const fetchBlockcypherReceived = async (chainPath: string, address: string): Promise<number | null> => {
-    const res = await fetchWithTimeout(`https://api.blockcypher.com/v1/${chainPath}/addrs/${address}?unspentOnly=false&limit=50`);
-    const data = await res.json();
-    if (data.error || !Array.isArray(data.txrefs)) return null;
-    const cutoff = Date.now() - ONCHAIN_LOOKBACK_MS;
-    let received = 0;
-    for (const ref of data.txrefs) {
-      if (ref.tx_input_n !== -1) continue;
-      if (ref.tx_output_n === -1) continue;
-      const t = ref.confirmed ? new Date(ref.confirmed).getTime() : Date.now();
-      if (t >= cutoff && ref.value != null) received += ref.value;
-    }
-    return received / (chainPath.startsWith('eth') ? 1e18 : 1e8);
-  };
-
-  // Fetch SoChain v3 — returns balance as a string. Fallback for when
-  // BlockCypher is rate-limited or unreachable from the browser.
-  const fetchSochainBalance = async (network: string, address: string): Promise<number | null> => {
-    const res = await fetchWithTimeout(`https://sochain.com/api/v3/address/${network}/${address}`);
-    const data = await res.json();
-    if (data.status !== 'success' || !data.data) return null;
-    return parseFloat(data.data.balance || '0');
-  };
-
-  // Multi-fallback on-chain balance check.
-  // For BTC/LTC: try BlockCypher txrefs → SoChain balance → BlockCypher simple balance.
-  // For ETH/TRX/SOL/USDT: direct API.
+  // Server-side on-chain verification — avoids browser CORS / rate-limit issues.
+  // Falls back to client-side for TRX/SOL/USDT only.
   const fetchOnchainBalance = async (item: CryptoAddress): Promise<number | null> => {
     try {
-      if (item.id === 'btc' || item.id === 'ltc') {
-        const chain = BLOCKCYPHER_CHAINS[item.id];
-        const network = item.id === 'btc' ? 'BTC' : 'LTC';
-        // 1) BlockCypher txrefs (handles sweeping)
+      // BTC / LTC / ETH — use server-side endpoint
+      if (item.id === 'btc' || item.id === 'ltc' || item.id === 'eth') {
         try {
-          const r = await fetchBlockcypherReceived(chain, item.address);
-          if (r !== null) return r;
-        } catch { /* fallback */ }
-        // 2) SoChain balance
-        try {
-          const r = await fetchSochainBalance(network, item.address);
-          if (r !== null && r > 0) return r;
-        } catch { /* fallback */ }
-        // 3) BlockCypher simple balance (non-exchange addresses)
-        try {
-          const res = await fetchWithTimeout(`https://api.blockcypher.com/v1/${chain}/addrs/${item.address}/balance`);
+          const res = await fetch('/api/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: item.address, chain: item.id }),
+          });
           const data = await res.json();
-          if (!data.error) return (data.final_balance + (data.unconfirmed_balance || 0)) / 1e8;
-        } catch { /* give up */ }
-        return null;
-      }
-      if (item.id === 'eth') {
-        const chain = BLOCKCYPHER_CHAINS['eth'];
-        try {
-          const r = await fetchBlockcypherReceived(chain, item.address);
-          if (r !== null) return r;
+          if (data.received != null) return data.received as number;
         } catch { /* fallback */ }
-        try {
-          const res = await fetchWithTimeout(`https://api.blockcypher.com/v1/${chain}/addrs/${item.address}/balance`);
-          const data = await res.json();
-          if (!data.error) return (data.final_balance + (data.unconfirmed_balance || 0)) / 1e18;
-        } catch { /* give up */ }
         return null;
       }
       if (item.id === 'trx') {

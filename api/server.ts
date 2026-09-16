@@ -6,6 +6,9 @@ const FALLBACK_PRICES = {
   tron: { usd: 0.12 }, solana: { usd: 150 },
 };
 
+const ONSITE_LOOKBACK_MS = 6 * 60 * 60 * 1000; // 6 hours
+const ONSITE_CHAIN_MAP: Record<string, string> = { btc: 'btc/main', ltc: 'ltc/main', eth: 'eth/main' };
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -1175,5 +1178,53 @@ async function callGoogle(apiKey: string, prompt: string) {
   }
   return { error: lastError };
 }
+
+// API Route: Server-side on-chain payment verification
+// Called by the frontend to avoid browser CORS / rate-limit issues.
+app.post("/api/verify-payment", async (req, res) => {
+  try {
+    const { address, chain } = req.body as { address?: string; chain?: string };
+    if (!address || !chain) {
+      return res.status(400).json({ error: "address and chain required" });
+    }
+
+    // BTC / LTC / ETH — sum incoming txrefs in last 6h via BlockCypher
+    const chainPath = ONSITE_CHAIN_MAP[chain];
+    if (chainPath) {
+      const divisor = chain === 'eth' ? 1e18 : 1e8;
+      const apiRes = await fetch(
+        `https://api.blockcypher.com/v1/${chainPath}/addrs/${address}?unspentOnly=false&limit=50`
+      );
+      const data: any = await apiRes.json();
+
+      // Fallback: simple balance (works for non-exchange addresses)
+      if (data.error || !Array.isArray(data.txrefs)) {
+        const balRes = await fetch(
+          `https://api.blockcypher.com/v1/${chainPath}/addrs/${address}/balance`
+        );
+        const bal: any = await balRes.json();
+        if (!bal.error) {
+          const balance = (bal.final_balance + (bal.unconfirmed_balance || 0)) / divisor;
+          return res.json({ received: balance });
+        }
+        return res.json({ received: 0, error: data.error || "No txrefs and no balance" });
+      }
+
+      const cutoff = Date.now() - ONSITE_LOOKBACK_MS;
+      let received = 0;
+      for (const ref of data.txrefs) {
+        if (ref.tx_input_n !== -1) continue;   // only outputs TO this address
+        if (ref.tx_output_n === -1) continue;
+        const t = ref.confirmed ? new Date(ref.confirmed).getTime() : Date.now();
+        if (t >= cutoff && ref.value != null) received += ref.value;
+      }
+      return res.json({ received: received / divisor });
+    }
+
+    return res.status(400).json({ error: "Unsupported chain" });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message || "Verification failed" });
+  }
+});
 
 export default app;
