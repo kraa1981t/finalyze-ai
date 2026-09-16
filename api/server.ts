@@ -1205,9 +1205,9 @@ app.post("/api/verify-payment", async (req, res) => {
         const bal: any = await balRes.json();
         if (!bal.error) {
           const balance = (bal.final_balance + (bal.unconfirmed_balance || 0)) / divisor;
-          return res.json({ received: balance });
+          return res.json({ received: balance, totalReceived: (bal.total_received || 0) / divisor });
         }
-        return res.json({ received: 0, error: data.error || "No txrefs and no balance" });
+        return res.json({ received: 0, totalReceived: 0, error: data.error || "No txrefs and no balance" });
       }
 
       const cutoff = Date.now() - ONSITE_LOOKBACK_MS;
@@ -1218,12 +1218,51 @@ app.post("/api/verify-payment", async (req, res) => {
         const t = ref.confirmed ? new Date(ref.confirmed).getTime() : Date.now();
         if (t >= cutoff && ref.value != null) received += ref.value;
       }
-      return res.json({ received: received / divisor });
+      return res.json({
+        received: received / divisor,
+        totalReceived: (data.total_received || 0) / divisor,
+      });
     }
 
     return res.status(400).json({ error: "Unsupported chain" });
   } catch (e: any) {
     return res.status(500).json({ error: e.message || "Verification failed" });
+  }
+});
+
+// API Route: Proof-by-transaction-hash verification
+// The buyer pastes the tx hash; the server checks that this exact transaction
+// paid at least the expected amount to the payment address. Works even when
+// address-history APIs are down, as long as a single-tx lookup succeeds.
+app.post("/api/verify-tx", async (req, res) => {
+  try {
+    const { chain, txid, address } = req.body as { chain?: string; txid?: string; address?: string };
+    if (!chain || !txid || !address) {
+      return res.status(400).json({ error: "chain, txid and address required" });
+    }
+    const chainPath = ONSITE_CHAIN_MAP[chain];
+    if (!chainPath) {
+      return res.status(400).json({ error: "TX proof supports BTC, LTC and ETH only" });
+    }
+    const divisor = chain === 'eth' ? 1e18 : 1e8;
+    const txRes = await fetch(
+      `https://api.blockcypher.com/v1/${chainPath}/txs/${txid.trim()}`
+    );
+    const tx: any = await txRes.json();
+    if (tx.error || !Array.isArray(tx.outputs)) {
+      return res.json({ amount: 0, confirmations: 0, error: tx.error || "Transaction not found" });
+    }
+    const target = address.trim().toLowerCase();
+    let paid = 0;
+    for (const out of tx.outputs) {
+      const addrs: string[] = Array.isArray(out.addresses) ? out.addresses : [];
+      if (addrs.some(a => (a || '').toLowerCase() === target) && out.value != null) {
+        paid += out.value;
+      }
+    }
+    return res.json({ amount: paid / divisor, confirmations: tx.confirmations || 0 });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message || "TX verification failed" });
   }
 });
 
