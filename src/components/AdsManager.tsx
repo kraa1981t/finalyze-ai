@@ -138,49 +138,9 @@ function generateId(): string {
 
 const ADS_DOC = 'config/site_ads';
 
-// v3 footer ad set — force-seeds to Firestore in place of any older ads (always shown at page bottom).
-// Banner 1 renders far-right, banner 2 far-left on the same row; the popunder runs invisibly.
-const FOOTER_SEED_ADS: Ad[] = [
-  {
-    id: 'footer_seed_1',
-    name: 'Popunder (invisible)',
-    code: '<script>\n(function(gon){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = gon || {};\ns.src = "\\/\\/funny-tooth.com\\/cdDB9\\/6.b\\/2G5qlESbWRQm9lNQzQQUwUMBjsQAzmMeyg0w3ANJD\\/AyyfNXD\\/M\\/3S";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
-    type: 'custom',
-    adUnitType: 'popunder',
-    position: 'footer',
-    size: 'Full Page',
-    enabled: true,
-    paused: false,
-    assignedClients: [],
-    createdAt: Date.now(),
-  },
-  {
-    id: 'footer_banner_right',
-    name: 'taybe (In-Page Push)',
-    code: '<script>\n(function(pyxdg){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = pyxdg || {};\ns.src = "\\/\\/prizefamily.com\\/b.XOVtsWddGLlG0QY\\/WLcK\\/meBmg9VuzZAUMlBkjPuT_cm0NMZDdMJ1YMvjNketJNqzIQ-wzMyz\\/UbzPM\\/wA";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
-    type: 'custom',
-    adUnitType: 'inpage',
-    position: 'footer',
-    size: 'Responsive',
-    enabled: true,
-    paused: false,
-    assignedClients: [],
-    createdAt: Date.now(),
-  },
-  {
-    id: 'footer_banner_left',
-    name: 'Banner Left',
-    code: '<script>\n(function(bzbcjt){\nvar d = document,\n    s = d.createElement(\'script\'),\n    l = d.currentScript || d.scripts[d.scripts.length - 1];\ns.settings = bzbcjt || {};\ns.src = "\\/\\/prizefamily.com\\/bGX\\/V.sSdTGqly0gYdWYcV\\/Aeem\\/9RuKZmUSlAkpPuTYcf0\\/MwDaIj0cNDT\\/MntxNkzKQtwaMrjhQ\\/1YNwwZ";\ns.async = true;\ns.referrerPolicy = \'no-referrer-when-downgrade\';\nl.parentNode.insertBefore(s, l);\n})({})\n</script>',
-    type: 'custom',
-    adUnitType: 'banner',
-    position: 'footer',
-    size: 'Responsive',
-    enabled: true,
-    paused: false,
-    assignedClients: [],
-    createdAt: Date.now(),
-  },
-];
+// ── Manual Ads Manager ──
+// All ads are managed manually via the admin UI and saved to Firestore.
+// No hardcoded seed ads — the user has full control over what runs on the site.
 
 function loadAdsLocal(): Ad[] {
   try {
@@ -211,7 +171,7 @@ export async function loadAdsFromFirestore(): Promise<Ad[]> {
         id: ad.id || generateId(),
         name: ad.name || 'Untitled Ad',
         code: ad.code || '',
-        type: ad.type || 'adsterra',
+        type: ad.type || 'custom',
         adUnitType: ad.adUnitType || 'banner',
         position: ad.position || 'header',
         size: ad.size || undefined,
@@ -238,22 +198,6 @@ export async function saveAdsToFirestore(ads: Ad[]): Promise<void> {
     return obj;
   });
   await setDoc(doc(db, ADS_DOC), { ads: clean, updatedAt: Date.now() }, { merge: true });
-}
-
-// Force-write the current footer ad set (banner right / banner left / invisible popunder) to
-// Firestore, replacing any leftover older ads. Called from AdsManager and once per dev session.
-export async function forceFooterAdSeed(): Promise<void> {
-  try {
-    const firestoreAds = await loadAdsFromFirestore();
-    const needSeed =
-      firestoreAds.length !== FOOTER_SEED_ADS.length ||
-      !FOOTER_SEED_ADS.every(fs => firestoreAds.some(a => a.id === fs.id && a.code === fs.code));
-    if (needSeed) {
-      await saveAdsToFirestore(FOOTER_SEED_ADS);
-    }
-  } catch {
-    // ignore — will retry on next session
-  }
 }
 
 function loadAds(): Ad[] {
@@ -302,17 +246,12 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    loadAdsFromFirestore().then(async firestoreAds => {
-      const needSeed =
-        firestoreAds.length !== FOOTER_SEED_ADS.length ||
-        !FOOTER_SEED_ADS.every(fs => firestoreAds.some(a => a.id === fs.id && a.code === fs.code));
-      if (needSeed) {
-        await saveAdsToFirestore(FOOTER_SEED_ADS);
-        setAds(FOOTER_SEED_ADS);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(FOOTER_SEED_ADS));
-      } else {
+    loadAdsFromFirestore().then(firestoreAds => {
+      if (firestoreAds.length > 0) {
         setAds(firestoreAds);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(firestoreAds));
+      } else {
+        setAds(loadAds());
       }
     }).catch(() => {
       setAds(loadAds());
@@ -326,8 +265,6 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
   const [assignModal, setAssignModal] = useState<Ad | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterNetwork, setFilterNetwork] = useState<string>('all');
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
   const [newAd, setNewAd] = useState({
@@ -402,7 +339,15 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
 
   const mtzLinked = mtzLoaded && mtz.enabled && !!(mtz.headCode?.trim()) && !!(mtz.adsTxtContent?.trim());
 
-  const addAd = () => {
+  // Any mutation auto-saves to Firestore (manual management — no seed system).
+  const commit = async (next: Ad[]) => {
+    setAds(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    await saveAdsToFirestore(next);
+    showToast(isAr ? 'تم الحفظ في الموقع مباشرة' : 'Saved live to the site', 'ok');
+  };
+
+  const addAd = async () => {
     if (!newAd.name.trim()) return;
     const detectedType = newAd.type || detectAdNetwork(newAd.code);
     const ad: Ad = {
@@ -419,18 +364,18 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
       assignedClients: [],
       createdAt: Date.now(),
     };
-    setAds(prev => [...prev, ad]);
-    setHasUnsavedChanges(true);
+    await commit([...ads, ad]);
     resetNewAd();
     setShowAdd(false);
+    setEditAd(ad.id);
   };
 
-  const addFromPreset = (preset: Partial<Ad>) => {
+  const addFromPreset = async (preset: Partial<Ad>) => {
     const ad: Ad = {
       id: generateId(),
       name: preset.name || '',
       code: '',
-      type: preset.type || 'adsterra',
+      type: preset.type || 'custom',
       adUnitType: preset.adUnitType || 'banner',
       position: preset.position || 'header',
       size: preset.size,
@@ -440,25 +385,29 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
       assignedClients: [],
       createdAt: Date.now(),
     };
-    setAds(prev => [...prev, ad]);
-    setHasUnsavedChanges(true);
+    await commit([...ads, ad]);
     setShowPresetPicker(false);
     setEditAd(ad.id);
   };
 
-  const updateAd = (id: string, updates: Partial<Ad>) => {
-    setAds(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
-    setHasUnsavedChanges(true);
+  const updateAd = async (id: string, updates: Partial<Ad>) => {
+    const next = ads.map(a => a.id === id ? { ...a, ...updates } : a);
+    await commit(next);
   };
 
-  const deleteAd = (id: string) => {
+  const deleteAd = async (id: string) => {
     if (!confirm(isAr ? 'هل أنت متأكد من حذف هذا الإعلان؟' : 'Are you sure you want to delete this ad?')) return;
-    setAds(prev => prev.filter(a => a.id !== id));
-    setHasUnsavedChanges(true);
+    await commit(ads.filter(a => a.id !== id));
+  };
+
+  const toggleAdEnabled = async (id: string) => {
+    const ad = ads.find(a => a.id === id);
+    if (!ad) return;
+    await updateAd(id, { enabled: !ad.enabled, paused: false });
   };
 
   const toggleClientAssignment = (adId: string, clientEmail: string) => {
-    setAds(prev => prev.map(a => {
+    const next = ads.map(a => {
       if (a.id !== adId) return a;
       const has = a.assignedClients.includes(clientEmail);
       return {
@@ -467,21 +416,8 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
           ? a.assignedClients.filter(c => c !== clientEmail)
           : [...a.assignedClients, clientEmail],
       };
-    }));
-    setHasUnsavedChanges(true);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await saveAdsToFirestore(ads);
-      setHasUnsavedChanges(false);
-      showToast(isAr ? 'تم الحفظ بنجاح' : 'Saved successfully', 'ok');
-    } catch (e: any) {
-      console.error('Save error:', e);
-      showToast(isAr ? `خطأ: ${e.message}` : `Error: ${e.message}`, 'err');
-    }
-    setSaving(false);
+    });
+    commit(next);
   };
 
   const copyCode = (code: string) => {
@@ -506,31 +442,11 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
           </button>
           <div>
             <h1 className="text-xl font-black text-white">{isAr ? 'إدارة الإعلانات' : 'Ads Manager'}</h1>
-            <p className="text-xs text-slate-400">{isAr ? 'إدارة إعلانات Adsterra لحسابات العملاء' : 'Manage Adsterra ads for client accounts'}</p>
+            <p className="text-xs text-slate-400">{isAr ? 'أضف/عدّل/عطّل/احذف أي إعلان — يُحفظ تلقائيًا على الموقع مباشرة' : 'Add/edit/disable/delete any ad — auto-saved live to the site'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <a
-            href="https://beta.publishers.adsterra.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-3 py-2 rounded-xl text-xs font-bold transition-all"
-          >
-            <ExternalLink size={12} />
-            {isAr ? 'لوحة Adsterra' : 'Adsterra Panel'}
-          </a>
-          <button
-            onClick={handleSave}
-            disabled={!hasUnsavedChanges || saving}
-            className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl text-sm transition-all shadow-lg ${
-              hasUnsavedChanges
-                ? 'bg-amber-400 hover:bg-amber-500 text-black shadow-amber-400/20 animate-pulse'
-                : 'bg-white/5 text-slate-500 cursor-not-allowed'
-            }`}
-          >
-            <RotateCcw size={14} className={saving ? 'animate-spin' : ''} />
-            {saving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ التغييرات' : 'Save Changes')}
-          </button>
+          <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">● {isAr ? 'حفظ تلقائي' : 'Auto-saved'}</span>
           <button
             onClick={() => setShowPresetPicker(true)}
             className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-all"
@@ -688,15 +604,13 @@ export default function AdsManager({ lang, onBack }: AdsManagerProps) {
         )}
       </div>
 
-      {/* Unsaved Changes Warning */}
-      {hasUnsavedChanges && (
-        <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
-          <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-          <p className="text-xs text-amber-300 font-bold">
-            {isAr ? 'لديك تغييرات غير محفوظة. اضغط "حفظ التغييرات" لتطبيقها.' : 'You have unsaved changes. Click "Save Changes" to apply them.'}
-          </p>
-        </div>
-      )}
+      {/* Auto-save status */}
+      <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
+        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+        <p className="text-xs text-emerald-300 font-bold">
+          {isAr ? 'كل تغيير يُحفظ تلقائياً ويظهر على الموقع فوراً.' : 'Every change saves automatically and goes live immediately.'}
+        </p>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3">

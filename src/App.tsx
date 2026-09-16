@@ -48,7 +48,7 @@ function hasAnyStoredKey(): boolean {
 import ClientMonitor from './components/ClientMonitor';
 import SiteStatsPage from './components/SiteStatsPage';
 import AdsManager from './components/AdsManager';
-import { AdSlot, forceFooterAdSeed } from './components/AdsManager';
+import { AdSlot } from './components/AdsManager';
 import RadarSettingsPage from './components/RadarSettingsPage';
 
 
@@ -710,7 +710,6 @@ export default function App() {
   // DEVELOPER: Force sync on startup — ensures signals are always in Firestore
   useEffect(() => {
     if (!isDeveloperSession() || !user) return;
-    forceFooterAdSeed();
     const current = signalsRef.current;
     if (current.length === 0) return;
     console.log('[DEV] Startup sync — pushing', current.length, 'signals to Firestore');
