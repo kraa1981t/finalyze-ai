@@ -34,6 +34,7 @@ import AboutPage from './components/AboutPage';
 import SuggestionsPage from './components/SuggestionsPage';
 import TradeNowPage from './components/TradeNowPage';
 import StorePage from './components/StorePage';
+import SeoPricesPage from './pages/SeoPricesPage';
 import StoreSettingsPage from './components/StoreSettingsPage';
 import { StoreBot } from './services/storeService';
 
@@ -124,12 +125,12 @@ export default function App() {
     }
     setNeedsApiKeyState(email);
   };
-  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' => {
+  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'prices' => {
     const hash = window.location.hash.slice(1);
-    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings'].includes(hash)) return hash as any;
+    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings', 'prices'].includes(hash)) return hash as any;
     return 'main';
   };
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings'>(getPageFromHash);
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'prices'>(getPageFromHash);
   const navStackRef = useRef<string[]>([]);
 
   const navigateTo = (page: any) => {
@@ -634,7 +635,7 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings'];
+    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings', 'prices'];
     const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis', 'storeSettings'];
     const onHashChange = () => {
       const hash = window.location.hash.slice(1);
@@ -1849,7 +1850,7 @@ export default function App() {
       
       <main className={`flex-grow w-full relative transition-all duration-300 ${effectivePage === 'trade' ? 'pt-[104px] md:pt-[132px] pb-3 px-0 max-w-none' : 'max-w-7xl mx-auto px-4 pt-[144px] md:pt-[340px] pb-8'}`}>
         {/* Dedicated pages (from dashboard) */}
-        {effectivePage !== 'main' && (!needsApiKey || effectivePage === 'store' || effectivePage === 'plans' || effectivePage === 'storeSettings' || effectivePage === 'paymentSettings') && (
+        {effectivePage !== 'main' && (!needsApiKey || effectivePage === 'store' || effectivePage === 'plans' || effectivePage === 'storeSettings' || effectivePage === 'paymentSettings' || effectivePage === 'prices') && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
 
              {effectivePage === 'settings' && (
@@ -1992,6 +1993,10 @@ export default function App() {
                 onBack={goBack}
                 onGoToSuggestions={() => navigateTo('suggestions')}
               />
+            )}
+
+            {effectivePage === 'prices' && (
+              <SeoPricesPage lang={lang} onBack={goBack} />
             )}
 
             {effectivePage === 'suggestions' && (

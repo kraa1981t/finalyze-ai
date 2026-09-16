@@ -665,7 +665,7 @@ app.get("/api/quote", async (req, res) => {
     const isIndex = !!indexCfds[symbol];
     const isMetal = !!customMappings[symbol] && !isIndex;
 
-    const forexQuotes = ['USD','EUR','JPY','GBP','AUD','NZD','CAD','CHF','MXN','ZAR','TRY','SEK','NOK','DKK','SGD','HKD','CNH','THB','INR','PLN','CZK','HUF','ILS','KRW','TWD'];
+    const forexQuotes = ['USD','EUR','JPY','GBP','AUD','NZD','CAD','CHF','MXN','ZAR','TRY','SEK','NOK','DKK','SGD','HKD','CNH','THB','INR','PLN','CZK','HUF','ILS','KRW','TWD','DZD','EGP','MAD','TND','SAR','AED'];
     const isForex = !isMetal && !isCrypto && !isIndex && symbol.length === 6 &&
       forexQuotes.some(q => symbol.endsWith(q)) && forexQuotes.some(q => symbol.startsWith(q));
 
@@ -1263,6 +1263,131 @@ app.post("/api/verify-tx", async (req, res) => {
     return res.json({ amount: paid / divisor, confirmations: tx.confirmations || 0 });
   } catch (e: any) {
     return res.status(500).json({ error: e.message || "TX verification failed" });
+  }
+});
+
+// ── Daily AI Market Briefing (public prices page) ──
+// Produces a fresh AI-written Arabic+English market outlook once per day using
+// live quotes + current headlines and the server-side system key. Cached per
+// day so public visitors never blow the AI quota; clients may force a regen.
+const _briefingCache = new Map<string, any>();
+
+async function briefingQuote(symbol: string): Promise<number | null> {
+  const s = symbol.toUpperCase().replace(/ /g, '');
+  const cryptoPair = findServerCryptoPair(s);
+  if (cryptoPair) {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 7000);
+    try {
+      const results = await Promise.allSettled(
+        BINANCE_ENDPOINTS.map(async (base) => {
+          const r = await fetch(`${base}/api/v3/ticker/price?symbol=${cryptoPair}`, { signal: ac.signal });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+      );
+      clearTimeout(t);
+      const hit = results.find((x): x is PromiseFulfilledResult<any> => x.status === 'fulfilled' && typeof x.value?.price === 'number');
+      const p = hit?.value?.price;
+      if (typeof p === 'number' && p > 0) return p;
+    } catch { clearTimeout(t); }
+    const k = await fetchBinanceData(s, '5m');
+    const closes = k?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+    if (Array.isArray(closes)) {
+      for (let i = closes.length - 1; i >= 0; i--) if (closes[i] != null && closes[i] > 0) return closes[i];
+    }
+    const ck = _lastKnownQuote.get(s);
+    if (ck && typeof ck.price === 'number') return ck.price;
+    return null;
+  }
+  const metalMap: Record<string, string> = { XAUUSD: 'GC=F', XAGUSD: 'SI=F' };
+  if (metalMap[s]) {
+    const td = await fetchTwelveDataPrice(s);
+    if (td) return td;
+    const y = await fetchYahooQuote(metalMap[s]);
+    if (y) return y;
+  }
+  if (s.length === 6) return await fetchFrfQuote(s);
+  return null;
+}
+
+async function fetchBriefingNews(query: string): Promise<string[]> {
+  try {
+    const r = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`);
+    if (!r.ok) return [];
+    const xml = await r.text();
+    const titles = [...xml.matchAll(/<title>(.*?)<\/title>/g)].slice(1).map(m => m[1]);
+    const sources = [...xml.matchAll(/<source>(.*?)<\/source>/g)].map(m => m[1]);
+    return titles.slice(0, 4).map((title, i) => `${title} (${sources[i] || 'News'})`);
+  } catch { return []; }
+}
+
+function buildBriefingPrompt(prices: Record<string, number>, news: string[], date: string): string {
+  const lines = Object.entries(prices)
+    .map(([sym, p]) => `${sym} = $${typeof p === 'number' ? p.toFixed(6) : p}`)
+    .join('\n');
+  return `Today's date: ${date}.
+Current live market prices (server-side snapshot):
+${lines || 'no prices available'}
+Latest headlines:
+${news.slice(0, 6).map((n, i) => `${i + 1}. ${n}`).join('\n') || 'no headlines available'}
+Write a professional daily market briefing in JSON only. Use ONLY the numbers above and the headlines; never invent prices or data. Fields (all required):
+- summaryAr: Arabic market overview 2-3 sentences,
+- summaryEn: English overview of the same content,
+- goldAr: Arabic gold analysis with the exact XAUUSD number and implications,
+- goldEn: English gold analysis,
+- btcAr: Arabic bitcoin/crypto analysis with the exact BTCUSDT number,
+- btcEn: English crypto analysis,
+- dzdAr: Arabic note about the USD/DZD rate and gold value in DZD when USDDZD is present,
+- dzdEn: English note about the DZD rate.
+Keep every field short, factual, educational and professional.`;
+}
+
+app.post("/api/briefing", async (req, res) => {
+  try {
+    const force = !!(req.query && req.query.force === '1') || !!(req.body && req.body.force === true);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const cached = _briefingCache.get(todayStr);
+    if (cached && !force) return res.json(cached);
+
+    const quoteSymbols = ['XAUUSD', 'XAGUSD', 'BTCUSDT', 'ETHUSDT', 'USDDZD', 'EURUSD'];
+    const results = await Promise.allSettled(quoteSymbols.map(async (sym) => ({ sym, p: await briefingQuote(sym) })));
+    const prices: Record<string, number> = {};
+    results.forEach((r) => {
+      if (r.status === 'fulfilled' && r.value && typeof r.value.p === 'number' && r.value.p > 0) {
+        prices[r.value.sym] = r.value.p;
+      }
+    });
+
+    let news: string[] = [];
+    try {
+      const [n1, n2] = await Promise.all([fetchBriefingNews('gold silver price'), fetchBriefingNews('bitcoin crypto market news')]);
+      news = [...n1, ...n2].slice(0, 8);
+    } catch {}
+
+    const sysKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GROQ_API_KEY;
+    let brief: any = null;
+    if (sysKey) {
+      const aiResult = sysKey.startsWith('AIzaSy') || sysKey.startsWith('AQ.')
+        ? await callGoogle(sysKey, buildBriefingPrompt(prices, news, todayStr))
+        : await callGroq(sysKey, buildBriefingPrompt(prices, news, todayStr));
+      if (aiResult && aiResult.content) {
+        try { brief = JSON.parse(aiResult.content); } catch { brief = null; }
+      }
+    }
+
+    const payload = {
+      date: todayStr,
+      prices,
+      news,
+      brief,
+      hasSystemKey: !!sysKey,
+      generatedAt: Date.now(),
+    };
+    if (brief) _briefingCache.set(todayStr, payload);
+    return res.json(payload);
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message || 'Briefing failed' });
   }
 });
 

@@ -7,7 +7,7 @@ import { User as FirebaseUser } from 'firebase/auth';
 interface SidebarPanelProps {
   lang: Language;
   onClose: () => void;
-  onNavigate: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings') => void;
+  onNavigate: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'prices') => void;
   isDeveloper?: boolean;
   freemiumDisabled?: boolean;
   onPreview?: (device: 'phone' | 'tablet') => void;
@@ -22,6 +22,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
   const panelRef = useRef<HTMLDivElement>(null);
 
   const items = isDeveloper ? [
+    { icon: BarChart3, label: lang === 'ar' ? 'الأسعار الحية' : 'Live Prices', page: 'prices' as const, color: 'from-emerald-400 to-emerald-600' },
     { icon: Zap, label: lang === 'ar' ? 'إعدادات التحليل التلقائي' : 'Auto Analysis Settings', page: 'radar' as const, color: 'from-amber-400 to-amber-600' },
     { icon: Key, label: lang === 'ar' ? 'مفتاح API' : 'API Key', page: 'apiKey' as const, color: 'from-amber-400 to-amber-600' },
     { icon: User, label: lang === 'ar' ? 'الملف الشخصي' : 'Profile', page: 'profile' as const, color: 'from-amber-400 to-amber-600' },
@@ -36,6 +37,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
     { icon: BarChart3, label: lang === 'ar' ? 'إحصائيات الموقع' : 'Site Statistics', page: 'siteStats' as const, color: 'from-emerald-400 to-emerald-600' },
     { icon: Monitor, label: lang === 'ar' ? 'إعلاناتي' : 'My Ads', page: 'ads' as const, color: 'from-purple-400 to-purple-600' },
   ] : [
+    { icon: BarChart3, label: lang === 'ar' ? 'الأسعار الحية' : 'Live Prices', page: 'prices' as const, color: 'from-emerald-400 to-emerald-600' },
     { icon: User, label: lang === 'ar' ? 'الملف الشخصي' : 'Profile', page: 'profile' as const, color: 'from-amber-400 to-amber-600' },
     { icon: Info, label: lang === 'ar' ? 'نبذة عنا' : 'About Us', page: 'about' as const, color: 'from-amber-400 to-amber-600' },
     { icon: Lightbulb, label: lang === 'ar' ? 'اقتراحاتكم' : 'Your Suggestions', page: 'suggestions' as const, color: 'from-amber-400 to-amber-600' },
