@@ -1,56 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalLink, ShieldOff, Shield, RefreshCw } from 'lucide-react';
-import { fetchCryptoPricesDirect } from '../services/apiDirect';
+import { motion } from 'motion/react';
+import { X, Copy, Check, ArrowLeft, ShieldOff, Shield, RefreshCw, Wallet } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { StoreBot, downloadBot, recordBotPurchase, getDownloadGrant, grantBotDownload, consumeBotDownload, hasDownloadedBot } from '../services/storeService';
-import { loadPaymentSettings, savePaymentSettings, ConfirmMode, DEFAULT_CONFIRM_MODE, DEFAULT_BINANCE_EMAIL } from '../services/paymentSettings';
+import { loadPaymentSettings, ConfirmMode, DEFAULT_CONFIRM_MODE, DEFAULT_BINANCE_EMAIL, UsdtNetworkAddress } from '../services/paymentSettings';
 import { createPaymentRequest, checkUserGrant, consumeBotGrant } from '../services/paymentRequests';
 import PaymentRequestsSection from './PaymentRequestsSection';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
-
-const DEFAULT_ADDRESSES = [
-  { id: 'btc', name: 'Bitcoin (BTC)', address: '1QFZMm37yh15jy3dKgMWqmPj2MNvNqnsHe' },
-  { id: 'eth', name: 'Ethereum (ETH)', address: '0x5FF1292b76002E97877e8d05D8e8FA15fdD65318' },
-  { id: 'ltc', name: 'Litecoin (LTC)', address: 'ltc1qflq2drpe3vc9e3hvq0es97l7922ax7k5fnt4gs' },
-  { id: 'trx', name: 'TRON (TRX)', address: 'TDhhmgVHEj8c8qe7za4eMtbQmXeL1oJcDB' },
-  { id: 'sol', name: 'Solana (SOL)', address: '4TivXCgxtWWWRjCNFRqwzYEJ2kBG9qDqhH9ECXmM7oFp' },
-  { id: 'usdt', name: 'USDT (TRC20)', address: 'TDhhmgVHEj8c8qe7za4eMtbQmXeL1oJcDB' },
-];
-
-const COINGECKO_MAP: Record<string, string> = {
-  btc: 'bitcoin', eth: 'ethereum', ltc: 'litecoin', trx: 'tron', sol: 'solana', usdt: 'tether',
-};
-
-const PRICE_ALIASES: Record<string, string> = {
-  bitcoin: 'bitcoin', btc: 'bitcoin',
-  ethereum: 'ethereum', eth: 'ethereum',
-  litecoin: 'litecoin', ltc: 'litecoin',
-  tron: 'tron', trx: 'tron',
-  solana: 'solana', sol: 'solana',
-  tether: 'tether', usdt: 'tether',
-};
-
-const USDT_TRC20_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
-const SOL_RPC = 'https://api.mainnet-beta.solana.com';
-
-const POPULAR_COINS = [
-  'Bitcoin (BTC)', 'Ethereum (ETH)', 'Litecoin (LTC)', 'TRON (TRX)',
-  'Solana (SOL)', 'USDT (TRC20)', 'USDC (ERC20)', 'BNB (BSC)',
-  'Cardano (ADA)', 'XRP (Ripple)', 'Polkadot (DOT)', 'Dogecoin (DOGE)',
-  'Avalanche (AVAX)', 'Polygon (MATIC)', 'Chainlink (LINK)',
-];
-
-const STORAGE_KEY = 'crypto_payment_addresses';
-
-interface CryptoAddress {
-  id: string;
-  name: string;
-  address: string;
-}
+const TIMER_STORAGE_KEY = 'payment_timer_minutes';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -73,39 +33,13 @@ interface PaymentModalProps {
   planDurationDays?: number;
 }
 
-const TIMER_STORAGE_KEY = 'payment_timer_minutes';
-
-const fetchWithTimeout = async (url: string, options?: RequestInit, ms = 10000): Promise<Response> => {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-};
-
 export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle, botPurchase, sectionTab = 'bot', onBotPaid, onGoToStore, onGoToPlans, buyerEmail, buyerName, planDurationDays }: PaymentModalProps) {
   const isAr = lang === 'ar';
   const [section, setSection] = useState<'bot' | 'plan'>(sectionTab || 'bot');
-  const [addresses, setAddresses] = useState<CryptoAddress[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : DEFAULT_ADDRESSES;
-    } catch { return DEFAULT_ADDRESSES; }
-  });
-  const [prices, setPrices] = useState<Record<string, { usd: number }>>({
-    bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 },
-    tron: { usd: 0.12 }, solana: { usd: 150 }, tether: { usd: 1 },
-  });
-  const [editAddresses, setEditAddresses] = useState<CryptoAddress[]>([]);
-  const [isAdmin, setIsAdmin] = useState(manageMode || false);
-  const [newAddress, setNewAddress] = useState<CryptoAddress>({ id: '', name: '', address: '' });
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [nextId, setNextId] = useState(100);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [usdtAddresses, setUsdtAddresses] = useState<UsdtNetworkAddress[]>([]);
+  const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
+  const [copiedNetwork, setCopiedNetwork] = useState<string | null>(null);
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
-  const [selectedCoinId, setSelectedCoinId] = useState<string | null>(null);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [timerMinutes, setTimerMinutes] = useState(() => {
     const saved = localStorage.getItem(TIMER_STORAGE_KEY);
@@ -128,24 +62,15 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [botGrantTs, setBotGrantTs] = useState<number | null>(null);
   const [botDownloaded, setBotDownloaded] = useState(false);
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>(DEFAULT_CONFIRM_MODE);
-  const [binanceEmail, setBinanceEmail] = useState(DEFAULT_BINANCE_EMAIL);
+  const [binanceEmail] = useState(DEFAULT_BINANCE_EMAIL);
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
 
   useEffect(() => {
-    if (!isOpen) return;
-    fetchCryptoPricesDirect()
-      .then(data => { if (data?.bitcoin?.usd) setPrices(data); })
-      .catch(() => {});
-  }, [isOpen]);
-
-  useEffect(() => {
     if (isOpen) {
       setSection(sectionTab || 'bot');
-      setEditAddresses(JSON.parse(JSON.stringify(addresses)));
-      setCopiedId(null);
-      setNewAddress({ id: '', name: '', address: '' });
-      setSelectedCoinId(null);
+      setCopiedNetwork(null);
+      setSelectedNetwork(null);
       setPaymentConfirmed(false);
       setRequestNo(null);
       setRequestStatus('idle');
@@ -153,7 +78,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setContactEmail(buyerEmail || '');
       setTimerRunning(false);
       setTimerSeconds(0);
-      if (!manageMode) setIsAdmin(false);
       setEditSubPrices({ ...subPrices });
       if (botPurchase?.id) {
         setBotGrantTs(getDownloadGrant(botPurchase.id));
@@ -165,7 +89,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     }
   }, [isOpen]);
 
-  // Each confirmed payment operation grants exactly ONE download for the bot
   useEffect(() => {
     if (paymentConfirmed && botPurchase?.id) {
       grantBotDownload(botPurchase.id);
@@ -173,25 +96,21 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     }
   }, [paymentConfirmed]);
 
-  // Load shared payment settings from Firestore (crypto addresses only)
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
     const sync = async () => {
       const data = await loadPaymentSettings();
       if (cancelled || !data) return;
-      if (data.addresses && data.addresses.length) {
-        setAddresses(data.addresses);
-        setEditAddresses(JSON.parse(JSON.stringify(data.addresses)));
+      if (data.usdtAddresses && data.usdtAddresses.length) {
+        setUsdtAddresses(data.usdtAddresses);
       }
       if (data.confirmMode) setConfirmMode(data.confirmMode);
-      if (data.binanceNotifyEmail) setBinanceEmail(data.binanceNotifyEmail);
     };
     sync();
     return () => { cancelled = true; };
   }, [isOpen]);
 
-  // Countdown timer
   useEffect(() => {
     if (!timerRunning || timerSeconds <= 0) return;
     const interval = setInterval(() => {
@@ -200,7 +119,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
 
-  // Single shared grant — called after the developer releases the numbered request.
   const grantAccess = () => {
     setPaymentConfirmed(true);
     setRequestStatus('approved');
@@ -215,10 +133,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const buyerNameFinal = (buyerName || contactName).trim();
   const buyerEmailFinal = (buyerEmail || contactEmail).trim().toLowerCase();
 
-  // Submit a numbered confirmation request. The developer reviews name + date +
-  // product and releases manually (may take 1–24 hours).
   const requestManualConfirmation = async () => {
-    if (!selectedCoinId) return;
+    if (!selectedNetwork) return;
     if (!buyerNameFinal) {
       setError(isAr ? 'أدخل اسمك الكامل أولاً' : 'Enter your full name first');
       return;
@@ -227,7 +143,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setError(isAr ? 'أدخل بريدك الإلكتروني أولاً' : 'Enter your email first');
       return;
     }
-    const item = addresses.find(a => a.id === selectedCoinId);
+    const item = usdtAddresses.find(a => a.network === selectedNetwork);
     if (!item) return;
     setError(null);
     setRequestCreating(true);
@@ -239,8 +155,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         planLabel: isBotProduct ? undefined : productLabel,
         durationDays: isBotProduct ? undefined : (planDurationDays || 30),
         amountUsd: amount,
-        coinId: item.id,
-        coinName: item.name,
+        coinId: 'usdt',
+        coinName: `USDT (${item.networkLabel})`,
         address: item.address,
         buyerName: buyerNameFinal,
         buyerEmail: buyerEmailFinal,
@@ -255,7 +171,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setRequestCreating(false);
   };
 
-  // On open, honor an already-approved grant (returning customer / other device).
   useEffect(() => {
     if (!isOpen || manageMode || !buyerEmailFinal) return;
     let stopped = false;
@@ -263,11 +178,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       if (!stopped && g) grantAccess();
     });
     return () => { stopped = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, buyerEmailFinal, isBotProduct, botPurchase?.id]);
 
-  // Poll Firestore for the developer's manual release — works even if the site
-  // was closed while the developer approved.
   useEffect(() => {
     if (!isOpen || requestStatus !== 'pending' || !buyerEmailFinal) return;
     let stopped = false;
@@ -278,7 +190,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     const interval = setInterval(check, 15000);
     check();
     return () => { stopped = true; clearInterval(interval); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, requestStatus, buyerEmailFinal, isBotProduct, botPurchase?.id]);
 
   const refreshGrantStatus = async () => {
@@ -301,14 +212,14 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const copyAddress = async (addr: string, id: string) => {
+  const copyAddress = async (addr: string, network: string) => {
     try {
       await navigator.clipboard.writeText(addr);
-      setCopiedId(id);
-      setSelectedCoinId(id);
+      setCopiedNetwork(network);
+      setSelectedNetwork(network);
       setError(null);
       if (!timerRunning) startTimer();
-      setTimeout(() => setCopiedId(null), 2000);
+      setTimeout(() => setCopiedNetwork(null), 2000);
     } catch {}
   };
 
@@ -318,14 +229,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setCopiedAmountId(id);
       setTimeout(() => setCopiedAmountId(null), 2000);
     } catch {}
-  };
-
-  const saveAddresses = () => {
-    const clean = editAddresses.filter(a => a.name && a.address);
-    setAddresses(clean);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-    savePaymentSettings({ addresses: clean });
-    if (!manageMode) setIsAdmin(false);
   };
 
   const saveSubPrices = () => {
@@ -339,13 +242,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setDoc(doc(db, 'shared_settings', 'prices'), { ...clean, updatedAt: Date.now() }).catch(console.warn);
   };
 
-  const addNewAddress = () => {
-    if (!newAddress.name || !newAddress.address) return;
-    const id = 'custom_' + Date.now();
-    setEditAddresses([...editAddresses, { id, name: newAddress.name, address: newAddress.address }]);
-    setNewAddress({ id: '', name: '', address: '' });
-  };
-
   const handleDownloadBot = () => {
     if (!botPurchase || !paymentConfirmed || !botGrantTs) return;
     downloadBot(botPurchase);
@@ -356,26 +252,9 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     recordBotPurchase(botPurchase, buyerEmail || '').then(() => onBotPaid?.(botPurchase));
   };
 
-  const calcCryptoAmount = (coinId: string, coinName?: string): string => {
-    // Try direct coin ID lookup first
-    let coin = COINGECKO_MAP[coinId];
-    // If not found, try extracting ticker from name (e.g., "Bitcoin (BTC)" → "btc")
-    if (!coin && coinName) {
-      const match = coinName.match(/\((\w+)\)/);
-      if (match) {
-        const ticker = match[1].toLowerCase();
-        coin = COINGECKO_MAP[ticker] || PRICE_ALIASES[ticker];
-      }
-    }
-    const usdPrice = coin ? prices[coin]?.usd : undefined;
-    if (!usdPrice || usdPrice <= 0) return '...';
-    return (amount / usdPrice).toFixed(coinId === 'trx' ? 2 : coinId === 'sol' ? 4 : 8);
-  };
-
   if (!isOpen) return null;
 
   const isBotSection = section === 'bot' && !!botPurchase;
-  const isPlanSection = section === 'plan' && !botPurchase;
   const showBotDummy = section === 'bot' && !botPurchase && !manageMode;
   const showPlanDummy = section === 'plan' && !!botPurchase;
   const showAddresses = !showBotDummy && !showPlanDummy;
@@ -390,13 +269,12 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h3 className="text-xl font-bold text-white">{isAr ? (manageMode ? 'إدارة عناوين الدفع' : 'إتمام الدفع') : (manageMode ? 'Payment Settings' : 'Complete Payment')}</h3>
+            <h3 className="text-xl font-bold text-white">{isAr ? (manageMode ? 'إدارة الدفع' : 'إتمام الدفع') : (manageMode ? 'Payment Settings' : 'Complete Payment')}</h3>
             {!manageMode && <p className="text-sm text-slate-400">{isBotSection ? `${botPurchase!.name} - $${amount} USD` : `${currentLabel} Plan - $${amount} USD`}</p>}
           </div>
         </div>
       </div>
 
-      {/* Section switcher — Bots (default) vs Plans */}
       {!manageMode && (
         <div className="grid grid-cols-2 gap-3 mb-5">
           <button
@@ -422,7 +300,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         </div>
       )}
 
-      {/* Dummy panels when the section has no product selected */}
       {(showBotDummy || showPlanDummy) && (
         <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
           <p className="text-lg mb-4">{showBotDummy ? '🛒' : '⚡'}</p>
@@ -440,18 +317,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         </div>
       )}
 
-      {!manageMode && showAddresses && !selectedCoinId && (
+      {!manageMode && showAddresses && !selectedNetwork && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6">
           <p className="text-sm text-amber-400 font-bold text-center">
-            {isAr ? 'اختر عملة وانسخ العنوان للدفع. سيظهر العداد والمبلغ بعد النسخ.' : 'Choose a coin and copy the address to pay. The timer and amount will appear after copying.'}
-          </p>
-        </div>
-      )}
-
-      {manageMode && (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 mb-6">
-          <p className="text-sm text-emerald-400 font-bold text-center">
-            {isAr ? 'أنت في وضع الإدارة. يمكنك إضافة وتعديل وحذف عناوين الدفع. التغييرات تحفظ تلقائياً في المتصفح.' : 'You are in admin mode. You can add, edit, and delete payment addresses. Changes are saved automatically.'}
+            {isAr ? 'اختر شبكة USDT للدفع. انسخ العنوان والمبلغ وأرسل المبلغ.' : 'Choose a USDT network to pay. Copy the address and amount, then send.'}
           </p>
         </div>
       )}
@@ -471,123 +340,75 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 : '🔒 You already downloaded a copy of this bot. Each payment allows downloading one copy only.'}
             </p>
             <p className="text-[10px] text-rose-300/60 mt-1">
-              {isAr
-                ? 'لتتمكن من التحميل مرة أخرى، يلزمك إتمام عملية دفع جديدة.'
-                : 'To download again, a new payment is required.'}
+              {isAr ? 'لتتمكن من التحميل مرة أخرى، يلزمك إتمام عملية دفع جديدة.' : 'To download again, a new payment is required.'}
             </p>
           </div>
         )}
 
-                <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-        {addresses.length === 0 && !isAdmin && (
-          <p className="text-center text-slate-500 py-8">No payment addresses configured.</p>
+        <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+        {usdtAddresses.length === 0 && (
+          <div className="text-center py-8">
+            <Wallet size={32} className="mx-auto mb-3 text-slate-500" />
+            <p className="text-sm text-slate-400">{isAr ? 'لم يتم إعداد عناوين USDT بعد. اتصل بالمطور.' : 'No USDT addresses configured yet.'}</p>
+          </div>
         )}
 
-        {(isAdmin ? editAddresses : addresses).map((item) => {
-          const coin = COINGECKO_MAP[item.id];
-          const usdPrice = coin ? prices[coin]?.usd : undefined;
-
-          return (
-            <div key={item.id} className={`bg-white/5 border rounded-2xl p-4 transition-all hover:border-white/20 ${selectedCoinId === item.id ? 'border-emerald-500/70 ring-2 ring-emerald-500/40' : 'border-white/10'}`}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-black text-xs shadow-lg">
-                    {item.name.split(' ').pop()?.replace(/[()]/g, '') || '?'}
-                  </div>
-                  <div>
-                    <span className="text-sm font-black text-white">{item.name}</span>
-                    {usdPrice && (
-                      <span className="text-[10px] text-slate-400 block">1 {item.name.split(' ').pop()?.replace(/[()]/g, '')} = ${usdPrice.toFixed(2)}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {!isAdmin && (
-                    <>
-                      <button
-                        onClick={() => copyAddress(item.address, item.id)}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
-                      >
-                        {copiedId === item.id ? <Check size={14} /> : <Copy size={14} />}
-                        {copiedId === item.id ? 'Copied!' : 'Copy'}
-                      </button>
-                      <a
-                        href={`https://live.blockcypher.com/${item.id === 'usdt' ? 'tron' : item.id}/`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-                      >
-                        <ExternalLink size={14} />
-                      </a>
-                    </>
-                  )}
-                  {isAdmin && (
-                    <button
-                      onClick={() => setEditAddresses(prev => prev.filter(a => a.id !== item.id))}
-                      className="p-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
+        {usdtAddresses.map((item) => (
+          <div key={item.network} className={`bg-white/5 border rounded-2xl p-4 transition-all hover:border-white/20 ${selectedNetwork === item.network ? 'border-emerald-500/70 ring-2 ring-emerald-500/40' : 'border-white/10'}`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-black text-xs shadow-lg">USDT</div>
+                <div>
+                  <span className="text-sm font-black text-white">USDT ({item.networkLabel})</span>
+                  <span className="text-[10px] text-slate-400 block">1 USDT = $1.00</span>
                 </div>
               </div>
-
-              {isAdmin ? (
-                <input
-                  type="text"
-                  value={editAddresses.find(a => a.id === item.id)?.address || ''}
-                  onChange={(e) => setEditAddresses(prev => prev.map(a => a.id === item.id ? { ...a, address: e.target.value } : a))}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-emerald-500"
-                />
-                ) : (
-                <div className="bg-black/40 rounded-xl px-4 py-3">
-                  <div className="flex items-center justify-between">
-                    <code className="text-xs font-mono text-slate-300 break-all select-all">{item.address}</code>
-                    {calcCryptoAmount(item.id, item.name) !== '...' && (
-                      <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                        <span className="text-[10px] font-bold text-emerald-400">≈ {calcCryptoAmount(item.id, item.name)} {item.name.split(' ').pop()?.replace(/[()]/g, '')}</span>
-                        <button
-                          onClick={() => copyAmount(`${calcCryptoAmount(item.id, item.name)} ${item.name.split(' ').pop()?.replace(/[()]/g, '')}`, 'amt_' + item.id)}
-                          className="p-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
-                        >
-                          {copiedAmountId === 'amt_' + item.id ? <Check size={10} /> : <Copy size={10} />}
-                          </button>
-                    </div>
-                  )}
-                  </div>
-                </div>
-              )}
+              <button
+                onClick={() => copyAddress(item.address, item.network)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
+              >
+                {copiedNetwork === item.network ? <Check size={14} /> : <Copy size={14} />}
+                {copiedNetwork === item.network ? (isAr ? 'تم النسخ' : 'Copied!') : (isAr ? 'نسخ العنوان' : 'Copy')}
+              </button>
             </div>
-          );
-        })}
+            <div className="bg-black/40 rounded-xl px-4 py-3">
+              <div className="flex items-center justify-between">
+                <code className="text-xs font-mono text-slate-300 break-all select-all">{item.address}</code>
+                <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                  <span className="text-[10px] font-bold text-emerald-400">{amount} USDT</span>
+                  <button
+                    onClick={() => copyAmount(`${amount} USDT`, 'amt_' + item.network)}
+                    className="p-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
+                  >
+                    {copiedAmountId === 'amt_' + item.network ? <Check size={10} /> : <Copy size={10} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
         </div>
 
-        {/* Payment confirmation OVERLAY — covers the selected address */}
-        {!manageMode && selectedCoinId && (() => {
-          const item = addresses.find(a => a.id === selectedCoinId);
+        {!manageMode && selectedNetwork && (() => {
+          const item = usdtAddresses.find(a => a.network === selectedNetwork);
           if (!item) return null;
-          const ticker = item.name.split(' ').pop()?.replace(/[()]/g, '') || '';
-          const cryptoAmount = calcCryptoAmount(item.id, item.name);
           return (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
               className="absolute inset-0 z-10 bg-brand-bg/95 backdrop-blur-xl rounded-2xl border-2 border-emerald-500/40 p-5 flex flex-col justify-center shadow-[0_0_60px_-12px_rgba(16,185,129,0.4)]"
             >
               <button
-                onClick={() => { setSelectedCoinId(null); setTimerRunning(false); }}
+                onClick={() => { setSelectedNetwork(null); setTimerRunning(false); }}
                 className="absolute top-3 right-3 p-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
               >
                 <X size={16} />
               </button>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-black text-xs shadow-lg">
-                    {ticker}
-                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-black text-xs shadow-lg">USDT</div>
                   <div>
-                    <span className="text-sm font-black text-white">{item.name}</span>
+                    <span className="text-sm font-black text-white">USDT ({item.networkLabel})</span>
                     <span className="text-[10px] text-slate-400 block">{item.address.slice(0, 16)}...</span>
                   </div>
                 </div>
@@ -601,16 +422,14 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               )}
 
               <div className="bg-black/40 rounded-2xl px-5 py-4 text-center border border-emerald-500/20 mb-4">
-                <div className="text-3xl font-black text-white font-mono">
-                  {cryptoAmount === '...' ? '...' : cryptoAmount} {ticker}
-                </div>
+                <div className="text-3xl font-black text-white font-mono">{amount} USDT</div>
                 <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">≈ ${amount} USD</p>
                 <button
-                  onClick={() => copyAmount(`${cryptoAmount} ${ticker}`, 'confirm_amt')}
+                  onClick={() => copyAmount(`${amount} USDT`, 'confirm_amt')}
                   className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
                 >
                   {copiedAmountId === 'confirm_amt' ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedAmountId === 'confirm_amt' ? 'Copied!' : 'Copy Amount'}
+                  {copiedAmountId === 'confirm_amt' ? (isAr ? 'تم النسخ' : 'Copied!') : (isAr ? 'نسخ المبلغ' : 'Copy Amount')}
                 </button>
               </div>
 
@@ -651,8 +470,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl px-3 py-2.5 mb-3">
                     <p className="text-[11px] text-amber-300 text-center font-bold leading-relaxed">
                       {isAr
-                        ? 'بعد إتمام التحويل، اضغط الزر أدناه لإرسال طلب تأكيد مرقّم. تتم المراجعة يدوياً خلال 1 إلى 24 ساعة.'
-                        : 'After sending the amount, press below to submit a numbered confirmation request. Review is manual and takes 1 to 24 hours.'}
+                        ? 'بعد إتمام التحويل، اضغط الزر أدناه لإرسال طلب تأكيد مرقّم. تتم المراجعة تلقائياً أو يدوياً.'
+                        : 'After sending the amount, press below to submit a numbered confirmation request. Review may be automatic or manual.'}
                     </p>
                   </div>
                   <button
@@ -678,13 +497,13 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   </div>
                   <p className="text-[11px] text-amber-200/80 leading-relaxed">
                     {isAr
-                      ? 'طلبك قيد المراجعة. سيتم التحقق من وصول المبلغ ومطابقة الاسم والتاريخ ثم يُفرَج التحميل. قد يستغرق ذلك من 1 إلى 24 ساعة.'
-                      : 'Your request is under review. Once the amount is verified and matched by name and date, the release happens automatically. This may take 1 to 24 hours.'}
+                      ? 'طلبك قيد المراجعة. سيتم التحقق من وصول المبلغ ثم يُفرَج التحميل تلقائياً.'
+                      : 'Your request is under review. Once the amount is verified, release happens automatically.'}
                   </p>
                   <div className="flex items-center justify-center gap-2 mt-3">
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                     <span className="text-[10px] text-amber-300 font-bold uppercase tracking-widest">
-                      {isAr ? 'بانتظار إفراج المطور' : 'Awaiting developer release'}
+                      {isAr ? 'بانتظار الإفراج' : 'Awaiting release'}
                     </span>
                   </div>
                   <button
@@ -724,10 +543,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 <div className="text-center mt-2">
                   <p className="text-[10px] text-red-400 mb-2">{isAr ? 'انتهت المهلة. يمكنك إعادة المحاولة.' : 'Time expired. You can try again.'}</p>
                   <button
-                    onClick={() => { setSelectedCoinId(null); setTimerRunning(false); }}
+                    onClick={() => { setSelectedNetwork(null); setTimerRunning(false); }}
                     className="text-xs text-slate-400 hover:text-white underline"
                   >
-                    {isAr ? 'اختر عملة أخرى' : 'Choose another coin'}
+                    {isAr ? 'اختر شبكة أخرى' : 'Choose another network'}
                   </button>
                 </div>
               )}
@@ -737,75 +556,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
       </div>
       )}
-
-        <AnimatePresence>
-          {isAdmin && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-emerald-500/5 border border-dashed border-emerald-500/30 rounded-2xl p-4 space-y-3"
-            >
-              <h5 className="text-xs font-black uppercase text-emerald-400 tracking-widest">Add New Address</h5>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Coin name (e.g. Dogecoin DOGE)"
-                  value={newAddress.name}
-                  onChange={(e) => { setNewAddress({ ...newAddress, name: e.target.value }); setShowSuggestions(true); }}
-                  onFocus={() => setShowSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-emerald-500"
-                />
-                {showSuggestions && (
-                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-gray-900 border border-white/10 rounded-xl max-h-48 overflow-y-auto shadow-2xl">
-                    {POPULAR_COINS.filter(c => c.toLowerCase().includes(newAddress.name.toLowerCase())).map(coin => (
-                      <button
-                        key={coin}
-                        onMouseDown={() => { setNewAddress({ ...newAddress, name: coin }); setShowSuggestions(false); }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-emerald-500/20 hover:text-white transition-all font-medium"
-                      >
-                        {coin}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <input
-                type="text"
-                placeholder="Wallet address"
-                value={newAddress.address}
-                onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })}
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-emerald-500"
-              />
-              <button
-                onClick={addNewAddress}
-                disabled={!newAddress.name || !newAddress.address}
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-emerald-500 text-white font-black text-xs uppercase tracking-widest hover:bg-emerald-400 transition-all disabled:opacity-50"
-              >
-                <Plus size={14} /> Add Address
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-      <AnimatePresence>
-        {isAdmin && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="mt-6 flex justify-center"
-          >
-            <button
-              onClick={saveAddresses}
-              className="flex items-center gap-2 bg-emerald-500 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-emerald-400 transition-all active:scale-95"
-            >
-              <Check size={18} /> Save All Addresses
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {manageMode && (<>
         <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-4">
@@ -884,24 +634,18 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         <div className="mt-4">
           <PaymentRequestsSection lang={isAr ? 'ar' : 'en'} />
         </div>
-
-              </>)}
+      </>)}
 
       {!manageMode && showAddresses && (
         <p className="text-center text-[10px] text-slate-500 mt-4">
-          {isAr ? `بعد النسخ، أرسل المبلغ إلى العنوان. الوقت المتبقي: ${Math.floor(timerSeconds / 60)} دقيقة` : `After copying, send the amount to the address. Time remaining: ${Math.floor(timerSeconds / 60)} min`}
+          {isAr ? `USDT فقط — ثابت بسعر $1.00. الوقت المتبقي: ${Math.floor(timerSeconds / 60)} دقيقة` : `USDT only — fixed at $1.00. Time remaining: ${Math.floor(timerSeconds / 60)} min`}
         </p>
       )}
-
     </>
   );
 
   if (asPage) {
-    return (
-      <div>
-        {pageInner}
-      </div>
-    );
+    return <div>{pageInner}</div>;
   }
 
   return (

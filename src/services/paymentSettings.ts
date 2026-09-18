@@ -7,6 +7,12 @@ export interface PaymentAddress {
   address: string;
 }
 
+export interface UsdtNetworkAddress {
+  network: string;
+  networkLabel: string;
+  address: string;
+}
+
 // Two confirmation methods are available. Both are confirmed MANUALLY by the
 // developer from the store settings — the difference is only the customer-facing
 // instructions and how the developer cross-checks the incoming payment.
@@ -20,8 +26,19 @@ export type ConfirmMode = 'binance_email' | 'manual';
 export const DEFAULT_CONFIRM_MODE: ConfirmMode = 'binance_email';
 export const DEFAULT_BINANCE_EMAIL = 'kraamohamed478@gmail.com';
 
+export const USDT_NETWORKS = [
+  { network: 'trc20', networkLabel: 'TRC20 (Tron)' },
+  { network: 'erc20', networkLabel: 'ERC20 (Ethereum)' },
+  { network: 'bep20', networkLabel: 'BEP20 (BSC)' },
+  { network: 'polygon', networkLabel: 'Polygon' },
+  { network: 'solana', networkLabel: 'Solana' },
+  { network: 'optimism', networkLabel: 'Optimism' },
+  { network: 'arbitrum', networkLabel: 'Arbitrum' },
+];
+
 export interface PaymentSettingsData {
   addresses: PaymentAddress[];
+  usdtAddresses: UsdtNetworkAddress[];
   confirmMode: ConfirmMode;
   binanceNotifyEmail: string;
   updatedAt: number;

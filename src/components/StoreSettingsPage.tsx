@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Wallet, Copy } from 'lucide-react';
 import { StoreBot, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
 import PaymentRequestsSection from './PaymentRequestsSection';
+import { loadPaymentSettings, savePaymentSettings, UsdtNetworkAddress, USDT_NETWORKS } from '../services/paymentSettings';
 
 interface StoreSettingsPageProps {
   lang: 'ar' | 'en';
@@ -26,6 +27,10 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
   const [adding, setAdding] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [editingBot, setEditingBot] = useState<StoreBot | null>(null);
+  const [usdtAddresses, setUsdtAddresses] = useState<UsdtNetworkAddress[]>([]);
+  const [editingNetwork, setEditingNetwork] = useState<string | null>(null);
+  const [editingAddress, setEditingAddress] = useState('');
+  const [copiedNetwork, setCopiedNetwork] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,6 +39,14 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
   };
 
   useEffect(() => { refresh(); }, []);
+
+  useEffect(() => {
+    loadPaymentSettings().then(data => {
+      if (data?.usdtAddresses && data.usdtAddresses.length) {
+        setUsdtAddresses(data.usdtAddresses);
+      }
+    });
+  }, []);
 
   const handleFile = (f: File) => {
     if (f.size > MAX_FILE_BYTES) {
@@ -142,6 +155,33 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
     } catch {}
   };
 
+  const handleSaveUsdtAddress = async (network: string) => {
+    const updated = usdtAddresses.map(a =>
+      a.network === network ? { ...a, address: editingAddress } : a
+    );
+    if (!updated.find(a => a.network === network)) {
+      updated.push({ network, networkLabel: USDT_NETWORKS.find(n => n.network === network)?.networkLabel || network, address: editingAddress });
+    }
+    setUsdtAddresses(updated);
+    await savePaymentSettings({ usdtAddresses: updated });
+    setEditingNetwork(null);
+    setEditingAddress('');
+  };
+
+  const handleDeleteUsdtAddress = async (network: string) => {
+    const updated = usdtAddresses.filter(a => a.network !== network);
+    setUsdtAddresses(updated);
+    await savePaymentSettings({ usdtAddresses: updated });
+  };
+
+  const copyAddress = async (addr: string, network: string) => {
+    try {
+      await navigator.clipboard.writeText(addr);
+      setCopiedNetwork(network);
+      setTimeout(() => setCopiedNetwork(null), 2000);
+    } catch {}
+  };
+
   const formatPrice = (price: number) => (price <= 0 ? 'مجاني' : `$${(price / 100).toFixed(2)}`);
 
   return (
@@ -160,6 +200,90 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         </h3>
         <PaymentRequestsSection lang={isAr ? 'ar' : 'en'} />
       </div>
+
+      {/* USDT Wallet Addresses */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8"
+      >
+        <h3 className="text-2xl font-black uppercase text-emerald-400 tracking-widest mb-4 flex items-center gap-3">
+          <Wallet size={24} />
+          {isAr ? 'عناوين USDT للدفع' : 'USDT Payment Addresses'}
+        </h3>
+        <p className="text-sm text-slate-400 mb-4">
+          {isAr ? 'أضف عنوان USDT لكل شبكة. يختار العميل الشبكة المناسبة عند الدفع.' : 'Add a USDT address for each network. Customer chooses the network when paying.'}
+        </p>
+
+        <div className="space-y-3">
+          {USDT_NETWORKS.map(net => {
+            const saved = usdtAddresses.find(a => a.network === net.network);
+            const isEditing = editingNetwork === net.network;
+
+            return (
+              <div key={net.network} className="bg-black/20 border border-white/10 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-black text-white">{net.networkLabel}</span>
+                  <div className="flex items-center gap-2">
+                    {saved && !isEditing && (
+                      <>
+                        <button
+                          onClick={() => copyAddress(saved.address, net.network)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
+                        >
+                          <Copy size={12} />
+                          {copiedNetwork === net.network ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ' : 'Copy')}
+                        </button>
+                        <button
+                          onClick={() => { setEditingNetwork(net.network); setEditingAddress(saved.address); }}
+                          className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUsdtAddress(net.network)}
+                          className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editingAddress}
+                      onChange={(e) => setEditingAddress(e.target.value)}
+                      placeholder={isAr ? 'أدخل عنوان USDT' : 'Enter USDT address'}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-white outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      onClick={() => handleSaveUsdtAddress(net.network)}
+                      disabled={!editingAddress.trim()}
+                      className="px-4 py-2 rounded-lg bg-emerald-500 text-white font-black text-xs uppercase hover:bg-emerald-400 transition-all disabled:opacity-50"
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button
+                      onClick={() => { setEditingNetwork(null); setEditingAddress(''); }}
+                      className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 font-black text-xs uppercase hover:bg-white/10 transition-all"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-xs font-mono text-slate-400 bg-black/30 rounded-lg px-3 py-2 break-all">
+                    {saved ? saved.address : <span className="text-red-400">{isAr ? 'لم يتم الإعداد بعد' : 'Not configured yet'}</span>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
 
       {/* Add form */}
       <motion.div
