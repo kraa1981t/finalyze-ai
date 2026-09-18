@@ -1,13 +1,13 @@
-let _ctx: AudioContext | null = null;
-function ctx(): AudioContext {
-  if (!_ctx || _ctx.state === 'closed') _ctx = new AudioContext();
-  if (_ctx.state === 'suspended') _ctx.resume();
-  return _ctx;
+import { getAudioContext } from './audioEngine';
+
+function ctx(): AudioContext | null {
+  return getAudioContext();
 }
 
 export function playOpenSound() {
   try {
     const c = ctx();
+    if (!c) return;
     // Pop: two-tone ascending beep
     const o1 = c.createOscillator();
     const g1 = c.createGain();
@@ -40,6 +40,7 @@ export function playOpenSound() {
 export function playCloseSound() {
   try {
     const c = ctx();
+    if (!c) return;
     // Click: short sharp tick
     const o = c.createOscillator();
     const g = c.createGain();
@@ -57,6 +58,7 @@ export function playCloseSound() {
 export function playClickSound() {
   try {
     const c = ctx();
+    if (!c) return;
     const o = c.createOscillator();
     const g = c.createGain();
     o.type = 'sine';
@@ -71,6 +73,7 @@ export function playClickSound() {
 export function playDragTick() {
   try {
     const c = ctx();
+    if (!c) return;
     const o = c.createOscillator();
     const g = c.createGain();
     o.type = 'triangle';

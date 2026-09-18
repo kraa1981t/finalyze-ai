@@ -1,15 +1,46 @@
+type AudioWindow = Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext };
+
 let ctx: AudioContext | null = null;
 let unlocked = false;
 const customBuffers: Map<string, AudioBuffer> = new Map();
 
+function createAudioContext(): AudioContext | null {
+  try {
+    const w = window as AudioWindow;
+    const AC = w.AudioContext || w.webkitAudioContext;
+    if (!AC) return null;
+    return new AC();
+  } catch (e) {
+    console.warn('AudioContext unavailable:', e);
+    return null;
+  }
+}
+
+// Shared Web Audio context. Safe to call at any time; returns null only when
+// the browser exposes no Web Audio implementation at all.
+export function getAudioContext(): AudioContext | null {
+  if (!ctx || ctx.state === 'closed') ctx = createAudioContext();
+  // 'suspended' (autoplay policy) and 'interrupted' (iOS backgrounding) both
+  // need a resume attempt before we can produce sound.
+  if (ctx && ctx.state !== 'running') { ctx.resume().catch(() => {}); }
+  return ctx;
+}
+
+// Must run inside a real user gesture (click/touch). Creates, resumes and
+// "primes" the context so iOS/Safari allow later programmatic playback.
 export function initAudio() {
   try {
-    if (!ctx || ctx.state === 'closed') {
-      ctx = new AudioContext();
-    }
-    if (ctx.state === 'suspended') {
-      ctx.resume();
-    }
+    const ac = getAudioContext();
+    if (!ac) return;
+    if (ac.state === 'suspended') ac.resume().catch(() => {});
+    // Prime with a 1-sample silent buffer inside the gesture (iOS requirement).
+    try {
+      const buffer = ac.createBuffer(1, 1, 22050);
+      const source = ac.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ac.destination);
+      source.start(0);
+    } catch {}
     unlocked = true;
   } catch (e) {
     console.warn('initAudio failed:', e);
@@ -18,9 +49,7 @@ export function initAudio() {
 
 function getCtx(): AudioContext | null {
   if (!unlocked) { initAudio(); }
-  if (!ctx || ctx.state === 'closed') return null;
-  if (ctx.state === 'suspended') ctx.resume();
-  return ctx;
+  return getAudioContext();
 }
 
 function playTone(freq: number, duration: number, type: OscillatorType = 'sine', volume: number = 0.5) {
@@ -60,9 +89,10 @@ function playBuffer(buffer: AudioBuffer, volume: number) {
 
 export async function loadCustomAudio(key: string, blob: Blob) {
   try {
-    if (!ctx || ctx.state === 'closed') ctx = new AudioContext();
+    const ac = getAudioContext();
+    if (!ac) return;
     const arrayBuf = await blob.arrayBuffer();
-    const buffer = await ctx.decodeAudioData(arrayBuf);
+    const buffer = await ac.decodeAudioData(arrayBuf);
     customBuffers.set(key, buffer);
   } catch (e) {
     console.warn('Failed to decode custom audio:', e);
