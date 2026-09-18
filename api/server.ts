@@ -1,5 +1,7 @@
 import express from "express";
 import nodemailer from "nodemailer";
+import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
 
 const FALLBACK_PRICES = {
   bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 },
@@ -1390,5 +1392,268 @@ app.post("/api/briefing", async (req, res) => {
     return res.status(500).json({ error: e.message || 'Briefing failed' });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Automatic Binance deposit verification (IMAP → Firestore → auto release)
+// ---------------------------------------------------------------------------
+// Reads the Binance notification inbox over IMAP, extracts deposit amounts,
+// matches them against pending numbered payment requests, and releases access
+// automatically. Runs headless (no browser needed). Triggered by an external
+// cron (or Vercel Cron) hitting /api/check-binance-mail.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const FS_BASE = `https://firestore.googleapis.com/v1/projects/trading-made-easy-e8450/databases/(default)/documents`;
+const FS_KEY = process.env.FIRESTORE_KEY || 'AIzaSyCvMayEuNTlQ5CWbjrrqw3aft_H044-uQM';
+const MAIL_LOOKBACK_MS = 48 * 60 * 60 * 1000;   // only consider recent emails
+const REQUEST_WINDOW_BEFORE_MS = 12 * 60 * 60 * 1000;
+const REQUEST_WINDOW_AFTER_MS = 48 * 60 * 60 * 1000;
+const AMOUNT_TOLERANCE = 0.05;                   // dollars
+
+type Json = Record<string, any>;
+
+function toFsValue(v: any): Json {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === 'string') return { stringValue: v };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
+  if (typeof v === 'object') return { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, val]) => [k, toFsValue(val)])) } };
+  return { stringValue: String(v) };
+}
+
+function fromFsValue(v: any): any {
+  if (!v) return undefined;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('doubleValue' in v) return Number(v.doubleValue);
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('nullValue' in v) return null;
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(fromFsValue);
+  if ('mapValue' in v) return Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k, val]) => [k, fromFsValue(val)]));
+  return undefined;
+}
+
+const fsDocBody = (data: Json) => ({ fields: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, toFsValue(v)])) });
+const docIdFromName = (name: string) => String(name).split('/').pop() || '';
+const sanitizeFs = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+function grantDocIdFs(email: string, kind: string, botId?: string): string {
+  const key = kind === 'bot' ? `bot_${botId || 'unknown'}` : 'plan';
+  return `${sanitizeFs(email)}__${key}`;
+}
+
+async function fsList(collectionName: string): Promise<Json[]> {
+  const out: Json[] = [];
+  let pageToken = '';
+  for (let i = 0; i < 10; i++) {
+    const url = `${FS_BASE}/${collectionName}?key=${FS_KEY}&pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    const resp = await fetch(url);
+    if (!resp.ok) break;
+    const data: any = await resp.json();
+    (data.documents || []).forEach((d: any) => out.push({ id: docIdFromName(d.name), ...Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, fromFsValue(v)])) }));
+    pageToken = data.nextPageToken || '';
+    if (!pageToken) break;
+  }
+  return out;
+}
+
+async function fsGet(collectionName: string, id: string): Promise<Json | null> {
+  const resp = await fetch(`${FS_BASE}/${collectionName}/${encodeURIComponent(id)}?key=${FS_KEY}`);
+  if (!resp.ok) return null;
+  const d: any = await resp.json();
+  if (!d.fields) return null;
+  return Object.fromEntries(Object.entries(d.fields).map(([k, v]) => [k, fromFsValue(v)]));
+}
+
+async function fsPatch(collectionName: string, id: string, data: Json, mask?: string[]): Promise<void> {
+  const qs = mask && mask.length ? '&' + mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&') : '';
+  const resp = await fetch(`${FS_BASE}/${collectionName}/${encodeURIComponent(id)}?key=${FS_KEY}${qs}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fsDocBody(data)),
+  });
+  if (!resp.ok) throw new Error(`Firestore patch ${collectionName}/${id} failed: ${resp.status}`);
+}
+
+async function fsAdd(collectionName: string, data: Json): Promise<void> {
+  const resp = await fetch(`${FS_BASE}/${collectionName}?key=${FS_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fsDocBody(data)),
+  });
+  if (!resp.ok) throw new Error(`Firestore add ${collectionName} failed: ${resp.status}`);
+}
+
+function extractAmounts(text: string): number[] {
+  const found = new Set<number>();
+  const push = (raw: string) => {
+    const n = Number(String(raw).replace(',', '.'));
+    if (isFinite(n) && n > 0) found.add(Math.round(n * 100) / 100);
+  };
+  const contextual = /(?:amount|received|deposited|deposit|total|credit|المبلغ|استلام|تم استلام|وصل)[^0-9]{0,40}([0-9][0-9.,]*)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = contextual.exec(text))) push(m[1]);
+  const withCoin = /([0-9][0-9.,]*)\s*(?:USDT|USDC|BUSD|TUSD|FDUSD|USD|DAI|\$)/gi;
+  while ((m = withCoin.exec(text))) push(m[1]);
+  return [...found];
+}
+
+async function releasePaymentRequest(req: Json, now: number, source: string): Promise<void> {
+  await fsPatch('payment_requests', req.id, {
+    status: 'approved',
+    decidedAt: now,
+    decidedBy: source,
+  }, ['status', 'decidedAt', 'decidedBy']);
+
+  const grantId = grantDocIdFs(req.buyerEmail, req.kind, req.botId);
+  const grant: Json = {
+    email: (req.buyerEmail || '').toLowerCase(),
+    kind: req.kind,
+    status: 'active',
+    createdAt: now,
+    requestNo: req.requestNo,
+    botId: req.botId || null,
+    botName: req.botName || null,
+    planLabel: req.planLabel || null,
+  };
+  if (req.kind === 'plan') {
+    const days = Number(req.durationDays) > 0 ? Number(req.durationDays) : 30;
+    grant.expiryDate = new Date(now + days * 86400000).toISOString();
+  }
+  await fsPatch('payment_grants', grantId, grant);
+
+  const product = req.kind === 'bot' ? (req.botName || 'Bot') : (req.planLabel || 'Plan');
+  await fsAdd('dev_notifications', {
+    type: 'approved',
+    requestNo: req.requestNo,
+    titleAr: `إفراج تلقائي للطلب #${req.requestNo}`,
+    titleEn: `Auto-released request #${req.requestNo}`,
+    bodyAr: `${req.buyerName || req.buyerEmail} — ${product} — $${req.amountUsd}`,
+    bodyEn: `${req.buyerName || req.buyerEmail} — ${product} — $${req.amountUsd}`,
+    read: false,
+    createdAt: now,
+  });
+}
+
+async function checkBinanceMail(): Promise<Json> {
+  const user = process.env.BINANCE_IMAP_USER || process.env.BINANCE_EMAIL;
+  const pass = process.env.BINANCE_IMAP_PASS || process.env.BINANCE_APP_PASSWORD;
+  if (!user || !pass) {
+    return { ok: false, error: 'missing BINANCE_IMAP_USER / BINANCE_IMAP_PASS' };
+  }
+
+  const summary: Json = { ok: true, user, scanned: 0, binanceEmails: 0, approved: [], ambiguous: [], errors: [] };
+
+  // Load pending requests + processed-id state
+  const [requests, state] = await Promise.all([
+    fsList('payment_requests'),
+    fsGet('shared_settings', 'binance_mail_state'),
+  ]);
+  const pending = requests.filter((r) => r.status === 'pending' && typeof r.amountUsd === 'number' && r.amountUsd >= 0.5);
+  const processed: string[] = Array.isArray(state?.processed) ? state.processed : [];
+
+  const client = new ImapFlow({
+    host: 'imap.gmail.com',
+    port: 993,
+    secure: true,
+    auth: { user, pass },
+    logger: false,
+  });
+
+  const newlyProcessed: string[] = [];
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock('INBOX');
+    try {
+      const since = new Date(Date.now() - MAIL_LOOKBACK_MS);
+      for await (const msg of client.fetch({ since }, { uid: true, source: true })) {
+        summary.scanned++;
+        let parsed: any;
+        try {
+          parsed = await simpleParser(msg.source as Buffer);
+        } catch (e: any) {
+          summary.errors.push(`parse uid ${msg.uid}: ${e.message}`);
+          continue;
+        }
+        const fromText = String(parsed.from?.text || '').toLowerCase();
+        const messageId = String(parsed.messageId || `uid:${msg.uid}`);
+        if (processed.includes(messageId)) continue;
+        if (!fromText.includes('binance')) {
+          newlyProcessed.push(messageId);
+          continue;
+        }
+        summary.binanceEmails++;
+
+        const emailText = `${parsed.subject || ''}\n${parsed.text || ''}`;
+        const emailDate = parsed.date ? new Date(parsed.date).getTime() : Date.now();
+        const amounts = extractAmounts(emailText);
+        if (!amounts.length) continue;
+
+        const candidates = pending.filter((r) => {
+          const amountMatch = amounts.some((a) => Math.abs(a - r.amountUsd) <= AMOUNT_TOLERANCE);
+          if (!amountMatch) return false;
+          const created = Number(r.createdAt) || 0;
+          return created >= emailDate - REQUEST_WINDOW_BEFORE_MS && created <= emailDate + REQUEST_WINDOW_AFTER_MS;
+        });
+
+        if (candidates.length === 1) {
+          const req = candidates[0];
+          const now = Date.now();
+          try {
+            await releasePaymentRequest(req, now, 'auto-binance');
+            req.status = 'approved';
+            summary.approved.push({ requestNo: req.requestNo, buyer: req.buyerEmail, amount: req.amountUsd });
+            newlyProcessed.push(messageId);
+          } catch (e: any) {
+            summary.errors.push(`release #${req.requestNo}: ${e.message}`);
+          }
+        } else if (candidates.length > 1) {
+          summary.ambiguous.push({
+            messageId,
+            amounts,
+            requestNos: candidates.map((c) => c.requestNo),
+          });
+        }
+        // no candidates: leave unprocessed so a later-created request can still match
+      }
+    } finally {
+      lock.release();
+    }
+    await client.logout();
+  } catch (e: any) {
+    summary.ok = false;
+    summary.errors.push(`imap: ${e.message}`);
+  }
+
+  // Persist processed message ids (cap to keep the doc small)
+  try {
+    const merged = [...new Set([...processed, ...newlyProcessed])].slice(-500);
+    await fsPatch('shared_settings', 'binance_mail_state', { processed: merged, updatedAt: Date.now() });
+  } catch (e: any) {
+    summary.errors.push(`state: ${e.message}`);
+  }
+
+  return summary;
+}
+
+const binanceMailHandler = async (req: any, res: any) => {
+  const secret = process.env.CRON_SECRET;
+  if (secret) {
+    const auth = String(req.headers.authorization || '');
+    const token = String((req.query && req.query.token) || '');
+    if (auth !== `Bearer ${secret}` && token !== secret) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+  }
+  try {
+    const result = await checkBinanceMail();
+    return res.status(result.ok ? 200 : 500).json(result);
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+};
+
+app.get("/api/check-binance-mail", binanceMailHandler);
+app.post("/api/check-binance-mail", binanceMailHandler);
 
 export default app;
