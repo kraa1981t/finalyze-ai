@@ -57,6 +57,8 @@ interface HeaderProps {
   isAnalyzing?: boolean;
   newSuggestionsCount?: number;
   onNavigateSuggestions?: () => void;
+  paymentRequestsCount?: number;
+  onNavigatePaymentRequests?: () => void;
   clientRadarRunning?: boolean;
   showRadarComplete?: boolean;
   onPreview?: (device: 'phone' | 'tablet') => void;
@@ -96,6 +98,8 @@ export default function Header({
   isAnalyzing = false,
   newSuggestionsCount = 0,
   onNavigateSuggestions,
+  paymentRequestsCount = 0,
+  onNavigatePaymentRequests,
   clientRadarRunning = false,
   showRadarComplete = false,
   onPreview,
@@ -679,6 +683,22 @@ export default function Header({
                   {newSuggestionsCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
                       {newSuggestionsCount}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* Payment notifications - developer only */}
+              {isDeveloper && (
+                <button
+                  onClick={() => onNavigatePage?.('storeSettings')}
+                  title={lang === 'ar' ? 'طلبات الدفع والإفراج' : 'Payment requests & releases'}
+                  className="hidden md:flex relative p-3 rounded-xl bg-emerald-500 text-white hover:bg-emerald-400 transition-all shadow-md flex-shrink-0"
+                >
+                  <Bell size={22} />
+                  {paymentRequestsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
+                      {paymentRequestsCount}
                     </span>
                   )}
                 </button>

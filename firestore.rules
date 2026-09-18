@@ -72,6 +72,21 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Payment confirmation requests — clients create numbered requests, developer approves
+    match /payment_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    // Payment grants — written by developer approval, read by the buyer to unlock
+    match /payment_grants/{grantId} {
+      allow read, write: if true;
+    }
+
+    // Developer notifications — created on payment events, read by the developer
+    match /dev_notifications/{notifId} {
+      allow read, write: if true;
+    }
+
     // Suggestions — anyone can read/write
     match /suggestions/{suggestionId} {
       allow read, write: if true;

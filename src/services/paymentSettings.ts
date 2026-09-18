@@ -7,8 +7,23 @@ export interface PaymentAddress {
   address: string;
 }
 
+// Two confirmation methods are available. Both are confirmed MANUALLY by the
+// developer from the store settings — the difference is only the customer-facing
+// instructions and how the developer cross-checks the incoming payment.
+//   'binance_email' -> developer periodically reviews the Binance confirmation
+//                      email (kraamohamed478@gmail.com) and matches it by
+//                      amount + date/time with the numbered request.
+//   'manual'        -> developer reviews the numbered request directly and
+//                      releases once the amount is confirmed received.
+export type ConfirmMode = 'binance_email' | 'manual';
+
+export const DEFAULT_CONFIRM_MODE: ConfirmMode = 'binance_email';
+export const DEFAULT_BINANCE_EMAIL = 'kraamohamed478@gmail.com';
+
 export interface PaymentSettingsData {
   addresses: PaymentAddress[];
+  confirmMode: ConfirmMode;
+  binanceNotifyEmail: string;
   updatedAt: number;
 }
 

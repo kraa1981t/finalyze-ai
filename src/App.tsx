@@ -29,6 +29,7 @@ import { resolveConflicts } from './services/portfolioRiskService';
 import ApiKeyModal from './components/ApiKeyModal';
 import SubscriptionModal from './components/SubscriptionModal';
 import PaymentModal from './components/PaymentModal';
+import { getUnreadDevNotificationCount, fetchUserGrants } from './services/paymentRequests';
 import ProfilePage from './components/ProfilePage';
 import AboutPage from './components/AboutPage';
 import SuggestionsPage from './components/SuggestionsPage';
@@ -96,6 +97,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isPWA, setIsPWA] = useState(false);
   const [newSuggestionsCount, setNewSuggestionsCount] = useState(0);
+  const [paymentRequestsCount, setPaymentRequestsCount] = useState(0);
 
   useEffect(() => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
@@ -1659,6 +1661,46 @@ export default function App() {
     return () => clearInterval(interval);
   }, [user]);
 
+  // Developer: unread payment request notifications (shown on the header bell)
+  useEffect(() => {
+    if (!user) return;
+    let stopped = false;
+    const refresh = async () => {
+      if (!isDeveloperSession()) return;
+      const count = await getUnreadDevNotificationCount();
+      if (!stopped) setPaymentRequestsCount(count);
+    };
+    refresh();
+    const interval = setInterval(refresh, 30000);
+    return () => { stopped = true; clearInterval(interval); };
+  }, [user, activePage]);
+
+  // Client: pick up a developer-approved plan grant and activate the subscription.
+  // Runs on login and when returning to the app so a release works even if the
+  // site was closed while the developer approved it.
+  useEffect(() => {
+    if (!user?.email || isDeveloperSession()) return;
+    let stopped = false;
+    const checkGrant = async () => {
+      try {
+        const grants = await fetchUserGrants(user.email!);
+        if (stopped) return;
+        const active = grants.filter((g) => g.kind === 'plan' && g.status === 'active' && g.expiryDate && new Date(g.expiryDate) > new Date());
+        if (!active.length) return;
+        const best = active.sort((a, b) => new Date(b.expiryDate!).getTime() - new Date(a.expiryDate!).getTime())[0];
+        setActiveSubscription((prev) => {
+          if (prev && new Date(prev.expiryDate) >= new Date(best.expiryDate!)) return prev;
+          const sub = { label: best.planLabel || 'Plan', amount: 0, activatedAt: new Date(best.createdAt).toISOString(), expiryDate: best.expiryDate! };
+          try { localStorage.setItem('active_subscription', JSON.stringify(sub)); } catch {}
+          return sub;
+        });
+      } catch {}
+    };
+    checkGrant();
+    const interval = setInterval(checkGrant, 60000);
+    return () => { stopped = true; clearInterval(interval); };
+  }, [user?.email]);
+
   const handleLogin = async () => {
     setActivePage('main');
     setPaymentPlan(null);
@@ -1798,6 +1840,8 @@ export default function App() {
         isAnalyzing={isAnalyzing}
         newSuggestionsCount={effectivePage === 'suggestions' ? 0 : newSuggestionsCount}
         onNavigateSuggestions={() => navigateTo('suggestions')}
+        paymentRequestsCount={effectivePage === 'storeSettings' ? 0 : paymentRequestsCount}
+        onNavigatePaymentRequests={() => navigateTo('storeSettings')}
         clientRadarRunning={!isDeveloperSession() && clientRadarRunning}
         showRadarComplete={!isDeveloperSession() && showRadarComplete}
         onPreview={isDeveloperSession() ? (device) => setPreviewDevice(device) : undefined}
@@ -1904,6 +1948,8 @@ export default function App() {
                 botPurchase={botPurchase}
                 sectionTab={botPurchase ? 'bot' : 'plan'}
                 buyerEmail={user?.email || ''}
+                buyerName={user?.displayName || ''}
+                planDurationDays={paymentPlan?.durationDays}
                 onBotPaid={() => { setBotPurchase(null); setPaymentPlan(null); goBack(); }}
                 onGoToStore={() => { setPaymentPlan(null); setBotPurchase(null); navigateTo('store'); }}
                 onGoToPlans={() => { setPaymentPlan(null); setBotPurchase(null); navigateTo('plans'); }}

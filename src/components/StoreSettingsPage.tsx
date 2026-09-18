@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil } from 'lucide-react';
 import { StoreBot, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
+import PaymentRequestsSection from './PaymentRequestsSection';
 
 interface StoreSettingsPageProps {
   lang: 'ar' | 'en';
@@ -150,6 +151,14 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
           <ArrowLeft size={18} />
         </button>
         <h2 className="text-[30px] font-black text-white">{isAr ? 'إعدادات متجر البوتات والمؤشرات' : 'Bots & Indicators Store Settings'}</h2>
+      </div>
+
+      {/* Payment confirmation requests + method switch */}
+      <div className="mb-8">
+        <h3 className="text-2xl font-black uppercase text-emerald-400 tracking-widest mb-3">
+          {isAr ? 'تأكيد الدفع والإفراج' : 'Payment Confirmation & Release'}
+        </h3>
+        <PaymentRequestsSection lang={isAr ? 'ar' : 'en'} />
       </div>
 
       {/* Add form */}

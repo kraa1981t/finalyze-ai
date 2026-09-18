@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalLink, ShieldOff, Shield } from 'lucide-react';
+import { X, Copy, Check, Edit3, Trash2, Plus, Lock, Unlock, ArrowLeft, ExternalLink, ShieldOff, Shield, RefreshCw } from 'lucide-react';
 import { fetchCryptoPricesDirect } from '../services/apiDirect';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { StoreBot, downloadBot, recordBotPurchase, getDownloadGrant, grantBotDownload, consumeBotDownload, hasDownloadedBot } from '../services/storeService';
-import { loadPaymentSettings, savePaymentSettings } from '../services/paymentSettings';
+import { loadPaymentSettings, savePaymentSettings, ConfirmMode, DEFAULT_CONFIRM_MODE, DEFAULT_BINANCE_EMAIL } from '../services/paymentSettings';
+import { createPaymentRequest, checkUserGrant, consumeBotGrant } from '../services/paymentRequests';
+import PaymentRequestsSection from './PaymentRequestsSection';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
@@ -67,6 +69,8 @@ interface PaymentModalProps {
   onGoToStore?: () => void;
   onGoToPlans?: () => void;
   buyerEmail?: string;
+  buyerName?: string;
+  planDurationDays?: number;
 }
 
 const TIMER_STORAGE_KEY = 'payment_timer_minutes';
@@ -81,7 +85,7 @@ const fetchWithTimeout = async (url: string, options?: RequestInit, ms = 10000):
   }
 };
 
-export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle, botPurchase, sectionTab = 'bot', onBotPaid, onGoToStore, onGoToPlans, buyerEmail }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle, botPurchase, sectionTab = 'bot', onBotPaid, onGoToStore, onGoToPlans, buyerEmail, buyerName, planDurationDays }: PaymentModalProps) {
   const isAr = lang === 'ar';
   const [section, setSection] = useState<'bot' | 'plan'>(sectionTab || 'bot');
   const [addresses, setAddresses] = useState<CryptoAddress[]>(() => {
@@ -110,9 +114,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const [editTimer, setEditTimer] = useState(timerMinutes);
-  const [pollingActive, setPollingActive] = useState(false);
-  const [paymentDetected, setPaymentDetected] = useState(false);
-  const [pollingStatus, setPollingStatus] = useState('');
+  const [requestNo, setRequestNo] = useState<number | null>(null);
+  const [requestStatus, setRequestStatus] = useState<'idle' | 'pending' | 'approved' | 'rejected'>('idle');
+  const [requestCreating, setRequestCreating] = useState(false);
+  const [grantChecking, setGrantChecking] = useState(false);
   const [subPrices, setSubPrices] = useState(() => {
     try { const s = localStorage.getItem(SUBSCRIPTION_STORAGE_KEY); return s ? JSON.parse(s) : DEFAULT_PRICES; }
     catch { return DEFAULT_PRICES; }
@@ -122,6 +127,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [error, setError] = useState<string | null>(null);
   const [botGrantTs, setBotGrantTs] = useState<number | null>(null);
   const [botDownloaded, setBotDownloaded] = useState(false);
+  const [confirmMode, setConfirmMode] = useState<ConfirmMode>(DEFAULT_CONFIRM_MODE);
+  const [binanceEmail, setBinanceEmail] = useState(DEFAULT_BINANCE_EMAIL);
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -138,9 +147,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setNewAddress({ id: '', name: '', address: '' });
       setSelectedCoinId(null);
       setPaymentConfirmed(false);
-      setVerifyStatus('');
-      setTxid('');
-      setTxStatus('');
+      setRequestNo(null);
+      setRequestStatus('idle');
+      setContactName(buyerName || '');
+      setContactEmail(buyerEmail || '');
       setTimerRunning(false);
       setTimerSeconds(0);
       if (!manageMode) setIsAdmin(false);
@@ -174,6 +184,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         setAddresses(data.addresses);
         setEditAddresses(JSON.parse(JSON.stringify(data.addresses)));
       }
+      if (data.confirmMode) setConfirmMode(data.confirmMode);
+      if (data.binanceNotifyEmail) setBinanceEmail(data.binanceNotifyEmail);
     };
     sync();
     return () => { cancelled = true; };
@@ -188,126 +200,95 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
 
-  // Server-side on-chain status — avoids browser CORS / rate-limit issues.
-  // Returns { received (last 6h, sweep-proof), total (cumulative) }.
-  // Falls back to client-side for TRX/SOL/USDT only.
-  const fetchChainStatus = async (item: CryptoAddress): Promise<{ received: number; total: number } | null> => {
-    try {
-      // BTC / LTC / ETH — use server-side endpoint
-      if (item.id === 'btc' || item.id === 'ltc' || item.id === 'eth') {
-        try {
-          const res = await fetch('/api/verify-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ address: item.address, chain: item.id }),
-          });
-          const data = await res.json();
-          if (data.received != null) {
-            const received = data.received as number;
-            return { received, total: (data.totalReceived as number) ?? received };
-          }
-        } catch { /* fallback */ }
-        return null;
-      }
-      if (item.id === 'trx') {
-        const res = await fetchWithTimeout(`https://api.trongrid.io/v1/accounts/${item.address}`);
-        const data = await res.json();
-        const account = data?.data?.[0];
-        if (!account) return null;
-        const b = (account.balance || 0) / 1e6;
-        return { received: b, total: b };
-      }
-      if (item.id === 'usdt') {
-        const res = await fetchWithTimeout(`https://api.trongrid.io/v1/accounts/${item.address}`);
-        const data = await res.json();
-        const account = data?.data?.[0];
-        if (!account) return null;
-        const trc20 = Array.isArray(account.trc20) ? account.trc20 : [];
-        for (const entry of trc20) {
-          const value = entry?.[USDT_TRC20_CONTRACT];
-          if (value != null) { const b = parseFloat(value) / 1e6; return { received: b, total: b }; }
-        }
-        return { received: 0, total: 0 };
-      }
-      if (item.id === 'sol') {
-        const res = await fetchWithTimeout(SOL_RPC, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getBalance', params: [item.address] }),
-        });
-        const data = await res.json();
-        if (data?.result?.value == null) return null;
-        const b = data.result.value / 1e9;
-        return { received: b, total: b };
-      }
-      return null;
-    } catch { return null; }
-  };
-
-  // Baseline cumulative total per coin — captured when the coin is selected.
-  // Detects new payments even when exchanges sweep deposit addresses.
-  const baselineRef = React.useRef<Record<string, number>>({});
-
-  useEffect(() => {
-    if (!selectedCoinId || manageMode) return;
-    const item = addresses.find(a => a.id === selectedCoinId);
-    if (!item || baselineRef.current[item.address] != null) return;
-    fetchChainStatus(item).then(s => {
-      if (s) baselineRef.current[item.address] = s.total;
-    }).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCoinId]);
-
-  // Single shared grant — used by auto-detect, TXID proof and admin override.
+  // Single shared grant — called after the developer releases the numbered request.
   const grantAccess = () => {
+    setPaymentConfirmed(true);
+    setRequestStatus('approved');
+    setTimerRunning(false);
     if (!botPurchase?.id) { onConfirm?.(); return; }
     grantBotDownload(botPurchase.id);
-    setBotGrantTs(Date.now());
-    setPaymentConfirmed(true);
-    setPaymentDetected(true);
-    setTimerRunning(false);
-    setPollingActive(false);
+    setBotGrantTs(getDownloadGrant(botPurchase.id));
   };
 
-  // Poll blockchain for payment detection.
-  // Confirms when EITHER the 6h windowed received amount OR the growth of the
-  // cumulative total since coin selection covers the expected amount.
-  // Both paths are sweep-proof (exchange deposit addresses keep balance = 0).
-  useEffect(() => {
-    if (!selectedCoinId || paymentConfirmed || paymentDetected || !isOpen || manageMode) return;
+  const productLabel = botPurchase?.name || planLabel;
+  const isBotProduct = section === 'bot' && !!botPurchase?.id;
+  const buyerNameFinal = (buyerName || contactName).trim();
+  const buyerEmailFinal = (buyerEmail || contactEmail).trim().toLowerCase();
+
+  // Submit a numbered confirmation request. The developer reviews name + date +
+  // product and releases manually (may take 1–24 hours).
+  const requestManualConfirmation = async () => {
+    if (!selectedCoinId) return;
+    if (!buyerNameFinal) {
+      setError(isAr ? 'أدخل اسمك الكامل أولاً' : 'Enter your full name first');
+      return;
+    }
+    if (!buyerEmailFinal) {
+      setError(isAr ? 'أدخل بريدك الإلكتروني أولاً' : 'Enter your email first');
+      return;
+    }
     const item = addresses.find(a => a.id === selectedCoinId);
     if (!item) return;
+    setError(null);
+    setRequestCreating(true);
+    try {
+      const req = await createPaymentRequest({
+        kind: isBotProduct ? 'bot' : 'plan',
+        botId: botPurchase?.id,
+        botName: botPurchase?.name,
+        planLabel: isBotProduct ? undefined : productLabel,
+        durationDays: isBotProduct ? undefined : (planDurationDays || 30),
+        amountUsd: amount,
+        coinId: item.id,
+        coinName: item.name,
+        address: item.address,
+        buyerName: buyerNameFinal,
+        buyerEmail: buyerEmailFinal,
+        method: confirmMode,
+      });
+      setRequestNo(req.requestNo);
+      setRequestStatus('pending');
+      setTimerRunning(false);
+    } catch {
+      setError(isAr ? 'تعذر إرسال طلب التأكيد. حاول مرة أخرى.' : 'Could not submit the confirmation request. Try again.');
+    }
+    setRequestCreating(false);
+  };
 
-    setPollingActive(true);
-    setPollingStatus(isAr ? 'جاري التحقق من الدفع...' : 'Checking for payment...');
+  // On open, honor an already-approved grant (returning customer / other device).
+  useEffect(() => {
+    if (!isOpen || manageMode || !buyerEmailFinal) return;
+    let stopped = false;
+    checkUserGrant(buyerEmailFinal, isBotProduct ? 'bot' : 'plan', botPurchase?.id).then((g) => {
+      if (!stopped && g) grantAccess();
+    });
+    return () => { stopped = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, buyerEmailFinal, isBotProduct, botPurchase?.id]);
 
-    const checkTx = async () => {
-      try {
-        const status = await fetchChainStatus(item);
-        const coin = COINGECKO_MAP[item.id];
-        const usdPrice = coin ? prices[coin]?.usd : undefined;
-        if (status === null || !usdPrice) {
-          setPollingStatus(isAr ? 'الفحص التلقائي غير متاح لهذه العملة' : 'Auto-check not available for this coin');
-          return;
-        }
-        if (baselineRef.current[item.address] == null) {
-          baselineRef.current[item.address] = status.total;
-        }
-        const expectedCrypto = amount / usdPrice;
-        const grown = status.total - (baselineRef.current[item.address] || 0);
-        if (status.received >= expectedCrypto * 0.9 || grown >= expectedCrypto * 0.9) {
-          grantAccess();
-          setPollingStatus(isAr ? '✅ تم اكتشاف الدفع!' : '✅ Payment detected!');
-          return;
-        }
-        setPollingStatus(isAr ? 'في انتظار وصول الدفع...' : 'Awaiting payment...');
-      } catch { setPollingStatus(isAr ? 'الفحص التلقائي غير متاح لهذه العملة' : 'Auto-check not available for this coin'); }
+  // Poll Firestore for the developer's manual release — works even if the site
+  // was closed while the developer approved.
+  useEffect(() => {
+    if (!isOpen || requestStatus !== 'pending' || !buyerEmailFinal) return;
+    let stopped = false;
+    const check = async () => {
+      const g = await checkUserGrant(buyerEmailFinal, isBotProduct ? 'bot' : 'plan', botPurchase?.id);
+      if (!stopped && g) grantAccess();
     };
+    const interval = setInterval(check, 15000);
+    check();
+    return () => { stopped = true; clearInterval(interval); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, requestStatus, buyerEmailFinal, isBotProduct, botPurchase?.id]);
 
-    const interval = setInterval(checkTx, 15000);
-    checkTx(); // initial check
-    return () => { clearInterval(interval); setPollingActive(false); };
-  }, [selectedCoinId, paymentConfirmed, paymentDetected, isOpen, manageMode]);
+  const refreshGrantStatus = async () => {
+    if (!buyerEmailFinal) return;
+    setGrantChecking(true);
+    const g = await checkUserGrant(buyerEmailFinal, isBotProduct ? 'bot' : 'plan', botPurchase?.id);
+    if (g) grantAccess();
+    else setError(isAr ? 'لم يتم الإفراج بعد. قد يستغرق التأكيد حتى 24 ساعة.' : 'Not released yet. Confirmation may take up to 24 hours.');
+    setGrantChecking(false);
+  };
 
   const startTimer = () => {
     setTimerSeconds(timerMinutes * 60);
@@ -325,6 +306,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       await navigator.clipboard.writeText(addr);
       setCopiedId(id);
       setSelectedCoinId(id);
+      setError(null);
       if (!timerRunning) startTimer();
       setTimeout(() => setCopiedId(null), 2000);
     } catch {}
@@ -368,110 +350,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     if (!botPurchase || !paymentConfirmed || !botGrantTs) return;
     downloadBot(botPurchase);
     consumeBotDownload(botPurchase.id || '');
+    consumeBotGrant((buyerEmail || contactEmail).trim().toLowerCase(), botPurchase.id || '');
     setBotGrantTs(null);
     setBotDownloaded(true);
     recordBotPurchase(botPurchase, buyerEmail || '').then(() => onBotPaid?.(botPurchase));
-  };
-
-  // On-chain verification state (crypto method only — fully automatic)
-  const [verifying, setVerifying] = useState(false);
-  const [verifyStatus, setVerifyStatus] = useState('');
-  // Proof-by-TXID states (Path B — works even when address APIs fail)
-  const [txid, setTxid] = useState('');
-  const [txVerifying, setTxVerifying] = useState(false);
-  const [txStatus, setTxStatus] = useState('');
-  // Admin override PIN (Path C — set once in Payment Settings, stored locally)
-  const ADMIN_PIN_KEY = 'admin_override_pin';
-  const [adminPinInput, setAdminPinInput] = useState('');
-
-  const expectedCryptoFor = (item: CryptoAddress): number | null => {
-    const coin = COINGECKO_MAP[item.id];
-    const usdPrice = coin ? prices[coin]?.usd : undefined;
-    if (!usdPrice) return null;
-    return amount / usdPrice;
-  };
-
-  const verifyPaymentNow = async () => {
-    if (!selectedCoinId || !botPurchase) return;
-    const item = addresses.find(a => a.id === selectedCoinId);
-    if (!item) return;
-    setVerifying(true);
-    setVerifyStatus(isAr ? 'جاري التحقق من الدفع على البلوكتشين...' : 'Verifying payment on-chain...');
-    try {
-      const status = await fetchChainStatus(item);
-      const expectedCrypto = expectedCryptoFor(item);
-      if (status !== null && expectedCrypto != null) {
-        if (baselineRef.current[item.address] == null) {
-          baselineRef.current[item.address] = status.total;
-        }
-        const grown = status.total - (baselineRef.current[item.address] || 0);
-        if (status.received >= expectedCrypto * 0.9 || grown >= expectedCrypto * 0.9) {
-          grantAccess();
-          setVerifyStatus(isAr ? '✅ تم التحقق! الدفع وصل' : '✅ Verified! Payment received');
-        } else {
-          setVerifyStatus(isAr ? '⏳ الدفع لم يصل بعد — جرب بعد ثوانٍ' : '⏳ Payment not yet received — try again in a few seconds');
-        }
-      } else {
-        setVerifyStatus(isAr ? '⚠️ لا يمكن التحقق — تأكد من العنوان أو انتظر قليلاً ثم أعد المحاولة' : '⚠️ Cannot verify — check address or wait and retry');
-      }
-    } catch {
-      setVerifyStatus(isAr ? '❌ خطأ في التحقق' : '❌ Verification error');
-    }
-    setVerifying(false);
-  };
-
-  // Path B: verify by pasting the transaction hash from the wallet/exchange.
-  const verifyByTxid = async () => {
-    if (!selectedCoinId || !txid.trim()) return;
-    const item = addresses.find(a => a.id === selectedCoinId);
-    if (!item) return;
-    if (item.id !== 'btc' && item.id !== 'ltc' && item.id !== 'eth') {
-      setTxStatus(isAr ? 'إثبات TXID متاح لـ BTC و LTC و ETH فقط' : 'TXID proof supports BTC, LTC and ETH only');
-      return;
-    }
-    const expectedCrypto = expectedCryptoFor(item);
-    if (expectedCrypto == null) {
-      setTxStatus(isAr ? '⚠️ أسعار الصرف غير متاحة حالياً' : '⚠️ Exchange rates unavailable');
-      return;
-    }
-    setTxVerifying(true);
-    setTxStatus(isAr ? 'جاري فحص المعاملة...' : 'Checking transaction...');
-    try {
-      const res = await fetch('/api/verify-tx', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chain: item.id, txid: txid.trim(), address: item.address }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setTxStatus(isAr ? `⚠️ ${data.error} — تأكد من الـ TXID` : `⚠️ ${data.error} — check the TXID`);
-      } else if ((data.amount as number) >= expectedCrypto * 0.9) {
-        grantAccess();
-        const conf = data.confirmations as number;
-        setTxStatus(isAr
-          ? `✅ تم التحقق من المعاملة! (${conf} تأكيد)`
-          : `✅ Transaction verified! (${conf} confirmations)`);
-      } else {
-        setTxStatus(isAr ? '⏳ هذه المعاملة لم تدفع المبلغ المطلوب لهذا العنوان' : '⏳ This transaction did not pay the required amount to this address');
-      }
-    } catch {
-      setTxStatus(isAr ? '❌ خطأ في فحص المعاملة' : '❌ Transaction check error');
-    }
-    setTxVerifying(false);
-  };
-
-  // Path C: admin manual override (PIN set in Payment Settings → stored locally).
-  const adminOverrideGrant = () => {
-    const savedPin = localStorage.getItem(ADMIN_PIN_KEY) || '';
-    if (!savedPin) return;
-    const entered = window.prompt(isAr ? 'أدخل رمز الأدمن للمنح اليدوي:' : 'Enter admin PIN for manual grant:');
-    if (entered == null) return;
-    if (entered === savedPin) {
-      grantAccess();
-      setVerifyStatus(isAr ? '✅ منح يدوي من الأدمن' : '✅ Manual grant by admin');
-    } else {
-      setVerifyStatus(isAr ? '❌ رمز خاطئ' : '❌ Wrong PIN');
-    }
   };
 
   const calcCryptoAmount = (coinId: string, coinName?: string): string => {
@@ -712,6 +594,12 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">{isBotSection ? botPurchase!.name : currentLabel}</span>
               </div>
 
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/40 rounded-xl px-3 py-2 mb-3">
+                  <p className="text-[11px] font-black text-red-400 text-center">{error}</p>
+                </div>
+              )}
+
               <div className="bg-black/40 rounded-2xl px-5 py-4 text-center border border-emerald-500/20 mb-4">
                 <div className="text-3xl font-black text-white font-mono">
                   {cryptoAmount === '...' ? '...' : cryptoAmount} {ticker}
@@ -735,28 +623,82 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 </div>
               </div>
 
-              {pollingStatus && !paymentDetected && (
-                <p className="text-[10px] text-amber-400 text-center animate-pulse mb-2">{pollingStatus}</p>
+              {(!buyerNameFinal || !buyerEmailFinal) && (
+                <div className="space-y-2 mb-3">
+                  {!buyerNameFinal && (
+                    <input
+                      type="text"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      placeholder={isAr ? 'اسمك الكامل' : 'Your full name'}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+                    />
+                  )}
+                  {!buyerEmailFinal && (
+                    <input
+                      type="email"
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                      placeholder={isAr ? 'بريدك الإلكتروني' : 'Your email'}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+                    />
+                  )}
+                </div>
               )}
 
-              {verifyStatus && <p className="text-[10px] text-emerald-400 font-bold text-center mb-2">{verifyStatus}</p>}
+              {!paymentConfirmed && requestStatus === 'idle' && (
+                <>
+                  <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl px-3 py-2.5 mb-3">
+                    <p className="text-[11px] text-amber-300 text-center font-bold leading-relaxed">
+                      {isAr
+                        ? 'بعد إتمام التحويل، اضغط الزر أدناه لإرسال طلب تأكيد مرقّم. تتم المراجعة يدوياً خلال 1 إلى 24 ساعة.'
+                        : 'After sending the amount, press below to submit a numbered confirmation request. Review is manual and takes 1 to 24 hours.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={requestManualConfirmation}
+                    disabled={requestCreating || timerSeconds <= 0}
+                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg disabled:opacity-50 ${
+                      requestCreating
+                        ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400 cursor-wait'
+                        : 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
+                    }`}
+                  >
+                    {requestCreating
+                      ? (isAr ? '⏳ جاري إرسال الطلب...' : '⏳ Submitting request...')
+                      : (isAr ? '📨 أرسلت الدفع — اطلب تأكيد التحرير' : '📨 I have paid — request release')}
+                  </button>
+                </>
+              )}
 
-              {!paymentConfirmed ? (
-                <button
-                  onClick={verifyPaymentNow}
-                  disabled={verifying || timerSeconds <= 0}
-                  className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
-                    verifying
-                      ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400 cursor-wait'
-                      : 'bg-emerald-500 text-white hover:bg-emerald-400 cursor-pointer shadow-emerald-500/40'
-                  }`}
-                >
-                  {verifying
-                    ? (isAr ? '⏳ جاري التحقق من البلوكتشين...' : '⏳ Verifying on-chain...')
-                    : (isAr ? '✅ تأكدت من الدفع — تحقق الآن' : '✅ I confirm I paid — Verify now')
-                  }
-                </button>
-              ) : (
+              {requestStatus === 'pending' && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-center">
+                  <div className="text-2xl font-black text-[#F59E0B] mb-1">
+                    {isAr ? `طلبك رقم #${requestNo}` : `Request #${requestNo}`}
+                  </div>
+                  <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                    {isAr
+                      ? 'طلبك قيد المراجعة. سيتم التحقق من وصول المبلغ ومطابقة الاسم والتاريخ ثم يُفرَج التحميل. قد يستغرق ذلك من 1 إلى 24 ساعة.'
+                      : 'Your request is under review. Once the amount is verified and matched by name and date, the release happens automatically. This may take 1 to 24 hours.'}
+                  </p>
+                  <div className="flex items-center justify-center gap-2 mt-3">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    <span className="text-[10px] text-amber-300 font-bold uppercase tracking-widest">
+                      {isAr ? 'بانتظار إفراج المطور' : 'Awaiting developer release'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={refreshGrantStatus}
+                    disabled={grantChecking}
+                    className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white transition-all text-xs font-black disabled:opacity-50"
+                  >
+                    <RefreshCw size={13} className={grantChecking ? 'animate-spin' : ''} />
+                    {isAr ? 'تحديث الحالة' : 'Refresh status'}
+                  </button>
+                </div>
+              )}
+
+              {paymentConfirmed && (
                 <button
                   onClick={() => {
                     if (section === 'bot' && botPurchase) {
@@ -778,48 +720,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 </button>
               )}
 
-              {!paymentConfirmed && (selectedCoinId === 'btc' || selectedCoinId === 'ltc' || selectedCoinId === 'eth') && (
-                <div className="mt-3 bg-black/30 border border-white/10 rounded-2xl p-3">
-                  <p className="text-[10px] text-slate-400 text-center mb-2">
-                    {isAr ? 'أو الصق رقم المعاملة (TXID) من محفظتك للإثبات الفوري:' : 'Or paste the transaction hash (TXID) from your wallet for instant proof:'}
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={txid}
-                      onChange={(e) => setTxid(e.target.value)}
-                      placeholder="TXID…"
-                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white outline-none focus:border-emerald-500"
-                    />
-                    <button
-                      onClick={verifyByTxid}
-                      disabled={txVerifying || !txid.trim()}
-                      className="px-4 py-2 rounded-xl bg-blue-500/15 border border-blue-500/40 text-blue-300 hover:bg-blue-500/25 transition-all text-xs font-black disabled:opacity-40"
-                    >
-                      {txVerifying ? '…' : (isAr ? 'تحقق' : 'Verify')}
-                    </button>
-                  </div>
-                  {txStatus && <p className="text-[10px] text-sky-300 text-center mt-2">{txStatus}</p>}
-                </div>
-              )}
-
-              {!paymentConfirmed && (
-                <button
-                  onClick={adminOverrideGrant}
-                  className="w-full text-center text-[10px] text-slate-600 hover:text-slate-400 underline mt-3"
-                >
-                  {isAr ? 'تجاوز الأدمن (منح يدوي)' : 'Admin override (manual grant)'}
-                </button>
-              )}
-
-              {paymentDetected && (
-                <p className="text-[10px] text-emerald-400 text-center font-bold mt-2">
-                  {isAr
-                    ? (section === 'bot' && botPurchase ? '✅ تم اكتشاف وصول المبلغ! اضغط "تحميل البوت الآن" لتحميل ملف البوت تلقائياً.' : '✅ تم اكتشاف وصول المبلغ! اضغط "Activate Plan" لتفعيل خطتك.')
-                    : (section === 'bot' && botPurchase ? '✅ Payment received! Press "Download Bot Now" to auto-download the bot file.' : '✅ Payment received! Press "Activate Plan" to activate your plan.')}
-                </p>
-              )}
-              {timerSeconds <= 0 && !paymentDetected && (
+              {timerSeconds <= 0 && requestStatus === 'idle' && !paymentConfirmed && (
                 <div className="text-center mt-2">
                   <p className="text-[10px] text-red-400 mb-2">{isAr ? 'انتهت المهلة. يمكنك إعادة المحاولة.' : 'Time expired. You can try again.'}</p>
                   <button
@@ -980,31 +881,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           </div>
         </div>
 
-        <div className="mt-4 bg-white/5 border border-white/10 rounded-2xl p-4">
-          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">{isAr ? 'رمز تجاوز الأدمن' : 'Admin Override PIN'}</h5>
-          <p className="text-[10px] text-slate-500 mb-3">{isAr ? 'يُستخدم للمنح اليدوي للتحميل عند فشل التحقق التلقائي. يُحفظ في هذا المتصفح فقط.' : 'Used for manual download grants when auto-verification fails. Stored in this browser only.'}</p>
-          <div className="flex items-center gap-3">
-            <input
-              type="password"
-              value={adminPinInput}
-              onChange={(e) => setAdminPinInput(e.target.value)}
-              placeholder="PIN"
-              className="w-32 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-emerald-500"
-            />
-            <button
-              onClick={() => {
-                localStorage.setItem(ADMIN_PIN_KEY, adminPinInput);
-                setAdminPinInput('');
-              }}
-              disabled={!adminPinInput}
-              className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black disabled:opacity-40"
-            >
-              {isAr ? 'حفظ الرمز' : 'Save PIN'}
-            </button>
-            {(localStorage.getItem(ADMIN_PIN_KEY) || '') && (
-              <span className="text-[10px] text-emerald-400">✓ {isAr ? 'محفوظ' : 'saved'}</span>
-            )}
-          </div>
+        <div className="mt-4">
+          <PaymentRequestsSection lang={isAr ? 'ar' : 'en'} />
         </div>
 
               </>)}
