@@ -1407,7 +1407,11 @@ const FS_KEY = process.env.FIRESTORE_KEY || 'AIzaSyCvMayEuNTlQ5CWbjrrqw3aft_H044
 const MAIL_LOOKBACK_MS = 48 * 60 * 60 * 1000;   // only consider recent emails
 const REQUEST_WINDOW_BEFORE_MS = 12 * 60 * 60 * 1000;
 const REQUEST_WINDOW_AFTER_MS = 48 * 60 * 60 * 1000;
-const AMOUNT_TOLERANCE = 0.05;                   // dollars
+const AMOUNT_TOLERANCE = 0.2;                   // dollars — accepts ±$0.20 (volatility buffer)
+const COIN_RATES_CACHE_MS = 60 * 1000;          // cache prices 1 minute
+
+interface CoinRate { symbol: string; price: number; at: number; }
+let coinRatesCache: CoinRate[] | null = null;
 
 type Json = Record<string, any>;
 
@@ -1484,18 +1488,43 @@ async function fsAdd(collectionName: string, data: Json): Promise<void> {
   if (!resp.ok) throw new Error(`Firestore add ${collectionName} failed: ${resp.status}`);
 }
 
-function extractAmounts(text: string): number[] {
-  const found = new Set<number>();
-  const push = (raw: string) => {
+function extractAmounts(text: string): { amount: number; coin: string }[] {
+  const found = new Map<string, number>();
+  const push = (raw: string, coin: string) => {
     const n = Number(String(raw).replace(',', '.'));
-    if (isFinite(n) && n > 0) found.add(Math.round(n * 100) / 100);
+    if (isFinite(n) && n > 0) found.set(`${coin}:${Math.round(n * 100) / 100}`, Math.round(n * 100) / 100);
   };
-  const contextual = /(?:amount|received|deposited|deposit|total|credit|المبلغ|استلام|تم استلام|وصل)[^0-9]{0,40}([0-9][0-9.,]*)/gi;
+  const coinSymbols = 'USDT|USDC|BUSD|TUSD|FDUSD|DAI|LTC|TRX|SOL';
+  const contextual = /(?:amount|received|deposited|deposit|total|credit|المبلغ|استلام|تم استلام|وصل)[^0-9]{0,40}([0-9][0-9.,]*(?:\.\d+)?)\s*(USDT|USDC|BUSD|TUSD|FDUSD|DAI|LTC|TRX|SOL)?/gi;
   let m: RegExpExecArray | null;
-  while ((m = contextual.exec(text))) push(m[1]);
-  const withCoin = /([0-9][0-9.,]*)\s*(?:USDT|USDC|BUSD|TUSD|FDUSD|USD|DAI|\$)/gi;
-  while ((m = withCoin.exec(text))) push(m[1]);
-  return [...found];
+  while ((m = contextual.exec(text))) push(m[1], (m[2] || 'USDT').toUpperCase());
+  const withCoin = /([0-9][0-9.,]*(?:\.\d+)?)\s*(USDT|USDC|BUSD|TUSD|FDUSD|DAI|LTC|TRX|SOL)/gi;
+  while ((m = withCoin.exec(text))) push(m[1], m[2].toUpperCase());
+  const withCoinBefore = /(USDT|USDC|BUSD|TUSD|FDUSD|DAI|LTC|TRX|SOL)\s*([0-9][0-9.,]*(?:\.\d+)?)/gi;
+  while ((m = withCoinBefore.exec(text))) push(m[2], m[1].toUpperCase());
+  const withGenericUsd = /([0-9][0-9.,]*(?:\.\d+)?)\s*\$|\$([0-9][0-9.,]*(?:\.\d+)?)/gi;
+  while ((m = withGenericUsd.exec(text))) push(m[1] || m[2], 'USDT');
+  return [...found.keys()].map((k) => ({ amount: found.get(k)!, coin: k.split(':')[0] }));
+}
+
+// Fetch current USD price for a coin symbol via Binance (USDT stays 1:1).
+async function fetchCoinPrice(symbol: string): Promise<number> {
+  if (symbol === 'USDT' || symbol === 'USDC' || symbol === 'BUSD' || symbol === 'TUSD' || symbol === 'FDUSD' || symbol === 'DAI') return 1;
+  const cacheFind = coinRatesCache?.find((c) => c.symbol === symbol);
+  if (cacheFind && Date.now() - cacheFind.at < COIN_RATES_CACHE_MS) return cacheFind.price;
+  try {
+    const resp = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}USDT`);
+    const data: any = await resp.json();
+    const price = Number(data?.price);
+    if (isFinite(price) && price > 0) {
+      if (!coinRatesCache) coinRatesCache = [];
+      const idx = coinRatesCache.findIndex((c) => c.symbol === symbol);
+      const entry = { symbol, price, at: Date.now() };
+      if (idx >= 0) coinRatesCache[idx] = entry; else coinRatesCache.push(entry);
+      return price;
+    }
+  } catch {}
+  return 0;
 }
 
 async function releasePaymentRequest(req: Json, now: number, source: string): Promise<void> {
@@ -1589,32 +1618,53 @@ async function checkBinanceMail(): Promise<Json> {
         const amounts = extractAmounts(emailText);
         if (!amounts.length) continue;
 
-        const candidates = pending.filter((r) => {
-          const amountMatch = amounts.some((a) => Math.abs(a - r.amountUsd) <= AMOUNT_TOLERANCE);
-          if (!amountMatch) return false;
-          const created = Number(r.createdAt) || 0;
-          return created >= emailDate - REQUEST_WINDOW_BEFORE_MS && created <= emailDate + REQUEST_WINDOW_AFTER_MS;
-        });
+        // Match each detected (amount, coin) against pending requests.
+        // Convert both the received amount and the expected coin amount to USD
+        // using the SAME current price — the price cancels out, so this is
+        // exactly |receivedCoin - expectedCoin| × price ≤ AMOUNT_TOLERANCE,
+        // making exact coin payments immune to volatility.
+        let matched = false;
+        for (const entry of amounts) {
+          if (matched) break;
+          const price = await fetchCoinPrice(entry.coin);
+          if (!(price > 0)) continue;
 
-        if (candidates.length === 1) {
-          const req = candidates[0];
-          const now = Date.now();
-          try {
-            await releasePaymentRequest(req, now, 'auto-binance');
-            req.status = 'approved';
-            summary.approved.push({ requestNo: req.requestNo, buyer: req.buyerEmail, amount: req.amountUsd });
-            newlyProcessed.push(messageId);
-          } catch (e: any) {
-            summary.errors.push(`release #${req.requestNo}: ${e.message}`);
-          }
-        } else if (candidates.length > 1) {
-          summary.ambiguous.push({
-            messageId,
-            amounts,
-            requestNos: candidates.map((c) => c.requestNo),
+          const candidates = pending.filter((r) => {
+            const reqCoin = String(r.coinId || 'usdt').toLowerCase();
+            const entryCoin = entry.coin.toLowerCase();
+            if (entryCoin !== reqCoin) return false;
+            const expectedCoin = Number(r.coinAmountExpected) > 0
+              ? Number(r.coinAmountExpected)
+              : r.amountUsd;
+            const diffUsd = Math.abs(entry.amount - expectedCoin) * price;
+            if (diffUsd > AMOUNT_TOLERANCE) return false;
+            const created = Number(r.createdAt) || 0;
+            return created >= emailDate - REQUEST_WINDOW_BEFORE_MS && created <= emailDate + REQUEST_WINDOW_AFTER_MS;
           });
+
+          if (candidates.length === 1) {
+            const req = candidates[0];
+            const now = Date.now();
+            try {
+              await releasePaymentRequest(req, now, 'auto-binance');
+              req.status = 'approved';
+              summary.approved.push({ requestNo: req.requestNo, buyer: req.buyerEmail, amount: req.amountUsd, coin: entry.coin });
+              newlyProcessed.push(messageId);
+              matched = true;
+            } catch (e: any) {
+              summary.errors.push(`release #${req.requestNo}: ${e.message}`);
+              break;
+            }
+          } else if (candidates.length > 1) {
+            summary.ambiguous.push({
+              messageId,
+              coin: entry.coin,
+              amounts,
+              requestNos: candidates.map((c) => c.requestNo),
+            });
+          }
         }
-        // no candidates: leave unprocessed so a later-created request can still match
+        // if matched (or no candidates): possibly leave unprocessed so a later-created request can still match
       }
     } finally {
       lock.release();

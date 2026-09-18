@@ -31,6 +31,7 @@ export interface PaymentRequest {
   coinId?: string;
   coinName?: string;
   address?: string;
+  coinAmountExpected?: number;
   buyerName: string;
   buyerEmail: string;
   method: ConfirmMethod;

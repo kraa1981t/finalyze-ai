@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Wallet, Copy } from 'lucide-react';
 import { StoreBot, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
 import PaymentRequestsSection from './PaymentRequestsSection';
-import { loadPaymentSettings, savePaymentSettings, UsdtNetworkAddress, USDT_NETWORKS } from '../services/paymentSettings';
+import { loadPaymentSettings, savePaymentSettings, PaymentAddress, PAYMENT_METHODS } from '../services/paymentSettings';
 
 interface StoreSettingsPageProps {
   lang: 'ar' | 'en';
@@ -27,10 +27,10 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
   const [adding, setAdding] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [editingBot, setEditingBot] = useState<StoreBot | null>(null);
-  const [usdtAddresses, setUsdtAddresses] = useState<UsdtNetworkAddress[]>([]);
-  const [editingNetwork, setEditingNetwork] = useState<string | null>(null);
+  const [addresses, setAddresses] = useState<PaymentAddress[]>([]);
+  const [editingMethod, setEditingMethod] = useState<string | null>(null);
   const [editingAddress, setEditingAddress] = useState('');
-  const [copiedNetwork, setCopiedNetwork] = useState<string | null>(null);
+  const [copiedMethod, setCopiedMethod] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,8 +42,8 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
 
   useEffect(() => {
     loadPaymentSettings().then(data => {
-      if (data?.usdtAddresses && data.usdtAddresses.length) {
-        setUsdtAddresses(data.usdtAddresses);
+      if (data?.addresses && data.addresses.length) {
+        setAddresses(data.addresses);
       }
     });
   }, []);
@@ -155,30 +155,30 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
     } catch {}
   };
 
-  const handleSaveUsdtAddress = async (network: string) => {
-    const updated = usdtAddresses.map(a =>
-      a.network === network ? { ...a, address: editingAddress } : a
-    );
-    if (!updated.find(a => a.network === network)) {
-      updated.push({ network, networkLabel: USDT_NETWORKS.find(n => n.network === network)?.networkLabel || network, address: editingAddress });
+  const handleSaveAddress = async (method: string) => {
+    const def = PAYMENT_METHODS.find(m => m.method === method);
+    if (!def) return;
+    const updated = addresses.map(a => a.method === method ? { ...a, address: editingAddress } : a);
+    if (!updated.find(a => a.method === method)) {
+      updated.push({ method, label: def.label, symbol: def.symbol, stable: def.stable, address: editingAddress });
     }
-    setUsdtAddresses(updated);
-    await savePaymentSettings({ usdtAddresses: updated });
-    setEditingNetwork(null);
+    setAddresses(updated);
+    await savePaymentSettings({ addresses: updated });
+    setEditingMethod(null);
     setEditingAddress('');
   };
 
-  const handleDeleteUsdtAddress = async (network: string) => {
-    const updated = usdtAddresses.filter(a => a.network !== network);
-    setUsdtAddresses(updated);
-    await savePaymentSettings({ usdtAddresses: updated });
+  const handleDeleteAddress = async (method: string) => {
+    const updated = addresses.filter(a => a.method !== method);
+    setAddresses(updated);
+    await savePaymentSettings({ addresses: updated });
   };
 
-  const copyAddress = async (addr: string, network: string) => {
+  const copyAddress = async (addr: string, method: string) => {
     try {
       await navigator.clipboard.writeText(addr);
-      setCopiedNetwork(network);
-      setTimeout(() => setCopiedNetwork(null), 2000);
+      setCopiedMethod(method);
+      setTimeout(() => setCopiedMethod(null), 2000);
     } catch {}
   };
 
@@ -201,7 +201,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         <PaymentRequestsSection lang={isAr ? 'ar' : 'en'} />
       </div>
 
-      {/* USDT Wallet Addresses */}
+      {/* Payment Addresses */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -209,44 +209,63 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
       >
         <h3 className="text-2xl font-black uppercase text-emerald-400 tracking-widest mb-4 flex items-center gap-3">
           <Wallet size={24} />
-          {isAr ? 'عناوين USDT للدفع' : 'USDT Payment Addresses'}
+          {isAr ? 'عناوين الدفع' : 'Payment Addresses'}
         </h3>
         <p className="text-sm text-slate-400 mb-4">
-          {isAr ? 'أضف عنوان USDT لكل شبكة. يختار العميل الشبكة المناسبة عند الدفع.' : 'Add a USDT address for each network. Customer chooses the network when paying.'}
+          {isAr
+            ? 'أضف عنواناً لكل وسيلة دفع. USDT شبكاتها ثابتة (1 = $1). LTC / TRX / SOL عملات متحركة السعر ويُقارن مبلغها المحوّل مع التسامح.'
+            : 'Add a wallet address for each method. USDT networks are fixed (1 = $1). LTC / TRX / SOL are volatile — their converted amount is matched with tolerance.'}
         </p>
 
         <div className="space-y-3">
-          {USDT_NETWORKS.map(net => {
-            const saved = usdtAddresses.find(a => a.network === net.network);
-            const isEditing = editingNetwork === net.network;
+          {PAYMENT_METHODS.map(def => {
+            const saved = addresses.find(a => a.method === def.method);
+            const isEditing = editingMethod === def.method;
 
             return (
-              <div key={net.network} className="bg-black/20 border border-white/10 rounded-xl p-4">
+              <div key={def.method} className="bg-black/20 border border-white/10 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-black text-white">{net.networkLabel}</span>
                   <div className="flex items-center gap-2">
-                    {saved && !isEditing && (
-                      <>
+                    <span className="text-sm font-black text-white">{def.label}</span>
+                    {!def.stable && (
+                      <span className="text-[10px] font-black uppercase bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-full px-2 py-0.5">
+                        {isAr ? 'سعر متحرك' : 'Volatile'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!isEditing && (
+                      saved ? (
+                        <>
+                          <button
+                            onClick={() => copyAddress(saved.address, def.method)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
+                          >
+                            <Copy size={12} />
+                            {copiedMethod === def.method ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ' : 'Copy')}
+                          </button>
+                          <button
+                            onClick={() => { setEditingMethod(def.method); setEditingAddress(saved.address); }}
+                            className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAddress(def.method)}
+                            className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      ) : (
                         <button
-                          onClick={() => copyAddress(saved.address, net.network)}
+                          onClick={() => { setEditingMethod(def.method); setEditingAddress(''); }}
                           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
                         >
-                          <Copy size={12} />
-                          {copiedNetwork === net.network ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ' : 'Copy')}
+                          <Plus size={12} />
+                          {isAr ? 'إضافة عنوان' : 'Add Address'}
                         </button>
-                        <button
-                          onClick={() => { setEditingNetwork(net.network); setEditingAddress(saved.address); }}
-                          className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUsdtAddress(net.network)}
-                          className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </>
+                      )
                     )}
                   </div>
                 </div>
@@ -257,18 +276,18 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                       type="text"
                       value={editingAddress}
                       onChange={(e) => setEditingAddress(e.target.value)}
-                      placeholder={isAr ? 'أدخل عنوان USDT' : 'Enter USDT address'}
+                      placeholder={isAr ? 'أدخل عنوان المحفظة' : 'Enter wallet address'}
                       className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-white outline-none focus:border-emerald-500"
                     />
                     <button
-                      onClick={() => handleSaveUsdtAddress(net.network)}
+                      onClick={() => handleSaveAddress(def.method)}
                       disabled={!editingAddress.trim()}
                       className="px-4 py-2 rounded-lg bg-emerald-500 text-white font-black text-xs uppercase hover:bg-emerald-400 transition-all disabled:opacity-50"
                     >
                       <Check size={14} />
                     </button>
                     <button
-                      onClick={() => { setEditingNetwork(null); setEditingAddress(''); }}
+                      onClick={() => { setEditingMethod(null); setEditingAddress(''); }}
                       className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 font-black text-xs uppercase hover:bg-white/10 transition-all"
                     >
                       <X size={14} />

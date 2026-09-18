@@ -4,7 +4,8 @@ import { X, Copy, Check, ArrowLeft, ShieldOff, Shield, RefreshCw, Wallet } from 
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { StoreBot, downloadBot, recordBotPurchase, getDownloadGrant, grantBotDownload, consumeBotDownload, hasDownloadedBot } from '../services/storeService';
-import { loadPaymentSettings, ConfirmMode, DEFAULT_CONFIRM_MODE, DEFAULT_BINANCE_EMAIL, UsdtNetworkAddress } from '../services/paymentSettings';
+import { loadPaymentSettings, ConfirmMode, DEFAULT_CONFIRM_MODE, DEFAULT_BINANCE_EMAIL, PaymentAddress, SYMBOL_TO_PRICE_KEY } from '../services/paymentSettings';
+import { fetchCryptoPricesDirect } from '../services/apiDirect';
 import { createPaymentRequest, checkUserGrant, consumeBotGrant } from '../services/paymentRequests';
 import PaymentRequestsSection from './PaymentRequestsSection';
 
@@ -36,10 +37,11 @@ interface PaymentModalProps {
 export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle, botPurchase, sectionTab = 'bot', onBotPaid, onGoToStore, onGoToPlans, buyerEmail, buyerName, planDurationDays }: PaymentModalProps) {
   const isAr = lang === 'ar';
   const [section, setSection] = useState<'bot' | 'plan'>(sectionTab || 'bot');
-  const [usdtAddresses, setUsdtAddresses] = useState<UsdtNetworkAddress[]>([]);
+  const [usdtAddresses, setUsdtAddresses] = useState<PaymentAddress[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [copiedNetwork, setCopiedNetwork] = useState<string | null>(null);
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
+  const [prices, setPrices] = useState<Record<string, { usd: number }>>({});
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [timerMinutes, setTimerMinutes] = useState(() => {
     const saved = localStorage.getItem(TIMER_STORAGE_KEY);
@@ -102,13 +104,20 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     const sync = async () => {
       const data = await loadPaymentSettings();
       if (cancelled || !data) return;
-      if (data.usdtAddresses && data.usdtAddresses.length) {
-        setUsdtAddresses(data.usdtAddresses);
+      if (data.addresses && data.addresses.length) {
+        setUsdtAddresses(data.addresses);
       }
       if (data.confirmMode) setConfirmMode(data.confirmMode);
     };
     sync();
     return () => { cancelled = true; };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetchCryptoPricesDirect()
+      .then((d: any) => { if (d) setPrices(d); })
+      .catch(() => {});
   }, [isOpen]);
 
   useEffect(() => {
@@ -133,6 +142,31 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const buyerNameFinal = (buyerName || contactName).trim();
   const buyerEmailFinal = (buyerEmail || contactEmail).trim().toLowerCase();
 
+  // Coin amount the customer must send. Stable USDT = exactly $amount (1:1).
+  // Volatile coins = USD amount converted at the current market price.
+  const expectedCoinAmount = (item: PaymentAddress): number => {
+    if (item.stable) return amount;
+    const priceKey = SYMBOL_TO_PRICE_KEY[item.symbol] || 'tether';
+    const price = prices[priceKey]?.usd;
+    if (!price || price <= 0) return 0;
+    return amount / price;
+  };
+
+  const coinAmountText = (item: PaymentAddress): string => {
+    const n = expectedCoinAmount(item);
+    if (n <= 0) return '...';
+    const decimals = item.symbol === 'TRX' ? 2 : item.symbol === 'SOL' ? 4 : item.symbol === 'LTC' ? 6 : 2;
+    return n.toFixed(decimals);
+  };
+
+  const coinPriceText = (item: PaymentAddress): string => {
+    if (item.stable) return '1 USDT = $1.00';
+    const priceKey = SYMBOL_TO_PRICE_KEY[item.symbol] || 'tether';
+    const price = prices[priceKey]?.usd;
+    if (!price) return '';
+    return `1 ${item.symbol} = $${price < 1 ? price.toFixed(4) : price.toFixed(2)}`;
+  };
+
   const requestManualConfirmation = async () => {
     if (!selectedNetwork) return;
     if (!buyerNameFinal) {
@@ -143,11 +177,14 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setError(isAr ? 'أدخل بريدك الإلكتروني أولاً' : 'Enter your email first');
       return;
     }
-    const item = usdtAddresses.find(a => a.network === selectedNetwork);
+    const item = usdtAddresses.find(a => a.method === selectedNetwork);
     if (!item) return;
     setError(null);
     setRequestCreating(true);
     try {
+      const priceKey = SYMBOL_TO_PRICE_KEY[item.symbol] || 'tether';
+      const price = item.stable ? 1 : (prices[priceKey]?.usd || 0);
+      const expectedCoin = item.stable ? amount : (price > 0 ? amount / price : 0);
       const req = await createPaymentRequest({
         kind: isBotProduct ? 'bot' : 'plan',
         botId: botPurchase?.id,
@@ -155,9 +192,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         planLabel: isBotProduct ? undefined : productLabel,
         durationDays: isBotProduct ? undefined : (planDurationDays || 30),
         amountUsd: amount,
-        coinId: 'usdt',
-        coinName: `USDT (${item.networkLabel})`,
+        coinId: item.symbol.toLowerCase(),
+        coinName: item.label,
         address: item.address,
+        coinAmountExpected: expectedCoin,
         buyerName: buyerNameFinal,
         buyerEmail: buyerEmailFinal,
         method: confirmMode,
@@ -320,7 +358,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       {!manageMode && showAddresses && !selectedNetwork && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6">
           <p className="text-sm text-amber-400 font-bold text-center">
-            {isAr ? 'اختر شبكة USDT للدفع. انسخ العنوان والمبلغ وأرسل المبلغ.' : 'Choose a USDT network to pay. Copy the address and amount, then send.'}
+            {isAr ? 'اختر وسيلة الدفع. انسخ العنوان والمبلغ المحدد وأرسل المبلغ. يبدأ العداد فور النسخ.' : 'Choose a payment method. Copy the address and the exact amount, then send. The timer starts once copied.'}
           </p>
         </div>
       )}
@@ -349,49 +387,55 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         {usdtAddresses.length === 0 && (
           <div className="text-center py-8">
             <Wallet size={32} className="mx-auto mb-3 text-slate-500" />
-            <p className="text-sm text-slate-400">{isAr ? 'لم يتم إعداد عناوين USDT بعد. اتصل بالمطور.' : 'No USDT addresses configured yet.'}</p>
+            <p className="text-sm text-slate-400">{isAr ? 'لم يتم إعداد عناوين الدفع بعد. اتصل بالمطور.' : 'No payment addresses configured yet.'}</p>
           </div>
         )}
 
-        {usdtAddresses.map((item) => (
-          <div key={item.network} className={`bg-white/5 border rounded-2xl p-4 transition-all hover:border-white/20 ${selectedNetwork === item.network ? 'border-emerald-500/70 ring-2 ring-emerald-500/40' : 'border-white/10'}`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-black text-xs shadow-lg">USDT</div>
-                <div>
-                  <span className="text-sm font-black text-white">USDT ({item.networkLabel})</span>
-                  <span className="text-[10px] text-slate-400 block">1 USDT = $1.00</span>
+        {usdtAddresses.map((item) => {
+          const amt = coinAmountText(item);
+          return (
+            <div key={item.method} className={`bg-white/5 border rounded-2xl p-4 transition-all hover:border-white/20 ${selectedNetwork === item.method ? 'border-emerald-500/70 ring-2 ring-emerald-500/40' : 'border-white/10'}`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xs shadow-lg ${item.stable ? 'bg-gradient-to-br from-emerald-500 to-green-600' : 'bg-gradient-to-br from-amber-500 to-orange-600'}`}>
+                    {item.symbol}
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-white">{item.label}</span>
+                    <span className="text-[10px] text-slate-400 block">{coinPriceText(item)}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => copyAddress(item.address, item.method)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
+                >
+                  {copiedNetwork === item.method ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedNetwork === item.method ? (isAr ? 'تم النسخ' : 'Copied!') : (isAr ? 'نسخ العنوان' : 'Copy')}
+                </button>
+              </div>
+              <div className="bg-black/40 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <code className="text-xs font-mono text-slate-300 break-all select-all">{item.address}</code>
+                  <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                    <span className="text-[10px] font-bold text-emerald-400">{amt} {item.symbol}</span>
+                    <button
+                      onClick={() => copyAmount(`${amt} ${item.symbol}`, 'amt_' + item.method)}
+                      className="p-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
+                    >
+                      {copiedAmountId === 'amt_' + item.method ? <Check size={10} /> : <Copy size={10} />}
+                    </button>
+                  </div>
                 </div>
               </div>
-              <button
-                onClick={() => copyAddress(item.address, item.network)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
-              >
-                {copiedNetwork === item.network ? <Check size={14} /> : <Copy size={14} />}
-                {copiedNetwork === item.network ? (isAr ? 'تم النسخ' : 'Copied!') : (isAr ? 'نسخ العنوان' : 'Copy')}
-              </button>
             </div>
-            <div className="bg-black/40 rounded-xl px-4 py-3">
-              <div className="flex items-center justify-between">
-                <code className="text-xs font-mono text-slate-300 break-all select-all">{item.address}</code>
-                <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                  <span className="text-[10px] font-bold text-emerald-400">{amount} USDT</span>
-                  <button
-                    onClick={() => copyAmount(`${amount} USDT`, 'amt_' + item.network)}
-                    className="p-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
-                  >
-                    {copiedAmountId === 'amt_' + item.network ? <Check size={10} /> : <Copy size={10} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
         </div>
 
         {!manageMode && selectedNetwork && (() => {
-          const item = usdtAddresses.find(a => a.network === selectedNetwork);
-          if (!item) return null;
+          const overlayItem = usdtAddresses.find(a => a.method === selectedNetwork);
+          if (!overlayItem) return null;
+          const overlayAmt = coinAmountText(overlayItem);
           return (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -406,10 +450,12 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               </button>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-black text-xs shadow-lg">USDT</div>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xs shadow-lg ${overlayItem.stable ? 'bg-gradient-to-br from-emerald-500 to-green-600' : 'bg-gradient-to-br from-amber-500 to-orange-600'}`}>
+                    {overlayItem.symbol}
+                  </div>
                   <div>
-                    <span className="text-sm font-black text-white">USDT ({item.networkLabel})</span>
-                    <span className="text-[10px] text-slate-400 block">{item.address.slice(0, 16)}...</span>
+                    <span className="text-sm font-black text-white">{overlayItem.label}</span>
+                    <span className="text-[10px] text-slate-400 block">{overlayItem.address.slice(0, 16)}...</span>
                   </div>
                 </div>
                 <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">{isBotSection ? botPurchase!.name : currentLabel}</span>
@@ -422,10 +468,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               )}
 
               <div className="bg-black/40 rounded-2xl px-5 py-4 text-center border border-emerald-500/20 mb-4">
-                <div className="text-3xl font-black text-white font-mono">{amount} USDT</div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">≈ ${amount} USD</p>
+                <div className="text-3xl font-black text-white font-mono">{overlayAmt} {overlayItem.symbol}</div>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">≈ ${amount} USD · {coinPriceText(overlayItem)}</p>
                 <button
-                  onClick={() => copyAmount(`${amount} USDT`, 'confirm_amt')}
+                  onClick={() => copyAmount(`${overlayAmt} ${overlayItem.symbol}`, 'confirm_amt')}
                   className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
                 >
                   {copiedAmountId === 'confirm_amt' ? <Check size={14} /> : <Copy size={14} />}
