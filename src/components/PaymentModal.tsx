@@ -526,8 +526,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   </div>
                   <p className="text-[11px] text-amber-200/80 leading-relaxed">
                     {isAr
-                      ? 'طلبك قيد المراجعة. سيتم التحقق من وصول المبلغ ثم يُفرَج التحميل تلقائياً.'
-                      : 'Your request is under review. Once the amount is verified, release happens automatically.'}
+                      ? 'ملاحظة: قد تستغرق عملية التحقق بعض الوقت. يرجى الانتظار حتى يكتمل التحقق ليتم إفراج ملفات التحميل تلقائياً.'
+                      : 'Note: verification may take some time. Please wait until verification completes for your downloads to be released automatically.'}
                   </p>
                   <div className="flex items-center justify-center gap-2 mt-3">
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
