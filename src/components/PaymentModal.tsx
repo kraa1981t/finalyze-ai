@@ -7,6 +7,7 @@ import { StoreBot, downloadBot, recordBotPurchase, getDownloadGrant, grantBotDow
 import { loadPaymentSettings, ConfirmMode, DEFAULT_CONFIRM_MODE, DEFAULT_BINANCE_EMAIL, PaymentAddress, SYMBOL_TO_PRICE_KEY } from '../services/paymentSettings';
 import { fetchCryptoPricesDirect } from '../services/apiDirect';
 import { createPaymentRequest, checkUserGrant, consumeBotGrant } from '../services/paymentRequests';
+import { createSession, updateSession, completeSession, cancelSession, getCachedSession, getRemoteSession, readLocalSessions, genSessionId, PaymentSession } from '../services/paymentSession';
 import PaymentRequestsSection from './PaymentRequestsSection';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
@@ -32,9 +33,10 @@ interface PaymentModalProps {
   buyerEmail?: string;
   buyerName?: string;
   planDurationDays?: number;
+  resumeSessionId?: string | null;
 }
 
-export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle, botPurchase, sectionTab = 'bot', onBotPaid, onGoToStore, onGoToPlans, buyerEmail, buyerName, planDurationDays }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle, botPurchase, sectionTab = 'bot', onBotPaid, onGoToStore, onGoToPlans, buyerEmail, buyerName, planDurationDays, resumeSessionId }: PaymentModalProps) {
   const isAr = lang === 'ar';
   const [section, setSection] = useState<'bot' | 'plan'>(sectionTab || 'bot');
   const [usdtAddresses, setUsdtAddresses] = useState<PaymentAddress[]>([]);
@@ -49,6 +51,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   });
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [editTimer, setEditTimer] = useState(timerMinutes);
   const [requestNo, setRequestNo] = useState<number | null>(null);
   const [requestStatus, setRequestStatus] = useState<'idle' | 'pending' | 'approved' | 'rejected'>('idle');
@@ -118,6 +121,33 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       .catch(() => {});
   }, [isOpen]);
 
+  // Resume a previously interrupted transaction. Restores the payment method,
+  // address, email and the remaining wait time; keeps the request alive so the
+  // auto-verifier can still match a deposit email that arrived meanwhile.
+  useEffect(() => {
+    if (!isOpen || !resumeSessionId) return;
+    let cancelled = false;
+    (async () => {
+      const local = getCachedSession(resumeSessionId);
+      const session = local || (await getRemoteSession(resumeSessionId));
+      if (cancelled || !session || (session.status !== 'active' && session.status !== 'pending')) return;
+      setSessionId(session.id);
+      setContactEmail((session.buyerEmail || buyerEmail || '').trim());
+      if (session.method) {
+        setSelectedNetwork(session.method);
+        setTimerRunning(true);
+        const remaining = Math.max(0, Math.floor((session.activeUntil - Date.now()) / 1000));
+        setTimerSeconds(remaining);
+        if (remaining <= 0) setTimerRunning(false);
+      }
+      if (session.requestNo) {
+        setRequestNo(session.requestNo);
+        setRequestStatus('pending');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, resumeSessionId]);
+
   useEffect(() => {
     if (!timerRunning || timerSeconds <= 0) return;
     const interval = setInterval(() => {
@@ -130,6 +160,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setPaymentConfirmed(true);
     setRequestStatus('approved');
     setTimerRunning(false);
+    if (sessionId) { completeSession(sessionId); setSessionId(null); }
     if (!botPurchase?.id) { onConfirm?.(); return; }
     grantBotDownload(botPurchase.id);
     setBotGrantTs(getDownloadGrant(botPurchase.id));
@@ -196,6 +227,32 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setRequestNo(req.requestNo);
       setRequestStatus('pending');
       setTimerRunning(false);
+      if (sessionId) {
+        updateSession(sessionId, { requestNo: req.requestNo, status: 'pending' });
+      } else {
+        const method = usdtAddresses.find(a => a.method === selectedNetwork);
+        if (method) {
+          createSession({
+            kind: isBotProduct ? 'bot' : 'plan',
+            botId: isBotProduct ? botPurchase?.id : undefined,
+            botName: isBotProduct ? botPurchase?.name : undefined,
+            planLabel: isBotProduct ? undefined : planLabel,
+            durationDays: isBotProduct ? undefined : (planDurationDays || 30),
+            amountUsd: amount,
+            method: method.method,
+            symbol: method.symbol,
+            label: method.label,
+            address: method.address,
+            coinId: method.symbol.toLowerCase(),
+            coinName: method.label,
+            coinAmountExpected: method.stable ? amount : (expectedCoinAmount(method) || undefined),
+            buyerEmail: buyerEmailFinal || undefined,
+            requestNo: req.requestNo,
+            timerMinutes,
+            activeUntil: Date.now() + timerMinutes * 60 * 1000,
+          } as any).then((s) => setSessionId(s.id)).catch(() => {});
+        }
+      }
     } catch {
       setError(isAr ? 'تعذر إرسال طلب التأكيد. حاول مرة أخرى.' : 'Could not submit the confirmation request. Try again.');
     }
@@ -235,6 +292,60 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const startTimer = () => {
     setTimerSeconds(timerMinutes * 60);
     setTimerRunning(true);
+    persistSession();
+  };
+
+  // Save the in-progress transaction so it survives outages / crashes. Restart it
+  // on "continue" and cancel explicitly; otherwise it stays alive until settled.
+  const persistSession = () => {
+    if (manageMode) return;
+    const method = usdtAddresses.find(a => a.method === selectedNetwork);
+    if (!method) return;
+    const base: Partial<PaymentSession> = {
+      kind: isBotProduct ? 'bot' : 'plan',
+      botId: isBotProduct ? botPurchase?.id : undefined,
+      botName: isBotProduct ? botPurchase?.name : undefined,
+      planLabel: isBotProduct ? undefined : planLabel,
+      durationDays: isBotProduct ? undefined : (planDurationDays || 30),
+      amountUsd: amount,
+      method: method.method,
+      symbol: method.symbol,
+      label: method.label,
+      address: method.address,
+      coinId: method.symbol.toLowerCase(),
+      coinName: method.label,
+      coinAmountExpected: method.stable ? amount : (expectedCoinAmount(method) || undefined),
+      buyerEmail: buyerEmailFinal || undefined,
+      timerMinutes,
+      activeUntil: Date.now() + timerMinutes * 60 * 1000,
+    };
+    if (sessionId) {
+      updateSession(sessionId, base);
+    } else {
+      createSession(base as any).then((s) => setSessionId(s.id)).catch(() => {});
+    }
+  };
+
+  const renewSession = () => {
+    setTimerSeconds(timerMinutes * 60);
+    setTimerRunning(true);
+    persistSession();
+    // Revive: resubmit the numbered confirmation request (unless one already
+    // exists) so the email-archive verifier can search for an already-received
+    // payment. If none found, the request simply stays pending and the customer
+    // is asked to pay.
+    if (sessionId && requestStatus === 'idle' && buyerEmailFinal && selectedNetwork) {
+      const item = getCachedSession(sessionId);
+      if (item && !item.requestNo) requestManualConfirmation();
+    }
+  };
+
+  const cancelCurrentSession = () => {
+    if (sessionId) cancelSession(sessionId);
+    setSessionId(null);
+    setSelectedNetwork(null);
+    setTimerRunning(false);
+    setTimerSeconds(0);
   };
 
   const formatTime = (secs: number) => {
@@ -250,6 +361,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setSelectedNetwork(network);
       setError(null);
       if (!timerRunning) startTimer();
+      else persistSession();
       setTimeout(() => setCopiedNetwork(null), 2000);
     } catch {}
   };
@@ -487,7 +599,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                     type="email"
                     required
                     value={contactEmail}
-                    onChange={(e) => setContactEmail(e.target.value)}
+                    onChange={(e) => {
+                      setContactEmail(e.target.value);
+                      if (sessionId) updateSession(sessionId, { buyerEmail: e.target.value.trim().toLowerCase() });
+                    }}
                     placeholder={isAr ? 'بريدك الإلكتروني (إلزامي)' : 'Your email (required)'}
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
                   />
@@ -569,14 +684,22 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               )}
 
               {timerSeconds <= 0 && requestStatus === 'idle' && !paymentConfirmed && (
-                <div className="text-center mt-2">
-                  <p className="text-[10px] text-red-400 mb-2">{isAr ? 'انتهت المهلة. يمكنك إعادة المحاولة.' : 'Time expired. You can try again.'}</p>
-                  <button
-                    onClick={() => { setSelectedNetwork(null); setTimerRunning(false); }}
-                    className="text-xs text-slate-400 hover:text-white underline"
-                  >
-                    {isAr ? 'اختر شبكة أخرى' : 'Choose another network'}
-                  </button>
+                <div className="mt-3 space-y-2">
+                  <p className="text-[10px] text-red-400 text-center mb-2">{isAr ? 'انتهت مهلة الانتظار. يمكنك المتابعة أو إلغاء المعاملة.' : 'Wait period expired. Continue or cancel the transaction.'}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={renewSession}
+                      className="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-black text-xs uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/30"
+                    >
+                      {isAr ? 'متابعة المعاملة (تجديد المهلة)' : 'Continue (renew)'}
+                    </button>
+                    <button
+                      onClick={cancelCurrentSession}
+                      className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-red-400 hover:border-red-500/40 transition-all font-black text-xs uppercase tracking-widest"
+                    >
+                      {isAr ? 'إلغاء المعاملة' : 'Cancel transaction'}
+                    </button>
+                  </div>
                 </div>
               )}
             </motion.div>

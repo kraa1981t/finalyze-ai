@@ -38,6 +38,7 @@ import StorePage from './components/StorePage';
 import SeoPricesPage from './pages/SeoPricesPage';
 import StoreSettingsPage from './components/StoreSettingsPage';
 import { StoreBot } from './services/storeService';
+import { PaymentSession } from './services/paymentSession';
 
 function hasAnyStoredKey(): boolean {
   try {
@@ -62,6 +63,7 @@ export default function App() {
   const [manualAuthUrl, setManualAuthUrl] = useState<string | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string; durationDays: number } | null>(null);
   const [botPurchase, setBotPurchase] = useState<StoreBot | null>(null);
+  const [resumeSessionId, setResumeSessionId] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => {
     const k1 = localStorage.getItem('finalyze_key1_value');
     const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
@@ -1940,7 +1942,7 @@ export default function App() {
               <PaymentModal
                 key={user?.uid || 'no-session'}
                 isOpen={true}
-                onClose={() => { setPaymentPlan(null); setBotPurchase(null); goBack(); }}
+                onClose={() => { setResumeSessionId(null); setPaymentPlan(null); setBotPurchase(null); goBack(); }}
                 planLabel={paymentPlan?.label || ''}
                 amount={paymentPlan?.amount || 0}
                 asPage
@@ -1950,9 +1952,10 @@ export default function App() {
                 buyerEmail={user?.email || ''}
                 buyerName={user?.displayName || ''}
                 planDurationDays={paymentPlan?.durationDays}
-                onBotPaid={() => { setBotPurchase(null); setPaymentPlan(null); goBack(); }}
-                onGoToStore={() => { setPaymentPlan(null); setBotPurchase(null); navigateTo('store'); }}
-                onGoToPlans={() => { setPaymentPlan(null); setBotPurchase(null); navigateTo('plans'); }}
+                resumeSessionId={resumeSessionId}
+                onBotPaid={() => { setResumeSessionId(null); setBotPurchase(null); setPaymentPlan(null); goBack(); }}
+                onGoToStore={() => { setResumeSessionId(null); setPaymentPlan(null); setBotPurchase(null); navigateTo('store'); }}
+                onGoToPlans={() => { setResumeSessionId(null); setPaymentPlan(null); setBotPurchase(null); navigateTo('plans'); }}
                 onConfirm={() => {
                   const plan = paymentPlan!;
                   const expiryDate = new Date();
@@ -1965,6 +1968,7 @@ export default function App() {
                   };
                   localStorage.setItem('active_subscription', JSON.stringify(sub));
                   setActiveSubscription(sub);
+                   setResumeSessionId(null);
                    setPaymentPlan(null);
                    navigateTo('main');
                 }}
@@ -2065,8 +2069,16 @@ export default function App() {
                 onBack={goBack}
                 isDark={isDark}
                 onBuyBot={(bot) => {
+                  setResumeSessionId(null);
                   setBotPurchase(bot);
                   setPaymentPlan({ amount: bot.price / 100, label: '', durationDays: 0 });
+                  navigateTo('plans');
+                }}
+                onResumeSession={(session: PaymentSession, bot?: StoreBot) => {
+                  if (bot) setBotPurchase(bot);
+                  else setBotPurchase(null);
+                  setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                  setResumeSessionId(session.id);
                   navigateTo('plans');
                 }}
               />

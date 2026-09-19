@@ -1,26 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, ShoppingCart, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, FileText, ChevronDown, ChevronUp, RefreshCw, XCircle } from 'lucide-react';
 import { StoreBot, fetchStoreBots, formatFileSize } from '../services/storeService';
+import { loadSessions, cancelSession, PaymentSession } from '../services/paymentSession';
 
 interface StorePageProps {
   lang: 'ar' | 'en';
   onBack: () => void;
   isDark: boolean;
   onBuyBot: (bot: StoreBot) => void;
+  onResumeSession: (session: PaymentSession, bot?: StoreBot) => void;
 }
 
 const MAX_DESC_LEN = 55;
 
-export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageProps) {
+export default function StorePage({ lang, onBack, isDark, onBuyBot, onResumeSession }: StorePageProps) {
   const isAr = lang === 'ar';
   const [bots, setBots] = useState<StoreBot[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [pendingSessions, setPendingSessions] = useState<PaymentSession[]>([]);
+
+  const refreshSessions = () => {
+    loadSessions().then((list) => setPendingSessions(list));
+  };
 
   useEffect(() => {
     fetchStoreBots().then((list) => { setBots(list); setLoading(false); });
+    refreshSessions();
   }, []);
+
+  const handleCancelSession = async (id: string) => {
+    await cancelSession(id);
+    refreshSessions();
+  };
 
   const formatPrice = (price: number) => `$${(price / 100).toFixed(2)}`;
 
@@ -108,6 +121,53 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
           <ArrowLeft size={18} />
         </button>
       </div>
+
+      {/* Pending payment sessions */}
+      {pendingSessions.length > 0 && (
+        <div className="max-w-4xl mx-auto mb-5 space-y-2">
+          {pendingSessions.map((s) => (
+            <div
+              key={s.id}
+              className={`${cardBg} ${cardBorder} border rounded-2xl p-3.5 shadow-lg ${isDark ? 'bg-amber-50' : 'bg-white/5'}`}
+            >
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-amber-500/20 text-amber-500">
+                    <RefreshCw size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className={`text-sm font-black truncate ${isDark ? 'text-slate-900' : 'text-white'}`}>
+                      {isAr ? 'لديك معاملة سابقة قيد الانتظار' : 'You have a pending transaction'}
+                    </h4>
+                    <p className={`text-[11px] font-bold truncate ${isDark ? 'text-slate-500' : 'text-slate-300'}`}>
+                      {s.kind === 'bot' ? s.botName || 'Bot' : s.planLabel || 'Plan'} · ${s.amountUsd.toFixed(2)} USDT
+                      {s.requestNo ? ` · #${s.requestNo}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => onResumeSession(s, bots.find((b) => b.id === s.botId))}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#F59E0B] text-black font-black text-[11px] uppercase tracking-wider shadow-md shadow-[#F59E0B]/30 hover:bg-[#d97706] active:scale-95 transition-all"
+                  >
+                    <RefreshCw size={13} />
+                    {isAr ? 'متابعة المعاملة' : 'Continue'}
+                  </button>
+                  <button
+                    onClick={() => handleCancelSession(s.id)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border font-black text-[11px] uppercase tracking-wider transition-all ${
+                      isDark ? 'border-black/10 text-slate-500 hover:text-red-500 hover:border-red-400' : 'border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/40'
+                    }`}
+                  >
+                    <XCircle size={13} />
+                    {isAr ? 'إلغاء' : 'Cancel'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Title */}
       <div className="text-center mb-6 px-4">
