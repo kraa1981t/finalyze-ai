@@ -53,6 +53,35 @@ export const SYMBOL_TO_PRICE_KEY: Record<string, string> = {
   SOL: 'solana',
 };
 
+// Ensure every address has the full shape (method, label, symbol, stable).
+// Old records may store only { id, name, address } with no method — infer from
+// the display name; fill missing fields from the PAYMENT_METHODS definition.
+export function normalizeAddresses(list: any[] | undefined): PaymentAddress[] {
+  if (!Array.isArray(list)) return [];
+  const out: PaymentAddress[] = [];
+  for (const a of list) {
+    if (!a || typeof a !== 'object' || !a.address) continue;
+    const method = String(a.method || '');
+    let def = PAYMENT_METHODS.find((m) => m.method === method);
+    if (!def && a.name) {
+      const byLabel = PAYMENT_METHODS.find((m) => m.label.toLowerCase() === String(a.name).toLowerCase());
+      const bySymbol = PAYMENT_METHODS.find((m) => m.symbol.toLowerCase() === String(a.symbol || a.name || '').toLowerCase());
+      if (byLabel) def = byLabel;
+      else if (bySymbol) def = bySymbol;
+      else if (String(a.name).toLowerCase().includes('usdt')) def = PAYMENT_METHODS[0];
+    }
+    if (!def) continue;
+    out.push({
+      method: def.method,
+      label: def.label,
+      symbol: def.symbol,
+      stable: a.stable === true || def.stable,
+      address: String(a.address),
+    });
+  }
+  return out;
+}
+
 // Legacy field name for USDT-only addresses saved by an earlier version.
 const LEGACY_USDT_FIELD = 'usdtAddresses';
 
@@ -79,18 +108,20 @@ export async function savePaymentSettings(data: Partial<PaymentSettingsData>): P
 // Normalize legacy `usdtAddresses` (network list) into the new `addresses` shape.
 function normalizeLegacy(data: any): PaymentAddress[] | undefined {
   const direct = data?.addresses;
-  if (Array.isArray(direct) && direct.length) return direct as PaymentAddress[];
+  if (Array.isArray(direct) && direct.length) return normalizeAddresses(direct);
   const legacy = data?.[LEGACY_USDT_FIELD];
   if (Array.isArray(legacy) && legacy.length) {
-    return (legacy as any[])
-      .filter((a) => a?.network && a?.address)
-      .map((a) => ({
-        method: `usdt_${a.network}`,
-        label: `USDT (${a.networkLabel || a.network})`,
-        symbol: 'USDT',
-        stable: true,
-        address: a.address,
-      }));
+    return normalizeAddresses(
+      (legacy as any[])
+        .filter((a) => a?.network && a?.address)
+        .map((a) => ({
+          method: `usdt_${a.network}`,
+          name: `USDT (${a.networkLabel || a.network})`,
+          symbol: 'USDT',
+          stable: true,
+          address: a.address,
+        }))
+    );
   }
   return undefined;
 }
