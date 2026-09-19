@@ -65,7 +65,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [botDownloaded, setBotDownloaded] = useState(false);
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>(DEFAULT_CONFIRM_MODE);
   const [binanceEmail] = useState(DEFAULT_BINANCE_EMAIL);
-  const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
 
   useEffect(() => {
@@ -76,7 +75,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       setPaymentConfirmed(false);
       setRequestNo(null);
       setRequestStatus('idle');
-      setContactName(buyerName || '');
       setContactEmail(buyerEmail || '');
       setTimerRunning(false);
       setTimerSeconds(0);
@@ -139,7 +137,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
   const productLabel = botPurchase?.name || planLabel;
   const isBotProduct = section === 'bot' && !!botPurchase?.id;
-  const buyerNameFinal = (buyerName || contactName).trim();
   const buyerEmailFinal = (buyerEmail || contactEmail).trim().toLowerCase();
 
   // Coin amount the customer must send. Stable USDT = exactly $amount (1:1).
@@ -169,10 +166,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
   const requestManualConfirmation = async () => {
     if (!selectedNetwork) return;
-    if (!buyerNameFinal) {
-      setError(isAr ? 'أدخل اسمك الكامل أولاً' : 'Enter your full name first');
-      return;
-    }
     if (!buyerEmailFinal) {
       setError(isAr ? 'أدخل بريدك الإلكتروني أولاً' : 'Enter your email first');
       return;
@@ -196,7 +189,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         coinName: item.label,
         address: item.address,
         coinAmountExpected: expectedCoin,
-        buyerName: buyerNameFinal,
+        buyerName: (buyerName || '').trim(),
         buyerEmail: buyerEmailFinal,
         method: confirmMode,
       });
@@ -488,26 +481,15 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 </div>
               </div>
 
-              {(!buyerNameFinal || !buyerEmailFinal) && (
+              {!buyerEmailFinal && (
                 <div className="space-y-2 mb-3">
-                  {!buyerNameFinal && (
-                    <input
-                      type="text"
-                      value={contactName}
-                      onChange={(e) => setContactName(e.target.value)}
-                      placeholder={isAr ? 'اسمك الكامل' : 'Your full name'}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
-                    />
-                  )}
-                  {!buyerEmailFinal && (
-                    <input
-                      type="email"
-                      value={contactEmail}
-                      onChange={(e) => setContactEmail(e.target.value)}
-                      placeholder={isAr ? 'بريدك الإلكتروني' : 'Your email'}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
-                    />
-                  )}
+                  <input
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder={isAr ? 'بريدك الإلكتروني' : 'Your email'}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+                  />
                 </div>
               )}
 
