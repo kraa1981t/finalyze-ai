@@ -485,9 +485,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 <div className="space-y-2 mb-3">
                   <input
                     type="email"
+                    required
                     value={contactEmail}
                     onChange={(e) => setContactEmail(e.target.value)}
-                    placeholder={isAr ? 'بريدك الإلكتروني' : 'Your email'}
+                    placeholder={isAr ? 'بريدك الإلكتروني (إلزامي)' : 'Your email (required)'}
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -504,7 +505,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   </div>
                   <button
                     onClick={requestManualConfirmation}
-                    disabled={requestCreating || timerSeconds <= 0}
+                    disabled={requestCreating || timerSeconds <= 0 || !buyerEmailFinal}
                     className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg disabled:opacity-50 ${
                       requestCreating
                         ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400 cursor-wait'
