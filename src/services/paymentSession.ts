@@ -30,7 +30,16 @@ export interface PaymentSession {
 
 const LOCAL_KEY = 'finalyze_payment_sessions';
 const DEVICE_KEY = 'finalyze_device_id';
+const LAST_EMAIL_KEY = 'finalyze_last_payment_email';
 const COLLECTION = 'payment_sessions';
+
+export function getLastEmail(): string {
+  try { return localStorage.getItem(LAST_EMAIL_KEY) || ''; } catch { return ''; }
+}
+
+export function setLastEmail(email: string): void {
+  try { localStorage.setItem(LAST_EMAIL_KEY, (email || '').trim().toLowerCase()); } catch {}
+}
 
 export function getDeviceId(): string {
   try {
@@ -132,6 +141,21 @@ export async function loadSessions(email?: string): Promise<PaymentSession[]> {
   return [...merged.values()].filter((s) => (s.status === 'active' || s.status === 'pending') && (!email || (s.buyerEmail || '').toLowerCase() === email.toLowerCase()));
 }
 
+// Full history (completed / cancelled included) for the profile page, matched by
+// device + email so a customer can see every transaction they ever started.
+export async function loadAllSessions(email?: string): Promise<PaymentSession[]> {
+  const local = readLocalSessions();
+  const remote = await remoteList();
+  const merged: Map<string, PaymentSession> = new Map();
+  local.forEach((s) => merged.set(s.id, s));
+  remote.forEach((s) => merged.set(s.id, s));
+  if (email) {
+    const byEmail = await remoteListByEmail(email);
+    byEmail.forEach((s) => merged.set(s.id, s));
+  }
+  return [...merged.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
 export async function createSession(input: Omit<PaymentSession, 'id' | 'deviceId' | 'createdAt' | 'updatedAt' | 'status'>): Promise<PaymentSession> {
   const now = Date.now();
   const s: PaymentSession = {
@@ -142,6 +166,7 @@ export async function createSession(input: Omit<PaymentSession, 'id' | 'deviceId
     createdAt: now,
     updatedAt: now,
   };
+  if (s.buyerEmail) setLastEmail(s.buyerEmail);
   upsertLocal(s);
   await remoteSet(s);
   return s;

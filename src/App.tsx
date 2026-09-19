@@ -2034,6 +2034,29 @@ export default function App() {
                 lang={lang}
                 onBack={goBack}
                 isDeveloper={isDeveloperSession()}
+                autoEmail={user?.email || ''}
+                onResumeSession={(session) => {
+                  if (session.kind === 'bot') {
+                    fetchStoreBots().then((bots) => {
+                      const bot = bots.find((b) => b.id === session.botId) || null;
+                      if (bot) setBotPurchase(bot);
+                      else setBotPurchase(null);
+                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                      setResumeSessionId(session.id);
+                      navigateTo('plans');
+                    }).catch(() => {
+                      setBotPurchase(null);
+                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                      setResumeSessionId(session.id);
+                      navigateTo('plans');
+                    });
+                  } else {
+                    setBotPurchase(null);
+                    setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                    setResumeSessionId(session.id);
+                    navigateTo('plans');
+                  }
+                }}
               />
             )}
 

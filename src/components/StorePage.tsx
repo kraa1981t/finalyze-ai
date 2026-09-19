@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, ShoppingCart, FileText, ChevronDown, ChevronUp, RefreshCw, XCircle, Search } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, FileText, ChevronDown, ChevronUp, RefreshCw, XCircle, Clock, Search } from 'lucide-react';
 import { StoreBot, fetchStoreBots, formatFileSize } from '../services/storeService';
-import { loadSessions, cancelSession, PaymentSession } from '../services/paymentSession';
+import { loadSessions, cancelSession, PaymentSession, getLastEmail, setLastEmail } from '../services/paymentSession';
 
 interface StorePageProps {
   lang: 'ar' | 'en';
@@ -22,6 +22,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, onResumeSess
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [pendingSessions, setPendingSessions] = useState<PaymentSession[]>([]);
   const [lookupEmail, setLookupEmail] = useState('');
+  const [lookupOpen, setLookupOpen] = useState(false);
   const [searched, setSearched] = useState(false);
 
   const refreshSessions = (email?: string) => {
@@ -30,12 +31,16 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, onResumeSess
 
   useEffect(() => {
     fetchStoreBots().then((list) => { setBots(list); setLoading(false); });
-    refreshSessions(knownEmail);
+    refreshSessions(knownEmail || getLastEmail() || undefined);
   }, [knownEmail]);
 
   const handleCancelSession = async (id: string) => {
     await cancelSession(id);
-    refreshSessions(lookupEmail || knownEmail);
+    refreshSessions(knownEmail || getLastEmail() || undefined);
+  };
+
+  const handleLookup = () => {
+    if (lookupEmail.trim()) { setLastEmail(lookupEmail.trim()); refreshSessions(lookupEmail.trim()); setSearched(true); }
   };
 
   const formatPrice = (price: number) => `$${(price / 100).toFixed(2)}`;
@@ -127,36 +132,57 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, onResumeSess
 
       {/* Pending payment sessions */}
       {!knownEmail && (
-        <div className={`max-w-4xl mx-auto mb-4 rounded-2xl border p-3 ${isDark ? 'bg-slate-100 border-black/10' : 'bg-white/5 border-white/10'}`}>
-          <p className={`text-[10px] font-black uppercase tracking-widest text-center mb-2 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-            {isAr ? 'استعادة معاملة سابقة (ببحث بريدك الإلكتروني)' : 'Resume a previous transaction (search by your email)'}
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="email"
-              value={lookupEmail}
-              onChange={(e) => { setLookupEmail(e.target.value); setSearched(false); }}
-              placeholder={isAr ? 'أدخل بريدك الإلكتروني الذي استخدمته' : 'Enter the email you used'}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm outline-none border ${isDark ? 'bg-white border-black/10 text-slate-800' : 'bg-black/40 border-white/10 text-white'}`}
-            />
-            <button
-              onClick={() => { if (lookupEmail.trim()) { refreshSessions(lookupEmail.trim()); setSearched(true); } }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 text-black font-black text-xs uppercase tracking-wider hover:bg-emerald-400 transition-all"
-            >
-              <Search size={13} />
-              {isAr ? 'بحث' : 'Search'}
-            </button>
-          </div>
-          {searched && pendingSessions.length === 0 && (
-            <p className={`text-[10px] font-bold text-center mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              {isAr ? 'لا توجد معاملات معلقة بهذا البريد' : 'No pending transactions found for this email'}
-            </p>
+        <div className="max-w-4xl mx-auto mb-4">
+          <button
+            onClick={() => setLookupOpen((v) => !v)}
+            className={`w-full flex items-center justify-center gap-1.5 rounded-2xl border py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+              lookupOpen
+                ? (isDark ? 'bg-slate-100 border-black/10 text-slate-600' : 'bg-white/5 border-white/10 text-slate-400')
+                : (isDark ? 'bg-transparent border-black/10 text-slate-500 hover:text-slate-700' : 'bg-transparent border-white/10 text-slate-400 hover:text-slate-200')
+            }`}
+          >
+            <Search size={12} />
+            {lookupOpen
+              ? (isAr ? 'إغلاق البحث' : 'Close search')
+              : (isAr ? 'بحث عن معاملة بريد آخر' : 'Search another email for a transaction')}
+          </button>
+          {lookupOpen && (
+            <div className={`rounded-2xl border p-3 mt-2 ${isDark ? 'bg-slate-100 border-black/10' : 'bg-white/5 border-white/10'}`}>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={lookupEmail}
+                  onChange={(e) => { setLookupEmail(e.target.value); setSearched(false); }}
+                  placeholder={isAr ? 'أدخل بريدك الإلكتروني الذي استخدمته' : 'Enter the email you used'}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm outline-none border ${isDark ? 'bg-white border-black/10 text-slate-800' : 'bg-black/40 border-white/10 text-white'}`}
+                />
+                <button
+                  onClick={handleLookup}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 text-black font-black text-xs uppercase tracking-wider hover:bg-emerald-400 transition-all"
+                >
+                  <Search size={13} />
+                  {isAr ? 'بحث' : 'Search'}
+                </button>
+              </div>
+              {searched && pendingSessions.length === 0 && (
+                <p className={`text-[10px] font-bold text-center mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {isAr ? 'لا توجد معاملات معلقة بهذا البريد' : 'No pending transactions found for this email'}
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}
 
       {pendingSessions.length > 0 && (
         <div className="max-w-4xl mx-auto mb-5 space-y-2">
+          <div className={`flex items-center gap-2 ${isDark ? 'text-slate-600' : 'text-slate-300'} px-1`}>
+            <div className="relative flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/20 text-amber-500">
+              <RefreshCw size={16} />
+              <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            </div>
+            <span className="text-xs font-black uppercase tracking-widest">{isAr ? 'معاملة معلقة — استأنف الآن' : 'Pending transaction — resume now'}</span>
+          </div>
           {pendingSessions.map((s) => (
             <div
               key={s.id}
