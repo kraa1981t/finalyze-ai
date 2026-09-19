@@ -110,13 +110,26 @@ async function remoteList(): Promise<PaymentSession[]> {
   }
 }
 
-export async function loadSessions(): Promise<PaymentSession[]> {
+async function remoteListByEmail(email: string): Promise<PaymentSession[]> {
+  try {
+    const snap = await getDocs(query(collection(db, COLLECTION), where('buyerEmail', '==', email.toLowerCase())));
+    return snap.docs.map((d) => ({ ...(d.data() as any) })) as PaymentSession[];
+  } catch {
+    return [];
+  }
+}
+
+export async function loadSessions(email?: string): Promise<PaymentSession[]> {
   const local = readLocalSessions();
   const remote = await remoteList();
   const merged: Map<string, PaymentSession> = new Map();
   local.forEach((s) => merged.set(s.id, s));
   remote.forEach((s) => merged.set(s.id, s));
-  return [...merged.values()].filter((s) => s.status === 'active' || s.status === 'pending');
+  if (email) {
+    const byEmail = await remoteListByEmail(email);
+    byEmail.forEach((s) => merged.set(s.id, s));
+  }
+  return [...merged.values()].filter((s) => (s.status === 'active' || s.status === 'pending') && (!email || (s.buyerEmail || '').toLowerCase() === email.toLowerCase()));
 }
 
 export async function createSession(input: Omit<PaymentSession, 'id' | 'deviceId' | 'createdAt' | 'updatedAt' | 'status'>): Promise<PaymentSession> {

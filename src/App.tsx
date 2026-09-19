@@ -2068,6 +2068,7 @@ export default function App() {
                 lang={lang}
                 onBack={goBack}
                 isDark={isDark}
+                knownEmail={user?.email || ''}
                 onBuyBot={(bot) => {
                   setResumeSessionId(null);
                   setBotPurchase(bot);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, ShoppingCart, FileText, ChevronDown, ChevronUp, RefreshCw, XCircle } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, FileText, ChevronDown, ChevronUp, RefreshCw, XCircle, Search } from 'lucide-react';
 import { StoreBot, fetchStoreBots, formatFileSize } from '../services/storeService';
 import { loadSessions, cancelSession, PaymentSession } from '../services/paymentSession';
 
@@ -10,29 +10,32 @@ interface StorePageProps {
   isDark: boolean;
   onBuyBot: (bot: StoreBot) => void;
   onResumeSession: (session: PaymentSession, bot?: StoreBot) => void;
+  knownEmail?: string;
 }
 
 const MAX_DESC_LEN = 55;
 
-export default function StorePage({ lang, onBack, isDark, onBuyBot, onResumeSession }: StorePageProps) {
+export default function StorePage({ lang, onBack, isDark, onBuyBot, onResumeSession, knownEmail }: StorePageProps) {
   const isAr = lang === 'ar';
   const [bots, setBots] = useState<StoreBot[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [pendingSessions, setPendingSessions] = useState<PaymentSession[]>([]);
+  const [lookupEmail, setLookupEmail] = useState('');
+  const [searched, setSearched] = useState(false);
 
-  const refreshSessions = () => {
-    loadSessions().then((list) => setPendingSessions(list));
+  const refreshSessions = (email?: string) => {
+    loadSessions(email).then((list) => setPendingSessions(list));
   };
 
   useEffect(() => {
     fetchStoreBots().then((list) => { setBots(list); setLoading(false); });
-    refreshSessions();
-  }, []);
+    refreshSessions(knownEmail);
+  }, [knownEmail]);
 
   const handleCancelSession = async (id: string) => {
     await cancelSession(id);
-    refreshSessions();
+    refreshSessions(lookupEmail || knownEmail);
   };
 
   const formatPrice = (price: number) => `$${(price / 100).toFixed(2)}`;
@@ -123,6 +126,35 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, onResumeSess
       </div>
 
       {/* Pending payment sessions */}
+      {!knownEmail && (
+        <div className={`max-w-4xl mx-auto mb-4 rounded-2xl border p-3 ${isDark ? 'bg-slate-100 border-black/10' : 'bg-white/5 border-white/10'}`}>
+          <p className={`text-[10px] font-black uppercase tracking-widest text-center mb-2 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+            {isAr ? 'استعادة معاملة سابقة (ببحث بريدك الإلكتروني)' : 'Resume a previous transaction (search by your email)'}
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              value={lookupEmail}
+              onChange={(e) => { setLookupEmail(e.target.value); setSearched(false); }}
+              placeholder={isAr ? 'أدخل بريدك الإلكتروني الذي استخدمته' : 'Enter the email you used'}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm outline-none border ${isDark ? 'bg-white border-black/10 text-slate-800' : 'bg-black/40 border-white/10 text-white'}`}
+            />
+            <button
+              onClick={() => { if (lookupEmail.trim()) { refreshSessions(lookupEmail.trim()); setSearched(true); } }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 text-black font-black text-xs uppercase tracking-wider hover:bg-emerald-400 transition-all"
+            >
+              <Search size={13} />
+              {isAr ? 'بحث' : 'Search'}
+            </button>
+          </div>
+          {searched && pendingSessions.length === 0 && (
+            <p className={`text-[10px] font-bold text-center mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {isAr ? 'لا توجد معاملات معلقة بهذا البريد' : 'No pending transactions found for this email'}
+            </p>
+          )}
+        </div>
+      )}
+
       {pendingSessions.length > 0 && (
         <div className="max-w-4xl mx-auto mb-5 space-y-2">
           {pendingSessions.map((s) => (

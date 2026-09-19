@@ -289,18 +289,26 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setGrantChecking(false);
   };
 
-  const startTimer = () => {
+  const startTimer = (forEmail?: string) => {
+    const email = (forEmail ?? buyerEmailFinal).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email || '')) {
+      setError(isAr ? 'أدخل بريداً إلكترونياً صحيحاً أولاً لبدء المهلة.' : 'Enter a valid email first to start the wait period.');
+      return;
+    }
     setTimerSeconds(timerMinutes * 60);
     setTimerRunning(true);
-    persistSession();
+    persistSession(email);
   };
 
   // Save the in-progress transaction so it survives outages / crashes. Restart it
   // on "continue" and cancel explicitly; otherwise it stays alive until settled.
-  const persistSession = () => {
+  // The email is a hard requirement: without it the wait period never begins and
+  // no session is created, so an email change starts a brand-new transaction.
+  const persistSession = (emailFor?: string) => {
     if (manageMode) return;
     const method = usdtAddresses.find(a => a.method === selectedNetwork);
-    if (!method) return;
+    const email = (emailFor || '').trim().toLowerCase();
+    if (!method || !email) return;
     const base: Partial<PaymentSession> = {
       kind: isBotProduct ? 'bot' : 'plan',
       botId: isBotProduct ? botPurchase?.id : undefined,
@@ -315,12 +323,21 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       coinId: method.symbol.toLowerCase(),
       coinName: method.label,
       coinAmountExpected: method.stable ? amount : (expectedCoinAmount(method) || undefined),
-      buyerEmail: buyerEmailFinal || undefined,
+      buyerEmail: email,
       timerMinutes,
       activeUntil: Date.now() + timerMinutes * 60 * 1000,
     };
     if (sessionId) {
-      updateSession(sessionId, base);
+      // An email change means a brand-new transaction: never mutate the buyer
+      // email of an existing session (would break cross-device matching).
+      const current = getCachedSession(sessionId);
+      if (current && current.buyerEmail && current.buyerEmail !== email) {
+        cancelSession(sessionId);
+        setSessionId(null);
+        createSession(base as any).then((s) => setSessionId(s.id)).catch(() => {});
+      } else {
+        updateSession(sessionId, base);
+      }
     } else {
       createSession(base as any).then((s) => setSessionId(s.id)).catch(() => {});
     }
@@ -329,7 +346,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const renewSession = () => {
     setTimerSeconds(timerMinutes * 60);
     setTimerRunning(true);
-    persistSession();
+    persistSession(buyerEmailFinal);
     // Revive: resubmit the numbered confirmation request (unless one already
     // exists) so the email-archive verifier can search for an already-received
     // payment. If none found, the request simply stays pending and the customer
@@ -359,6 +376,14 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       await navigator.clipboard.writeText(addr);
       setCopiedNetwork(network);
       setSelectedNetwork(network);
+      if (!buyerEmailFinal) {
+        // Email is a hard requirement before the wait period can start; the
+        // transaction is keyed to it so it can be resumed from any device.
+        setError(isAr ? 'أدخل بريدك الإلكتروني أولاً لبدء المهلة.' : 'Enter your email first to start the wait period.');
+        setTimerRunning(false);
+        setTimeout(() => setCopiedNetwork(null), 2000);
+        return;
+      }
       setError(null);
       if (!timerRunning) startTimer();
       else persistSession();
@@ -593,17 +618,20 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 </div>
               </div>
 
-              {!buyerEmailFinal && (
+              {!sessionId && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(buyerEmailFinal || '') && (
                 <div className="space-y-2 mb-3">
                   <input
                     type="email"
                     required
                     value={contactEmail}
                     onChange={(e) => {
-                      setContactEmail(e.target.value);
-                      if (sessionId) updateSession(sessionId, { buyerEmail: e.target.value.trim().toLowerCase() });
+                      const v = e.target.value;
+                      setContactEmail(v);
+                      if (selectedNetwork && !sessionId && !timerRunning && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim())) {
+                        startTimer(v);
+                      }
                     }}
-                    placeholder={isAr ? 'بريدك الإلكتروني (إلزامي)' : 'Your email (required)'}
+                    placeholder={isAr ? 'بريدك الإلكتروني (إلزامي - أدخله لبدء المهلة)' : 'Your email (required - enter to start the wait period)'}
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -683,7 +711,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 </button>
               )}
 
-              {timerSeconds <= 0 && requestStatus === 'idle' && !paymentConfirmed && (
+              {timerSeconds <= 0 && sessionId && requestStatus === 'idle' && !paymentConfirmed && (
                 <div className="mt-3 space-y-2">
                   <p className="text-[10px] text-red-400 text-center mb-2">{isAr ? 'انتهت مهلة الانتظار. يمكنك المتابعة أو إلغاء المعاملة.' : 'Wait period expired. Continue or cancel the transaction.'}</p>
                   <div className="flex gap-2">
