@@ -1452,7 +1452,10 @@ async function fsList(collectionName: string): Promise<Json[]> {
   for (let i = 0; i < 10; i++) {
     const url = `${FS_BASE}/${collectionName}?key=${FS_KEY}&pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
     const resp = await fetch(url);
-    if (!resp.ok) break;
+    if (!resp.ok) {
+      console.error(`fsList ${collectionName} failed: HTTP ${resp.status} ${await resp.text()}`);
+      break;
+    }
     const data: any = await resp.json();
     (data.documents || []).forEach((d: any) => out.push({ id: docIdFromName(d.name), ...Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, fromFsValue(v)])) }));
     pageToken = data.nextPageToken || '';
@@ -1746,6 +1749,18 @@ const paymentLookupHandler = async (req: any, res: any) => {
     return res.status(500).json({ ok: false, error: e.message });
   }
 };
+const listWithStatus = async (collectionName: string): Promise<{ items: Json[]; status: number; body?: any }> => {
+  const url = `${FS_BASE}/${collectionName}?key=${FS_KEY}&pageSize=300`;
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    let body: any = null;
+    try { body = JSON.parse(await resp.text()); } catch {}
+    return { items: [], status: resp.status, body };
+  }
+  const data: any = await resp.json();
+  return { items: (data.documents || []).map((d: any) => ({ id: docIdFromName(d.name), ...Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, fromFsValue(v)])) })), status: 200 };
+};
+
 const paymentDumpHandler = async (req: any, res: any) => {
   const secret = process.env.CRON_SECRET;
   if (secret) {
@@ -1756,12 +1771,18 @@ const paymentDumpHandler = async (req: any, res: any) => {
     }
   }
   try {
-    const [requests, grants, sessions] = await Promise.all([
-      fsList('payment_requests'),
-      fsList('payment_grants'),
-      fsList('payment_sessions'),
+    const [requests, grants, sessions, clientInfo] = await Promise.all([
+      listWithStatus('payment_requests'),
+      listWithStatus('payment_grants'),
+      listWithStatus('payment_sessions'),
+      listWithStatus('clients'),
     ]);
-    return res.json({ count: requests.length + grants.length + sessions.length, requests, grants, sessions });
+    return res.json({
+      requests: { status: requests.status, count: requests.items.length, body: requests.body, items: requests.items },
+      grants: { status: grants.status, count: grants.items.length, body: grants.body, items: grants.items },
+      sessions: { status: sessions.status, count: sessions.items.length, body: sessions.body, items: sessions.items },
+      clients: { status: clientInfo.status, count: clientInfo.items.length, items: clientInfo.items },
+    });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e.message });
   }
