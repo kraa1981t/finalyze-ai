@@ -16,22 +16,19 @@ export interface PaymentMethodDef {
   stable: boolean;
 }
 
-// Two confirmation methods are available. Both are confirmed MANUALLY by the
-// developer from the store settings — the difference is only the customer-facing
-// instructions and how the developer cross-checks the incoming payment.
-//   'binance_email' -> developer periodically reviews the Binance confirmation
-//                      email (kraamohamed478@gmail.com) and matches it by
-//                      amount + date/time with the numbered request.
-//   'manual'        -> developer reviews the numbered request directly and
-//                      releases once the amount is confirmed received.
-export type ConfirmMode = 'binance_email' | 'manual';
+// Payment confirmation is MANUAL only. When the customer clicks "I have paid",
+// a numbered request lands in the developer panel (store settings) carrying the
+// customer email, product, price and the EXACT GMT timestamp of the click.
+// The developer compares that timestamp with the deposit arrival in their
+// wallet, then either confirms (releases the download) or rejects the request.
+export type ConfirmMode = 'manual';
 
-export const DEFAULT_CONFIRM_MODE: ConfirmMode = 'binance_email';
+export const DEFAULT_CONFIRM_MODE: ConfirmMode = 'manual';
 export const DEFAULT_BINANCE_EMAIL = 'kraamohamed478@gmail.com';
 
-// All supported payment methods. USDT variants are stable (1 USDT = $1).
-// LTC / TRX / SOL are volatile coins — for those the system matches on the
-// exact coin amount the customer was told to send, with a small $ tolerance.
+// Only STABLE coins are accepted. USDT variants are pegged (1 USDT = $1),
+// so no live-price conversion is needed and the amount is always exact.
+// Volatile coins (LTC / TRX / SOL ...) were removed deliberately.
 export const PAYMENT_METHODS: PaymentMethodDef[] = [
   { method: 'usdt_trc20', label: 'USDT (TRC20)', symbol: 'USDT', stable: true },
   { method: 'usdt_erc20', label: 'USDT (ERC20)', symbol: 'USDT', stable: true },
@@ -40,17 +37,11 @@ export const PAYMENT_METHODS: PaymentMethodDef[] = [
   { method: 'usdt_solana', label: 'USDT (Solana)', symbol: 'USDT', stable: true },
   { method: 'usdt_optimism', label: 'USDT (Optimism)', symbol: 'USDT', stable: true },
   { method: 'usdt_arbitrum', label: 'USDT (Arbitrum)', symbol: 'USDT', stable: true },
-  { method: 'ltc', label: 'Litecoin (LTC)', symbol: 'LTC', stable: false },
-  { method: 'trx', label: 'TRON (TRX)', symbol: 'TRX', stable: false },
-  { method: 'sol', label: 'Solana (SOL)', symbol: 'SOL', stable: false },
 ];
 
 // CoinGecko key for live price display in the customer payment screen.
 export const SYMBOL_TO_PRICE_KEY: Record<string, string> = {
   USDT: 'tether',
-  LTC: 'litecoin',
-  TRX: 'tron',
-  SOL: 'solana',
 };
 
 // Ensure every address has the full shape (method, label, symbol, stable).

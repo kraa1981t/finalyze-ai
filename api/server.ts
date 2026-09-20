@@ -1574,6 +1574,18 @@ async function checkBinanceMail(): Promise<Json> {
     return { ok: false, error: 'missing BINANCE_IMAP_USER / BINANCE_IMAP_PASS' };
   }
 
+  // Release is MANUAL only now. The cron auto-scanner must not release anything
+  // unless the owner explicitly re-enables binance-email confirmation mode.
+  try {
+    const paySettings = await fsGet('shared_settings', 'payments');
+    const confirmMode = String(paySettings?.confirmMode || 'manual');
+    if (confirmMode !== 'binance_email') {
+      return { ok: true, mode: 'manual', note: 'auto-release disabled — confirmation is manual', approved: [], scanned: 0 };
+    }
+  } catch {
+    return { ok: true, mode: 'manual', note: 'auto-release disabled — confirmation is manual', approved: [], scanned: 0 };
+  }
+
   const summary: Json = { ok: true, user, scanned: 0, binanceEmails: 0, approved: [], ambiguous: [], errors: [] };
 
   // Load pending requests + processed-id state

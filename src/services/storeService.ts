@@ -1,17 +1,35 @@
 import { db } from '../lib/firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, setDoc, query, orderBy, updateDoc, where, getDoc } from 'firebase/firestore';
 
+export type StoreCategory = 'bot' | 'indicator' | 'plan' | 'other';
+
 export interface StoreBot {
   id?: string;
   name: string;
   description: string;
   price: number;
+  category?: StoreCategory;
   fileName: string;
   fileType: string;
   fileSize: number;
   fileData: string;
   imageData?: string;
   createdAt: number;
+}
+
+export const STORE_CATEGORIES: { key: StoreCategory; labelAr: string; labelEn: string }[] = [
+  { key: 'bot', labelAr: 'بوتات', labelEn: 'Bots' },
+  { key: 'indicator', labelAr: 'مؤشرات', labelEn: 'Indicators' },
+  { key: 'plan', labelAr: 'خطط', labelEn: 'Plans' },
+  { key: 'other', labelAr: 'منتجات أخرى', labelEn: 'Other Products' },
+];
+
+export function categoryOf(bot: StoreBot): StoreCategory {
+  return bot.category || 'bot';
+}
+
+export function isFree(bot: StoreBot): boolean {
+  return (bot.price || 0) <= 0;
 }
 
 const BOTS_COLLECTION = 'store_bots';
@@ -68,6 +86,7 @@ export async function addStoreBot(bot: Omit<StoreBot, 'id'>): Promise<void> {
     name: bot.name,
     description: bot.description,
     price: bot.price,
+    category: bot.category || 'bot',
     fileName: bot.fileName,
     fileType: bot.fileType,
     fileSize: bot.fileSize,
@@ -83,6 +102,7 @@ export async function updateStoreBot(id: string, data: Partial<StoreBot>): Promi
   if (data.name !== undefined) updateData.name = data.name;
   if (data.description !== undefined) updateData.description = data.description;
   if (data.price !== undefined) updateData.price = data.price;
+  if (data.category !== undefined) updateData.category = data.category;
   if (data.fileName !== undefined) updateData.fileName = data.fileName;
   if (data.fileType !== undefined) updateData.fileType = data.fileType;
   if (data.fileSize !== undefined) updateData.fileSize = data.fileSize;

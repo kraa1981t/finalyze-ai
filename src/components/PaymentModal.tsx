@@ -642,8 +642,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl px-3 py-2.5 mb-3">
                     <p className="text-[11px] text-amber-300 text-center font-bold leading-relaxed">
                       {isAr
-                        ? 'بعد إتمام التحويل، اضغط الزر أدناه لإرسال طلب تأكيد مرقّم. تتم المراجعة تلقائياً أو يدوياً.'
-                        : 'After sending the amount, press below to submit a numbered confirmation request. Review may be automatic or manual.'}
+                        ? 'بعد إتمام التحويل، اضغط الزر أدناه لإرسال طلب تأكيد مرقّم. يُسجَّل وقت ضغطك بضبط تام بتوقيت غرينتش (دقيقة/ساعة/يوم/شهر/سنة) ليكون مرجع المقارنة. المراجعة تتم يدوياً من المطور خلال 10 دقائق إلى 48 ساعة.'
+                        : 'After sending the amount, press below to submit a numbered confirmation request. The exact GMT time of your click (minute/hour/day/month/year) is recorded as the reference. Review is done manually by the developer within 10 minutes to 48 hours.'}
                     </p>
                   </div>
                   <button
@@ -669,13 +669,13 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   </div>
                   <p className="text-[11px] text-amber-200/80 leading-relaxed">
                     {isAr
-                      ? 'ملاحظة: قد تستغرق عملية التحقق بعض الوقت. يرجى الانتظار حتى يكتمل التحقق ليتم إفراج ملفات التحميل تلقائياً.'
-                      : 'Note: verification may take some time. Please wait until verification completes for your downloads to be released automatically.'}
+                      ? 'تم تسجيل طلبك مع الوقت الدقيق بتوقيت غرينتش. يرجى الانتظار من 10 دقائق حتى 48 ساعة لمراجعة طلبك. بمجرد تأكيد الدفع والإفراج اليدوي من المطور سيتاح لك تحميل الملفات هنا.'
+                      : 'Your request was recorded with the exact GMT time. Please wait from 10 minutes up to 48 hours while your request is reviewed. Once the developer confirms the payment and release is done, your download will become available here.'}
                   </p>
                   <div className="flex items-center justify-center gap-2 mt-3">
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                     <span className="text-[10px] text-amber-300 font-bold uppercase tracking-widest">
-                      {isAr ? 'بانتظار الإفراج' : 'Awaiting release'}
+                      {isAr ? 'قيد المراجعة اليدوية' : 'Under manual review'}
                     </span>
                   </div>
                   <button
@@ -818,7 +818,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
       {!manageMode && showAddresses && (
         <p className="text-center text-[10px] text-slate-500 mt-4">
-          {isAr ? `USDT فقط — ثابت بسعر $1.00. الوقت المتبقي: ${Math.floor(timerSeconds / 60)} دقيقة` : `USDT only — fixed at $1.00. Time remaining: ${Math.floor(timerSeconds / 60)} min`}
+          {isAr ? `USDT فقط — عملة مستقرة ثابتة بسعر $1.00. الوقت المتبقي: ${Math.floor(timerSeconds / 60)} دقيقة` : `USDT only — stable coin fixed at $1.00. Time remaining: ${Math.floor(timerSeconds / 60)} min`}
         </p>
       )}
     </>

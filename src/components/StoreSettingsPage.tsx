@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Wallet, Copy } from 'lucide-react';
-import { StoreBot, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
+import { StoreBot, StoreCategory, STORE_CATEGORIES, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
 import PaymentRequestsSection from './PaymentRequestsSection';
 import { loadPaymentSettings, savePaymentSettings, PaymentAddress, PAYMENT_METHODS } from '../services/paymentSettings';
 
@@ -19,6 +19,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState<StoreCategory>('bot');
   const [priceInput, setPriceInput] = useState('');
   const [file, setFile] = useState<{ fileName: string; fileType: string; fileSize: number; fileData: string } | null>(null);
   const [image, setImage] = useState<{ fileName: string; fileData: string } | null>(null);
@@ -77,8 +78,8 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
   };
 
   const handleAdd = async () => {
-    if (!name.trim()) { setError(isAr ? 'أدخل اسم البوت' : 'Enter the bot name'); return; }
-    if (!file) { setError(isAr ? 'اختر ملف البوت (أي نوع)' : 'Choose the bot file (any type)'); return; }
+    if (!name.trim()) { setError(isAr ? 'أدخل اسم المنتج' : 'Enter the product name'); return; }
+    if (!file) { setError(isAr ? 'اختر ملف المنتج (أي نوع)' : 'Choose the product file (any type)'); return; }
     const cents = Math.max(0, Math.round((parseFloat(priceInput) || 0) * 100));
     setAdding(true);
     try {
@@ -92,18 +93,20 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
           name: name.trim(),
           description: description.trim(),
           price: cents,
+          category,
           fileName: file.fileName,
           fileType: file.fileType,
           fileSize: file.fileSize,
           fileData: file.fileData,
           imageData: image?.fileData || '',
         });
-        setSuccess(isAr ? '✅ تم تحديث البوت بنجاح' : '✅ Bot updated successfully');
+        setSuccess(isAr ? '✅ تم تحديث المنتج بنجاح' : '✅ Product updated successfully');
       } else {
         await addStoreBot({
           name: name.trim(),
           description: description.trim(),
           price: cents,
+          category,
           fileName: file.fileName,
           fileType: file.fileType,
           fileSize: file.fileSize,
@@ -111,7 +114,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
           imageData: image?.fileData || '',
           createdAt: Date.now(),
         });
-        setSuccess(isAr ? '✅ تمت إضافة البوت بنجاح' : '✅ Bot added successfully');
+        setSuccess(isAr ? '✅ تمت إضافة المنتج بنجاح' : '✅ Product added successfully');
       }
       resetForm();
       refresh();
@@ -127,6 +130,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
     setEditingBot(bot);
     setName(bot.name);
     setDescription(bot.description);
+    setCategory(bot.category || 'bot');
     setPriceInput(bot.price > 0 ? (bot.price / 100).toString() : '');
     setFile({ fileName: bot.fileName, fileType: bot.fileType, fileSize: bot.fileSize, fileData: bot.fileData });
     setImage(bot.imageData ? { fileName: bot.fileName, fileData: bot.imageData } : null);
@@ -138,6 +142,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
   const resetForm = () => {
     setName('');
     setDescription('');
+    setCategory('bot');
     setPriceInput('');
     setFile(null);
     setImage(null);
@@ -190,7 +195,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         <button onClick={onBack} className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all">
           <ArrowLeft size={18} />
         </button>
-        <h2 className="text-[30px] font-black text-white">{isAr ? 'إعدادات متجر البوتات والمؤشرات' : 'Bots & Indicators Store Settings'}</h2>
+        <h2 className="text-[30px] font-black text-white">{isAr ? 'إعدادات المتجر' : 'Store Settings'}</h2>
       </div>
 
       {/* Payment confirmation requests + method switch */}
@@ -213,8 +218,8 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         </h3>
         <p className="text-sm text-slate-400 mb-4">
           {isAr
-            ? 'أضف عنواناً لكل وسيلة دفع. USDT شبكاتها ثابتة (1 = $1). LTC / TRX / SOL عملات متحركة السعر ويُقارن مبلغها المحوّل مع التسامح.'
-            : 'Add a wallet address for each method. USDT networks are fixed (1 = $1). LTC / TRX / SOL are volatile — their converted amount is matched with tolerance.'}
+            ? 'أضف عنواناً لكل شبكة USDT (العملات المستقرة فقط). ثابتة بسعر 1 USDT = $1 فلا حاجة لتحويل الأسعار. تأكيد الدفع يدوي بالكامل من طرفك.'
+            : 'Add a wallet address for each USDT network (stable coins only). Pegged at 1 USDT = $1, no price conversion is needed. Payment confirmation is fully manual on your side.'}
         </p>
 
         <div className="space-y-3">
@@ -310,7 +315,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         animate={{ opacity: 1, y: 0 }}
         className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8"
       >
-        <h3 className="text-2xl font-black uppercase text-amber-400 tracking-widest mb-4">{editingBot ? (isAr ? 'تعديل بوت' : 'Edit Bot') : (isAr ? 'إضافة بوت جديد' : 'Add New Bot')}</h3>
+        <h3 className="text-2xl font-black uppercase text-amber-400 tracking-widest mb-4">{editingBot ? (isAr ? 'تعديل منتج' : 'Edit Product') : (isAr ? 'إضافة منتج جديد' : 'Add New Product')}</h3>
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-2xl rounded-xl px-4 py-3 mb-4">{error}</div>
@@ -321,7 +326,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
 
         <div className="space-y-4">
           <div>
-            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'اسم البوت' : 'Bot Name'}</label>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'اسم المنتج' : 'Product Name'}</label>
             <input
               type="text"
               value={name}
@@ -343,6 +348,27 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
           </div>
 
           <div>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'القسم (التصنيف)' : 'Section (Category)'}</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {STORE_CATEGORIES.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => setCategory(c.key)}
+                  className={`px-3 py-2.5 rounded-xl border-2 text-[15px] font-black transition-all ${
+                    category === c.key
+                      ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400'
+                      : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
+                  }`}
+                >
+                  {isAr ? c.labelAr : c.labelEn}
+                </button>
+              ))}
+            </div>
+            <p className="text-[13px] text-slate-500 mt-1.5">{isAr ? 'يظهر المنتج في هذا القسم داخل المتجر، مع صفين: مجاني (سعر 0) أعلى ثم مدفوع.' : 'The product appears under this section in the store, with two rows: free (price 0) on top then paid.'}</p>
+          </div>
+
+          <div>
             <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'السعر (اضبط 0 للمجاني)' : 'Price (0 = Free)'}</label>
             <div className="flex items-center gap-2">
               <span className="text-2xl font-black text-white">$</span>
@@ -360,7 +386,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
           </div>
 
           <div>
-            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'ملف البوت (أي نوع ملف)' : 'Bot File (any file type)'}</label>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'ملف المنتج (أي نوع ملف)' : 'Product File (any file type)'}</label>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -447,7 +473,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
 
       {/* Existing bots */}
       <h3 className="text-2xl font-black uppercase text-slate-400 tracking-widest mb-4">
-        {isAr ? `البوتات في المتجر (${bots.length})` : `Bots in store (${bots.length})`}
+        {isAr ? `المنتجات في المتجر (${bots.length})` : `Products in store (${bots.length})`}
       </h3>
 
       {loading ? (
@@ -456,7 +482,7 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         </div>
       ) : bots.length === 0 ? (
         <div className="text-center py-16 text-slate-500 text-2xl">
-          {isAr ? 'لا توجد بوتات بعد. أضف أول بوت من الأعلى.' : 'No bots yet. Add the first one above.'}
+          {isAr ? 'لا توجد منتجات بعد. أضف أول منتج من الأعلى.' : 'No products yet. Add the first one above.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -472,9 +498,14 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h4 className="text-[26px] font-black text-white truncate">{bot.name}</h4>
-                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-lg text-[15px] font-black uppercase border ${bot.price <= 0 ? 'text-emerald-400 border-emerald-400/50 bg-emerald-500/10' : 'text-amber-400 border-amber-400/50 bg-amber-500/10'}`}>
-                      {formatPrice(bot.price)}
-                    </span>
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      <span className={`inline-block px-2.5 py-0.5 rounded-lg text-[15px] font-black uppercase border ${bot.price <= 0 ? 'text-emerald-400 border-emerald-400/50 bg-emerald-500/10' : 'text-amber-400 border-amber-400/50 bg-amber-500/10'}`}>
+                        {formatPrice(bot.price)}
+                      </span>
+                      <span className="inline-block px-2.5 py-0.5 rounded-lg text-[13px] font-black uppercase border border-sky-400/50 bg-sky-500/10 text-sky-400">
+                        {isAr ? (STORE_CATEGORIES.find(c => c.key === (bot.category || 'bot'))?.labelAr || 'بوتات') : (STORE_CATEGORIES.find(c => c.key === (bot.category || 'bot'))?.labelEn || 'Bots')}
+                      </span>
+                    </div>
                     {bot.fileName && (
                       <span className="flex items-center gap-1.5 text-[15px] text-slate-400 mt-2">
                         <FileText size={10} /> {bot.fileName} {bot.fileSize ? `(${formatFileSize(bot.fileSize)})` : ''}

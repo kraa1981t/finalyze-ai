@@ -1,19 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { RefreshCw, Check, X, Clock, Mail, Wallet, User, ShoppingCart, Crown, Hash } from 'lucide-react';
+import { RefreshCw, Check, X, Clock, Mail, Wallet, User, ShoppingCart, Crown, Hash, Globe, ShieldCheck } from 'lucide-react';
 import {
   PaymentRequest,
   fetchPaymentRequests,
   approvePaymentRequest,
   rejectPaymentRequest,
 } from '../services/paymentRequests';
-import {
-  loadPaymentSettings,
-  savePaymentSettings,
-  ConfirmMode,
-  DEFAULT_CONFIRM_MODE,
-  DEFAULT_BINANCE_EMAIL,
-} from '../services/paymentSettings';
 
 interface PaymentRequestsSectionProps {
   lang: 'ar' | 'en';
@@ -28,40 +21,31 @@ function currentDevEmail(): string {
   return '';
 }
 
+// Exact GMT timestamp of when the customer clicked "I have paid".
+// This is the reference used to confirm the transaction is real: compare it
+// with the time the deposit arrived in the developer wallet.
+function fmtGmt(ts?: number): string {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}/${pad(d.getUTCMonth() + 1)}/${pad(d.getUTCDate())} — ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} GMT`;
+}
+
 export default function PaymentRequestsSection({ lang, developerEmail }: PaymentRequestsSectionProps) {
   const isAr = lang === 'ar';
   const [requests, setRequests] = useState<PaymentRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<ConfirmMode>(DEFAULT_CONFIRM_MODE);
-  const [binanceEmail, setBinanceEmail] = useState(DEFAULT_BINANCE_EMAIL);
-  const [emailDraft, setEmailDraft] = useState(DEFAULT_BINANCE_EMAIL);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'pending' | 'all'>('pending');
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [list, settings] = await Promise.all([fetchPaymentRequests(), loadPaymentSettings()]);
+    const list = await fetchPaymentRequests();
     setRequests(list);
-    if (settings?.confirmMode) setMode(settings.confirmMode);
-    if (settings?.binanceNotifyEmail) {
-      setBinanceEmail(settings.binanceNotifyEmail);
-      setEmailDraft(settings.binanceNotifyEmail);
-    }
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const changeMode = async (m: ConfirmMode) => {
-    setMode(m);
-    await savePaymentSettings({ confirmMode: m });
-  };
-
-  const saveEmail = async () => {
-    const clean = emailDraft.trim() || DEFAULT_BINANCE_EMAIL;
-    setBinanceEmail(clean);
-    await savePaymentSettings({ binanceNotifyEmail: clean });
-  };
 
   const approve = async (req: PaymentRequest) => {
     if (!req.id) return;
@@ -82,8 +66,6 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
   const shown = filter === 'pending' ? requests.filter((r) => r.status === 'pending') : requests;
   const pendingCount = requests.filter((r) => r.status === 'pending').length;
 
-  const fmtDate = (ts?: number) => (ts ? new Date(ts).toLocaleString(isAr ? 'ar-DZ' : 'en-GB') : '—');
-
   const statusStyle = (s: PaymentRequest['status']) => {
     if (s === 'approved') return 'text-emerald-400 border-emerald-400/40 bg-emerald-500/10';
     if (s === 'rejected') return 'text-red-400 border-red-400/40 bg-red-500/10';
@@ -97,67 +79,25 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
 
   return (
     <div className="space-y-4">
-      {/* Confirmation method switch — mutually exclusive */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-        <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">
-          {isAr ? 'طريقة تأكيد الدفع' : 'Payment Confirmation Method'}
-        </h5>
-        <p className="text-[11px] text-slate-500 mb-3">
-          {isAr
-            ? 'مفتاح واحد فقط يعمل في نفس الوقت. عند تفعيل طريقة تُعطَّل الأخرى تلقائياً. التأكيد يتم يدوياً من طرفك.'
-            : 'Only one method is active at a time. Enabling one disables the other automatically. Confirmation is done manually by you.'}
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <button
-            onClick={() => changeMode('binance_email')}
-            className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-xs font-black uppercase tracking-wider transition-all ${
-              mode === 'binance_email'
-                ? 'border-[#F59E0B] bg-[#F59E0B]/15 text-[#F59E0B]'
-                : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
-            }`}
-          >
-            <Mail size={16} />
-            {isAr ? 'التحقق عبر بريد Binance' : 'Binance Email Check'}
-          </button>
-          <button
-            onClick={() => changeMode('manual')}
-            className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-xs font-black uppercase tracking-wider transition-all ${
-              mode === 'manual'
-                ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400'
-                : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
-            }`}
-          >
-            <Check size={16} />
-            {isAr ? 'تأكيد يدوي' : 'Manual Confirmation'}
-          </button>
+      {/* Manual workflow — the only confirmation method */}
+      <div className="bg-white/5 border border-emerald-500/25 rounded-2xl p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <ShieldCheck size={16} className="text-emerald-400" />
+          <h5 className="text-xs font-black uppercase text-emerald-400 tracking-widest">
+            {isAr ? 'تأكيد يدوي — الإفراج من طرفك فقط' : 'Manual Confirmation — Release is yours only'}
+          </h5>
         </div>
-
-        {mode === 'binance_email' && (
-          <div className="mt-3">
-            <label className="text-[11px] text-slate-500 font-bold block mb-1">
-              {isAr ? 'بريد تأكيدات Binance' : 'Binance confirmation email'}
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="email"
-                value={emailDraft}
-                onChange={(e) => setEmailDraft(e.target.value)}
-                className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-[#F59E0B]"
-              />
-              <button
-                onClick={saveEmail}
-                className="px-4 py-2 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 text-[#F59E0B] hover:bg-[#F59E0B]/20 transition-all text-xs font-black"
-              >
-                {isAr ? 'حفظ' : 'Save'}
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1.5">
-              {isAr
-                ? `تحقق دورياً من هذا البريد وطابق المبلغ والتاريخ مع رقم الطلب أدناه.`
-                : `Periodically check this inbox and match amount + date with the request number below.`}
-            </p>
-          </div>
-        )}
+        <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
+          {isAr
+            ? 'عندما يضغط العميل على «أرسلت الدفع»، يصل طلب مرقّم هنا يعرض بريد العميل وصنف المنتج وقيمته والتوقيت الدقيق بتوقيت غرينتش. قارن هذا التوقيت مع تاريخ وصول التحويل إلى محفظتك، ثم قرّر: أكّد الطلب وأفرج التحميل، أو ارفضه إن كان مزوّراً ولم يصل شيء لمحفظتك.'
+            : 'When a customer presses "I have paid", a numbered request arrives here showing the customer email, product type, price and the exact GMT time. Compare that timestamp with when the deposit reached your wallet, then decide: confirm the request and release the download, or reject it if it is fake and nothing arrived.'}
+        </p>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-300 font-bold">
+          <Globe size={12} />
+          {isAr
+            ? 'توقيت غرينتش المذكور هو المرجع الوحيد لتأكيد أن المعاملة حقيقية — قارنه دائماً بتوقيت وصول الدفعة لمحفظتك.'
+            : 'The GMT time shown is the single reference to confirm a transaction is real — always compare it with the deposit arrival time in your wallet.'}
+        </div>
       </div>
 
       {/* Requests list */}
@@ -214,9 +154,19 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
                       {statusLabel(req.status)}
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                    <Clock size={11} /> {fmtDate(req.createdAt)}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] text-slate-500 flex items-center gap-1" title={new Date(req.createdAt).toLocaleString()}>
+                      <Clock size={11} /> {new Date(req.createdAt).toLocaleString(isAr ? 'ar-DZ' : 'en-GB')}
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-black font-mono ${
+                      req.status === 'pending'
+                        ? 'text-amber-300 border-amber-500/30 bg-amber-500/10'
+                        : 'text-slate-500 border-white/10 bg-white/5'
+                    }`}>
+                      <Globe size={11} />
+                      {fmtGmt(req.createdAt)}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-3 text-xs">
