@@ -1746,6 +1746,27 @@ const paymentLookupHandler = async (req: any, res: any) => {
     return res.status(500).json({ ok: false, error: e.message });
   }
 };
+const paymentDumpHandler = async (req: any, res: any) => {
+  const secret = process.env.CRON_SECRET;
+  if (secret) {
+    const auth = String(req.headers.authorization || '');
+    const token = String((req.query && req.query.token) || '');
+    if (auth !== `Bearer ${secret}` && token !== secret) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+  }
+  try {
+    const [requests, grants, sessions] = await Promise.all([
+      fsList('payment_requests'),
+      fsList('payment_grants'),
+      fsList('payment_sessions'),
+    ]);
+    return res.json({ count: requests.length + grants.length + sessions.length, requests, grants, sessions });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+};
 app.get("/api/payment-lookup", paymentLookupHandler);
+app.get("/api/payment-dump", paymentDumpHandler);
 
 export default app;
