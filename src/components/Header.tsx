@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell, ExternalLink, Smartphone, Tablet, X, Settings, Key, DollarSign, Wallet, Users, User, Crown, Info, Lightbulb, Monitor, CalendarDays, Store, BarChart3 } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell, ExternalLink, Smartphone, Tablet, X, Settings, Key, DollarSign, Wallet, Users, User as UserIcon, Crown, Info, Lightbulb, Monitor, CalendarDays, Store, BarChart3 } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings } from '../types';
 import { initAudio } from '../lib/audioEngine';
@@ -63,7 +63,7 @@ interface HeaderProps {
   showRadarComplete?: boolean;
   onPreview?: (device: 'phone' | 'tablet') => void;
   isPWA?: boolean;
-  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'prices') => void;
+  onNavigatePage?: (page: 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'prices' | 'transactions') => void;
   freemiumDisabled?: boolean;
   storeVisited?: boolean;
   compact?: boolean;
@@ -349,7 +349,7 @@ export default function Header({
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('profile'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
-                    <User size={18} className="text-[#F59E0B]" />
+                    <UserIcon size={18} className="text-[#F59E0B]" />
                     <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'الملف الشخصي' : 'Profile'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('settings'); }}
@@ -412,7 +412,7 @@ export default function Header({
                 <>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('profile'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
-                    <User size={18} className="text-[#F59E0B]" />
+                    <UserIcon size={18} className="text-[#F59E0B]" />
                     <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'الملف الشخصي' : 'Profile'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('about'); }}

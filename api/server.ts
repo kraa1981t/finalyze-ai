@@ -1589,10 +1589,8 @@ async function checkBinanceMail(): Promise<Json> {
     logger: false,
   });
 
-  const newlyProcessed: string[] = [];
-  try {
-    await client.connect();
-    const lock = await client.getMailboxLock('INBOX');
+  const scanFolder = async (folder: string): Promise<void> => {
+    const lock = await client.getMailboxLock(folder);
     try {
       const since = new Date(Date.now() - MAIL_LOOKBACK_MS);
       for await (const msg of client.fetch({ since }, { uid: true, source: true })) {
@@ -1601,7 +1599,7 @@ async function checkBinanceMail(): Promise<Json> {
         try {
           parsed = await simpleParser(msg.source as Buffer);
         } catch (e: any) {
-          summary.errors.push(`parse uid ${msg.uid}: ${e.message}`);
+          summary.errors.push(`parse uid ${msg.uid} (${folder}): ${e.message}`);
           continue;
         }
         const fromText = String(parsed.from?.text || '').toLowerCase();
@@ -1669,6 +1667,23 @@ async function checkBinanceMail(): Promise<Json> {
     } finally {
       lock.release();
     }
+  };
+
+  const newlyProcessed: string[] = [];
+  try {
+    await client.connect();
+    const mailboxes = await client.list();
+    const spamFolders = (mailboxes || [])
+      .map((m: any) => m.path)
+      .filter((p: string) => /spam|junk/i.test(p));
+    const folders = ['INBOX', ...spamFolders];
+    for (const folder of folders) {
+      try {
+        await scanFolder(folder);
+      } catch (e: any) {
+        summary.errors.push(`folder ${folder}: ${e.message}`);
+      }
+    }
     await client.logout();
   } catch (e: any) {
     summary.ok = false;
@@ -1705,5 +1720,32 @@ const binanceMailHandler = async (req: any, res: any) => {
 
 app.get("/api/check-binance-mail", binanceMailHandler);
 app.post("/api/check-binance-mail", binanceMailHandler);
+
+const paymentLookupHandler = async (req: any, res: any) => {
+  const secret = process.env.CRON_SECRET;
+  if (secret) {
+    const auth = String(req.headers.authorization || '');
+    const token = String((req.query && req.query.token) || '');
+    if (auth !== `Bearer ${secret}` && token !== secret) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+  }
+  try {
+    const email = String((req.query && req.query.email) || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ ok: false, error: 'missing email' });
+    const [requests, grants] = await Promise.all([
+      fsList('payment_requests'),
+      fsList('payment_grants'),
+    ]);
+    const mineRequests = requests
+      .filter((r) => String(r.buyerEmail || '').toLowerCase() === email)
+      .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+    const mineGrants = grants.filter((g) => String(g.email || '').toLowerCase() === email);
+    return res.json({ ok: true, email, requests: mineRequests, grants: mineGrants });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+};
+app.get("/api/payment-lookup", paymentLookupHandler);
 
 export default app;

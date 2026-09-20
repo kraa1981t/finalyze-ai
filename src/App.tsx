@@ -31,13 +31,14 @@ import SubscriptionModal from './components/SubscriptionModal';
 import PaymentModal from './components/PaymentModal';
 import { getUnreadDevNotificationCount, fetchUserGrants } from './services/paymentRequests';
 import ProfilePage from './components/ProfilePage';
+import TransactionsPage from './components/TransactionsPage';
 import AboutPage from './components/AboutPage';
 import SuggestionsPage from './components/SuggestionsPage';
 import TradeNowPage from './components/TradeNowPage';
 import StorePage from './components/StorePage';
 import SeoPricesPage from './pages/SeoPricesPage';
 import StoreSettingsPage from './components/StoreSettingsPage';
-import { StoreBot } from './services/storeService';
+import { StoreBot, fetchStoreBots } from './services/storeService';
 import { PaymentSession } from './services/paymentSession';
 
 function hasAnyStoredKey(): boolean {
@@ -129,12 +130,12 @@ export default function App() {
     }
     setNeedsApiKeyState(email);
   };
-  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'prices' => {
+  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'transactions' | 'prices' => {
     const hash = window.location.hash.slice(1);
-    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings', 'prices'].includes(hash)) return hash as any;
+    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings', 'transactions', 'prices'].includes(hash)) return hash as any;
     return 'main';
   };
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'prices'>(getPageFromHash);
+  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'transactions' | 'prices'>(getPageFromHash);
   const navStackRef = useRef<string[]>([]);
 
   const navigateTo = (page: any) => {
@@ -639,7 +640,7 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings', 'prices'];
+    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings', 'transactions', 'prices'];
     const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis', 'storeSettings'];
     const onHashChange = () => {
       const hash = window.location.hash.slice(1);
@@ -2065,6 +2066,36 @@ export default function App() {
                 lang={lang}
                 onBack={goBack}
                 onGoToSuggestions={() => navigateTo('suggestions')}
+              />
+            )}
+
+            {effectivePage === 'transactions' && (
+              <TransactionsPage
+                lang={lang}
+                onBack={goBack}
+                autoEmail={user?.email || ''}
+                onResumeSession={(session) => {
+                  if (session.kind === 'bot') {
+                    fetchStoreBots().then((bots) => {
+                      const bot = bots.find((b) => b.id === session.botId) || null;
+                      if (bot) setBotPurchase(bot);
+                      else setBotPurchase(null);
+                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                      setResumeSessionId(session.id);
+                      navigateTo('plans');
+                    }).catch(() => {
+                      setBotPurchase(null);
+                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                      setResumeSessionId(session.id);
+                      navigateTo('plans');
+                    });
+                  } else {
+                    setBotPurchase(null);
+                    setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                    setResumeSessionId(session.id);
+                    navigateTo('plans');
+                  }
+                }}
               />
             )}
 
