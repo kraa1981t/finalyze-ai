@@ -6,6 +6,7 @@ import { AutoAnalysisSettings } from '../types';
 import { initAudio } from '../lib/audioEngine';
 import { BASE_URL } from '../lib/firebase';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
+import { fetchUrgentNews } from '../services/urgentNews';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
@@ -144,6 +145,28 @@ export default function Header({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
+  const [newsFlash, setNewsFlash] = useState(false);
+
+  useEffect(() => {
+    if (lang !== 'en' || isDeveloper) return;
+    let stopTimer: ReturnType<typeof setTimeout> | null = null;
+    const seen = new Set<string>();
+    let initialized = false;
+    const check = async () => {
+      const items = await fetchUrgentNews();
+      if (!initialized) { items.forEach((i) => seen.add(i.title)); initialized = true; return; }
+      const fresh = items.filter((i) => !seen.has(i.title));
+      fresh.forEach((i) => seen.add(i.title));
+      if (fresh.length > 0) {
+        setNewsFlash(true);
+        if (stopTimer) clearTimeout(stopTimer);
+        stopTimer = setTimeout(() => setNewsFlash(false), 60000);
+      }
+    };
+    check();
+    const id = setInterval(check, 60000);
+    return () => { clearInterval(id); if (stopTimer) clearTimeout(stopTimer); };
+  }, [lang, isDeveloper]);
   const isPWA = isPWAMode;
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [mobileLangOpen, setMobileLangOpen] = useState(false);
@@ -640,6 +663,24 @@ export default function Header({
             {/* Icons - desktop only | MOBILE: all icons moved into sidebar menu */}
             {!isPWA && (
             <div className="hidden md:flex items-center gap-2 flex-1 min-w-0 justify-end">
+              {/* Live Prices | English + client only, sits to the LEFT of the store icon.
+                  Flashes for one minute when urgent market news appears. */}
+              {!isDeveloper && lang === 'en' && (
+              <button
+                onClick={() => onNavigatePage?.('prices')}
+                className={cn(
+                  "hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#4E342E] hover:bg-[#3E2723] text-white shadow-lg shadow-black/30 active:scale-95 transition-all border border-black/10 flex-shrink-0",
+                  newsFlash && "animate-flash-fast"
+                )}
+                title="Live Prices"
+              >
+                <BarChart3 size={24} className="flex-shrink-0" />
+                <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                  Live Prices
+                </span>
+              </button>
+              )}
+
               {/* Store | Client desktop only (developer uses sidebar item) — flashing "مجاني" inside the icon, widens horizontally */}
               {!isDeveloper && (
               <button
