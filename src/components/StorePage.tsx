@@ -81,7 +81,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
     const accent = free
       ? {
           card: 'bg-gradient-to-br from-emerald-400 to-emerald-700 border-emerald-300/50 shadow-emerald-600/40',
-          box: 'bg-white/15',
+          box: 'bg-white/20',
           title: 'text-white',
           sub: 'text-emerald-50',
           body: 'text-emerald-50',
@@ -91,7 +91,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
         }
       : {
           card: 'bg-gradient-to-br from-sky-400 to-blue-700 border-sky-300/50 shadow-blue-600/40',
-          box: 'bg-white/15',
+          box: 'bg-white/20',
           title: 'text-white',
           sub: 'text-sky-50',
           body: 'text-sky-50',
@@ -118,13 +118,13 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
           <div className="flex-1 flex flex-col gap-2.5 p-3 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${accent.box}`}>
-                  {free ? <Gift size={18} className="text-white" /> : <ShoppingCart size={18} className="text-white" />}
+                <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center keep-white ${accent.box}`}>
+                  {free ? <Gift size={18} /> : <ShoppingCart size={18} />}
                 </div>
                 <div className="min-w-0">
-                  <h3 className={`text-sm font-black truncate ${accent.title}`}>{bot.name}</h3>
+                  <h3 className={`text-sm font-black truncate keep-white ${accent.title}`}>{bot.name}</h3>
                   {bot.fileName && (
-                    <span className={`text-[9px] flex items-center gap-1 mt-0.5 ${accent.sub}`}>
+                    <span className={`text-[9px] flex items-center gap-1 mt-0.5 keep-white ${accent.sub}`}>
                       <FileText size={9} /> {bot.fileName} {bot.fileSize ? `(${formatFileSize(bot.fileSize)})` : ''}
                     </span>
                   )}
@@ -137,11 +137,11 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
 
             {bot.description && (
               <div>
-                <p className={`text-xs leading-relaxed break-words font-medium ${accent.body}`}>{shown}</p>
+                <p className={`text-xs leading-relaxed break-words font-medium keep-white ${accent.body}`}>{shown}</p>
                 {needToggle && (
                   <button
                     onClick={() => setExpanded((prev) => ({ ...prev, [bot.id ?? '']: !isOpen }))}
-                    className={`mt-0.5 flex items-center gap-0.5 text-[10px] font-black uppercase tracking-wide transition-all ${accent.link}`}
+                    className={`mt-0.5 flex items-center gap-0.5 text-[10px] font-black uppercase tracking-wide transition-all keep-white ${accent.link}`}
                   >
                     {isOpen ? (isAr ? 'عرض أقل' : 'Read Less') : (isAr ? 'اقرأ المزيد' : 'Read More')}
                     {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
@@ -151,7 +151,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
             )}
 
             {showMsg && (
-              <p className="text-[11px] font-black text-center text-white bg-black/30 rounded-lg py-1 px-2">{downloadMsg?.text}</p>
+              <p className="text-[11px] font-black text-center keep-white bg-black/30 rounded-lg py-1 px-2">{downloadMsg?.text}</p>
             )}
 
             <button
@@ -220,8 +220,8 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
         </button>
         {activeCat && (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700">
-              {(() => { const I = TILE_ICONS[activeCat]; return <I size={16} className="text-white" />; })()}
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700 keep-white">
+              {(() => { const I = TILE_ICONS[activeCat]; return <I size={16} />; })()}
             </div>
             <h2 className={`text-base sm:text-lg font-black ${pageTitle}`}>{catLabel(isAr, activeCat)}</h2>
           </div>
@@ -281,16 +281,16 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
                   onClick={() => setActiveCat(key)}
                   className="bg-gradient-to-br from-sky-400 to-blue-700 border border-sky-300/50 rounded-2xl p-4 flex flex-col items-center gap-3 transition-all shadow-lg shadow-blue-600/40 ring-1 ring-white/10 hover:scale-[1.03] active:scale-95 text-center"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center shadow-inner ring-1 ring-white/15">
-                    <Icon size={34} className="text-white" />
+                  <div className="w-[4.5rem] h-[4.5rem] rounded-2xl bg-white/20 border border-white/40 flex items-center justify-center keep-white shadow-inner">
+                    <Icon size={38} strokeWidth={2.1} />
                   </div>
-                  <span className="text-base font-black text-white drop-shadow">{catLabel(isAr, key)}</span>
-                  <div className="flex items-center gap-2 text-xs font-black uppercase">
-                    <span className="px-2.5 py-1 rounded-full bg-white/20 border border-white/40 text-white flex items-center gap-1">
-                      <Gift size={12} /> {c.free} {isAr ? 'مجاني' : 'Free'}
+                  <span className="text-lg font-black keep-white">{catLabel(isAr, key)}</span>
+                  <div className="flex items-center gap-2 text-sm font-black uppercase keep-white">
+                    <span className="px-2.5 py-1 rounded-full bg-white/20 border border-white/40 flex items-center gap-1 keep-white">
+                      <Gift size={14} /> {c.free} {isAr ? 'مجاني' : 'Free'}
                     </span>
-                    <span className="px-2.5 py-1 rounded-full bg-white/20 border border-white/40 text-white flex items-center gap-1">
-                      <Sparkles size={12} /> {c.paid} {isAr ? 'مدفوع' : 'Paid'}
+                    <span className="px-2.5 py-1 rounded-full bg-white/20 border border-white/40 flex items-center gap-1 keep-white">
+                      <Sparkles size={14} /> {c.paid} {isAr ? 'مدفوع' : 'Paid'}
                     </span>
                   </div>
                 </motion.button>

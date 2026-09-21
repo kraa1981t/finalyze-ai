@@ -506,3 +506,27 @@ body.light .panel-strip .strip-title {
 .animate-flash-fast {
   animation: flash-fast 0.8s ease-in-out infinite;
 }
+
+/* Text & icons that sit on SOLID brand-colored surfaces (store product cards,
+   blue category tiles): keep them pure white in BOTH themes. The light-mode
+   remaps above turn .text-white / .text-xs into dark green, which is unreadable
+   on a green/blue card — these rules win by higher specificity + source order. */
+.keep-white,
+.keep-white svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+.light .keep-white,
+.light .keep-white svg,
+.light .keep-white.text-white,
+.light .keep-white.text-xs,
+.light .keep-white.text-\[9px\],
+.light .keep-white.text-\[10px\],
+.light .keep-white.text-\[11px\],
+.light .keep-white.text-sm,
+.light .keep-white.text-base,
+.light .keep-white.text-lg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
