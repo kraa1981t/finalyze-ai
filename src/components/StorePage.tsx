@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, ShoppingCart, FileText, ChevronDown, ChevronUp, Bot, Activity, Crown, Package, Download, Gift, Sparkles } from 'lucide-react';
+import { ShoppingCart, FileText, ChevronDown, ChevronUp, Bot, Activity, Crown, Package, Download, Gift, Sparkles } from 'lucide-react';
 import { StoreBot, StoreCategory, fetchStoreBots, formatFileSize, isFree, categoryOf, STORE_CATEGORIES, downloadBot, getDownloadGrant, consumeBotDownload } from '../services/storeService';
 
 interface StorePageProps {
@@ -212,19 +212,8 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
   return (
     <div className="w-full px-2 pb-10">
       <div className="max-w-4xl mx-auto flex items-center gap-3 mb-4">
-        <button
-          onClick={() => (activeCat ? setActiveCat(null) : onBack())}
-          className={`p-2 rounded-xl border transition-all ${isDark ? 'bg-black/5 border-black/10 text-slate-600 hover:text-black' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
-        >
-          <ArrowLeft size={18} />
-        </button>
         {activeCat && (
-          <div className="flex items-center gap-3">
-            <div className="w-24 h-24 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700 keep-white">
-              {(() => { const I = TILE_ICONS[activeCat]; return <I size={52} />; })()}
-            </div>
-            <h2 className={`text-lg sm:text-xl font-black ${pageTitle}`}>{catLabel(isAr, activeCat)}</h2>
-          </div>
+          <h2 className={`text-lg sm:text-xl font-black ${pageTitle}`}>{catLabel(isAr, activeCat)}</h2>
         )}
       </div>
 
@@ -255,6 +244,11 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
             </div>
           ) : (
             <>
+              <div className="flex justify-center mb-2">
+                <div className="w-24 h-24 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700 keep-white">
+                  {(() => { const I = TILE_ICONS[activeCat]; return <I size={52} />; })()}
+                </div>
+              </div>
               {renderStack(catBots, true, activeCat)}
               {sectionDivider()}
               {renderStack(catBots, false, activeCat)}
