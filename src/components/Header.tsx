@@ -650,7 +650,20 @@ export default function Header({
                   <span className="text-[14px] font-black uppercase tracking-[0.15em] text-white/70 leading-tight mt-1 block">For Financial<br/>Market Analysis</span>
                 )}
               </div>
-              {/* Live Prices | client only, sits beside the site name at the far edge so it never overlaps the top icon row. Flashes for one minute when urgent market news appears. */}
+              {/* Mobile hamburger — stays top-right on phones, hidden on desktop (desktop uses icon-row menu) */}
+              <button
+                onClick={() => setShowMobileMenu(true)}
+                className="flex md:hidden p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
+                title={lang === 'ar' ? 'القائمة' : 'Menu'}
+              >
+                <Menu size={22} />
+              </button>
+            </div>
+
+            {/* Icons - desktop only | MOBILE: all icons moved into sidebar menu */}
+            {!isPWA && (
+            <div className="hidden md:flex items-center gap-3 flex-1 min-w-0 justify-end">
+              {/* Live Prices | client only, sits right before the store icon with the same gap as every other top-bar icon. Flashes for one minute when urgent market news appears. */}
               {!isDeveloper && (
                 <button
                   onClick={() => onNavigatePage?.('prices')}
@@ -666,19 +679,6 @@ export default function Header({
                   </span>
                 </button>
               )}
-              {/* Mobile hamburger — stays top-right on phones, hidden on desktop (desktop uses icon-row menu) */}
-              <button
-                onClick={() => setShowMobileMenu(true)}
-                className="flex md:hidden p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
-                title={lang === 'ar' ? 'القائمة' : 'Menu'}
-              >
-                <Menu size={22} />
-              </button>
-            </div>
-
-            {/* Icons - desktop only | MOBILE: all icons moved into sidebar menu */}
-            {!isPWA && (
-            <div className="hidden md:flex items-center gap-2 flex-1 min-w-0 justify-end">
               {/* Store | Client desktop only (developer uses sidebar item) — flashing "مجاني" inside the icon, widens horizontally */}
               {!isDeveloper && (
               <button
