@@ -627,7 +627,7 @@ export default function Header({
 
         {/* Content Overlay - top row: logo left, icons right | MOBILE: icons wrap below logo via flex-wrap, desktop unchanged via md: */}
         <div className={cn(
-          "relative max-w-7xl mx-auto px-4 h-full flex flex-wrap items-start transition-all duration-300",
+          "relative w-full h-full flex flex-wrap items-start transition-all duration-300",
           compact ? 'pt-2' : 'pt-3'
         )}>
           <div className="flex flex-wrap md:flex-nowrap items-center gap-3 w-full">
@@ -655,13 +655,13 @@ export default function Header({
                 <button
                   onClick={() => onNavigatePage?.('prices')}
                   className={cn(
-                    "hidden md:flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-[#4E342E] hover:bg-[#3E2723] text-white shadow-lg shadow-black/30 active:scale-95 transition-all border border-black/10 flex-shrink-0",
+                    "hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#4E342E] hover:bg-[#3E2723] text-white shadow-lg shadow-black/30 active:scale-95 transition-all border border-black/10 flex-shrink-0",
                     newsFlash && "animate-flash-fast"
                   )}
                   title={lang === 'ar' ? 'الأسعار الحية' : 'Live Prices'}
                 >
-                  <BarChart3 size={18} className="flex-shrink-0" />
-                  <span className="text-xs font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                  <BarChart3 size={24} className="flex-shrink-0" />
+                  <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
                     {lang === 'ar' ? 'الأسعار الحية' : 'Live Prices'}
                   </span>
                 </button>
