@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingCart, FileText, ChevronDown, ChevronUp, Bot, Activity, Crown, Package, Download, Gift, Sparkles } from 'lucide-react';
-import { StoreBot, StoreCategory, fetchStoreBots, formatFileSize, isFree, categoryOf, STORE_CATEGORIES, downloadBot, getDownloadGrant, consumeBotDownload } from '../services/storeService';
+import { StoreBot, StoreCategory, fetchStoreBots, formatFileSize, isFree, categoryOf, STORE_CATEGORIES, downloadBot, getDownloadGrant, consumeBotDownload, DOWNLOAD_GRANT_TTL_MS } from '../services/storeService';
 
 interface StorePageProps {
   lang: 'ar' | 'en';
@@ -31,6 +31,12 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
   const [activeCat, setActiveCat] = useState<StoreCategory | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [downloadMsg, setDownloadMsg] = useState<{ botId: string; text: string } | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     fetchStoreBots().then((list) => { setBots(list); setLoading(false); });
@@ -75,7 +81,11 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
     const isOpen = !!expanded[bot.id ?? ''];
     const shown = isOpen || !needToggle ? bot.description : bot.description.slice(0, MAX_DESC_LEN) + '…';
     const free = isFree(bot);
-    const granted = !free && !!getDownloadGrant(bot.id ?? '');
+    const grantTs = free ? null : getDownloadGrant(bot.id ?? '');
+    const granted = grantTs !== null;
+    const remainingMs = grantTs ? Math.max(0, DOWNLOAD_GRANT_TTL_MS - (nowTick - grantTs)) : 0;
+    const mm = String(Math.floor(remainingMs / 60000)).padStart(2, '0');
+    const ss = String(Math.floor((remainingMs % 60000) / 1000)).padStart(2, '0');
     const showMsg = downloadMsg?.botId === bot.id;
     // Solid brand-colored boxes (no product image): green = free, blue = paid
     const accent = free
@@ -152,6 +162,12 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
 
             {showMsg && (
               <p className="text-[11px] font-black text-center keep-white bg-black/30 rounded-lg py-1 px-2">{downloadMsg?.text}</p>
+            )}
+
+            {granted && (
+              <p className="text-[11px] font-black text-center keep-white">
+                {isAr ? `التحميل متاح خلال ${mm}:${ss}` : `Download available for ${mm}:${ss}`}
+              </p>
             )}
 
             <button

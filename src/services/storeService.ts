@@ -46,9 +46,18 @@ function writeMap(key: string, map: Record<string, number>): void {
   try { localStorage.setItem(key, JSON.stringify(map)); } catch {}
 }
 
+export const DOWNLOAD_GRANT_TTL_MS = 60 * 60 * 1000;
+
 export function getDownloadGrant(botId: string): number | null {
   const grants = readMap(DOWNLOAD_GRANTS_KEY);
-  return grants[botId] ?? null;
+  const ts = grants[botId];
+  if (!ts) return null;
+  if (Date.now() - ts >= DOWNLOAD_GRANT_TTL_MS) {
+    delete grants[botId];
+    writeMap(DOWNLOAD_GRANTS_KEY, grants);
+    return null;
+  }
+  return ts;
 }
 
 export function grantBotDownload(botId: string): void {
