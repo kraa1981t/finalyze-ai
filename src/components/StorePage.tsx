@@ -12,11 +12,11 @@ interface StorePageProps {
 
 const MAX_DESC_LEN = 55;
 
-const CATEGORY_ICONS: Record<StoreCategory, { Icon: React.ComponentType<{ size?: number; className?: string }>; gradient: string; shadow: string }> = {
-  bot: { Icon: Bot, gradient: 'from-emerald-400 to-emerald-600', shadow: 'shadow-emerald-500/30' },
-  indicator: { Icon: Activity, gradient: 'from-sky-400 to-blue-600', shadow: 'shadow-sky-500/30' },
-  plan: { Icon: Crown, gradient: 'from-amber-400 to-orange-600', shadow: 'shadow-amber-500/30' },
-  other: { Icon: Package, gradient: 'from-violet-400 to-purple-600', shadow: 'shadow-violet-500/30' },
+const TILE_ICONS: Record<StoreCategory, React.ComponentType<{ size?: number; className?: string }>> = {
+  bot: Bot,
+  indicator: Activity,
+  plan: Crown,
+  other: Package,
 };
 
 function catLabel(isAr: boolean, key: StoreCategory): string {
@@ -38,9 +38,6 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
 
   const formatPrice = (price: number) => `$${(price / 100).toFixed(2)}`;
 
-  // Theme-inverted cards: black box in light mode, white box in dark mode
-  const cardBg = isDark ? 'bg-white' : 'bg-[#0B0F17]';
-  const cardBorder = isDark ? 'border-black/10' : 'border-white/15';
   const pageTitle = isDark ? 'text-slate-900' : 'text-white';
   const pageSub = isDark ? 'text-slate-500' : 'text-slate-400';
 
@@ -80,68 +77,61 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
     const free = isFree(bot);
     const granted = !free && !!getDownloadGrant(bot.id ?? '');
     const showMsg = downloadMsg?.botId === bot.id;
-    // Free boxes = brand green (matches the top logo), paid boxes = store-icon blue
+    // Solid brand-colored boxes (no product image): green = free, blue = paid
     const accent = free
       ? {
-          border: 'border-emerald-500/40',
-          tint: 'bg-emerald-500/[0.07]',
-          hover: isDark ? 'hover:shadow-emerald-500/25' : 'hover:shadow-emerald-500/15',
-          pill: 'text-emerald-500 border-emerald-500/60 bg-emerald-500/15',
-          chip: 'text-emerald-500 border-emerald-500/50',
-          btn: 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/30',
+          card: 'bg-gradient-to-br from-emerald-400 to-emerald-700 border-emerald-300/50 shadow-emerald-600/40',
+          box: 'bg-white/15',
+          title: 'text-white',
+          sub: 'text-emerald-50',
+          body: 'text-emerald-50',
+          link: 'text-white underline decoration-emerald-200/60 hover:decoration-white',
+          pill: 'bg-white text-emerald-700 border-white',
+          btn: 'bg-white text-emerald-600 hover:bg-emerald-50 shadow-black/20',
         }
       : {
-          border: 'border-sky-500/40',
-          tint: 'bg-sky-500/[0.07]',
-          hover: isDark ? 'hover:shadow-sky-500/25' : 'hover:shadow-sky-500/15',
-          pill: 'text-sky-400 border-sky-500/60 bg-sky-500/15',
-          chip: 'text-sky-400 border-sky-500/50',
-          btn: 'bg-sky-500 hover:bg-sky-400 shadow-sky-500/30',
+          card: 'bg-gradient-to-br from-sky-400 to-blue-700 border-sky-300/50 shadow-blue-600/40',
+          box: 'bg-white/15',
+          title: 'text-white',
+          sub: 'text-sky-50',
+          body: 'text-sky-50',
+          link: 'text-white underline decoration-sky-200/60 hover:decoration-white',
+          pill: 'bg-white text-sky-700 border-white',
+          btn: 'bg-white text-sky-600 hover:bg-sky-50 shadow-black/20',
         };
     return (
       <motion.div
         key={bot.id}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`${cardBg} ${accent.border} ${accent.tint} border rounded-xl p-3 flex flex-col gap-2 transition-all shadow-lg ${accent.hover}`}
+        className={`${accent.card} border rounded-xl p-3 flex flex-col gap-2.5 transition-all shadow-lg hover:scale-[1.02]`}
       >
-        {bot.imageData && (
-          <div className="relative -mt-3 -mx-3 mb-0">
-            <img src={bot.imageData} alt={bot.name} className="w-full h-28 object-cover rounded-t-xl rounded-b-lg" />
-            <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 text-white text-[9px] font-black uppercase tracking-wider">
-              {isAr ? 'آلية العمل' : 'How it works'}
-            </span>
-            <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 text-[10px] font-black uppercase tracking-wider border-2 ${accent.chip}`}>
-              {free ? (isAr ? 'مجاني' : 'Free') : (isAr ? 'مدفوع' : 'Premium')}
-            </span>
-          </div>
-        )}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center shadow-md bg-gradient-to-br ${CATEGORY_ICONS[categoryOf(bot)].gradient}`}>
-              {free ? <Gift size={16} className="text-black" /> : <ShoppingCart size={16} className="text-black" />}
+            <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${accent.box}`}>
+              {free ? <Gift size={18} className="text-white" /> : <ShoppingCart size={18} className="text-white" />}
             </div>
             <div className="min-w-0">
-              <h3 className={`text-sm font-black truncate ${isDark ? 'text-slate-900' : 'text-white'}`}>{bot.name}</h3>
+              <h3 className={`text-sm font-black truncate ${accent.title}`}>{bot.name}</h3>
               {bot.fileName && (
-                <span className={`text-[9px] flex items-center gap-1 mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-300'}`}>
+                <span className={`text-[9px] flex items-center gap-1 mt-0.5 ${accent.sub}`}>
                   <FileText size={9} /> {bot.fileName} {bot.fileSize ? `(${formatFileSize(bot.fileSize)})` : ''}
                 </span>
               )}
             </div>
           </div>
-          <span className={`shrink-0 px-2 py-1 rounded-lg text-[10px] font-black uppercase border-2 ${accent.pill}`}>
+          <span className={`shrink-0 px-2 py-1 rounded-lg text-[11px] font-black uppercase border-2 ${accent.pill}`}>
             {free ? (isAr ? 'مجاني' : 'Free') : formatPrice(bot.price)}
           </span>
         </div>
 
         {bot.description && (
           <div>
-            <p className={`text-xs leading-relaxed break-words ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>{shown}</p>
+            <p className={`text-xs leading-relaxed break-words font-medium ${accent.body}`}>{shown}</p>
             {needToggle && (
               <button
                 onClick={() => setExpanded((prev) => ({ ...prev, [bot.id ?? '']: !isOpen }))}
-                className={`mt-0.5 flex items-center gap-0.5 text-[10px] font-black uppercase tracking-wide transition-all ${isDark ? 'text-emerald-600 hover:text-emerald-700' : 'text-emerald-400 hover:text-emerald-300'}`}
+                className={`mt-0.5 flex items-center gap-0.5 text-[10px] font-black uppercase tracking-wide transition-all ${accent.link}`}
               >
                 {isOpen ? (isAr ? 'عرض أقل' : 'Read Less') : (isAr ? 'اقرأ المزيد' : 'Read More')}
                 {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
@@ -151,12 +141,12 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
         )}
 
         {showMsg && (
-          <p className="text-[11px] font-black text-emerald-500 text-center">{downloadMsg?.text}</p>
+          <p className="text-[11px] font-black text-center text-white bg-black/30 rounded-lg py-1 px-2">{downloadMsg?.text}</p>
         )}
 
         <button
           onClick={() => (granted ? handleGrantedDownload(bot) : handleProductAction(bot))}
-          className={`flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-white font-black text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all ${accent.btn}`}
+          className={`flex items-center justify-center gap-1.5 w-full py-2 rounded-lg font-black text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all ${accent.btn}`}
         >
           {granted ? <Download size={14} /> : free ? <Gift size={14} /> : <ShoppingCart size={14} />}
           {granted ? (isAr ? 'تحميل الآن' : 'Download Now')
@@ -177,7 +167,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
     return (
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-4 mt-2">
-          <span className={`px-3 py-1.5 rounded-xl border-2 text-base sm:text-lg font-black uppercase tracking-wide whitespace-nowrap ${free ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500' : 'bg-red-500/10 border-red-500/40 text-red-500'}`}>
+          <span className={`px-3 py-1.5 rounded-xl border-2 text-base sm:text-lg font-black uppercase tracking-wide whitespace-nowrap ${free ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500' : 'bg-sky-500/10 border-sky-500/50 text-sky-500'}`}>
             {title}
           </span>
           <div className={`flex-1 h-[3px] rounded-full ${isDark ? 'bg-black/15' : 'bg-white/20'}`} />
@@ -218,8 +208,8 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
         </button>
         {activeCat && (
           <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-md bg-gradient-to-br ${CATEGORY_ICONS[activeCat].gradient}`}>
-              {(() => { const I = CATEGORY_ICONS[activeCat].Icon; return <I size={16} className="text-black" />; })()}
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700">
+              {(() => { const I = TILE_ICONS[activeCat]; return <I size={16} className="text-white" />; })()}
             </div>
             <h2 className={`text-base sm:text-lg font-black ${pageTitle}`}>{catLabel(isAr, activeCat)}</h2>
           </div>
@@ -267,8 +257,9 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
       ) : (
         <div className="w-full">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {(Object.keys(CATEGORY_ICONS) as StoreCategory[]).map((key) => {
-              const { Icon, gradient, shadow } = CATEGORY_ICONS[key];
+            {STORE_CATEGORIES.map((s) => {
+              const key = s.key;
+              const Icon = TILE_ICONS[key];
               const c = counts[key];
               return (
                 <motion.button
@@ -276,17 +267,17 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   onClick={() => setActiveCat(key)}
-                  className={`${cardBg} ${cardBorder} border rounded-2xl p-4 flex flex-col items-center gap-2.5 transition-all shadow-lg ${shadow} hover:scale-[1.03] active:scale-95 text-center`}
+                  className="bg-gradient-to-br from-sky-500 to-blue-700 border border-sky-300/40 rounded-2xl p-4 flex flex-col items-center gap-2.5 transition-all shadow-lg shadow-blue-600/40 hover:scale-[1.03] active:scale-95 text-center"
                 >
-                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg`}>
-                    <Icon size={26} className="text-black" />
+                  <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center shadow-inner">
+                    <Icon size={26} className="text-white" />
                   </div>
-                  <span className={`text-sm font-black ${isDark ? 'text-slate-900' : 'text-white'}`}>{catLabel(isAr, key)}</span>
+                  <span className="text-sm font-black text-white">{catLabel(isAr, key)}</span>
                   <div className="flex items-center gap-2 text-[10px] font-black uppercase">
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-full bg-white/15 border border-white/40 text-white flex items-center gap-1">
                       <Gift size={10} /> {c.free} {isAr ? 'مجاني' : 'Free'}
                     </span>
-                    <span className="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-400 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-full bg-white/15 border border-white/40 text-white flex items-center gap-1">
                       <Sparkles size={10} /> {c.paid} {isAr ? 'مدفوع' : 'Paid'}
                     </span>
                   </div>
