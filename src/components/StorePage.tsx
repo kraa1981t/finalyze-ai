@@ -112,7 +112,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
               src={bot.imageData}
               alt={bot.name}
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
-              className="w-24 sm:w-28 shrink-0 object-cover min-h-full"
+              className="w-32 sm:w-40 shrink-0 object-cover min-h-full"
             />
           )}
           <div className="flex-1 flex flex-col gap-2.5 p-3 min-w-0">
