@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Wallet, Copy, Crown, Shield, ShieldOff, Timer } from 'lucide-react';
-import { StoreBot, StoreCategory, STORE_CATEGORIES, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
+import { StoreBot, StoreCategory, STORE_CATEGORIES, typesForCategory, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
 import { loadPaymentSettings, savePaymentSettings, PaymentAddress, PAYMENT_METHODS } from '../services/paymentSettings';
 
 interface StoreSettingsPageProps {
@@ -33,6 +33,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<StoreCategory>('bot');
+  const [type, setType] = useState<string>('');
   const [priceInput, setPriceInput] = useState('');
   const [file, setFile] = useState<{ fileName: string; fileType: string; fileSize: number; fileData: string } | null>(null);
   const [image, setImage] = useState<{ fileName: string; fileData: string } | null>(null);
@@ -107,6 +108,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
           description: description.trim(),
           price: cents,
           category,
+          type,
           fileName: file.fileName,
           fileType: file.fileType,
           fileSize: file.fileSize,
@@ -120,6 +122,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
           description: description.trim(),
           price: cents,
           category,
+          type,
           fileName: file.fileName,
           fileType: file.fileType,
           fileSize: file.fileSize,
@@ -144,6 +147,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
     setName(bot.name);
     setDescription(bot.description);
     setCategory(bot.category || 'bot');
+    setType(bot.type || '');
     setPriceInput(bot.price > 0 ? (bot.price / 100).toString() : '');
     setFile({ fileName: bot.fileName, fileType: bot.fileType, fileSize: bot.fileSize, fileData: bot.fileData });
     setImage(bot.imageData ? { fileName: bot.fileName, fileData: bot.imageData } : null);
@@ -483,10 +487,10 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
             <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'القسم (التصنيف)' : 'Section (Category)'}</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {STORE_CATEGORIES.map((c) => (
-                <button
+<button
                   key={c.key}
                   type="button"
-                  onClick={() => setCategory(c.key)}
+                  onClick={() => { setCategory(c.key); setType(''); }}
                   className={`px-3 py-2.5 rounded-xl border-2 text-[15px] font-black transition-all ${
                     category === c.key
                       ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400'
@@ -497,6 +501,28 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                 </button>
               ))}
             </div>
+
+          {typesForCategory(category).length > 0 && (
+            <div>
+              <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'نوع المنتج' : 'Product Type'}</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {typesForCategory(category).map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setType(type === t.key ? '' : t.key)}
+                    className={`px-3 py-2.5 rounded-xl border-2 text-[15px] font-black transition-all ${
+                      type === t.key
+                        ? 'border-sky-500 bg-sky-500/15 text-sky-400'
+                        : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
+                    }`}
+                  >
+                    {isAr ? t.labelAr : t.labelEn}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
             <p className="text-[13px] text-slate-500 mt-1.5">{isAr ? 'يظهر المنتج في هذا القسم داخل المتجر، مع صفين: مجاني (سعر 0) أعلى ثم مدفوع.' : 'The product appears under this section in the store, with two rows: free (price 0) on top then paid.'}</p>
           </div>
 

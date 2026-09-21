@@ -29,7 +29,7 @@ import { resolveConflicts } from './services/portfolioRiskService';
 import ApiKeyModal from './components/ApiKeyModal';
 import SubscriptionModal from './components/SubscriptionModal';
 import PaymentModal from './components/PaymentModal';
-import { getUnreadDevNotificationCount, fetchUserGrants } from './services/paymentRequests';
+import { getUnreadDevNotificationCount, getUnreadSiteRequestCount, fetchUserGrants } from './services/paymentRequests';
 import ProfilePage from './components/ProfilePage';
 import TransactionsPage from './components/TransactionsPage';
 import AboutPage from './components/AboutPage';
@@ -101,6 +101,7 @@ export default function App() {
   const [isPWA, setIsPWA] = useState(false);
   const [newSuggestionsCount, setNewSuggestionsCount] = useState(0);
   const [paymentRequestsCount, setPaymentRequestsCount] = useState(0);
+  const [siteRequestsCount, setSiteRequestsCount] = useState(0);
 
   useEffect(() => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
@@ -1678,6 +1679,20 @@ export default function App() {
     return () => { stopped = true; clearInterval(interval); };
   }, [user, activePage]);
 
+  // Developer: unread website creation requests (shown on the header bell)
+  useEffect(() => {
+    if (!user) return;
+    let stopped = false;
+    const refresh = async () => {
+      if (!isDeveloperSession()) return;
+      const count = await getUnreadSiteRequestCount();
+      if (!stopped) setSiteRequestsCount(count);
+    };
+    refresh();
+    const interval = setInterval(refresh, 30000);
+    return () => { stopped = true; clearInterval(interval); };
+  }, [user, activePage]);
+
   // Client: pick up a developer-approved plan grant and activate the subscription.
   // Runs on login and when returning to the app so a release works even if the
   // site was closed while the developer approved it.
@@ -1843,7 +1858,7 @@ export default function App() {
         isAnalyzing={isAnalyzing}
         newSuggestionsCount={effectivePage === 'suggestions' ? 0 : newSuggestionsCount}
         onNavigateSuggestions={() => navigateTo('suggestions')}
-        paymentRequestsCount={effectivePage === 'storeSettings' ? 0 : paymentRequestsCount}
+        paymentRequestsCount={effectivePage === 'storeSettings' ? 0 : paymentRequestsCount + siteRequestsCount}
         onNavigatePaymentRequests={() => navigateTo('storeSettings')}
         clientRadarRunning={!isDeveloperSession() && clientRadarRunning}
         showRadarComplete={!isDeveloperSession() && showRadarComplete}
@@ -2109,6 +2124,8 @@ export default function App() {
                 lang={lang}
                 onBack={goBack}
                 isDark={isDark}
+                userName={user?.displayName || ''}
+                userEmail={user?.email || ''}
                 onBuyBot={(bot) => {
                   setResumeSessionId(null);
                   setBotPurchase(bot);

@@ -4,6 +4,7 @@ import { Language } from '../lib/i18n';
 import { loadAllSessions, cancelSession, PaymentSession } from '../services/paymentSession';
 import { fetchPaymentRequests, fetchUserGrants, PaymentRequest, PaymentGrant } from '../services/paymentRequests';
 import PaymentRequestsSection from './PaymentRequestsSection';
+import SiteRequestsSection from './SiteRequestsSection';
 
 interface TransactionsPageProps {
   lang: Language;
@@ -153,6 +154,7 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
         {isDeveloper && (
           <div className="mb-6">
             <PaymentRequestsSection lang={lang === 'ar' ? 'ar' : 'en'} developerEmail={autoEmail} />
+            <SiteRequestsSection lang={lang === 'ar' ? 'ar' : 'en'} />
           </div>
         )}
 

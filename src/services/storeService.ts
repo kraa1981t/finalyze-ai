@@ -9,6 +9,7 @@ export interface StoreBot {
   description: string;
   price: number;
   category?: StoreCategory;
+  type?: string;
   fileName: string;
   fileType: string;
   fileSize: number;
@@ -23,6 +24,35 @@ export const STORE_CATEGORIES: { key: StoreCategory; labelAr: string; labelEn: s
   { key: 'plan', labelAr: 'خطط', labelEn: 'Plans' },
   { key: 'other', labelAr: 'منتجات أخرى', labelEn: 'Other Products' },
 ];
+
+// Platform types shared by bots & indicators
+export const PLATFORM_TYPES: { key: string; labelAr: string; labelEn: string }[] = [
+  { key: 'mt5', labelAr: 'ميتا تريدر 5', labelEn: 'MetaTrader 5' },
+  { key: 'tradingview', labelAr: 'ترندنق فيو', labelEn: 'TradingView' },
+  { key: 'ctrader', labelAr: 'سي تريدر', labelEn: 'cTrader' },
+];
+
+// Types for "other products"
+export const OTHER_TYPES: { key: string; labelAr: string; labelEn: string }[] = [
+  { key: 'template', labelAr: 'قوالب مواقع', labelEn: 'Website Templates' },
+  { key: 'banner', labelAr: 'بنرات إعلانية', labelEn: 'Banners' },
+  { key: 'logo', labelAr: 'شعارات', labelEn: 'Logos' },
+];
+
+export function typesForCategory(cat: StoreCategory): { key: string; labelAr: string; labelEn: string }[] {
+  if (cat === 'other') return OTHER_TYPES;
+  if (cat === 'bot' || cat === 'indicator') return PLATFORM_TYPES;
+  return [];
+}
+
+export function typeOf(bot: StoreBot): string {
+  return bot.type || '';
+}
+
+export function typeLabel(key: string, isAr: boolean): string {
+  const t = [...PLATFORM_TYPES, ...OTHER_TYPES].find((x) => x.key === key);
+  return isAr ? (t?.labelAr || '') : (t?.labelEn || '');
+}
 
 export function categoryOf(bot: StoreBot): StoreCategory {
   return bot.category || 'bot';
@@ -96,6 +126,7 @@ export async function addStoreBot(bot: Omit<StoreBot, 'id'>): Promise<void> {
     description: bot.description,
     price: bot.price,
     category: bot.category || 'bot',
+    type: bot.type || '',
     fileName: bot.fileName,
     fileType: bot.fileType,
     fileSize: bot.fileSize,
@@ -112,6 +143,7 @@ export async function updateStoreBot(id: string, data: Partial<StoreBot>): Promi
   if (data.description !== undefined) updateData.description = data.description;
   if (data.price !== undefined) updateData.price = data.price;
   if (data.category !== undefined) updateData.category = data.category;
+  if (data.type !== undefined) updateData.type = data.type;
   if (data.fileName !== undefined) updateData.fileName = data.fileName;
   if (data.fileType !== undefined) updateData.fileType = data.fileType;
   if (data.fileSize !== undefined) updateData.fileSize = data.fileSize;

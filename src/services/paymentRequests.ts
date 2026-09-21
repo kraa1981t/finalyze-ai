@@ -71,6 +71,7 @@ const REQUESTS = 'payment_requests';
 const GRANTS = 'payment_grants';
 const NOTIFS = 'dev_notifications';
 const COUNTER = 'payment_counter';
+const SITE_REQ_COLLECTION = 'analysisResults';
 
 const sanitize = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
 
@@ -247,5 +248,63 @@ export async function markAllDevNotificationsRead(): Promise<void> {
 export async function deleteDevNotification(id: string): Promise<void> {
   try {
     await deleteDoc(doc(db, NOTIFS, id));
+  } catch {}
+}
+
+// ── Website creation requests ──
+// Stored in `analysisResults` with _type='siteRequest' (same open collection the
+// suggestions use) so anonymous clients can submit and the developer gets a badge.
+export interface SiteRequest {
+  id?: string;
+  name: string;
+  contact: string;
+  message: string;
+  read: boolean;
+  createdAt: any;
+}
+
+export async function submitSiteRequest(input: { name: string; contact: string; message: string }): Promise<void> {
+  await addDoc(collection(db, SITE_REQ_COLLECTION), {
+    _type: 'siteRequest',
+    name: (input.name || '').trim(),
+    contact: (input.contact || '').trim(),
+    message: (input.message || '').trim(),
+    read: false,
+    createdAt: new Date(),
+  });
+}
+
+export async function fetchSiteRequests(): Promise<SiteRequest[]> {
+  try {
+    const snap = await getDocs(query(collection(db, SITE_REQ_COLLECTION), where('_type', '==', 'siteRequest')));
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as any) }) as SiteRequest)
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  } catch {
+    return [];
+  }
+}
+
+export async function markAllSiteRequestsRead(): Promise<void> {
+  try {
+    const snap = await getDocs(query(collection(db, SITE_REQ_COLLECTION), where('_type', '==', 'siteRequest'), where('read', '==', false)));
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.update(d.ref, { read: true }));
+    await batch.commit();
+  } catch {}
+}
+
+export async function getUnreadSiteRequestCount(): Promise<number> {
+  try {
+    const snap = await getDocs(query(collection(db, SITE_REQ_COLLECTION), where('_type', '==', 'siteRequest'), where('read', '==', false)));
+    return snap.size;
+  } catch {
+    return 0;
+  }
+}
+
+export async function deleteSiteRequest(id: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, SITE_REQ_COLLECTION, id));
   } catch {}
 }
