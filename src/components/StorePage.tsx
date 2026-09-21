@@ -178,10 +178,10 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
   };
 
   const sectionDivider = () => (
-    <div className="flex items-center gap-3 my-6">
-      <div className={`flex-1 h-[2px] rounded-full ${isDark ? 'bg-black/20' : 'bg-white/25'}`} />
-      <div className={`w-2.5 h-2.5 rounded-full ${isDark ? 'bg-black/20' : 'bg-white/25'}`} />
-      <div className={`flex-1 h-[2px] rounded-full ${isDark ? 'bg-black/20' : 'bg-white/25'}`} />
+    <div className="flex items-center gap-3 my-7 px-1">
+      <div className="flex-1 h-1 rounded-full bg-gradient-to-r from-transparent via-[#F59E0B]/80 to-[#F59E0B]" />
+      <div className="w-4 h-4 rotate-45 border-[3px] border-[#F59E0B] bg-[#F59E0B]/20 shadow-[0_0_14px_rgba(245,158,11,0.7)]" />
+      <div className="flex-1 h-1 rounded-full bg-gradient-to-l from-transparent via-[#F59E0B]/80 to-[#F59E0B]" />
     </div>
   );
 

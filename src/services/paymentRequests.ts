@@ -219,9 +219,10 @@ export async function fetchDevNotifications(): Promise<DevNotification[]> {
 
 export async function getUnreadDevNotificationCount(): Promise<number> {
   try {
-    // Only "request" notifications (new payments awaiting manual confirmation)
-    // count toward the red badge; "approved"/"rejected" ones are informational.
-    const snap = await getDocs(query(collection(db, NOTIFS), where('read', '==', false), where('type', '==', 'request')));
+    // Source of truth: payment requests still awaiting a developer decision.
+    // Notifications are informational only — a decided request must not keep
+    // the red badge alive, no matter how old its unread notification is.
+    const snap = await getDocs(query(collection(db, REQUESTS), where('status', '==', 'pending')));
     return snap.size;
   } catch {
     return 0;
