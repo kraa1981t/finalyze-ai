@@ -43,7 +43,6 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
   const cardBorder = isDark ? 'border-black/10' : 'border-white/15';
   const pageTitle = isDark ? 'text-slate-900' : 'text-white';
   const pageSub = isDark ? 'text-slate-500' : 'text-slate-400';
-  const divider = isDark ? 'bg-black/10' : 'bg-white/10';
 
   const counts = useMemo(() => {
     const out: Record<StoreCategory, { free: number; paid: number }> = { bot: { free: 0, paid: 0 }, indicator: { free: 0, paid: 0 }, plan: { free: 0, paid: 0 }, other: { free: 0, paid: 0 } };
@@ -151,29 +150,40 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
     );
   };
 
-  const renderStack = (list: StoreBot[], free: boolean) => {
+  const renderStack = (list: StoreBot[], free: boolean, cat: StoreCategory) => {
     const catBots = list.filter((b) => isFree(b) === free);
+    const base = catLabel(isAr, cat);
+    const title = isAr ? `${base} ${free ? 'مجانية' : 'مدفوعة'}` : `${free ? 'Free' : 'Paid'} ${base}`;
+    const empty = isAr
+      ? (free ? `لا توجد ${base} مجانية هنا بعد` : `لا توجد ${base} مدفوعة هنا بعد`)
+      : (free ? `No free ${base.toLowerCase()} here yet` : `No paid ${base.toLowerCase()} here yet`);
     return (
       <div className="mb-6">
-        <div className="flex items-center gap-2 mb-3 mt-1">
-          <span className={`text-xl font-black uppercase tracking-wide whitespace-nowrap ${free ? 'text-emerald-500' : 'text-red-500'}`}>
-            {isAr ? (free ? 'مجاني' : 'مدفوع') : (free ? 'Free' : 'Paid')}
+        <div className="flex items-center gap-3 mb-4 mt-2">
+          <span className={`px-3 py-1.5 rounded-xl border-2 text-base sm:text-lg font-black uppercase tracking-wide whitespace-nowrap ${free ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500' : 'bg-red-500/10 border-red-500/40 text-red-500'}`}>
+            {title}
           </span>
-          <div className={`flex-1 h-px ${divider}`} />
-          <span className={`text-[10px] font-black uppercase ${pageSub}`}>{catBots.length}</span>
+          <div className={`flex-1 h-[3px] rounded-full ${isDark ? 'bg-black/15' : 'bg-white/20'}`} />
+          <span className={`px-2.5 py-1 rounded-lg text-sm font-black ${pageSub}`}>{catBots.length}</span>
         </div>
         {catBots.length === 0 ? (
-          <p className={`text-xs font-bold text-center py-6 ${pageSub}`}>
-            {isAr ? (free ? 'لا توجد منتجات مجانية هنا بعد' : 'لا توجد منتجات مدفوعة هنا بعد') : (free ? 'No free products here yet' : 'No paid products here yet')}
-          </p>
+          <p className={`text-sm font-bold text-center py-6 ${pageSub}`}>{empty}</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <AnimatePresence>{catBots.map((bot) => renderCard(bot))}</AnimatePresence>
           </div>
         )}
       </div>
     );
   };
+
+  const sectionDivider = () => (
+    <div className="flex items-center gap-3 my-6">
+      <div className={`flex-1 h-[2px] rounded-full ${isDark ? 'bg-black/20' : 'bg-white/25'}`} />
+      <div className={`w-2.5 h-2.5 rounded-full ${isDark ? 'bg-black/20' : 'bg-white/25'}`} />
+      <div className={`flex-1 h-[2px] rounded-full ${isDark ? 'bg-black/20' : 'bg-white/25'}`} />
+    </div>
+  );
 
   const catBots = useMemo(
     () => (activeCat ? [...bots].filter((b) => categoryOf(b) === activeCat) : []),
@@ -216,7 +226,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
           <p className={`text-xs mt-3 font-bold ${pageSub}`}>{isAr ? 'جاري تحميل المتجر...' : 'Loading store...'}</p>
         </div>
       ) : activeCat ? (
-        <div className="max-w-4xl mx-auto">
+        <div className="w-full">
           {catBots.length === 0 ? (
             <div className="text-center py-20">
               <p className={`text-base font-black ${isDark ? 'text-slate-700' : 'text-slate-300'}`}>
@@ -226,8 +236,9 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
             </div>
           ) : (
             <>
-              {renderStack(catBots, true)}
-              {renderStack(catBots, false)}
+              {renderStack(catBots, true, activeCat)}
+              {sectionDivider()}
+              {renderStack(catBots, false, activeCat)}
             </>
           )}
         </div>
@@ -237,8 +248,8 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
           <p className={`text-xs mt-1 font-bold ${pageSub}`}>{isAr ? 'ترقبوا الإضافات الجديدة قريباً' : 'New additions coming soon'}</p>
         </div>
       ) : (
-        <div className="max-w-4xl mx-auto">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {(Object.keys(CATEGORY_ICONS) as StoreCategory[]).map((key) => {
               const { Icon, gradient, shadow } = CATEGORY_ICONS[key];
               const c = counts[key];

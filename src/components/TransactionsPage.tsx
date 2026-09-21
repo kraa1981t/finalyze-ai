@@ -142,7 +142,7 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
               <Receipt size={20} className="text-[#F59E0B]" />
               {isDeveloper ? (isAr ? 'تأكيد معاملات العملاء' : 'Customer Payment Confirmations') : (isAr ? 'معاملاتي' : 'My Transactions')}
             </h2>
-            <p className="text-[11px] font-bold text-slate-400 mt-0.5">
+            <p className="text-sm font-bold text-slate-400 mt-0.5">
               {isDeveloper
                 ? (isAr ? 'افحص الطلبات، قارن توقيت غرينتش، ثم أكّد أو ارفض لتحرير التحميل.' : 'Review requests, compare the GMT time, then approve or reject to release downloads.')
                 : (isAr ? 'سجل معاملاتك: المكتملة، الملغاة، والقيد التأكيد/الانتظار.' : 'Your transactions: confirmed, cancelled, pending, and active.')}
@@ -162,7 +162,7 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
             </span>
-            <p className="text-[11px] text-amber-300 font-bold">
+            <p className="text-sm text-amber-300 font-bold">
               {isAr
                 ? `لديك ${pendingCount} معاملة معلقة — استأنفها أو انتظر التأكيد`
                 : `You have ${pendingCount} pending transaction${pendingCount > 1 ? 's' : ''} — resume or wait for confirmation`}
@@ -171,14 +171,14 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
         )}
 
         <div className="flex items-center justify-between mb-3">
-          <label className="text-xs font-black uppercase tracking-wider text-slate-400">
+          <label className="text-sm font-black uppercase tracking-wider text-slate-400">
             {isAr ? 'قائمة المعاملات' : 'Transaction list'}
           </label>
           <button
             onClick={load}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-white text-[10px] font-black uppercase tracking-wider transition-all"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-white text-xs font-black uppercase tracking-wider transition-all"
           >
-            <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
             {isAr ? 'تحديث' : 'Refresh'}
           </button>
         </div>
@@ -186,14 +186,14 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
         {!loaded ? (
           <button
             onClick={load}
-            className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white text-xs font-black uppercase tracking-wider transition-all"
+            className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white text-sm font-black uppercase tracking-wider transition-all"
           >
             {isAr ? 'عرض المعاملات' : 'View transactions'}
           </button>
         ) : rows.length === 0 ? (
           <div className="rounded-2xl bg-white/5 border border-white/10 p-6 text-center">
             <Receipt size={28} className="mx-auto mb-2 text-slate-500" />
-            <p className="text-[11px] text-slate-400 font-bold">{isAr ? 'لا توجد معاملات بعد' : 'No transactions yet'}</p>
+            <p className="text-sm text-slate-400 font-bold">{isAr ? 'لا توجد معاملات بعد' : 'No transactions yet'}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -201,19 +201,19 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
               <div key={t.key} className="rounded-2xl bg-white/5 border border-white/10 p-3.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-white truncate">{t.title}</p>
-                    <p className="text-[10px] text-slate-400 font-bold truncate mt-0.5">
+                    <p className="text-base font-black text-white truncate">{t.title}</p>
+                    <p className="text-xs text-slate-400 font-bold truncate mt-0.5">
                       {autoEmail} · ${t.amountUsd.toFixed(2)} USDT
                       {t.requestNo ? ` · #${t.requestNo}` : ''}
                       {t.method ? ` · ${t.method}` : ''}
                     </p>
-                    <p className="text-[9px] text-slate-500 font-bold mt-0.5 flex items-center gap-1">
-                      <Clock size={9} />
+                    <p className="text-xs text-slate-500 font-bold mt-0.5 flex items-center gap-1">
+                      <Clock size={12} />
                       {isAr ? 'أنشئت بتوقيت غرينتش:' : 'Created (GMT):'} {fmtGmt(t.createdAt)}
                       {t.decidedAt ? ` · ${isAr ? 'الحسم:' : 'decided:'} ${fmtGmt(t.decidedAt)}` : ''}
                     </p>
                   </div>
-                  <span className={`shrink-0 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider ${stClass(t.status)}`}>
+                  <span className={`shrink-0 px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider ${stClass(t.status)}`}>
                     {stLabel(t.status)}
                   </span>
                 </div>
@@ -221,39 +221,39 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
                   {(t.status === 'active' || t.status === 'pending') && t.session && (
                     <button
                       onClick={() => onResumeSession?.(t.session!)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F59E0B] text-black font-black text-[10px] uppercase tracking-wider hover:bg-[#d97706] transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F59E0B] text-black font-black text-xs uppercase tracking-wider hover:bg-[#d97706] transition-all"
                     >
-                      <RefreshCw size={11} />
+                      <RefreshCw size={12} />
                       {isAr ? 'متابعة المعاملة' : 'Resume'}
                     </button>
                   )}
                   {t.status === 'active' && t.session && (
                     <button
                       onClick={() => handleCancel(t.session!.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-red-400 hover:border-red-500/40 text-[10px] font-black uppercase tracking-wider transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-red-400 hover:border-red-500/40 text-xs font-black uppercase tracking-wider transition-all"
                     >
-                      <XCircle size={11} />
+                      <XCircle size={12} />
                       {isAr ? 'إلغاء' : 'Cancel'}
                     </button>
                   )}
                   {t.status === 'confirmed' && t.grant && (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
-                      <CheckCircle2 size={11} />
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-black uppercase tracking-wider">
+                      <CheckCircle2 size={12} />
                       {isAr ? 'تم إفراج التحميل' : 'Download released'}
                     </span>
                   )}
                   {t.status === 'confirmed' && (
                     <button
                       onClick={() => onGoToStore?.()}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-black text-[10px] uppercase tracking-wider hover:bg-emerald-400 transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-black text-xs uppercase tracking-wider hover:bg-emerald-400 transition-all"
                     >
-                      <Store size={11} />
+                      <Store size={12} />
                       {isAr ? 'التحميل من المتجر' : 'Go to Store to download'}
                     </button>
                   )}
                   {(t.status === 'cancelled') && (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-black uppercase tracking-wider">
-                      <XCircle size={11} />
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-black uppercase tracking-wider">
+                      <XCircle size={12} />
                       {isAr ? 'تم الرفض / الإلغاء' : 'Rejected / cancelled'}
                     </span>
                   )}

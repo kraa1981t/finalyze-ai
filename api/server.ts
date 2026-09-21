@@ -1500,6 +1500,20 @@ async function fsSet(collectionName: string, id: string, data: Json): Promise<vo
   if (!resp.ok) throw new Error(`Firestore set ${collectionName}/${id} failed: ${resp.status}`);
 }
 
+// Mark every notification that refers to a given request number as read, so the
+// red badge on the header bell disappears once the developer has decided on it.
+async function markRequestNotifsRead(requestNo: unknown): Promise<void> {
+  try {
+    const target = String(requestNo);
+    const notifications = await fsList('dev_notifications');
+    await Promise.all(
+      notifications
+        .filter((n) => String(n.requestNo || '') === target)
+        .map((n) => fsPatch('dev_notifications', n.id, { read: true }, ['read']))
+    );
+  } catch {}
+}
+
 function extractAmounts(text: string): { amount: number; coin: string }[] {
   const found = new Map<string, number>();
   const push = (raw: string, coin: string) => {
@@ -1571,9 +1585,10 @@ async function releasePaymentRequest(req: Json, now: number, source: string): Pr
     titleEn: `Auto-released request #${req.requestNo}`,
     bodyAr: `${req.buyerName || req.buyerEmail} — ${product} — $${req.amountUsd}`,
     bodyEn: `${req.buyerName || req.buyerEmail} — ${product} — $${req.amountUsd}`,
-    read: false,
+    read: true,
     createdAt: now,
   });
+  await markRequestNotifsRead(req.requestNo);
 }
 
 async function checkBinanceMail(): Promise<Json> {
@@ -1921,10 +1936,11 @@ app.post("/api/payment-request-decision", async (req: any, res: any) => {
         titleEn: `Request #${reqDoc.requestNo} released`,
         bodyAr: `${reqDoc.buyerName || reqDoc.buyerEmail} — تم تحرير التحميل/الخطة`,
         bodyEn: `${reqDoc.buyerName || reqDoc.buyerEmail} — download/plan released`,
-        read: false,
+        read: true,
         createdAt: now,
       });
     }
+    await markRequestNotifsRead(reqDoc.requestNo);
     return res.json({ ok: true, status: action === 'approve' ? 'approved' : 'rejected' });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e.message });

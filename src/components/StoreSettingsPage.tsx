@@ -1,19 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Wallet, Copy } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Wallet, Copy, Crown, Shield, ShieldOff, Timer } from 'lucide-react';
 import { StoreBot, StoreCategory, STORE_CATEGORIES, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
 import { loadPaymentSettings, savePaymentSettings, PaymentAddress, PAYMENT_METHODS } from '../services/paymentSettings';
 
 interface StoreSettingsPageProps {
   lang: 'ar' | 'en';
   onBack: () => void;
+  freemiumDisabled?: boolean;
+  onFreemiumToggle?: (v: boolean) => void;
 }
 
 const MAX_FILE_BYTES = 300 * 1024;
 const MAX_DOC_BYTES = 900 * 1024;
+const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
+const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
+const TIMER_STORAGE_KEY = 'payment_timer_minutes';
 
-export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPageProps) {
+export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: externalFreemium, onFreemiumToggle }: StoreSettingsPageProps) {
   const isAr = lang === 'ar';
+  const [freemiumDisabled, setFreemiumDisabled] = useState(externalFreemium ?? localStorage.getItem('finalyze_freemium_disabled') === 'true');
+  const [editSubPrices, setEditSubPrices] = useState(() => {
+    try { const s = localStorage.getItem(SUBSCRIPTION_STORAGE_KEY); return s ? JSON.parse(s) : DEFAULT_PRICES; }
+    catch { return DEFAULT_PRICES; }
+  });
+  const [editTimer, setEditTimer] = useState(() => {
+    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
+    return saved ? parseInt(saved) : 30;
+  });
   const [bots, setBots] = useState<StoreBot[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -188,6 +202,35 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
 
   const formatPrice = (price: number) => (price <= 0 ? 'مجاني' : `$${(price / 100).toFixed(2)}`);
 
+  const saveSubPrices = () => {
+    const clean = {
+      weekly: Math.max(0.01, Number(editSubPrices.weekly) || DEFAULT_PRICES.weekly),
+      monthly: Math.max(0.01, Number(editSubPrices.monthly) || DEFAULT_PRICES.monthly),
+      yearly: Math.max(0.01, Number(editSubPrices.yearly) || DEFAULT_PRICES.yearly),
+    };
+    setEditSubPrices(clean);
+    localStorage.setItem(SUBSCRIPTION_STORAGE_KEY, JSON.stringify(clean));
+    setSuccess(isAr ? '✅ تم حفظ أسعار الخطط' : '✅ Plan prices saved');
+    setTimeout(() => setSuccess(''), 3000);
+  };
+
+  const saveTimer = () => {
+    const mins = Math.max(1, Number(editTimer) || 30);
+    setEditTimer(mins);
+    localStorage.setItem(TIMER_STORAGE_KEY, String(mins));
+    setSuccess(isAr ? `✅ تم حفظ مدة المهلة: ${mins} دقيقة` : `✅ Wait period saved: ${mins} minutes`);
+    setTimeout(() => setSuccess(''), 3000);
+  };
+
+  const toggleFreemium = () => {
+    const newVal = !freemiumDisabled;
+    setFreemiumDisabled(newVal);
+    localStorage.setItem('finalyze_freemium_disabled', newVal ? 'true' : 'false');
+    localStorage.setItem('finalyze_hide_plans', newVal ? 'true' : 'false');
+    window.dispatchEvent(new Event('freemium-toggle'));
+    onFreemiumToggle?.(newVal);
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 pb-16">
       <div className="flex items-center gap-3 mb-6">
@@ -196,6 +239,104 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
         </button>
         <h2 className="text-[30px] font-black text-white">{isAr ? 'إعدادات المتجر' : 'Store Settings'}</h2>
       </div>
+
+      {/* Plans & Payment — managed entirely from Store Settings */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8"
+      >
+        <h3 className="text-2xl font-black uppercase text-amber-400 tracking-widest mb-1 flex items-center gap-3">
+          <Crown size={24} />
+          {isAr ? 'الدفع والخطط' : 'Payments & Plans'}
+        </h3>
+        <p className="text-sm text-slate-400 mb-6">
+          {isAr
+            ? 'كل ما يخص البيع والدفع هنا: أسعار الخطط، تفعيل/تعطيل الخطط للعملاء، ومدة مهلة الدفع.'
+            : 'Everything about selling and payments lives here: plan prices, enabling/disabling plans for clients, and the payment wait period.'}
+        </p>
+
+        {/* Enable / disable plans for clients */}
+        <div className="bg-black/20 border border-white/10 rounded-xl p-4 mb-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h5 className="text-lg font-black text-white">
+                {isAr ? 'تفعيل / تعطيل الخطط للعملاء' : 'Enable / Disable Plans for Clients'}
+              </h5>
+              <p className="text-sm text-slate-400 mt-1">
+                {freemiumDisabled
+                  ? (isAr ? 'المفعّل الآن: جميع المنتجات مجانية ولا تظهر خطط للعملاء.' : 'Currently ON: all products free and plans are hidden from clients.')
+                  : (isAr ? 'المعطّل الآن: الخطط مرئية والقيود مفعلة للعملاء.' : 'Currently OFF: plans are visible and restrictions are active for clients.')}
+              </p>
+            </div>
+            <button
+              onClick={toggleFreemium}
+              className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
+                freemiumDisabled
+                  ? 'bg-emerald-500 text-white shadow-emerald-500/40'
+                  : 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+              }`}
+            >
+              {freemiumDisabled ? <Shield size={18} /> : <ShieldOff size={18} />}
+              {freemiumDisabled
+                ? (isAr ? 'مفعّل: وصول كامل' : 'ON: Full Access')
+                : (isAr ? 'معطّل: قيود مفعلة' : 'OFF: Restricted')}
+            </button>
+          </div>
+        </div>
+
+        {/* Plan prices */}
+        <div className="bg-black/20 border border-white/10 rounded-xl p-4 mb-4">
+          <h5 className="text-lg font-black text-white mb-3">{isAr ? 'أسعار الخطط' : 'Plan Prices'}</h5>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {(['weekly', 'monthly', 'yearly'] as const).map((key) => (
+              <div key={key} className="flex items-center gap-2">
+                <span className="text-base font-black text-slate-300 uppercase w-24">{isAr ? (key === 'weekly' ? 'أسبوعي' : key === 'monthly' ? 'شهري' : 'سنوي') : key}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-lg font-black text-white">$</span>
+                  <input
+                    type="number"
+                    value={editSubPrices[key]}
+                    onChange={(e) => setEditSubPrices({ ...editSubPrices, [key]: e.target.value })}
+                    className="w-24 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-lg font-bold text-white outline-none focus:border-amber-500"
+                    min="0.01" step="0.01"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={saveSubPrices}
+            className="mt-4 flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-base font-black"
+          >
+            <Check size={16} /> {isAr ? 'حفظ أسعار الخطط' : 'Save Plan Prices'}
+          </button>
+        </div>
+
+        {/* Payment wait period */}
+        <div className="bg-black/20 border border-white/10 rounded-xl p-4">
+          <h5 className="text-lg font-black text-white mb-3 flex items-center gap-2">
+            <Timer size={18} className="text-emerald-400" />
+            {isAr ? 'مدة مهلة الدفع' : 'Payment Wait Period'}
+          </h5>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              value={editTimer}
+              onChange={(e) => setEditTimer(Math.max(1, Number(e.target.value) || 1))}
+              className="w-24 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-lg font-bold text-white outline-none focus:border-emerald-500"
+              min="1"
+            />
+            <span className="text-base text-slate-400">{isAr ? 'دقيقة' : 'minutes'}</span>
+            <button
+              onClick={saveTimer}
+              className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-base font-black"
+            >
+              {isAr ? 'حفظ' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Payment Addresses */}
       <motion.div

@@ -1989,21 +1989,6 @@ export default function App() {
               />
             )}
 
-            {effectivePage === 'paymentSettings' && (
-              <PaymentModal
-                key={user?.uid || 'no-session'}
-                isOpen={true}
-                onClose={goBack}
-                planLabel=""
-                amount={0}
-                asPage
-                manageMode
-                lang={lang}
-                freemiumDisabled={freemiumDisabled}
-                onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); setDoc(doc(db, 'shared_settings', 'freemium'), { disabled: v, updatedAt: Date.now() }).catch(console.warn); }}
-              />
-            )}
-
             {effectivePage === 'clientMonitor' && isDeveloperSession() && (
               <ClientMonitor
                 key={user?.uid || 'no-session'}
@@ -2137,6 +2122,8 @@ export default function App() {
               <StoreSettingsPage
                 lang={lang}
                 onBack={goBack}
+                freemiumDisabled={freemiumDisabled}
+                onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); setDoc(doc(db, 'shared_settings', 'freemium'), { disabled: v, updatedAt: Date.now() }).catch(console.warn); }}
               />
             )}
 

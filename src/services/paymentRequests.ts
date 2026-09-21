@@ -219,7 +219,9 @@ export async function fetchDevNotifications(): Promise<DevNotification[]> {
 
 export async function getUnreadDevNotificationCount(): Promise<number> {
   try {
-    const snap = await getDocs(query(collection(db, NOTIFS), where('read', '==', false)));
+    // Only "request" notifications (new payments awaiting manual confirmation)
+    // count toward the red badge; "approved"/"rejected" ones are informational.
+    const snap = await getDocs(query(collection(db, NOTIFS), where('read', '==', false), where('type', '==', 'request')));
     return snap.size;
   } catch {
     return 0;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
-import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell, ExternalLink, Smartphone, Tablet, X, Settings, Key, DollarSign, Wallet, Users, User as UserIcon, Crown, Info, Lightbulb, Monitor, CalendarDays, Store, BarChart3 } from 'lucide-react';
+import { TrendingUp, LogIn, LogOut, Moon, Sun, Globe, ArrowLeft, Menu, Zap, AlertTriangle, MessageCircle, Upload, Download, FileAudio, Bell, ExternalLink, Smartphone, Tablet, X, Settings, Key, DollarSign, Users, User as UserIcon, Crown, Info, Lightbulb, Monitor, CalendarDays, Store, BarChart3 } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 import { AutoAnalysisSettings } from '../types';
 import { initAudio } from '../lib/audioEngine';
@@ -364,11 +364,6 @@ export default function Header({
                       <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'الخطط' : 'Plans'}</span>
                     </button>
                   )}
-                  <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('paymentSettings'); }}
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
-                    <Wallet size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'عناوين الدفع' : 'Payment Addresses'}</span>
-                  </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('storeSettings'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Store size={18} className="text-[#F59E0B]" />
@@ -688,11 +683,11 @@ export default function Header({
                 </button>
               )}
 
-              {/* Payment notifications - developer only */}
+              {/* Payment notifications - developer only → opens Transactions page */}
               {isDeveloper && (
                 <button
-                  onClick={() => onNavigatePage?.('storeSettings')}
-                  title={lang === 'ar' ? 'طلبات الدفع والإفراج' : 'Payment requests & releases'}
+                  onClick={() => onNavigatePage?.('transactions')}
+                  title={lang === 'ar' ? 'الطلبات والمعاملات' : 'Requests & transactions'}
                   className="hidden md:flex relative p-3 rounded-xl bg-emerald-500 text-white hover:bg-emerald-400 transition-all shadow-md flex-shrink-0"
                 >
                   <Bell size={22} />

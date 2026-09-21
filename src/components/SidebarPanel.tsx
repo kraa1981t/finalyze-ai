@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Key, DollarSign, Wallet, Users, Zap, User, Crown, Info, Lightbulb, Monitor, BarChart3, Smartphone, Tablet, TrendingUp, MessageCircle, LogIn, LogOut, Store, Receipt } from 'lucide-react';
+import { Settings, Key, DollarSign, Users, Zap, User, Crown, Info, Lightbulb, Monitor, BarChart3, Smartphone, Tablet, TrendingUp, MessageCircle, LogIn, LogOut, Store, Receipt } from 'lucide-react';
 import { Language } from '../lib/i18n';
 import { User as FirebaseUser } from 'firebase/auth';
 
@@ -30,7 +30,6 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
     ...(!freemiumDisabled ? [
       { icon: DollarSign, label: lang === 'ar' ? 'الخطط' : 'Plans', page: 'plans' as const, color: 'from-amber-400 to-amber-600' },
     ] : []),
-    { icon: Wallet, label: lang === 'ar' ? 'عناوين الدفع' : 'Payment Addresses', page: 'paymentSettings' as const, color: 'from-amber-400 to-amber-600' },
     { icon: Store, label: lang === 'ar' ? 'إعدادات المتجر' : 'Store Settings', page: 'storeSettings' as const, color: 'from-sky-400 to-sky-600' },
     { icon: Receipt, label: lang === 'ar' ? 'معاملاتي' : 'My Transactions', page: 'transactions' as const, color: 'from-emerald-400 to-emerald-600' },
     { icon: Store, label: lang === 'ar' ? 'عرض المتجر (اختبار)' : 'View Store (test)', page: 'store' as const, color: 'from-emerald-400 to-emerald-600' },
