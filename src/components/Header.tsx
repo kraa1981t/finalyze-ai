@@ -148,7 +148,7 @@ export default function Header({
   const [newsFlash, setNewsFlash] = useState(false);
 
   useEffect(() => {
-    if (lang !== 'en' || isDeveloper) return;
+    if (isDeveloper) return;
     let stopTimer: ReturnType<typeof setTimeout> | null = null;
     const seen = new Set<string>();
     let initialized = false;
@@ -650,6 +650,22 @@ export default function Header({
                   <span className="text-[14px] font-black uppercase tracking-[0.15em] text-white/70 leading-tight mt-1 block">For Financial<br/>Market Analysis</span>
                 )}
               </div>
+              {/* Live Prices | client only, sits beside the site name at the far edge so it never overlaps the top icon row. Flashes for one minute when urgent market news appears. */}
+              {!isDeveloper && (
+                <button
+                  onClick={() => onNavigatePage?.('prices')}
+                  className={cn(
+                    "hidden md:flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-[#4E342E] hover:bg-[#3E2723] text-white shadow-lg shadow-black/30 active:scale-95 transition-all border border-black/10 flex-shrink-0",
+                    newsFlash && "animate-flash-fast"
+                  )}
+                  title={lang === 'ar' ? 'الأسعار الحية' : 'Live Prices'}
+                >
+                  <BarChart3 size={18} className="flex-shrink-0" />
+                  <span className="text-xs font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                    {lang === 'ar' ? 'الأسعار الحية' : 'Live Prices'}
+                  </span>
+                </button>
+              )}
               {/* Mobile hamburger — stays top-right on phones, hidden on desktop (desktop uses icon-row menu) */}
               <button
                 onClick={() => setShowMobileMenu(true)}
@@ -663,24 +679,6 @@ export default function Header({
             {/* Icons - desktop only | MOBILE: all icons moved into sidebar menu */}
             {!isPWA && (
             <div className="hidden md:flex items-center gap-2 flex-1 min-w-0 justify-end">
-              {/* Live Prices | English + client only, sits to the LEFT of the store icon.
-                  Flashes for one minute when urgent market news appears. */}
-              {!isDeveloper && lang === 'en' && (
-              <button
-                onClick={() => onNavigatePage?.('prices')}
-                className={cn(
-                  "hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#4E342E] hover:bg-[#3E2723] text-white shadow-lg shadow-black/30 active:scale-95 transition-all border border-black/10 flex-shrink-0",
-                  newsFlash && "animate-flash-fast"
-                )}
-                title="Live Prices"
-              >
-                <BarChart3 size={24} className="flex-shrink-0" />
-                <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                  Live Prices
-                </span>
-              </button>
-              )}
-
               {/* Store | Client desktop only (developer uses sidebar item) — flashing "مجاني" inside the icon, widens horizontally */}
               {!isDeveloper && (
               <button
