@@ -211,12 +211,6 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
 
   return (
     <div className="w-full px-2 pb-10">
-      <div className="max-w-4xl mx-auto flex items-center gap-3 mb-4">
-        {activeCat && (
-          <h2 className={`text-lg sm:text-xl font-black ${pageTitle}`}>{catLabel(isAr, activeCat)}</h2>
-        )}
-      </div>
-
       {!activeCat && (
         <div className="text-center mb-6 px-4">
           <h2 className={`text-xl sm:text-2xl font-black ${pageTitle}`}>
@@ -235,6 +229,12 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
         </div>
       ) : activeCat ? (
         <div className="w-full">
+          <div className="flex flex-col items-center mb-3">
+            <h2 className={`text-lg sm:text-xl font-black mb-2 ${pageTitle}`}>{catLabel(isAr, activeCat)}</h2>
+            <div className="w-24 h-24 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700 keep-white">
+              {(() => { const I = TILE_ICONS[activeCat]; return <I size={52} />; })()}
+            </div>
+          </div>
           {catBots.length === 0 ? (
             <div className="text-center py-20">
               <p className={`text-base font-black ${isDark ? 'text-slate-700' : 'text-slate-300'}`}>
@@ -244,11 +244,6 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
             </div>
           ) : (
             <>
-              <div className="flex justify-center mb-2">
-                <div className="w-24 h-24 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700 keep-white">
-                  {(() => { const I = TILE_ICONS[activeCat]; return <I size={52} />; })()}
-                </div>
-              </div>
               {renderStack(catBots, true, activeCat)}
               {sectionDivider()}
               {renderStack(catBots, false, activeCat)}
