@@ -80,18 +80,39 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
     const free = isFree(bot);
     const granted = !free && !!getDownloadGrant(bot.id ?? '');
     const showMsg = downloadMsg?.botId === bot.id;
+    // Free boxes = brand green (matches the top logo), paid boxes = store-icon blue
+    const accent = free
+      ? {
+          border: 'border-emerald-500/40',
+          tint: 'bg-emerald-500/[0.07]',
+          hover: isDark ? 'hover:shadow-emerald-500/25' : 'hover:shadow-emerald-500/15',
+          pill: 'text-emerald-500 border-emerald-500/60 bg-emerald-500/15',
+          chip: 'text-emerald-500 border-emerald-500/50',
+          btn: 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/30',
+        }
+      : {
+          border: 'border-sky-500/40',
+          tint: 'bg-sky-500/[0.07]',
+          hover: isDark ? 'hover:shadow-sky-500/25' : 'hover:shadow-sky-500/15',
+          pill: 'text-sky-400 border-sky-500/60 bg-sky-500/15',
+          chip: 'text-sky-400 border-sky-500/50',
+          btn: 'bg-sky-500 hover:bg-sky-400 shadow-sky-500/30',
+        };
     return (
       <motion.div
         key={bot.id}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`${cardBg} ${cardBorder} border rounded-xl p-3 flex flex-col gap-2 transition-all shadow-lg ${isDark ? 'hover:shadow-amber-500/20' : 'hover:shadow-amber-500/10'}`}
+        className={`${cardBg} ${accent.border} ${accent.tint} border rounded-xl p-3 flex flex-col gap-2 transition-all shadow-lg ${accent.hover}`}
       >
         {bot.imageData && (
           <div className="relative -mt-3 -mx-3 mb-0">
             <img src={bot.imageData} alt={bot.name} className="w-full h-28 object-cover rounded-t-xl rounded-b-lg" />
             <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 text-white text-[9px] font-black uppercase tracking-wider">
               {isAr ? 'آلية العمل' : 'How it works'}
+            </span>
+            <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 text-[10px] font-black uppercase tracking-wider border-2 ${accent.chip}`}>
+              {free ? (isAr ? 'مجاني' : 'Free') : (isAr ? 'مدفوع' : 'Premium')}
             </span>
           </div>
         )}
@@ -109,7 +130,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
               )}
             </div>
           </div>
-          <span className={`shrink-0 px-2 py-1 rounded-lg text-[10px] font-black uppercase border-2 ${free ? 'text-emerald-400 border-emerald-400/40 bg-emerald-500/10' : 'text-amber-400 border-amber-400/40 bg-amber-500/10'}`}>
+          <span className={`shrink-0 px-2 py-1 rounded-lg text-[10px] font-black uppercase border-2 ${accent.pill}`}>
             {free ? (isAr ? 'مجاني' : 'Free') : formatPrice(bot.price)}
           </span>
         </div>
@@ -135,11 +156,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
 
         <button
           onClick={() => (granted ? handleGrantedDownload(bot) : handleProductAction(bot))}
-          className={`flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-black font-black text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all ${
-            granted || free
-              ? 'bg-emerald-500 shadow-emerald-500/30 hover:bg-emerald-400'
-              : 'bg-[#F59E0B] shadow-[#F59E0B]/30 hover:bg-[#d97706]'
-          }`}
+          className={`flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-white font-black text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all ${accent.btn}`}
         >
           {granted ? <Download size={14} /> : free ? <Gift size={14} /> : <ShoppingCart size={14} />}
           {granted ? (isAr ? 'تحميل الآن' : 'Download Now')
@@ -269,7 +286,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
                     <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center gap-1">
                       <Gift size={10} /> {c.free} {isAr ? 'مجاني' : 'Free'}
                     </span>
-                    <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-400 flex items-center gap-1">
                       <Sparkles size={10} /> {c.paid} {isAr ? 'مدفوع' : 'Paid'}
                     </span>
                   </div>
