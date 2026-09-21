@@ -219,11 +219,11 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
           <ArrowLeft size={18} />
         </button>
         {activeCat && (
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700 keep-white">
-              {(() => { const I = TILE_ICONS[activeCat]; return <I size={16} />; })()}
+          <div className="flex items-center gap-3">
+            <div className="w-24 h-24 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700 keep-white">
+              {(() => { const I = TILE_ICONS[activeCat]; return <I size={52} />; })()}
             </div>
-            <h2 className={`text-base sm:text-lg font-black ${pageTitle}`}>{catLabel(isAr, activeCat)}</h2>
+            <h2 className={`text-lg sm:text-xl font-black ${pageTitle}`}>{catLabel(isAr, activeCat)}</h2>
           </div>
         )}
       </div>
