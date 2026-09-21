@@ -8,7 +8,6 @@ import { loadPaymentSettings, ConfirmMode, DEFAULT_CONFIRM_MODE, DEFAULT_BINANCE
 import { fetchCryptoPricesDirect } from '../services/apiDirect';
 import { createPaymentRequest, checkUserGrant, consumeBotGrant } from '../services/paymentRequests';
 import { createSession, updateSession, completeSession, cancelSession, getCachedSession, getRemoteSession, readLocalSessions, genSessionId, PaymentSession } from '../services/paymentSession';
-import PaymentRequestsSection from './PaymentRequestsSection';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
@@ -809,10 +808,6 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               Save Timer
             </button>
           </div>
-        </div>
-
-        <div className="mt-4">
-          <PaymentRequestsSection lang={isAr ? 'ar' : 'en'} />
         </div>
       </>)}
 

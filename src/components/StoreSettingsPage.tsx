@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Wallet, Copy } from 'lucide-react';
 import { StoreBot, StoreCategory, STORE_CATEGORIES, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
-import PaymentRequestsSection from './PaymentRequestsSection';
 import { loadPaymentSettings, savePaymentSettings, PaymentAddress, PAYMENT_METHODS } from '../services/paymentSettings';
 
 interface StoreSettingsPageProps {
@@ -196,14 +195,6 @@ export default function StoreSettingsPage({ lang, onBack }: StoreSettingsPagePro
           <ArrowLeft size={18} />
         </button>
         <h2 className="text-[30px] font-black text-white">{isAr ? 'إعدادات المتجر' : 'Store Settings'}</h2>
-      </div>
-
-      {/* Payment confirmation requests + method switch */}
-      <div className="mb-8">
-        <h3 className="text-2xl font-black uppercase text-emerald-400 tracking-widest mb-3">
-          {isAr ? 'تأكيد الدفع والإفراج' : 'Payment Confirmation & Release'}
-        </h3>
-        <PaymentRequestsSection lang={isAr ? 'ar' : 'en'} />
       </div>
 
       {/* Payment Addresses */}

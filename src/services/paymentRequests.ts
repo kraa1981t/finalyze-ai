@@ -97,30 +97,45 @@ export async function reserveRequestNo(): Promise<number> {
 export async function createPaymentRequest(
   input: Omit<PaymentRequest, 'id' | 'requestNo' | 'status' | 'createdAt'>
 ): Promise<PaymentRequest> {
-  const requestNo = await reserveRequestNo();
-  const payload: Omit<PaymentRequest, 'id'> = {
+  // Server-side persistence: the numbered request is created from Vercel so it
+  // always lands in Firestore, regardless of client SDK write conditions.
+  const resp = await fetch('/api/payment-request/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      kind: input.kind,
+      botId: input.botId,
+      botName: input.botName,
+      planLabel: input.planLabel,
+      durationDays: input.durationDays,
+      amountUsd: input.amountUsd,
+      coinId: input.coinId,
+      coinName: input.coinName,
+      address: input.address,
+      coinAmountExpected: input.coinAmountExpected,
+      buyerName: (input.buyerName || '').trim(),
+      buyerEmail: (input.buyerEmail || '').trim(),
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    throw new Error(data?.error || 'request create failed');
+  }
+  return {
     ...input,
-    buyerEmail: (input.buyerEmail || '').toLowerCase(),
-    requestNo,
+    id: data.id,
+    requestNo: Number(data.requestNo),
     status: 'pending',
     createdAt: Date.now(),
   };
-  const ref = await addDoc(collection(db, REQUESTS), payload as any);
-  const product = input.kind === 'bot' ? (input.botName || 'Bot') : (input.planLabel || 'Plan');
-  await addDevNotification({
-    type: 'request',
-    requestNo,
-    titleAr: `طلب تأكيد دفع جديد #${requestNo}`,
-    titleEn: `New payment request #${requestNo}`,
-    bodyAr: `${input.buyerName || input.buyerEmail} — ${product} — $${input.amountUsd}`,
-    bodyEn: `${input.buyerName || input.buyerEmail} — ${product} — $${input.amountUsd}`,
-    read: false,
-    createdAt: Date.now(),
-  });
-  return { id: ref.id, ...payload };
 }
 
 export async function fetchPaymentRequests(): Promise<PaymentRequest[]> {
+  try {
+    const resp = await fetch('/api/payment-requests-list');
+    const data = await resp.json();
+    if (data.ok && Array.isArray(data.items)) return data.items as PaymentRequest[];
+  } catch {}
   try {
     const snap = await getDocs(query(collection(db, REQUESTS), orderBy('createdAt', 'desc')));
     return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as PaymentRequest[];
@@ -131,48 +146,19 @@ export async function fetchPaymentRequests(): Promise<PaymentRequest[]> {
 
 export async function approvePaymentRequest(req: PaymentRequest, developerEmail: string): Promise<void> {
   if (!req.id) return;
-  const now = Date.now();
-  await updateDoc(doc(db, REQUESTS, req.id), {
-    status: 'approved',
-    decidedAt: now,
-    decidedBy: developerEmail,
-  });
-
-  const id = grantDocId(req.buyerEmail, req.kind, req.botId);
-  const grant: Omit<PaymentGrant, 'id'> = {
-    email: (req.buyerEmail || '').toLowerCase(),
-    kind: req.kind,
-    botId: req.botId,
-    botName: req.botName,
-    planLabel: req.planLabel,
-    status: 'active',
-    requestNo: req.requestNo,
-    createdAt: now,
-  };
-  if (req.kind === 'plan') {
-    const days = Number(req.durationDays) > 0 ? Number(req.durationDays) : 30;
-    grant.expiryDate = new Date(now + days * 86400000).toISOString();
-  }
-  await setDoc(doc(db, GRANTS, id), grant as any, { merge: true });
-
-  await addDevNotification({
-    type: 'approved',
-    requestNo: req.requestNo,
-    titleAr: `تم إفراج الطلب #${req.requestNo}`,
-    titleEn: `Request #${req.requestNo} released`,
-    bodyAr: `${req.buyerName || req.buyerEmail} — تم تحرير التحميل/الخطة`,
-    bodyEn: `${req.buyerName || req.buyerEmail} — download/plan released`,
-    read: false,
-    createdAt: Date.now(),
+  await fetch('/api/payment-request-decision', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: req.id, action: 'approve', developerEmail }),
   });
 }
 
 export async function rejectPaymentRequest(req: PaymentRequest, developerEmail: string): Promise<void> {
   if (!req.id) return;
-  await updateDoc(doc(db, REQUESTS, req.id), {
-    status: 'rejected',
-    decidedAt: Date.now(),
-    decidedBy: developerEmail,
+  await fetch('/api/payment-request-decision', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: req.id, action: 'reject', developerEmail }),
   });
 }
 

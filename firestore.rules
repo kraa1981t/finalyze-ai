@@ -66,6 +66,11 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Payment sessions — in-progress transactions saved by clients (resume across devices)
+    match /payment_sessions/{sessionId} {
+      allow read, write: if true;
+    }
+
     // Site ads config — developer writes, anyone reads
     match /config/{docId} {
       allow read: if true;

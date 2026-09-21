@@ -1491,6 +1491,15 @@ async function fsAdd(collectionName: string, data: Json): Promise<void> {
   if (!resp.ok) throw new Error(`Firestore add ${collectionName} failed: ${resp.status}`);
 }
 
+async function fsSet(collectionName: string, id: string, data: Json): Promise<void> {
+  const resp = await fetch(`${FS_BASE}/${collectionName}/${encodeURIComponent(id)}?key=${FS_KEY}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fsDocBody(data)),
+  });
+  if (!resp.ok) throw new Error(`Firestore set ${collectionName}/${id} failed: ${resp.status}`);
+}
+
 function extractAmounts(text: string): { amount: number; coin: string }[] {
   const found = new Map<string, number>();
   const push = (raw: string, coin: string) => {
@@ -1801,5 +1810,125 @@ const paymentDumpHandler = async (req: any, res: any) => {
 };
 app.get("/api/payment-lookup", paymentLookupHandler);
 app.get("/api/payment-dump", paymentDumpHandler);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Server-managed payment requests — persistence from the server, not the client.
+// The browser only ever reads/decides through these endpoints, so a numbered
+// request is guaranteed to exist for the developer to review and release.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Create a pending numbered payment request (clicked "I have paid").
+app.post("/api/payment-request/create", async (req: any, res: any) => {
+  try {
+    const b = req.body || {};
+    const email = String(b.buyerEmail || '').toLowerCase().trim();
+    const kind = b.kind === 'plan' ? 'plan' : 'bot';
+    const amount = Number(b.amountUsd);
+    if (!email || !isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ ok: false, error: 'missing buyerEmail / amountUsd' });
+    }
+    const counter = await fsGet('shared_settings', 'payment_counter');
+    const last = Number(counter?.last) || 1000;
+    const requestNo = last + 1;
+    await fsPatch('shared_settings', 'payment_counter', { last: requestNo, updatedAt: Date.now() }, ['last', 'updatedAt']);
+    const payload: Json = {
+      kind,
+      botId: b.botId,
+      botName: b.botName,
+      planLabel: b.planLabel,
+      durationDays: b.durationDays,
+      amountUsd: amount,
+      coinId: b.coinId,
+      coinName: b.coinName,
+      address: b.address,
+      coinAmountExpected: b.coinAmountExpected,
+      buyerName: String(b.buyerName || ''),
+      buyerEmail: email,
+      method: 'manual',
+      status: 'pending',
+      createdAt: Date.now(),
+      requestNo,
+    };
+    const id = `req_${requestNo}`;
+    await fsSet('payment_requests', id, payload);
+    const product = kind === 'bot' ? (b.botName || 'Bot') : (b.planLabel || 'Plan');
+    await fsAdd('dev_notifications', {
+      type: 'request',
+      requestNo,
+      titleAr: `طلب تأكيد دفع جديد #${requestNo}`,
+      titleEn: `New payment request #${requestNo}`,
+      bodyAr: `${b.buyerName || email} — ${product} — $${amount}`,
+      bodyEn: `${b.buyerName || email} — ${product} — $${amount}`,
+      read: false,
+      createdAt: Date.now(),
+    });
+    return res.json({ ok: true, id, requestNo, status: 'pending' });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// List every payment request (newest first) for the developer review panel.
+app.get("/api/payment-requests-list", async (_req: any, res: any) => {
+  try {
+    const items = await fsList('payment_requests');
+    items.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+    return res.json({ ok: true, items });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Developer decision: approve (creates the release grant), or reject.
+app.post("/api/payment-request-decision", async (req: any, res: any) => {
+  try {
+    const b = req.body || {};
+    const id = String(b.id || '');
+    const action = String(b.action || '');
+    if (!id || !['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ ok: false, error: 'missing id / invalid action' });
+    }
+    const reqDoc = await fsGet('payment_requests', id);
+    if (!reqDoc) return res.status(404).json({ ok: false, error: `request ${id} not found` });
+    const now = Date.now();
+    const developerEmail = String(b.developerEmail || 'dev@finalyze').trim();
+    await fsPatch('payment_requests', id, {
+      status: action === 'approve' ? 'approved' : 'rejected',
+      decidedAt: now,
+      decidedBy: developerEmail,
+    });
+    if (action === 'approve') {
+      const grantId = grantDocIdFs(String(reqDoc.buyerEmail || ''), String(reqDoc.kind || 'bot'), reqDoc.botId);
+      const grant: Json = {
+        email: String(reqDoc.buyerEmail || '').toLowerCase(),
+        kind: reqDoc.kind || 'bot',
+        botId: reqDoc.botId,
+        botName: reqDoc.botName,
+        planLabel: reqDoc.planLabel,
+        status: 'active',
+        requestNo: reqDoc.requestNo,
+        createdAt: now,
+      };
+      if (String(reqDoc.kind) === 'plan') {
+        const days = Number(reqDoc.durationDays) > 0 ? Number(reqDoc.durationDays) : 30;
+        grant.expiryDate = new Date(now + days * 86400000).toISOString();
+      }
+      await fsSet('payment_grants', grantId, grant);
+      await fsAdd('dev_notifications', {
+        type: 'approved',
+        requestNo: reqDoc.requestNo,
+        titleAr: `تم إفراج الطلب #${reqDoc.requestNo}`,
+        titleEn: `Request #${reqDoc.requestNo} released`,
+        bodyAr: `${reqDoc.buyerName || reqDoc.buyerEmail} — تم تحرير التحميل/الخطة`,
+        bodyEn: `${reqDoc.buyerName || reqDoc.buyerEmail} — download/plan released`,
+        read: false,
+        createdAt: now,
+      });
+    }
+    return res.json({ ok: true, status: action === 'approve' ? 'approved' : 'rejected' });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 export default app;

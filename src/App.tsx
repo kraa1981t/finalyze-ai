@@ -2074,6 +2074,8 @@ export default function App() {
                 lang={lang}
                 onBack={goBack}
                 autoEmail={user?.email || ''}
+                isDeveloper={isDeveloperSession()}
+                onGoToStore={() => navigateTo('store')}
                 onResumeSession={(session) => {
                   if (session.kind === 'bot') {
                     fetchStoreBots().then((bots) => {
@@ -2122,18 +2124,10 @@ export default function App() {
                 lang={lang}
                 onBack={goBack}
                 isDark={isDark}
-                knownEmail={user?.email || ''}
                 onBuyBot={(bot) => {
                   setResumeSessionId(null);
                   setBotPurchase(bot);
                   setPaymentPlan({ amount: bot.price / 100, label: '', durationDays: 0 });
-                  navigateTo('plans');
-                }}
-                onResumeSession={(session: PaymentSession, bot?: StoreBot) => {
-                  if (bot) setBotPurchase(bot);
-                  else setBotPurchase(null);
-                  setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
-                  setResumeSessionId(session.id);
                   navigateTo('plans');
                 }}
               />
