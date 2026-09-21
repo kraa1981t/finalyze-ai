@@ -38,8 +38,8 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
 
   const formatPrice = (price: number) => `$${(price / 100).toFixed(2)}`;
 
-  const pageTitle = isDark ? 'text-slate-900' : 'text-white';
-  const pageSub = isDark ? 'text-slate-500' : 'text-slate-400';
+  const pageTitle = 'text-white';
+  const pageSub = 'text-slate-400';
 
   const counts = useMemo(() => {
     const out: Record<StoreCategory, { free: number; paid: number }> = { bot: { free: 0, paid: 0 }, indicator: { free: 0, paid: 0 }, plan: { free: 0, paid: 0 }, other: { free: 0, paid: 0 } };
@@ -237,7 +237,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
           </div>
           {catBots.length === 0 ? (
             <div className="text-center py-20">
-              <p className={`text-base font-black ${isDark ? 'text-slate-700' : 'text-slate-300'}`}>
+              <p className="text-base font-black text-slate-300">
                 {isAr ? 'لا توجد منتجات في هذا القسم بعد' : 'No products in this section yet'}
               </p>
               <p className={`text-xs mt-1 font-bold ${pageSub}`}>{isAr ? 'ترقبوا الإضافات الجديدة قريباً' : 'New additions coming soon'}</p>
@@ -252,7 +252,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot }: StorePageP
         </div>
       ) : bots.length === 0 ? (
         <div className="text-center py-20">
-          <p className={`text-base font-black ${isDark ? 'text-slate-700' : 'text-slate-300'}`}>{isAr ? 'لا توجد منتجات في المتجر بعد' : 'No products in the store yet'}</p>
+          <p className="text-base font-black text-slate-300">{isAr ? 'لا توجد منتجات في المتجر بعد' : 'No products in the store yet'}</p>
           <p className={`text-xs mt-1 font-bold ${pageSub}`}>{isAr ? 'ترقبوا الإضافات الجديدة قريباً' : 'New additions coming soon'}</p>
         </div>
       ) : (
