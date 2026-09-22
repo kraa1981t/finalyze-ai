@@ -169,13 +169,13 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
         animate={{ opacity: 1, y: 0 }}
         className={`${accent.card} border rounded-xl overflow-hidden transition-all shadow-lg hover:scale-[1.02]`}
       >
-        <div className="flex items-stretch">
+        <div className="flex flex-col">
           {bot.imageData && (
             <img
               src={bot.imageData}
               alt={bot.name}
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
-              className="w-32 sm:w-40 shrink-0 object-cover min-h-full"
+              className="w-full h-auto block"
             />
           )}
           <div className="flex-1 flex flex-col gap-2.5 p-3 min-w-0">
