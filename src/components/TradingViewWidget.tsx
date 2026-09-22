@@ -6,7 +6,6 @@ import {
   ColorType,
   LineStyle,
   CrosshairMode,
-  PriceScaleMode,
 } from 'lightweight-charts';
 import { playClickSound, playDragTick } from '../lib/tradeSounds';
 
@@ -116,8 +115,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
 
   const allPropsRef = useRef({ entryPrice, sl, tp, onSlChange, onTpChange, openedAt });
   allPropsRef.current = { entryPrice, sl, tp, onSlChange, onTpChange, openedAt };
-  const livePriceRef = useRef<number | null>(livePrice);
-  livePriceRef.current = livePrice;
 
   const lineDefs = (p = allPropsRef.current) => {
     return [
@@ -296,11 +293,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           vertLines: { color: 'rgba(255,255,255,0.04)' },
           horzLines: { color: 'rgba(255,255,255,0.04)' },
         },
-        rightPriceScale: {
-          borderColor: 'rgba(255,255,255,0.1)',
-          mode: PriceScaleMode.Normal,
-          scaleMargins: { top: 0.16, bottom: 0.16 },
-        },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
         timeScale: { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true, secondsVisible: false },
         crosshair: { mode: CrosshairMode.Normal },
       });
@@ -312,25 +305,6 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
       });
-      // Always include the trade levels (entry/SL/TP/current price) in the
-      // autoscaled price range so lines are never visually squeezed "closer"
-      // than the values configured in the trade settings — real distances shown.
-      try {
-        series.applyOptions({
-          autoscaleInfoProvider: (original: any) => {
-            const base = original ? original() : null;
-            const p = allPropsRef.current;
-            const levels = [p.entryPrice, p.sl, p.tp, livePriceRef.current].filter((n) => n != null && isFinite(n as number)) as number[];
-            if (!base || !levels.length) return base;
-            return {
-              priceRange: {
-                minValue: Math.min(base.priceRange.minValue, ...levels),
-                maxValue: Math.max(base.priceRange.maxValue, ...levels),
-              },
-            };
-          },
-        });
-      } catch {}
       chartRef.current = chart;
       seriesRef.current = series;
       updateLines();
