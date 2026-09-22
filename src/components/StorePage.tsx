@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingCart, FileText, ChevronDown, ChevronUp, Bot, Activity, Crown, Package, Download, Gift, Sparkles, ArrowLeft, Code2, LayoutTemplate, Image, PenTool, Monitor, Cpu, BarChart3, Send } from 'lucide-react';
 import { StoreBot, StoreCategory, fetchStoreBots, formatFileSize, isFree, categoryOf, typeOf, typeLabelForCat, typesForCategory, STORE_CATEGORIES, downloadBot, getDownloadGrant, consumeBotDownload, DOWNLOAD_GRANT_TTL_MS } from '../services/storeService';
+import { generateBotBanner } from '../services/storeBanner';
 import { submitSiteRequest } from '../services/paymentRequests';
 
 interface StorePageProps {
@@ -140,6 +141,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
     const ss = String(Math.floor((remainingMs % 60000) / 1000)).padStart(2, '0');
     const showMsg = downloadMsg?.botId === bot.id;
     const typeLabelTxt = typeLabelForCat(categoryOf(bot), typeOf(bot), isAr);
+    const imgSrc = bot.imageData || generateBotBanner(bot);
     // Solid brand-colored boxes (no product image): green = free, blue = paid
     const accent = free
       ? {
@@ -170,9 +172,9 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
         className={`${accent.card} border rounded-xl overflow-hidden transition-all shadow-lg hover:scale-[1.02]`}
       >
         <div className="flex flex-col">
-          {bot.imageData && (
+          {imgSrc && (
             <img
-              src={bot.imageData}
+              src={imgSrc}
               alt={bot.name}
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
               className="w-full h-auto block"
