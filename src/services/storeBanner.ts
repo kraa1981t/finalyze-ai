@@ -2,6 +2,7 @@ import { StoreBot, categoryOf, typeOf, typeLabelForCat, isFree } from './storeSe
 
 type Motif =
   | 'momentum'
+  | 'upgrade'
   | 'breakoutReversal'
   | 'breakout'
   | 'reversal'
@@ -21,7 +22,8 @@ interface StrategyProfile {
 
 const TOP_SHADES: Record<Motif, string> = {
   momentum: '#3b0764',
-  breakoutReversal: '#881337',
+  upgrade: '#082f49',
+  breakoutReversal: '#7f1d1d',
   breakout: '#78350f',
   reversal: '#9f1239',
   trend: '#134e4a',
@@ -36,6 +38,15 @@ function detectStrategy(bot: StoreBot): StrategyProfile {
   const text = baked.toLowerCase();
   const has = (words: string[]) => words.some((w) => text.includes(w) || baked.includes(w));
 
+  if (has(['plus', 'upgrad', 'improved performance'])) {
+    return {
+      motif: 'upgrade',
+      accent: '#38bdf8',
+      badge: 'PRO UPGRADED',
+      taglineAr: 'نسخة مطوّرة بجودة وأداء أعلى',
+      taglineEn: 'Upgraded performance & reliability',
+    };
+  }
   if (has(['momentum', 'زخم'])) {
     return {
       motif: 'momentum',
@@ -141,31 +152,42 @@ function motifGraphic(st: StrategyProfile): string {
       <polyline points="${pts}"/>
     </g>`;
   switch (st.motif) {
+    case 'upgrade':
+      return `
+        <path d="M436 288 L522 288 L548 252 L476 132 L404 252 Z" fill="none" stroke="${a}" stroke-width="2.5" stroke-opacity="0.35"/>
+        <path d="M476 132 L548 252 L522 288 L436 288 Z" fill="${a}" fill-opacity="0.12"/>
+        <path d="M476 252 l-20 -38 12 0 -14 -26 26 44 -12 0 z" fill="#e0f2fe"/>
+        <g fill="none" stroke="${a}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="320,260 380,236 440,240 500,196 560,200 620,158"/>
+        </g>
+        <g fill="none" stroke="${a}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.18">
+          <polyline points="320,260 380,236 440,240 500,196 560,200 620,158"/>
+        </g>`;
     case 'momentum':
       return `
-        ${path('340,266 380,248 420,254 460,218 500,226 540,180 580,188 615,150', 3.5, 0.2)}
-        ${path('340,266 380,248 420,254 460,218 500,226 540,180 580,188 615,150', 7, 0.18)}
-        <g fill="#c4b5fd" opacity="0.85">
-          <rect x="358" y="262" width="10" height="18" rx="2"/>
-          <rect x="416" y="234" width="10" height="36" rx="2"/>
-          <rect x="478" y="210" width="10" height="50" rx="2"/>
-          <rect x="538" y="186" width="10" height="64" rx="2"/>
-          <rect x="596" y="158" width="10" height="82" rx="2"/>
+        ${path('320,266 380,248 420,254 460,218 500,226 540,180 580,188 620,148', 4.5, 0.2)}
+        ${path('320,266 380,248 420,254 460,218 500,226 540,180 580,188 620,148', 10, 0.15)}
+        <g fill="#c4b5fd" opacity="0.9">
+          <rect x="356" y="262" width="12" height="18" rx="2"/>
+          <rect x="414" y="232" width="12" height="38" rx="2"/>
+          <rect x="476" y="206" width="12" height="54" rx="2"/>
+          <rect x="538" y="180" width="12" height="70" rx="2"/>
+          <rect x="598" y="152" width="12" height="88" rx="2"/>
         </g>
-        <path d="M548 116 l-18 40 h16 l-16 40 34 -54 h-17 z" fill="#fde68a"/>`;
+        <path d="M548 112 l-20 44 h17 l-17 44 40 -60 h-19 z" fill="#fde68a"/>`;
     case 'breakoutReversal':
       return `
-        <line x1="320" y1="206" x2="622" y2="206" stroke="#e2e8f0" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.75"/>
-        <g fill="none" stroke="${a}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="320,258 360,246 400,228 452,206 468,196"/>
-          <polyline points="468,196 520,270 552,246 596,282"/>
+        <line x1="310" y1="210" x2="622" y2="210" stroke="#e2e8f0" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.8"/>
+        <g fill="none" stroke="${a}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="310,262 360,248 404,226 452,202 468,192"/>
+          <polyline points="468,192 524,272 556,246 602,286"/>
         </g>
-        <g fill="none" stroke="${a}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.18">
-          <polyline points="320,258 360,246 400,228 452,206 468,196 520,270 552,246 596,282"/>
+        <g fill="none" stroke="${a}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" opacity="0.16">
+          <polyline points="310,262 360,248 404,226 452,202 468,192 524,272 556,246 602,286"/>
         </g>
-        <circle cx="468" cy="196" r="5" fill="none" stroke="#ffffff" stroke-width="2"/>
-        <path d="M596 282 l10 -16 h-20 z" fill="${a}"/>
-        <text x="582" y="178" text-anchor="end" font-family="Arial" font-weight="800" font-size="13" fill="#fecdd3">enters opposite</text>`;
+        <circle cx="468" cy="192" r="6" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+        <path d="M602 286 l12 -18 h-24 z" fill="${a}"/>
+        <text x="588" y="176" text-anchor="end" font-family="Arial" font-weight="800" font-size="14" fill="#fecdd3">enters opposite</text>`;
     case 'breakout':
       return `
         <line x1="320" y1="212" x2="622" y2="212" stroke="#e2e8f0" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.75"/>
