@@ -260,7 +260,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
         {catBots.length === 0 ? (
           <p className={`text-sm font-bold text-center py-6 ${pageSub}`}>{empty}</p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-5 md:gap-7">
             <AnimatePresence>{catBots.map((bot) => renderCard(bot))}</AnimatePresence>
           </div>
         )}
@@ -426,7 +426,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
           <p className={`text-center text-sm font-black mb-4 ${pageTitle}`}>
             {isAr ? `اختر نوع ${catLabel(isAr, activeCat as StoreCategory)}` : `Choose a ${catLabel(isAr, activeCat as StoreCategory).toLowerCase()} type`}
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 md:gap-7">
             {types.map((t) => {
               const c = typeCounts[t.key] || { free: 0, paid: 0 };
               const TypeIcon = TYPE_ICONS[t.key] || Package;
@@ -502,7 +502,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
         emptyBox(isAr ? 'لا توجد منتجات في المتجر بعد' : 'No products in the store yet', isAr ? 'ترقبوا الإضافات الجديدة قريباً' : 'New additions coming soon')
       ) : (
         <div className="w-full">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 md:gap-7">
             {STORE_CATEGORIES.map((s) => {
               const key = s.key;
               const Icon = TILE_ICONS[key];
