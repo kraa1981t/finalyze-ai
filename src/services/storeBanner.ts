@@ -38,7 +38,7 @@ const TOP_SHADES: Record<Motif, string> = {
 };
 
 function detectStrategy(bot: StoreBot): StrategyProfile {
-  const baked = `${bot.name} ${bot.description}`;
+  const baked = `${bot.name} ${bot.description} ${bot.descriptionAr || ''} ${bot.descriptionEn || ''}`;
   const text = baked.toLowerCase();
   const has = (words: string[]) => words.some((w) => text.includes(w) || baked.includes(w));
 

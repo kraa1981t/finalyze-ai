@@ -130,9 +130,10 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
   );
 
   const renderCard = (bot: StoreBot) => {
-    const needToggle = bot.description.length > MAX_DESC_LEN;
+    const desc = isAr ? (bot.descriptionAr || bot.description) : (bot.descriptionEn || bot.description);
+    const needToggle = desc.length > MAX_DESC_LEN;
     const isOpen = !!expanded[bot.id ?? ''];
-    const shown = isOpen || !needToggle ? bot.description : bot.description.slice(0, MAX_DESC_LEN) + '…';
+    const shown = isOpen || !needToggle ? desc : desc.slice(0, MAX_DESC_LEN) + '…';
     const free = isFree(bot);
     const grantTs = free ? null : getDownloadGrant(bot.id ?? '');
     const granted = grantTs !== null;

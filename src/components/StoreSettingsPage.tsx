@@ -32,6 +32,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [descriptionEn, setDescriptionEn] = useState('');
   const [category, setCategory] = useState<StoreCategory>('bot');
   const [type, setType] = useState<string>('');
   const [priceInput, setPriceInput] = useState('');
@@ -106,6 +107,8 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
         await updateStoreBot(editingBot.id!, {
           name: name.trim(),
           description: description.trim(),
+          descriptionAr: description.trim(),
+          descriptionEn: descriptionEn.trim(),
           price: cents,
           category,
           type,
@@ -120,6 +123,8 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
         await addStoreBot({
           name: name.trim(),
           description: description.trim(),
+          descriptionAr: description.trim(),
+          descriptionEn: descriptionEn.trim(),
           price: cents,
           category,
           type,
@@ -145,7 +150,8 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
   const handleEdit = (bot: StoreBot) => {
     setEditingBot(bot);
     setName(bot.name);
-    setDescription(bot.description);
+    setDescription(bot.descriptionAr || bot.description);
+    setDescriptionEn(bot.descriptionEn || (bot.descriptionAr ? '' : bot.description));
     setCategory(bot.category || 'bot');
     setType(bot.type || '');
     setPriceInput(bot.price > 0 ? (bot.price / 100).toString() : '');
@@ -159,6 +165,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
   const resetForm = () => {
     setName('');
     setDescription('');
+    setDescriptionEn('');
     setCategory('bot');
     setPriceInput('');
     setFile(null);
@@ -473,12 +480,24 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
           </div>
 
           <div>
-            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'وصف قصير' : 'Short Description'}</label>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'الوصف (بالعربية)' : 'Description (Arabic)'}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
+              dir="rtl"
               placeholder={isAr ? 'وصف مختصر لما يقدمه البوت...' : 'Short description of what the bot does...'}
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white outline-none focus:border-amber-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">Description (English)</label>
+            <textarea
+              value={descriptionEn}
+              onChange={(e) => setDescriptionEn(e.target.value)}
+              rows={2}
+              placeholder="A concise description of what the bot does..."
               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white outline-none focus:border-amber-500 resize-none"
             />
           </div>
@@ -689,7 +708,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                 {bot.imageData && (
                   <img src={bot.imageData} alt={bot.name} className="w-full h-24 object-cover rounded-xl border border-white/10 mt-3" />
                 )}
-                {bot.description && <p className="text-[15px] text-slate-400 mt-3 leading-relaxed">{bot.description}</p>}
+                {bot.description && <p className="text-[15px] text-slate-400 mt-3 leading-relaxed">{isAr ? (bot.descriptionAr || bot.description) : (bot.descriptionEn || bot.description)}</p>}
               </motion.div>
             ))}
           </AnimatePresence>

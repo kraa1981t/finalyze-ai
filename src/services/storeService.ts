@@ -7,6 +7,8 @@ export interface StoreBot {
   id?: string;
   name: string;
   description: string;
+  descriptionAr?: string;
+  descriptionEn?: string;
   price: number;
   category?: StoreCategory;
   type?: string;
@@ -131,6 +133,8 @@ export async function addStoreBot(bot: Omit<StoreBot, 'id'>): Promise<void> {
   await addDoc(collection(db, BOTS_COLLECTION), {
     name: bot.name,
     description: bot.description,
+    descriptionAr: bot.descriptionAr || '',
+    descriptionEn: bot.descriptionEn || '',
     price: bot.price,
     category: bot.category || 'bot',
     type: bot.type || '',
@@ -148,6 +152,8 @@ export async function updateStoreBot(id: string, data: Partial<StoreBot>): Promi
   const updateData: Record<string, unknown> = {};
   if (data.name !== undefined) updateData.name = data.name;
   if (data.description !== undefined) updateData.description = data.description;
+  if (data.descriptionAr !== undefined) updateData.descriptionAr = data.descriptionAr;
+  if (data.descriptionEn !== undefined) updateData.descriptionEn = data.descriptionEn;
   if (data.price !== undefined) updateData.price = data.price;
   if (data.category !== undefined) updateData.category = data.category;
   if (data.type !== undefined) updateData.type = data.type;
