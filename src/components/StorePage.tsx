@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingCart, FileText, ChevronDown, ChevronUp, Bot, Activity, Crown, Package, Download, Gift, Sparkles, ArrowLeft, Code2, LayoutTemplate, Image, PenTool, Monitor, Cpu, BarChart3, Send } from 'lucide-react';
-import { StoreBot, StoreCategory, fetchStoreBots, formatFileSize, isFree, categoryOf, typeOf, typeLabel, typesForCategory, STORE_CATEGORIES, downloadBot, getDownloadGrant, consumeBotDownload, DOWNLOAD_GRANT_TTL_MS } from '../services/storeService';
+import { StoreBot, StoreCategory, fetchStoreBots, formatFileSize, isFree, categoryOf, typeOf, typeLabelForCat, typesForCategory, STORE_CATEGORIES, downloadBot, getDownloadGrant, consumeBotDownload, DOWNLOAD_GRANT_TTL_MS } from '../services/storeService';
 import { submitSiteRequest } from '../services/paymentRequests';
 
 interface StorePageProps {
@@ -139,7 +139,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
     const mm = String(Math.floor(remainingMs / 60000)).padStart(2, '0');
     const ss = String(Math.floor((remainingMs % 60000) / 1000)).padStart(2, '0');
     const showMsg = downloadMsg?.botId === bot.id;
-    const typeLabelTxt = typeLabel(typeOf(bot), isAr);
+    const typeLabelTxt = typeLabelForCat(categoryOf(bot), typeOf(bot), isAr);
     // Solid brand-colored boxes (no product image): green = free, blue = paid
     const accent = free
       ? {
@@ -240,7 +240,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
 
   const renderStack = (list: StoreBot[], free: boolean, cat: StoreCategory, typeKey?: string) => {
     const catBots = list.filter((b) => isFree(b) === free);
-    const base = typeKey ? (typeLabel(typeKey, isAr) || catLabel(isAr, cat)) : catLabel(isAr, cat);
+    const base = typeKey ? (typeLabelForCat(cat, typeKey, isAr) || catLabel(isAr, cat)) : catLabel(isAr, cat);
     const title = isAr ? `${base} ${free ? 'مجانية' : 'مدفوعة'}` : `${free ? 'Free' : 'Paid'} ${base}`;
     const empty = isAr
       ? (free ? `لا توجد ${base} مجانية هنا بعد` : `لا توجد ${base} مدفوعة هنا بعد`)
@@ -397,7 +397,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
         <div className="w-full">
           {levelBack()}
           <div className="flex flex-col items-center mb-3">
-            <h2 className={`text-lg sm:text-xl font-black mb-2 ${pageTitle}`}>{typeLabel(activeType, isAr)}</h2>
+            <h2 className={`text-lg sm:text-xl font-black mb-2 ${pageTitle}`}>{typeLabelForCat(activeCat, activeType, isAr)}</h2>
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700 keep-white">
               {(() => { const I = TYPE_ICONS[activeType] || Package; return <I size={40} />; })()}
             </div>
@@ -438,7 +438,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
                   <div className="w-[4rem] h-[4rem] rounded-2xl bg-white/20 border border-white/40 flex items-center justify-center keep-white shadow-inner">
                     <TypeIcon size={30} strokeWidth={2.1} />
                   </div>
-                  <span className="text-base font-black keep-white">{typeLabel(t.key, isAr)}</span>
+                  <span className="text-base font-black keep-white">{typeLabelForCat(activeCat as StoreCategory, t.key, isAr)}</span>
                   <div className="flex items-center gap-2 text-sm font-black uppercase keep-white">
                     <span className="px-2.5 py-1 rounded-full bg-white/20 border border-white/40 flex items-center gap-1 keep-white">
                       <Gift size={14} /> {c.free} {isAr ? 'مجاني' : 'Free'}

@@ -54,6 +54,13 @@ export function typeLabel(key: string, isAr: boolean): string {
   return isAr ? (t?.labelAr || '') : (t?.labelEn || '');
 }
 
+export function typeLabelForCat(cat: StoreCategory, key: string, isAr: boolean): string {
+  const base = typeLabel(key, isAr);
+  if (cat === 'bot') return isAr ? `بوت ${base}` : `Bot ${base}`;
+  if (cat === 'indicator') return isAr ? `مؤشر ${base}` : `Indicator ${base}`;
+  return base;
+}
+
 export function categoryOf(bot: StoreBot): StoreCategory {
   return bot.category || 'bot';
 }

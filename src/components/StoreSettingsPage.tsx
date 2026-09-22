@@ -517,7 +517,9 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                         : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
                     }`}
                   >
-                    {isAr ? t.labelAr : t.labelEn}
+                    {isAr
+                      ? (category === 'bot' ? `بوت ${t.labelAr}` : category === 'indicator' ? `مؤشر ${t.labelAr}` : t.labelAr)
+                      : (category === 'bot' ? `Bot ${t.labelEn}` : category === 'indicator' ? `Indicator ${t.labelEn}` : t.labelEn)}
                   </button>
                 ))}
               </div>
