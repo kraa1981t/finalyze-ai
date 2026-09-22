@@ -7,6 +7,8 @@ type Motif =
   | 'breakout'
   | 'reversal'
   | 'trend'
+  | 'range'
+  | 'orderblocks'
   | 'grid'
   | 'scalping'
   | 'oscillator'
@@ -27,6 +29,8 @@ const TOP_SHADES: Record<Motif, string> = {
   breakout: '#78350f',
   reversal: '#9f1239',
   trend: '#134e4a',
+  range: '#164e63',
+  orderblocks: '#431407',
   grid: '#082f49',
   scalping: '#7c2d12',
   oscillator: '#0c4a6e',
@@ -38,7 +42,7 @@ function detectStrategy(bot: StoreBot): StrategyProfile {
   const text = baked.toLowerCase();
   const has = (words: string[]) => words.some((w) => text.includes(w) || baked.includes(w));
 
-  if (has(['plus', 'upgrad', 'improved performance'])) {
+  if (!isFree(bot) && has(['plus', 'upgrad', 'improved performance'])) {
     return {
       motif: 'upgrade',
       accent: '#38bdf8',
@@ -54,6 +58,24 @@ function detectStrategy(bot: StoreBot): StrategyProfile {
       badge: 'MOMENTUM',
       taglineAr: 'تحليل قوة الزخم واقتناص الحركات القوية',
       taglineEn: 'Momentum strength engine',
+    };
+  }
+  if (has(['order block', 'supply', 'demand', 'عرض وطلب', 'منطق'])) {
+    return {
+      motif: 'orderblocks',
+      accent: '#f97316',
+      badge: 'ORDER BLOCKS',
+      taglineAr: 'مناطق عرض وطلب على فريمات مجتمعة',
+      taglineEn: 'Supply & demand zone entries',
+    };
+  }
+  if (has(['rringe', 'range', 'رينج', 'عرضي'])) {
+    return {
+      motif: 'range',
+      accent: '#22d3ee',
+      badge: 'RANGE',
+      taglineAr: 'تداول احترافي في الاتجاه العرضي',
+      taglineEn: 'Range trading engine',
     };
   }
   if (has(['counter-trend', 'counter trend', 'reversal', 'opposite direction', 'انعكاس', 'عكس الاتجاه', 'عكس اتجاه'])) {
@@ -101,7 +123,7 @@ function detectStrategy(bot: StoreBot): StrategyProfile {
       taglineEn: 'Fast scalping entries',
     };
   }
-  if (has(['rsi', 'indicator', 'indicators', 'average', 'average', 'متوسط', 'مؤشر'])) {
+  if (has(['rsi', 'indicator', 'indicators', 'average', 'average', 'smc', 'تحليل', 'عوامل', 'متوسط', 'مؤشر'])) {
     return {
       motif: 'oscillator',
       accent: '#0ea5e9',
@@ -203,6 +225,32 @@ function motifGraphic(st: StrategyProfile): string {
         ${path('320,238 380,282 440,300 486,296 536,258 578,220 620,194', 3.5, 0.2)}
         ${path('320,238 380,282 440,300 486,296 536,258 578,220 620,194', 7, 0.18)}
         <path d="M560 214 l-16 12 18 -4 z" fill="${a}"/>`;
+    case 'range':
+      return `
+        <line x1="310" y1="182" x2="622" y2="182" stroke="#e2e8f0" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.8"/>
+        <line x1="310" y1="284" x2="622" y2="284" stroke="#e2e8f0" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.8"/>
+        <g fill="none" stroke="${a}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="320,288 352,258 384,292 416,262 448,290 480,258 512,292 544,262 576,290 620,268"/>
+        </g>
+        <g fill="none" stroke="${a}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.16">
+          <polyline points="320,288 352,258 384,292 416,262 448,290 480,258 512,292 544,262 576,290 620,268"/>
+        </g>
+        <path d="M352 172 l10 -18 h-20 z" fill="${a}"/><path d="M556 296 l12 -16 h-24 z" fill="${a}"/>`;
+    case 'orderblocks':
+      return `
+        <rect x="310" y="136" width="310" height="40" rx="6" fill="${a}" opacity="0.30"/>
+        <rect x="310" y="240" width="310" height="40" rx="6" fill="${a}" opacity="0.18"/>
+        <line x1="310" y1="136" x2="620" y2="136" stroke="${a}" stroke-width="2" stroke-opacity="0.8"/>
+        <line x1="310" y1="176" x2="620" y2="176" stroke="${a}" stroke-width="2" stroke-opacity="0.8"/>
+        <line x1="310" y1="240" x2="620" y2="240" stroke="${a}" stroke-width="2" stroke-opacity="0.6"/>
+        <line x1="310" y1="280" x2="620" y2="280" stroke="${a}" stroke-width="2" stroke-opacity="0.6"/>
+        <g fill="none" stroke="${a}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="320,184 350,176 388,180 424,170 462,174 500,262 540,258 580,266 620,262"/>
+          <polyline points="500,262 500,300"/>
+        </g>
+        <circle cx="500" cy="262" r="5" fill="${a}"/>
+        <text x="466" y="312" text-anchor="middle" font-family="Arial" font-weight="800" font-size="12" fill="#fdba74">support</text>
+        <text x="560" y="326" text-anchor="middle" font-family="Arial" font-weight="800" font-size="12" fill="#fdba74">demand zone</text>`;
     case 'trend':
       return `
         <line x1="320" y1="260" x2="620" y2="168" stroke="${a}" stroke-width="3.5" stroke-linecap="round"/>
