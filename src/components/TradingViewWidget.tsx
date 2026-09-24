@@ -8,6 +8,7 @@ import {
   CrosshairMode,
 } from 'lightweight-charts';
 import { playClickSound, playDragTick } from '../lib/tradeSounds';
+import { getInstrumentConfig } from '../lib/positionMath';
 
 // Strip outlier candles whose range exceeds median*5 — protects the chart
 // even when the backend returns stale Twelve Data with implausible spikes.
@@ -304,6 +305,24 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         borderDownColor: '#ef5350',
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
+        // Match the price-axis precision to the instrument's own decimals so the
+        // axis and TP/SL labels show EXACTLY the same numeric values as the
+        // open-trade row (5 decimals forex, 3 decimals JPY, 2 decimals others).
+        // Without this the default 2-decimal axis rounds 1.10095 -> "1.10",
+        // making every chart level look smaller than its true value.
+        priceFormat: (() => {
+          try {
+            const rawSym = (symbol || '').includes(':') ? symbol.split(':')[1] : symbol;
+            const cfg = getInstrumentConfig(rawSym);
+            return {
+              type: 'price' as const,
+              precision: cfg.decimals,
+              minMove: 1 / Math.pow(10, cfg.decimals),
+            };
+          } catch {
+            return { type: 'price' as const, precision: 2, minMove: 0.01 };
+          }
+        })(),
       });
       chartRef.current = chart;
       seriesRef.current = series;
