@@ -1432,7 +1432,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                           ) : (
                             <div className="flex items-center gap-1.5">
                               <div className="flex items-center gap-0.5">
-                                <span className={`text-base font-bold min-w-[52px] text-center ${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`} dir="ltr">{slUsd != null ? `$${slUsd.toFixed(2)}` : '—'}</span>
+                                <div className="min-w-[52px] flex flex-col items-center">
+                                        <span className={`text-base font-bold leading-tight ${t.sl != null ? 'text-red-400' : 'text-brand-text/25'}`} dir="ltr">{slUsd != null ? `$${slUsd.toFixed(2)}` : '—'}</span>
+                                        {t.sl != null && <span className="text-[10px] leading-tight text-red-400/70" dir="ltr">{fmtPrice(t.sl)}</span>}
+                                      </div>
                                 <div className="flex flex-col gap-0.5">
                                   <button onClick={() => stepOpenTradeLevel(t, 'sl', 1)} className="w-6 h-3.5 rounded bg-red-500/15 hover:bg-red-500/30 text-red-300 flex items-center justify-center active:scale-90 transition-all" title="زيادة SL">▲</button>
                                   <button onClick={() => stepOpenTradeLevel(t, 'sl', -1)} className="w-6 h-3.5 rounded bg-red-500/15 hover:bg-red-500/30 text-red-300 flex items-center justify-center active:scale-90 transition-all" title="نقص SL">▼</button>
@@ -1440,7 +1443,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                               </div>
                               <span className="text-brand-text/30">/</span>
                               <div className="flex items-center gap-0.5">
-                                <span className={`text-base font-bold min-w-[52px] text-center ${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`} dir="ltr">{tpUsd != null ? `$${tpUsd.toFixed(2)}` : '—'}</span>
+                                <div className="min-w-[52px] flex flex-col items-center">
+                                        <span className={`text-base font-bold leading-tight ${t.tp != null ? 'text-emerald-400' : 'text-brand-text/25'}`} dir="ltr">{tpUsd != null ? `$${tpUsd.toFixed(2)}` : '—'}</span>
+                                        {t.tp != null && <span className="text-[10px] leading-tight text-emerald-400/70" dir="ltr">{fmtPrice(t.tp)}</span>}
+                                      </div>
                                 <div className="flex flex-col gap-0.5">
                                   <button onClick={() => stepOpenTradeLevel(t, 'tp', 1)} className="w-6 h-3.5 rounded bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 flex items-center justify-center active:scale-90 transition-all" title="زيادة TP">▲</button>
                                   <button onClick={() => stepOpenTradeLevel(t, 'tp', -1)} className="w-6 h-3.5 rounded bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 flex items-center justify-center active:scale-90 transition-all" title="نقص TP">▼</button>

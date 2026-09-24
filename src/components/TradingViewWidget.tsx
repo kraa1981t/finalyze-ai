@@ -116,6 +116,8 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
 
   const allPropsRef = useRef({ entryPrice, sl, tp, onSlChange, onTpChange, openedAt });
   allPropsRef.current = { entryPrice, sl, tp, onSlChange, onTpChange, openedAt };
+  const livePriceRef = useRef<number | null>(livePrice);
+  livePriceRef.current = livePrice;
 
   const lineDefs = (p = allPropsRef.current) => {
     return [
@@ -294,7 +296,10 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           vertLines: { color: 'rgba(255,255,255,0.04)' },
           horzLines: { color: 'rgba(255,255,255,0.04)' },
         },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+        rightPriceScale: {
+          borderColor: 'rgba(255,255,255,0.1)',
+          scaleMargins: { top: 0.12, bottom: 0.12 },
+        },
         timeScale: { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true, secondsVisible: false },
         crosshair: { mode: CrosshairMode.Normal },
       });
@@ -323,6 +328,18 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
             return { type: 'price' as const, precision: 2, minMove: 0.01 };
           }
         })(),
+        autoscaleInfoProvider: (original: any) => {
+          const base = original ? original() : null;
+          const p = allPropsRef.current;
+          const levels = [p.entryPrice, p.sl, p.tp, livePriceRef.current].filter((n) => n != null && isFinite(n as number)) as number[];
+          if (!base || !levels.length) return base;
+          return {
+            priceRange: {
+              minValue: Math.min(base.priceRange.minValue, ...levels),
+              maxValue: Math.max(base.priceRange.maxValue, ...levels),
+            },
+          };
+        },
       });
       chartRef.current = chart;
       seriesRef.current = series;
