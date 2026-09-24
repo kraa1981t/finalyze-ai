@@ -76,6 +76,14 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
   const [drawColor, setDrawColor] = useState('#60a5fa');
   const [drawWidth, setDrawWidth] = useState(2);
+  // Visible build version: the content-hashed bundle filename served right now,
+  // so the user can verify they are running the LATEST deployment (cache proof).
+  const [bundleVer] = useState<string>(() => {
+    try {
+      const s = document.querySelector('script[src*="/assets/index-"]')?.getAttribute('src');
+      return s ? s.split('/').pop() || '' : '';
+    } catch { return ''; }
+  });
 
   // new UI states
   const [activeTool, setActiveTool] = useState('cursor');
@@ -739,6 +747,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
 
       {/* bottom nav: scroll back/forward/reset */}
       <div className="flex items-center justify-center gap-4 py-2 bg-[#0b0e14] border-t border-white/5">
+        <span className="text-[10px] text-white/30 font-mono px-2" title="App build (bundle hash)">{bundleVer || 'dev'}</span>
         <button onClick={() => { playClickSound(); scrollBy(-1); }} title="للخلف" className="w-14 h-10 rounded-lg bg-white/5 border-2 border-white/10 text-white hover:bg-white/10 active:scale-90 transition-all flex items-center justify-center text-xl">←</button>
         <button onClick={() => { playClickSound(); scrollBy(1); }} title="للأمام" className="w-14 h-10 rounded-lg bg-white/5 border-2 border-white/10 text-white hover:bg-white/10 active:scale-90 transition-all flex items-center justify-center text-xl">→</button>
         <button onClick={() => { playClickSound(); resetView(); }} title="العودة لآخر سعر (مع الحفاظ على الحجم)" className="w-14 h-10 rounded-lg bg-[#F59E0B] text-black font-black flex items-center justify-center text-xl border-2 border-[#F59E0B] active:scale-90 transition-all">↻</button>
