@@ -3,6 +3,7 @@ import { ShieldCheck, Zap, Globe, BarChart3, TrendingUp, Languages, Loader2, Che
 import { motion } from 'motion/react';
 import { Language } from '../lib/i18n';
 import { BASE_URL } from '../lib/firebase';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface LoginOverlayProps {
   onLogin: () => void;
@@ -115,16 +116,14 @@ export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, 
                 <span className="text-emerald-400 text-sm font-black uppercase tracking-wider">Free Signal Access</span>
               </div>
               <p className="text-slate-300 text-sm leading-relaxed">
-                {isAr
-                  ? 'سجل الآن واحصل على أفضل إشارة دخول قوية على جميع الأسواق وكل أنواع الرموز مجاناً!'
-                  : 'Sign up now and get the best strong entry signals across all markets and all symbol types — completely free!'}
+                {lt(lang, 516)}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-6">
               {[
-                { icon: <BarChart3 size={18} />, label: isAr ? 'تحليل لحظي' : 'Real-time Analysis' },
-                { icon: <Globe size={18} />, label: isAr ? 'تغطية عالمية' : 'Global Coverage' },
+                { icon: <BarChart3 size={18} />, label: lt(lang, 449) },
+                { icon: <Globe size={18} />, label: lt(lang, 270) },
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-3 text-slate-300 justify-end">
                   <span className="text-sm font-medium">{item.label}</span>
@@ -152,22 +151,20 @@ export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, 
             <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-center space-y-5">
               <div className="flex items-center gap-2 text-emerald-400 justify-center font-bold text-sm">
                 <ShieldCheck size={18} />
-                <span>{isAr ? 'تسجيل الدخول' : 'Sign In'}</span>
+                <span>{lt(lang, 513)}</span>
               </div>
 
               {/* Promotional line inside card */}
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
                 <p className="text-emerald-400 text-xs font-bold">
-                  {isAr
-                    ? '🎯 سجّل مجاناً واحصل على إشارات قوية لكل الأسواق'
-                    : '🎯 Sign up free & get strong signals for all markets'}
+                  {lt(lang, 23)}
                 </p>
               </div>
 
               <p className="text-xs text-slate-400 text-center">
                 {redirecting
-                  ? (isAr ? 'جاري التوجيه...' : 'Redirecting...')
-                  : (isAr ? 'سجل دخول بحساب Google' : 'Sign in with your Google account')}
+                  ? (lt(lang, 451))
+                  : (lt(lang, 515))}
               </p>
 
               <button
@@ -181,14 +178,14 @@ export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, 
                   <Globe size={18} />
                 )}
                 {redirecting
-                  ? (isAr ? 'جاري...' : 'Redirecting...')
-                  : (isAr ? 'تسجيل دخول بـ Google' : 'Sign In with Google')}
+                  ? (lt(lang, 452))
+                  : (lt(lang, 514))}
               </button>
 
               {manualAuthUrl && (
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-center space-y-2">
                   <p className="text-[11px] text-amber-400 font-bold">
-                    {isAr ? '⚠️ فشل التوجيه التلقائي' : '⚠️ Auto-redirect failed'}
+                    {lt(lang, 8)}
                   </p>
                   <a
                     href={manualAuthUrl}
@@ -196,7 +193,7 @@ export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, 
                     rel="noopener noreferrer"
                     className="inline-block w-full bg-amber-500 hover:bg-amber-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all"
                   >
-                    {isAr ? '👆 اضغط هنا' : '👆 Click here to Sign In'}
+                    {lt(lang, 24)}
                   </a>
                 </div>
               )}
@@ -213,7 +210,7 @@ export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, 
             </div>
 
             <p className="mt-4 text-center text-xs text-slate-500">
-              {isAr ? 'لا يوجد التزام، يمكنك الإلغاء في أي وقت' : 'No commitment, cancel anytime.'}
+              {lt(lang, 359)}
             </p>
           </motion.div>
         </div>

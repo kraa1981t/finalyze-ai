@@ -54,6 +54,7 @@ import SiteStatsPage from './components/SiteStatsPage';
 import AdsManager from './components/AdsManager';
 import { AdSlot } from './components/AdsManager';
 import RadarSettingsPage from './components/RadarSettingsPage';
+import { lt, ltp } from './lib/i18nUI';
 
 
 export default function App() {
@@ -136,8 +137,9 @@ export default function App() {
     if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings', 'transactions', 'prices'].includes(hash)) return hash as any;
     return 'main';
   };
-  const [activePage, setActivePage] = useState<'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'transactions' | 'prices'>(getPageFromHash);
-  const navStackRef = useRef<string[]>([]);
+  type ActivePage = 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'transactions' | 'prices';
+  const [activePage, setActivePage] = useState<ActivePage>(getPageFromHash);
+  const navStackRef = useRef<ActivePage[]>([]);
 
   const navigateTo = (page: any) => {
     if (page !== activePage) {
@@ -280,14 +282,14 @@ export default function App() {
         if (isFirstLoad && !hasPlayedFirstSound && results.length > 0) {
           hasPlayedFirstSound = true;
           const symbols = results.map((r: any) => r.symbol).join(' ΓÇó ');
-          setNewSignalAlert(lang === 'ar' ? `\u062a\u0646\u0628\u064a\u0647 \u0641\u0631\u0635\u0629 \u062c\u062f\u064a\u062f\u0629 \u2014 ${symbols}` : `New Opportunity Alert \u2014 ${symbols}`);
+          setNewSignalAlert(ltp(lang, 787, symbols));
           setTimeout(() => setNewSignalAlert(null), 10000);
           try { playAudio('success'); } catch {}
         }
         // Play sound when any new opportunity arrives
         else if (hasNewSignal) {
           const newSymbols = newSignals.map((r: any) => r.symbol).join(' ΓÇó ');
-          setNewSignalAlert(lang === 'ar' ? `\u062a\u0646\u0628\u064a\u0647 \u0641\u0631\u0635\u0629 \u062c\u062f\u064a\u062f\u0629 \u2014 ${newSymbols}` : `New Opportunity Alert \u2014 ${newSymbols}`);
+          setNewSignalAlert(ltp(lang, 787, newSymbols));
           setTimeout(() => setNewSignalAlert(null), 10000);
           try { playAudio('success'); } catch {}
         }
@@ -906,7 +908,7 @@ export default function App() {
       setTopSignals([...strong, ...regular]);
 
       if (hasBrandNewSymbol) {
-        setNewSignalAlert(lang === 'ar' ? '\u2705 \u0644\u0642\u062f \u0631\u0635\u0629 \u062a\u062f\u0627\u0648\u0644 \u0642\u0648\u064a\u0629 \u062c\u062f\u064a\u062f\u0629!' : '\u2705 New strong trading opportunity detected!');
+        setNewSignalAlert(lt(lang, 784));
         setTimeout(() => setNewSignalAlert(null), 8000);
         setTimeout(() => {
           try { initAudio(); } catch {}
@@ -1547,7 +1549,7 @@ export default function App() {
             setUser(mockUser);
             persistNeedsApiKey(null);
           } else {
-            alert(lang === 'ar' ? '\u26a0\ufe0f \u0631\u0628\u0637 \u0627\u0644\u062a\u062d\u0642\u0642 \u063a\u064a\u0631 \u0635\u0627\u0644\u062d \u0623\u0648 \u0645\u0646\u062a\u0647\u064a.' : '\u26a0\ufe0f Invalid or expired verification link.');
+            alert(lt(lang, 782));
             window.history.replaceState({}, '', window.location.pathname);
           }
         } catch (e) {
@@ -1583,7 +1585,7 @@ export default function App() {
       }
 
       if (isBannedEmail(email) || existing?.status === 'banned') {
-        setLoginError(lang === 'ar' ? '\u062d\u0635\u0631 \u0627\u0644\u062d\u0633\u0627\u0628 \u0645\u062d\u0638\u0648\u0638. \u0644\u0627 \u064a\u0645\u0643\u0646\u0643 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644.' : 'This account is banned. You cannot log in.');
+        setLoginError(lt(lang, 767));
         setRedirecting(false);
         return;
       }
@@ -1904,7 +1906,7 @@ export default function App() {
             className="bg-brand-alt border-b border-red-500/20 py-2 text-center"
           >
             <span className="text-red-500 text-[10px] font-black uppercase tracking-widest">
-              {lang === 'ar' ? '\u0644\u0627 \u062a\u0648\u062c\u062f \u0625\u0634\u0627\u0631\u0627\u062a \u0642\u0648\u064a\u0629 \u062d\u0627\u0644\u064a\u0627\u064b' : 'No strong signals currently'}
+              {lt(lang, 735)}
             </span>
           </motion.div>
         )}
@@ -2147,7 +2149,7 @@ export default function App() {
             {effectivePage === 'manualAnalysis' && isDeveloperSession() && (
               <div className="max-w-4xl mx-auto px-4 py-8">
                 <h2 className="text-2xl font-black text-brand-text mb-6 text-center">
-                  {lang === 'ar' ? 'التحليل اليدوي' : 'Manual Analysis'}
+                  {lt(lang, 728)}
                 </h2>
                 <AnalysisForm
                   user={user} lang={lang} settings={settings}
@@ -2253,7 +2255,7 @@ export default function App() {
               <div className="max-w-4xl mx-auto mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                 <p className="text-amber-400 text-sm font-medium">{analysisError}</p>
                 <button onClick={() => { setAnalysisResults(null); setAnalysisError(null); }} className="mt-2 text-xs text-amber-400 hover:text-amber-300 underline">
-                  {lang === 'ar' ? '\u062a\u0639\u064a\u062f \u0644\u0644\u0645\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649' : 'Try again'}
+                  {lt(lang, 770)}
                 </button>
               </div>
             )}
@@ -2268,7 +2270,7 @@ export default function App() {
             className="fixed bottom-6 right-6 z-[90] flex items-center gap-3 bg-[#F59E0B] hover:bg-[#d97706] transition-all rounded-2xl px-5 py-4 shadow-2xl shadow-[#F59E0B]/30 active:scale-95 group"
           >
             <ArrowLeft size={22} className="text-black group-hover:-translate-x-1 transition-transform" />
-            <span className="text-sm font-black text-black">{lang === 'ar' ? '\u0639\u0648\u062f\u0629 \u0644\u0644\u062e\u0644\u0641' : 'Go back'}</span>
+            <span className="text-sm font-black text-black">{lt(lang, 720)}</span>
           </button>
         )}
       </main>

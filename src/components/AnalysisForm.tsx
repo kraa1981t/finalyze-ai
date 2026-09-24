@@ -12,11 +12,12 @@ import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
 import { getStatus, subscribe } from '../services/rateLimitTracker';
 import { getOpenStockExchanges } from '../lib/marketHours';
+import { lt, ltp } from '../lib/i18nUI';
 
 interface AnalysisFormProps {
   user: User | null;
   onBegin: () => void;
-  onProgress: (current: string, total: number, index: number, failed?: number) => void;
+  onProgress: (current: string, total: number, index: number, failed?: number, exchange?: string) => void;
   onResult: (res: AnalysisResult[]) => void;
   onError: (msg?: string, allFailed?: boolean) => void;
   lang: Language;
@@ -177,7 +178,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
     }
 
     if (!isMarketOpen(data.type)) {
-      setFormErrors([lang === 'ar' ? 'عفواً.. هذه الأسواق مغلقة حالياً ولا يمكن تحليلها' : 'Sorry.. These markets are currently closed and cannot be analyzed']);
+      setFormErrors([lt(lang, 756)]);
       return;
     }
 
@@ -266,13 +267,11 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
       if (failedSymbols.length > 0) {
         const failedList = failedSymbols.map(f => `${f.symbol}`).join(', ');
         const sampleErrors = [...new Set(failedSymbols.map(f => f.error))].slice(0, 3).join('; ');
-        const summary = lang === 'ar'
-          ? `نجح ${results.length} من ${allSymbolsToAnalyze.length}. فشل ${failedSymbols.length}: ${failedList}. (${sampleErrors})`
-          : `${results.length}/${allSymbolsToAnalyze.length} succeeded. ${failedSymbols.length} failed: ${failedList}. (${sampleErrors})`;
+        const summary = ltp(lang, 788, String(results.length), String(allSymbolsToAnalyze.length), String(failedSymbols.length), failedList, sampleErrors);
         setFormErrors(failedSymbols.map(f => `${f.symbol}: ${f.error}`));
         onError(summary, results.length === 0);
       } else if (results.length === 0) {
-        onError(lang === 'ar' ? 'فشل التحليل لجميع الرموز' : 'Analysis failed for all symbols', true);
+        onError(lt(lang, 696), true);
       }
     } catch (error: any) {
       console.error("[Global Form Error]:", error);
@@ -306,13 +305,13 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
           {rateLimitActive && (
             <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-2 text-red-400 text-xs font-bold">
               <Ban size={14} />
-              <span>{lang === 'ar' ? `معدل الطلبات ممتلئ — يعود بعد ${rateLimitCountdown} ثانية` : `Rate limit exceeded — resets in ${rateLimitCountdown}s`}</span>
+              <span>{ltp(lang, 789, String(rateLimitCountdown))}</span>
             </div>
           )}
           {!rateLimitActive && (
             <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2 text-emerald-400 text-xs font-bold">
               <Activity size={14} />
-              <span>{lang === 'ar' ? 'الطلبات نشطة' : 'Requests active'}</span>
+              <span>{lt(lang, 748)}</span>
             </div>
           )}
           <label className="text-base font-black text-brand-text opacity-100 uppercase tracking-widest pl-2">{t.selectMarket}</label>
@@ -385,7 +384,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-muted" size={14} />
                            <input 
                              type="text"
-                             placeholder={lang === 'ar' ? 'بحث عن أي رمز عالمي...' : 'Search global symbols...'}
+                             placeholder={lt(lang, 754)}
                              value={dropdownSearch}
                              onChange={(e) => setDropdownSearch(e.target.value)}
                              className="w-full bg-brand-text/5 border border-brand-text/10 rounded-2xl py-3 pl-10 pr-4 text-sm font-bold text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
@@ -405,7 +404,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                             {dropdownSearch ? (
                               <>
                                 <h6 className="text-xs font-black text-primary uppercase tracking-widest px-1">
-                                  {lang === 'ar' ? 'نتائج البحث' : 'Search Results'}
+                                  {lt(lang, 753)}
                                 </h6>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                   {(() => {
@@ -444,7 +443,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                                         ))}
                                         {results.length === 0 && (
                                           <p className="text-xs text-brand-muted w-full text-center py-4 italic col-span-full">
-                                            {lang === 'ar' ? 'لا توجد رموز إضافية مطابقة للبحث' : 'No additional matching symbols found'}
+                                            {lt(lang, 734)}
                                           </p>
                                         )}
                                       </>
@@ -454,7 +453,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                               </>
                             ) : (
                               <div className="py-6 text-center text-sm text-brand-muted font-bold italic">
-                                {lang === 'ar' ? 'اكتب للبحث عن رموز إضافية...' : 'Type to search for additional symbols...'}
+                                {lt(lang, 772)}
                               </div>
                             )}
                           </div>
@@ -466,7 +465,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                              onClick={() => setActiveDropdown(null)}
                              className="w-full py-3 bg-brand-text/5 hover:bg-brand-text/10 rounded-xl text-sm font-black text-brand-text transition-all uppercase tracking-widest"
                            >
-                             {lang === 'ar' ? 'إغلاق القائمة' : 'Close Menu'}
+                             {lt(lang, 707)}
                            </button>
                         </div>
                       </motion.div>
@@ -507,7 +506,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
              </div>
              ) : (
                <span className="text-xs font-black text-amber-400 uppercase tracking-widest">
-                 {lang === 'ar' ? `5/${FREE_SYMBOLS[selectedType]?.length || 5}` : `${selectedSymbols.filter(s => FREE_SYMBOLS[selectedType]?.includes(s)).length}/${FREE_SYMBOLS[selectedType]?.length || 5}`}
+                 {ltp(lang, 790, String(selectedSymbols.filter(s => FREE_SYMBOLS[selectedType]?.includes(s)).length), String(FREE_SYMBOLS[selectedType]?.length || 5))}
                </span>
              )}
           </div>
@@ -517,7 +516,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             <div className="space-y-8">
               {(!hasActivePlan ? (() => {
                 const freeSyms = FREE_SYMBOLS[selectedType] || [];
-                return [{ label: lang === 'ar' ? 'أشهر الرموز' : 'Popular Free', symbols: freeSyms }];
+                return [{ label: lt(lang, 739), symbols: freeSyms }];
               })() : SYMBOL_GROUPS[selectedType])?.map((group, index, arr) => {
                 let groupSymbols = hasActivePlan ? group.symbols.filter(sym => !hiddenSymbols.includes(sym)) : [...group.symbols];
                 
@@ -648,7 +647,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                />
                {!hasActivePlan && (
                  <p className="text-[10px] text-amber-400 mt-2 font-bold">
-                   {lang === 'ar' ? 'متاح فقط للمشتركين. اشترك لتحليل رموز إضافية.' : 'Available only for subscribers. Subscribe to analyze more symbols.'}
+                   {lt(lang, 703)}
                  </p>
                )}
             </div>
@@ -683,13 +682,13 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   <div className="flex flex-col">
                     <span className="text-base font-black uppercase text-black">{t[style.label as keyof typeof t]}</span>
                     <span className="text-sm text-black/70">
-                      {style.id === 'swing_trading' ? (lang === 'ar' ? 'تركيز على الاتجاهات الكبرى (4س/يومي) - الأكثر أماناً' : 'Focus on major trends (H4/D1) - Safest') : ''}
-                      {style.id === 'day_trading' ? (lang === 'ar' ? 'تحركات اليوم الحالي فقط' : 'Current day moves only') : ''}
-                      {style.id === 'scalping' ? (lang === 'ar' ? 'تحركات لحظية سريعة جداً' : 'Very fast intraday moves') : ''}
+                      {style.id === 'swing_trading' ? (lt(lang, 714)) : ''}
+                      {style.id === 'day_trading' ? (lt(lang, 710)) : ''}
+                      {style.id === 'scalping' ? (lt(lang, 776)) : ''}
                     </span>
                     {isLocked && (
                       <span className="text-[10px] text-amber-400 font-black uppercase tracking-widest">
-                        {lang === 'ar' ? '🔒 مميز • اشترك' : '🔒 Premium • Subscribe'}
+                        {lt(lang, 785)}
                       </span>
                     )}
                   </div>
@@ -745,7 +744,7 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   onClick={() => abortRef.current?.abort()}
                   className="px-5 py-2 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-black uppercase tracking-widest transition-all ml-4"
                 >
-                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                  {lt(lang, 120)}
                 </button>
               </div>
             ) : (
@@ -763,9 +762,9 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
             const subPrices = (() => { try { return JSON.parse(localStorage.getItem('subscription_prices') || '{}'); } catch { return {}; } })();
             const prices = { weekly: subPrices.weekly ?? 2, monthly: subPrices.monthly ?? 6, yearly: subPrices.yearly ?? 60 };
             const plans = [
-              { key: 'weekly', label: lang === 'ar' ? 'أسبوعي' : 'Weekly', price: prices.weekly, desc: lang === 'ar' ? 'تحليل مؤسسي لمدة 7 أيام' : '7 days analysis', icon: 'Weekly', color: 'from-sky-500 to-sky-600', border: 'border-sky-500/30' },
-              { key: 'monthly', label: lang === 'ar' ? 'شهري' : 'Monthly', price: prices.monthly, desc: lang === 'ar' ? 'وصول كامل للسوق' : 'Full market access', color: 'from-emerald-500 to-emerald-600', border: 'border-emerald-500/30', popular: true },
-              { key: 'yearly', label: lang === 'ar' ? 'سنوي' : 'Yearly', price: prices.yearly, desc: lang === 'ar' ? 'أفضل قيمة + دعم VIP' : 'Best value + VIP', color: 'from-amber-500 to-orange-600', border: 'border-amber-500/30', best: true },
+              { key: 'weekly', label: lt(lang, 681), price: prices.weekly, desc: lt(lang, 693), icon: 'Weekly', color: 'from-sky-500 to-sky-600', border: 'border-sky-500/30' },
+              { key: 'monthly', label: lt(lang, 682), price: prices.monthly, desc: lt(lang, 719), color: 'from-emerald-500 to-emerald-600', border: 'border-emerald-500/30', popular: true },
+              { key: 'yearly', label: lt(lang, 683), price: prices.yearly, desc: lt(lang, 704), color: 'from-amber-500 to-orange-600', border: 'border-amber-500/30', best: true },
             ];
             return (
             <motion.div
@@ -788,8 +787,8 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                       <Zap size={22} className="text-white" />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-lg font-black text-white">{lang === 'ar' ? 'ميزة مميزة' : 'Premium Feature'}</h3>
-                      <p className="text-xs text-slate-400">{lang === 'ar' ? 'هذه الميزة متاحة فقط للمشتركين' : 'Available for subscribers only'}</p>
+                      <h3 className="text-lg font-black text-white">{lt(lang, 740)}</h3>
+                      <p className="text-xs text-slate-400">{lt(lang, 702)}</p>
                     </div>
                   </div>
                   <button
@@ -824,19 +823,19 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                       {plan.popular && (
                         <span className="mt-2 text-[9px] text-emerald-400 font-black uppercase tracking-widest flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                          {lang === 'ar' ? 'للوصول الكامل' : 'Full Access'}
+                          {lt(lang, 718)}
                         </span>
                       )}
                       {plan.best && (
                         <span className="mt-2 text-[9px] text-amber-400 font-black uppercase tracking-widest flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                          {lang === 'ar' ? 'الوصول الكامل' : 'Full Access'}
+                          {lt(lang, 718)}
                         </span>
                       )}
                       {plan.key === 'weekly' && (
                         <span className="mt-2 text-[9px] text-sky-400 font-black uppercase tracking-widest flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                          {lang === 'ar' ? 'جرب لمدة أسبوع' : 'Try for a week'}
+                          {lt(lang, 771)}
                         </span>
                       )}
                     </div>
@@ -847,13 +846,13 @@ export default function AnalysisForm({ user, onBegin, onProgress, onResult, onEr
                   onClick={() => { setShowUpgradeOverlay(false); onUpgrade(); }}
                   className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-black text-sm uppercase tracking-widest shadow-lg hover:opacity-90 transition-all active:scale-95"
                 >
-                  {lang === 'ar' ? 'اشترك الآن وتمتع بكامل الصلاحية' : 'Subscribe Now & Unlock All Features'}
+                  {lt(lang, 761)}
                 </button>
                 <button
                   onClick={() => setShowUpgradeOverlay(false)}
                   className="text-xs text-slate-500 hover:text-white underline transition-colors"
                 >
-                  {lang === 'ar' ? 'لا شكراً، استمر مع الخطة المجانية' : 'No thanks, continue with free plan'}
+                  {lt(lang, 736)}
                 </button>
               </motion.div>
             </motion.div>

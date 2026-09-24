@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Globe, ExternalLink, Eye, Users, Calendar, TrendingUp, RefreshCw, BarChart3, MapPin, Link2, Trash2 } from 'lucide-react';
 import { Language } from '../lib/i18n';
 import { getSiteStats, getDailyStats, SiteStats, resetAllStats } from '../lib/tracking';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface SiteStatsPageProps {
   lang: Language;
@@ -65,7 +66,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
   }, []);
 
   const handleReset = async () => {
-    const confirmMsg = isAr ? 'هل أنت متأكد من مسح جميع الإحصائيات؟ لا يمكن التراجع.' : 'Are you sure you want to reset all statistics? This cannot be undone.';
+    const confirmMsg = lt(lang, 89);
     if (!confirm(confirmMsg)) return;
     setResetting(true);
     try {
@@ -96,8 +97,8 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
             <BarChart3 size={24} className="text-black" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white">{isAr ? 'إحصائيات الموقع' : 'Site Statistics'}</h2>
-            <p className="text-sm text-white/50">{isAr ? 'تتبع الزيارات والمصادر والدول' : 'Track visits, sources & countries'}</p>
+            <h2 className="text-2xl font-black text-white">{lt(lang, 517)}</h2>
+            <p className="text-sm text-white/50">{lt(lang, 572)}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -107,7 +108,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 text-sm font-bold transition-all"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            {isAr ? 'تحديث' : 'Refresh'}
+            {lt(lang, 453)}
           </button>
           <button
             onClick={handleReset}
@@ -115,7 +116,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-sm font-bold transition-all"
           >
             <Trash2 size={16} className={resetting ? 'animate-spin' : ''} />
-            {isAr ? 'مسح الكل' : 'Reset All'}
+            {lt(lang, 468)}
           </button>
         </div>
       </div>
@@ -127,22 +128,22 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
             <div className="bg-brand-alt rounded-2xl p-5 border border-white/10 text-center">
               <Eye size={22} className="text-blue-400 mx-auto mb-2" />
               <div className="text-4xl font-black text-blue-400">{stats.totalViews}</div>
-              <div className="text-sm text-white/60 font-bold mt-1">{isAr ? 'مشاهدات إجمالية' : 'Total Views'}</div>
+              <div className="text-sm text-white/60 font-bold mt-1">{lt(lang, 569)}</div>
             </div>
             <div className="bg-brand-alt rounded-2xl p-5 border border-white/10 text-center">
               <Calendar size={22} className="text-emerald-400 mx-auto mb-2" />
               <div className="text-4xl font-black text-emerald-400">{stats.todayViews}</div>
-              <div className="text-sm text-white/60 font-bold mt-1">{isAr ? 'مشاهدات اليوم' : 'Today Views'}</div>
+              <div className="text-sm text-white/60 font-bold mt-1">{lt(lang, 564)}</div>
             </div>
             <div className="bg-brand-alt rounded-2xl p-5 border border-white/10 text-center">
               <TrendingUp size={22} className="text-amber-400 mx-auto mb-2" />
               <div className="text-4xl font-black text-amber-400">{stats.totalClicks}</div>
-              <div className="text-sm text-white/60 font-bold mt-1">{isAr ? 'نقرات إجمالية' : 'Total Clicks'}</div>
+              <div className="text-sm text-white/60 font-bold mt-1">{lt(lang, 567)}</div>
             </div>
             <div className="bg-brand-alt rounded-2xl p-5 border border-white/10 text-center">
               <Users size={22} className="text-purple-400 mx-auto mb-2" />
               <div className="text-4xl font-black text-purple-400">{stats.uniqueVisitors}</div>
-              <div className="text-sm text-white/60 font-bold mt-1">{isAr ? 'زوار فريدين' : 'Unique Visitors'}</div>
+              <div className="text-sm text-white/60 font-bold mt-1">{lt(lang, 586)}</div>
             </div>
           </div>
 
@@ -150,15 +151,15 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-brand-alt rounded-2xl p-4 border border-white/10 text-center">
               <div className="text-3xl font-black text-blue-400">{stats.todayViews}</div>
-              <div className="text-sm text-white/60 font-bold mt-1">{isAr ? 'مشاهدات اليوم' : "Today's Views"}</div>
+              <div className="text-sm text-white/60 font-bold mt-1">{lt(lang, 687)}</div>
             </div>
             <div className="bg-brand-alt rounded-2xl p-4 border border-white/10 text-center">
               <div className="text-3xl font-black text-amber-400">{stats.todayClicks}</div>
-              <div className="text-sm text-white/60 font-bold mt-1">{isAr ? 'نقرات اليوم' : "Today's Clicks"}</div>
+              <div className="text-sm text-white/60 font-bold mt-1">{lt(lang, 688)}</div>
             </div>
             <div className="bg-brand-alt rounded-2xl p-4 border border-white/10 text-center">
               <div className="text-3xl font-black text-purple-400">{stats.todayUniqueVisitors}</div>
-              <div className="text-sm text-white/60 font-bold mt-1">{isAr ? 'زوار اليوم' : "Today's Visitors"}</div>
+              <div className="text-sm text-white/60 font-bold mt-1">{lt(lang, 689)}</div>
             </div>
           </div>
 
@@ -168,7 +169,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
             <div className="bg-brand-alt rounded-2xl p-6 border border-white/10">
               <div className="flex items-center gap-2 mb-4">
                 <Globe size={20} className="text-emerald-400" />
-                <h3 className="text-lg font-black text-white">{isAr ? 'الدول الأكثر زيارة' : 'Top Countries'}</h3>
+                <h3 className="text-lg font-black text-white">{lt(lang, 565)}</h3>
               </div>
               {stats.topCountries.length > 0 ? (
                 <div className="space-y-3">
@@ -182,7 +183,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
                             <MapPin size={14} className="text-emerald-400" />
                             <span className="text-base font-bold text-white">{c.country}</span>
                           </div>
-                          <span className="text-base font-black text-emerald-400">{c.views} {isAr ? 'زيارة' : 'views'}</span>
+                          <span className="text-base font-black text-emerald-400">{c.views} {lt(lang, 601)}</span>
                         </div>
                         <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
                           <div
@@ -195,7 +196,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
                   })}
                 </div>
               ) : (
-                <div className="text-center py-8 text-white/30 text-sm">{isAr ? 'لا توجد بيانات بعد' : 'No data yet'}</div>
+                <div className="text-center py-8 text-white/30 text-sm">{lt(lang, 360)}</div>
               )}
             </div>
 
@@ -203,7 +204,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
             <div className="bg-brand-alt rounded-2xl p-6 border border-white/10">
               <div className="flex items-center gap-2 mb-4">
                 <Link2 size={20} className="text-cyan-400" />
-                <h3 className="text-lg font-black text-white">{isAr ? 'مصادر الزيارات' : 'Traffic Sources'}</h3>
+                <h3 className="text-lg font-black text-white">{lt(lang, 577)}</h3>
               </div>
               {stats.topSources.length > 0 ? (
                 <div className="space-y-3">
@@ -212,7 +213,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
                     const pct = (s.views / maxViews) * 100;
                     const color = SOURCE_COLORS[s.source] || '#9CA3AF';
                     const icon = SOURCE_ICONS[s.source] || '🌐';
-                    const displayName = s.source === 'direct' ? (isAr ? 'زيارة مباشرة' : 'Direct Visit') : s.source;
+                    const displayName = s.source === 'direct' ? (lt(lang, 204)) : s.source;
                     return (
                       <div key={i} className="relative">
                         <div className="flex items-center justify-between mb-1">
@@ -233,7 +234,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
                   })}
                 </div>
               ) : (
-                <div className="text-center py-8 text-white/30 text-sm">{isAr ? 'لا توجد بيانات بعد' : 'No data yet'}</div>
+                <div className="text-center py-8 text-white/30 text-sm">{lt(lang, 360)}</div>
               )}
             </div>
           </div>
@@ -243,7 +244,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
             <div className="bg-brand-alt rounded-2xl p-6 border border-white/10">
               <div className="flex items-center gap-2 mb-4">
                 <Eye size={20} className="text-blue-400" />
-                <h3 className="text-lg font-black text-white">{isAr ? 'أكثر الصفحات مشاهدة' : 'Most Viewed Pages'}</h3>
+                <h3 className="text-lg font-black text-white">{lt(lang, 340)}</h3>
               </div>
               <div className="space-y-3">
                 {stats.topPages.map((p, i) => {
@@ -253,7 +254,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
                     <div key={i} className="relative">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-base font-mono text-white/80">{p.page}</span>
-                        <span className="text-base font-black text-blue-400">{p.views} {isAr ? 'مشاهدة' : 'views'}</span>
+                        <span className="text-base font-black text-blue-400">{p.views} {lt(lang, 602)}</span>
                       </div>
                       <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
                         <div
@@ -273,7 +274,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
             <div className="bg-brand-alt rounded-2xl p-6 border border-white/10">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp size={20} className="text-amber-400" />
-                <h3 className="text-lg font-black text-white">{isAr ? 'أكثر العناصر نقرة' : 'Most Clicked Elements'}</h3>
+                <h3 className="text-lg font-black text-white">{lt(lang, 339)}</h3>
               </div>
               <div className="space-y-3">
                 {stats.topClicks.map((c, i) => {
@@ -303,7 +304,7 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
             <div className="bg-brand-alt rounded-2xl p-6 border border-white/10">
               <div className="flex items-center gap-2 mb-4">
                 <BarChart3 size={20} className="text-purple-400" />
-                <h3 className="text-lg font-black text-white">{isAr ? 'آخر 7 أيام' : 'Last 7 Days'}</h3>
+                <h3 className="text-lg font-black text-white">{lt(lang, 288)}</h3>
               </div>
               <div className="flex items-end gap-2 h-32">
                 {dailyStats.map((d, i) => {
@@ -324,11 +325,11 @@ export default function SiteStatsPage({ lang }: SiteStatsPageProps) {
               <div className="flex items-center gap-6 justify-center mt-4">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded bg-blue-500/70" />
-                  <span className="text-sm text-white/50 font-bold">{isAr ? 'مشاهدات' : 'Views'}</span>
+                  <span className="text-sm text-white/50 font-bold">{lt(lang, 603)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded bg-amber-500/70" />
-                  <span className="text-sm text-white/50 font-bold">{isAr ? 'نقرات' : 'Clicks'}</span>
+                  <span className="text-sm text-white/50 font-bold">{lt(lang, 138)}</span>
                 </div>
               </div>
             </div>

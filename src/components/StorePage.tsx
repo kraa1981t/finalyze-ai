@@ -4,9 +4,11 @@ import { ShoppingCart, FileText, ChevronDown, ChevronUp, Bot, Activity, Crown, P
 import { StoreBot, StoreCategory, fetchStoreBots, formatFileSize, isFree, categoryOf, typeOf, typeLabelForCat, typesForCategory, STORE_CATEGORIES, downloadBot, getDownloadGrant, consumeBotDownload, DOWNLOAD_GRANT_TTL_MS } from '../services/storeService';
 import { generateBotBanner } from '../services/storeBanner';
 import { submitSiteRequest } from '../services/paymentRequests';
+import { Language } from '../lib/i18n';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface StorePageProps {
-  lang: 'ar' | 'en';
+  lang: Language;
   onBack: () => void;
   isDark: boolean;
   onBuyBot: (bot: StoreBot) => void;
@@ -34,9 +36,9 @@ const TYPE_ICONS: Record<string, IconType> = {
   logo: PenTool,
 };
 
-function catLabel(isAr: boolean, key: StoreCategory): string {
+function catLabel(lang: Language, key: StoreCategory): string {
   const c = STORE_CATEGORIES.find((x) => x.key === key);
-  return isAr ? (c?.labelAr || '') : (c?.labelEn || '');
+  return pkick(lang, c, 'label');
 }
 
 export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, userEmail }: StorePageProps) {
@@ -98,7 +100,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
     setDownloadMsg(null);
     if (isFree(bot)) {
       downloadBot(bot);
-      setDownloadMsg({ botId: bot.id || '', text: isAr ? '✓ جاري تحميل الملف المجاني' : '✓ Downloading the free file' });
+      setDownloadMsg({ botId: bot.id || '', text: lt(lang, 17) });
       setTimeout(() => setDownloadMsg(null), 3000);
       return;
     }
@@ -109,7 +111,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
     setDownloadMsg(null);
     downloadBot(bot);
     consumeBotDownload(bot.id || '');
-    setDownloadMsg({ botId: bot.id || '', text: isAr ? '✓ تم تنزيل المنتج على سطح مكتبك' : '✓ Product downloaded to your desktop' });
+    setDownloadMsg({ botId: bot.id || '', text: lt(lang, 18) });
     setTimeout(() => setDownloadMsg(null), 3000);
   };
 
@@ -125,12 +127,12 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
       className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white text-xs font-black uppercase tracking-wider transition-all mb-4"
     >
       <ArrowLeft size={14} />
-      {isAr ? 'رجوع' : 'Back'}
+      {lt(lang, 97)}
     </button>
   );
 
   const renderCard = (bot: StoreBot) => {
-    const desc = isAr ? (bot.descriptionAr || bot.description) : (bot.descriptionEn || bot.description);
+    const desc = lang === 'ar' ? (bot.descriptionAr || bot.description) : (bot.descriptionEn || bot.description);
     const needToggle = desc.length > MAX_DESC_LEN;
     const isOpen = !!expanded[bot.id ?? ''];
     const shown = isOpen || !needToggle ? desc : desc.slice(0, MAX_DESC_LEN) + '…';
@@ -141,7 +143,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
     const mm = String(Math.floor(remainingMs / 60000)).padStart(2, '0');
     const ss = String(Math.floor((remainingMs % 60000) / 1000)).padStart(2, '0');
     const showMsg = downloadMsg?.botId === bot.id;
-    const typeLabelTxt = typeLabelForCat(categoryOf(bot), typeOf(bot), isAr);
+    const typeLabelTxt = typeLabelForCat(categoryOf(bot), typeOf(bot), lang);
     const imgSrc = bot.imageData || generateBotBanner(bot);
     // Solid brand-colored boxes (no product image): green = free, blue = paid
     const accent = free
@@ -197,7 +199,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
                 </div>
               </div>
               <span className={`shrink-0 px-2 py-1 rounded-lg text-[11px] font-black uppercase border-2 ${accent.pill}`}>
-                {free ? (isAr ? 'مجاني' : 'Free') : formatPrice(bot.price)}
+                {free ? (lt(lang, 264)) : formatPrice(bot.price)}
               </span>
             </div>
 
@@ -209,7 +211,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
                     onClick={() => setExpanded((prev) => ({ ...prev, [bot.id ?? '']: !isOpen }))}
                     className={`mt-0.5 flex items-center gap-0.5 text-[10px] font-black uppercase tracking-wide transition-all keep-white ${accent.link}`}
                   >
-                    {isOpen ? (isAr ? 'عرض أقل' : 'Read Less') : (isAr ? 'اقرأ المزيد' : 'Read More')}
+                    {isOpen ? (lt(lang, 446)) : (lt(lang, 447))}
                     {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
                   </button>
                 )}
@@ -222,7 +224,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
 
             {granted && (
               <p className="text-[11px] font-black text-center keep-white">
-                {isAr ? `التحميل متاح خلال ${mm}:${ss}` : `Download available for ${mm}:${ss}`}
+                {ltp(lang, 658, mm, ss)}
               </p>
             )}
 
@@ -231,9 +233,9 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
               className={`flex items-center justify-center gap-1.5 w-full py-2 rounded-lg font-black text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all ${accent.btn}`}
             >
               {granted ? <Download size={14} /> : free ? <Gift size={14} /> : <ShoppingCart size={14} />}
-              {granted ? (isAr ? 'تحميل الآن' : 'Download Now')
-                : free ? (isAr ? 'تحميل مجاني' : 'Download Free')
-                  : (isAr ? 'اشترِ الآن' : 'Buy Now')}
+              {granted ? (lt(lang, 212))
+                : free ? (lt(lang, 211))
+                  : (lt(lang, 118))}
             </button>
           </div>
         </div>
@@ -243,11 +245,11 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
 
   const renderStack = (list: StoreBot[], free: boolean, cat: StoreCategory, typeKey?: string) => {
     const catBots = list.filter((b) => isFree(b) === free);
-    const base = typeKey ? (typeLabelForCat(cat, typeKey, isAr) || catLabel(isAr, cat)) : catLabel(isAr, cat);
-    const title = isAr ? `${base} ${free ? 'مجانية' : 'مدفوعة'}` : `${free ? 'Free' : 'Paid'} ${base}`;
-    const empty = isAr
-      ? (free ? `لا توجد ${base} مجانية هنا بعد` : `لا توجد ${base} مدفوعة هنا بعد`)
-      : (free ? `No free ${base.toLowerCase()} here yet` : `No paid ${base.toLowerCase()} here yet`);
+    const base = typeKey ? (typeLabelForCat(cat, typeKey, lang) || catLabel(lang, cat)) : catLabel(lang, cat);
+    const title = free ? ltp(lang, 659, base) : ltp(lang, 660, base);
+    const empty = free
+      ? ltp(lang, 793, lang === 'en' ? base.toLowerCase() : base)
+      : ltp(lang, 794, lang === 'en' ? base.toLowerCase() : base);
     return (
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-4 mt-2">
@@ -283,7 +285,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
 
   const renderCategoryHeader = (cat: StoreCategory) => (
     <div className="flex flex-col items-center mb-4">
-      <h2 className={`text-lg sm:text-xl font-black mb-2 ${pageTitle}`}>{catLabel(isAr, cat)}</h2>
+      <h2 className={`text-lg sm:text-xl font-black mb-2 ${pageTitle}`}>{catLabel(lang, cat)}</h2>
       <div className="w-24 h-24 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700 keep-white">
         {(() => { const I = TILE_ICONS[cat]; return <I size={52} />; })()}
       </div>
@@ -300,7 +302,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reqName.trim() || !reqContact.trim() || !reqMessage.trim()) {
-      setReqErr(isAr ? 'يرجى إدخال الاسم ووسيلة التواصل ونص الطلب' : 'Please enter your name, contact, and request message');
+      setReqErr(lt(lang, 426));
       return;
     }
     setRequesting(true);
@@ -309,7 +311,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
       await submitSiteRequest({ name: reqName, contact: reqContact, message: reqMessage });
       setReqDone(true);
     } catch {
-      setReqErr(isAr ? 'تعذر إرسال الطلب. حاول مرة أخرى.' : 'Could not send the request. Try again.');
+      setReqErr(lt(lang, 179));
     }
     setRequesting(false);
   };
@@ -319,10 +321,10 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
       {levelBack()}
       <div className="flex flex-col items-center mb-4">
         <h2 className={`text-lg sm:text-xl font-black mb-2 ${pageTitle}`}>
-          {isAr ? 'طلب إنشاء موقع' : 'Website Creation Request'}
+          {lt(lang, 616)}
         </h2>
         <p className={`text-xs sm:text-sm font-bold text-center ${pageSub}`}>
-          {isAr ? 'أرسل طلبك وسيتواصل معك المطور لشرح التفاصيل' : 'Send your request and the developer will contact you to discuss the details'}
+          {lt(lang, 501)}
         </p>
       </div>
 
@@ -333,46 +335,46 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
           className="bg-gradient-to-br from-emerald-400 to-emerald-700 border border-emerald-300/50 rounded-2xl p-6 text-center shadow-lg shadow-emerald-600/40"
         >
           <Gift size={36} className="mx-auto mb-3 keep-white" />
-          <h3 className="text-lg font-black keep-white">{isAr ? 'تم إرسال طلبك بنجاح' : 'Your request was sent successfully'}</h3>
+          <h3 className="text-lg font-black keep-white">{lt(lang, 630)}</h3>
           <p className="text-sm font-bold keep-white mt-2">
-            {isAr ? 'سيتواصل معك المطور قريباً عبر وسيلة التواصل التي أدخلتها لمناقشة طلبك بالتفصيل.' : 'The developer will contact you soon via the contact you provided to discuss your request in detail.'}
+            {lt(lang, 552)}
           </p>
           <button
             onClick={() => { setReqDone(false); setReqMessage(''); }}
             className="mt-5 px-5 py-2.5 rounded-xl bg-white text-emerald-700 font-black text-sm uppercase tracking-wider shadow-md hover:bg-emerald-50 active:scale-95 transition-all"
           >
-            {isAr ? 'إرسال طلب آخر' : 'Send Another Request'}
+            {lt(lang, 497)}
           </button>
         </motion.div>
       ) : (
         <form onSubmit={handleRequestSubmit} className="bg-black/40 border border-white/10 rounded-2xl p-4 flex flex-col gap-4">
           <div>
-            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'الاسم' : 'Name'}</label>
+            <label className="text-xs font-black text-slate-400 mb-1.5 block">{lt(lang, 343)}</label>
             <input
               type="text"
               value={reqName}
               onChange={(e) => setReqName(e.target.value)}
-              placeholder={isAr ? 'اسمك الكامل' : 'Your full name'}
+              placeholder={lt(lang, 627)}
               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-lg text-white outline-none focus:border-[#F59E0B]"
             />
           </div>
           <div>
-            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'وسيلة التواصل' : 'Contact (phone / email / Telegram)'}</label>
+            <label className="text-xs font-black text-slate-400 mb-1.5 block">{lt(lang, 168)}</label>
             <input
               type="text"
               value={reqContact}
               onChange={(e) => setReqContact(e.target.value)}
-              placeholder={isAr ? 'هاتف، بريد، أو تيليجرام' : 'Phone, email, or Telegram'}
+              placeholder={lt(lang, 421)}
               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-lg text-white outline-none focus:border-[#F59E0B]"
             />
           </div>
           <div>
-            <label className="text-xs font-black text-slate-400 mb-1.5 block">{isAr ? 'نص الطلب' : 'Request Message'}</label>
+            <label className="text-xs font-black text-slate-400 mb-1.5 block">{lt(lang, 462)}</label>
             <textarea
               value={reqMessage}
               onChange={(e) => setReqMessage(e.target.value)}
               rows={4}
-              placeholder={isAr ? 'اشرح موقعك المطلوب بالتفصيل: النوع، الصفحات، الخصائص...' : 'Explain your requested website in detail: type, pages, features...'}
+              placeholder={lt(lang, 247)}
               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-lg text-white outline-none focus:border-[#F59E0B] resize-none"
             />
           </div>
@@ -382,7 +384,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
             disabled={requesting}
             className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#F59E0B] hover:bg-[#d97706] text-black font-black text-sm uppercase tracking-wider shadow-md active:scale-95 transition-all disabled:opacity-60"
           >
-            <Send size={16} /> {requesting ? (isAr ? 'جاري الإرسال...' : 'Sending...') : (isAr ? 'إرسال الطلب' : 'Send Request')}
+            <Send size={16} /> {requesting ? (lt(lang, 502)) : (lt(lang, 498))}
           </button>
         </form>
       )}
@@ -400,13 +402,13 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
         <div className="w-full">
           {levelBack()}
           <div className="flex flex-col items-center mb-3">
-            <h2 className={`text-lg sm:text-xl font-black mb-2 ${pageTitle}`}>{typeLabelForCat(activeCat, activeType, isAr)}</h2>
+            <h2 className={`text-lg sm:text-xl font-black mb-2 ${pageTitle}`}>{typeLabelForCat(activeCat, activeType, lang)}</h2>
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-sky-500 to-blue-700 keep-white">
               {(() => { const I = TYPE_ICONS[activeType] || Package; return <I size={40} />; })()}
             </div>
           </div>
           {typed.length === 0 ? (
-            emptyBox(isAr ? 'لا توجد منتجات من هذا النوع بعد' : 'No products of this type yet', isAr ? 'ترقبوا الإضافات الجديدة قريباً' : 'New additions coming soon')
+            emptyBox(lt(lang, 367), lt(lang, 350))
           ) : (
             <>
               {renderStack(typed, true, activeCat, activeType)}
@@ -424,7 +426,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
           {levelBack()}
           {renderCategoryHeader(activeCat as StoreCategory)}
           <p className={`text-center text-sm font-black mb-4 ${pageTitle}`}>
-            {isAr ? `اختر نوع ${catLabel(isAr, activeCat as StoreCategory)}` : `Choose a ${catLabel(isAr, activeCat as StoreCategory).toLowerCase()} type`}
+            {ltp(lang, 661, catLabel(lang, activeCat as StoreCategory).toLowerCase())}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 md:gap-7">
             {types.map((t) => {
@@ -441,13 +443,13 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
                   <div className="w-[4rem] h-[4rem] rounded-2xl bg-white/20 border border-white/40 flex items-center justify-center keep-white shadow-inner">
                     <TypeIcon size={30} strokeWidth={2.1} />
                   </div>
-                  <span className="text-base font-black keep-white">{typeLabelForCat(activeCat as StoreCategory, t.key, isAr)}</span>
+                  <span className="text-base font-black keep-white">{typeLabelForCat(activeCat as StoreCategory, t.key, lang)}</span>
                   <div className="flex items-center gap-2 text-sm font-black uppercase keep-white">
                     <span className="px-2.5 py-1 rounded-full bg-white/20 border border-white/40 flex items-center gap-1 keep-white">
-                      <Gift size={14} /> {c.free} {isAr ? 'مجاني' : 'Free'}
+                      <Gift size={14} /> {c.free} {lt(lang, 264)}
                     </span>
                     <span className="px-2.5 py-1 rounded-full bg-white/20 border border-white/40 flex items-center gap-1 keep-white">
-                      <Sparkles size={14} /> {c.paid} {isAr ? 'مدفوع' : 'Paid'}
+                      <Sparkles size={14} /> {c.paid} {lt(lang, 404)}
                     </span>
                   </div>
                 </motion.button>
@@ -455,7 +457,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
             })}
           </div>
           <p className={`text-center text-[10px] font-bold mt-5 ${pageSub}`}>
-            {isAr ? 'اضغط على أي نوع لفتح صفحته الخاصة' : 'Tap a type to open its dedicated page'}
+            {lt(lang, 547)}
           </p>
         </div>
       );
@@ -466,7 +468,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
         {levelBack()}
         {renderCategoryHeader(activeCat as StoreCategory)}
         {catBots.length === 0 ? (
-          emptyBox(isAr ? 'لا توجد منتجات في هذا القسم بعد' : 'No products in this section yet', isAr ? 'ترقبوا الإضافات الجديدة قريباً' : 'New additions coming soon')
+          emptyBox(lt(lang, 366), lt(lang, 350))
         ) : (
           <>
             {renderStack(catBots, true, activeCat as StoreCategory)}
@@ -483,10 +485,10 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
       {!activeCat && (
         <div className="text-center mb-6 px-4">
           <h2 className={`text-xl sm:text-2xl font-black ${pageTitle}`}>
-            {isAr ? 'متجر التداول' : 'Trading Store'}
+            {lt(lang, 576)}
           </h2>
           <p className={`text-xs sm:text-sm mt-2 font-bold ${pageSub}`}>
-            {isAr ? 'بوتات ومؤشرات وخطط ومنتجات — مجاني ومدفوع' : 'Bots, indicators, plans & products — free and paid'}
+            {lt(lang, 111)}
           </p>
         </div>
       )}
@@ -494,12 +496,12 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20">
           <div className="w-10 h-10 rounded-full border-4 border-emerald-500/30 border-t-emerald-500 animate-spin" />
-          <p className={`text-xs mt-3 font-bold ${pageSub}`}>{isAr ? 'جاري تحميل المتجر...' : 'Loading store...'}</p>
+          <p className={`text-xs mt-3 font-bold ${pageSub}`}>{lt(lang, 302)}</p>
         </div>
       ) : activeCat ? (
         categoryPage()
       ) : bots.length === 0 ? (
-        emptyBox(isAr ? 'لا توجد منتجات في المتجر بعد' : 'No products in the store yet', isAr ? 'ترقبوا الإضافات الجديدة قريباً' : 'New additions coming soon')
+        emptyBox(lt(lang, 365), lt(lang, 350))
       ) : (
         <div className="w-full">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 md:gap-7">
@@ -518,13 +520,13 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
                   <div className="w-[4.5rem] h-[4.5rem] rounded-2xl bg-white/20 border border-white/40 flex items-center justify-center keep-white shadow-inner">
                     <Icon size={38} strokeWidth={2.1} />
                   </div>
-                  <span className="text-lg font-black keep-white">{catLabel(isAr, key)}</span>
+                  <span className="text-lg font-black keep-white">{catLabel(lang, key)}</span>
                   <div className="flex items-center gap-2 text-sm font-black uppercase keep-white">
                     <span className="px-2.5 py-1 rounded-full bg-white/20 border border-white/40 flex items-center gap-1 keep-white">
-                      <Gift size={14} /> {c.free} {isAr ? 'مجاني' : 'Free'}
+                      <Gift size={14} /> {c.free} {lt(lang, 264)}
                     </span>
                     <span className="px-2.5 py-1 rounded-full bg-white/20 border border-white/40 flex items-center gap-1 keep-white">
-                      <Sparkles size={14} /> {c.paid} {isAr ? 'مدفوع' : 'Paid'}
+                      <Sparkles size={14} /> {c.paid} {lt(lang, 404)}
                     </span>
                   </div>
                 </motion.button>
@@ -541,16 +543,16 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, userName, us
                 <Code2 size={28} strokeWidth={2.1} />
               </div>
               <div className="text-left">
-                <span className="block text-lg font-black keep-white">{isAr ? 'طلب إنشاء موقع' : 'Website Creation Request'}</span>
-                <span className="block text-sm font-bold keep-white/90">{isAr ? 'أرسل طلبك وسيتواصل معك المطور' : 'Send your request — the developer will contact you'}</span>
+                <span className="block text-lg font-black keep-white">{lt(lang, 616)}</span>
+                <span className="block text-sm font-bold keep-white/90">{lt(lang, 500)}</span>
               </div>
             </motion.button>
           </div>
           <p className={`text-center text-[10px] font-bold mt-5 ${pageSub}`}>
-            {isAr ? 'اضغط على أي قسم لفتح صفحته الخاصة' : 'Tap a section to open its dedicated page'}
+            {lt(lang, 546)}
           </p>
           <p className={`text-center text-[9px] font-bold mt-1 ${pageSub}`}>
-            {isAr ? 'معاملاتك تظهر في صفحة «معاملاتي» من القائمة الجانبية' : 'Your transactions show under Transactions in the side menu'}
+            {lt(lang, 634)}
           </p>
         </div>
       )}

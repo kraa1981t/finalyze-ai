@@ -8,6 +8,8 @@ import { loadPaymentSettings, ConfirmMode, DEFAULT_CONFIRM_MODE, DEFAULT_BINANCE
 import { fetchCryptoPricesDirect } from '../services/apiDirect';
 import { createPaymentRequest, checkUserGrant, consumeBotGrant } from '../services/paymentRequests';
 import { createSession, updateSession, completeSession, cancelSession, getCachedSession, getRemoteSession, readLocalSessions, genSessionId, PaymentSession } from '../services/paymentSession';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
+import { Language } from '../lib/i18n';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
@@ -21,7 +23,7 @@ interface PaymentModalProps {
   asPage?: boolean;
   manageMode?: boolean;
   onConfirm?: () => void;
-  lang?: 'en' | 'ar';
+  lang?: Language;
   freemiumDisabled?: boolean;
   onFreemiumToggle?: (v: boolean) => void;
   botPurchase?: StoreBot | null;
@@ -197,7 +199,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const requestManualConfirmation = async () => {
     if (!selectedNetwork) return;
     if (!buyerEmailFinal) {
-      setError(isAr ? 'أدخل بريدك الإلكتروني أولاً' : 'Enter your email first');
+      setError(lt(lang, 237));
       return;
     }
     const item = usdtAddresses.find(a => a.method === selectedNetwork);
@@ -253,7 +255,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         }
       }
     } catch {
-      setError(isAr ? 'تعذر إرسال طلب التأكيد. حاول مرة أخرى.' : 'Could not submit the confirmation request. Try again.');
+      setError(lt(lang, 180));
     }
     setRequestCreating(false);
   };
@@ -284,14 +286,14 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     setGrantChecking(true);
     const g = await checkUserGrant(buyerEmailFinal, isBotProduct ? 'bot' : 'plan', botPurchase?.id);
     if (g) grantAccess();
-    else setError(isAr ? 'لم يتم الإفراج بعد. قد يستغرق التأكيد حتى 24 ساعة.' : 'Not released yet. Confirmation may take up to 24 hours.');
+    else setError(lt(lang, 380));
     setGrantChecking(false);
   };
 
   const startTimer = (forEmail?: string) => {
     const email = (forEmail ?? buyerEmailFinal).trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email || '')) {
-      setError(isAr ? 'أدخل بريداً إلكترونياً صحيحاً أولاً لبدء المهلة.' : 'Enter a valid email first to start the wait period.');
+      setError(lt(lang, 233));
       return;
     }
     setTimerSeconds(timerMinutes * 60);
@@ -378,7 +380,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       if (!buyerEmailFinal) {
         // Email is a hard requirement before the wait period can start; the
         // transaction is keyed to it so it can be resumed from any device.
-        setError(isAr ? 'أدخل بريدك الإلكتروني أولاً لبدء المهلة.' : 'Enter your email first to start the wait period.');
+        setError(lt(lang, 238));
         setTimerRunning(false);
         setTimeout(() => setCopiedNetwork(null), 2000);
         return;
@@ -436,7 +438,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h3 className="text-xl font-bold text-white">{isAr ? (manageMode ? 'إدارة الدفع' : 'إتمام الدفع') : (manageMode ? 'Payment Settings' : 'Complete Payment')}</h3>
+            <h3 className="text-xl font-bold text-white">{manageMode ? lt(lang, 649) : lt(lang, 650)}</h3>
             {!manageMode && <p className="text-sm text-slate-400">{isBotSection ? `${botPurchase!.name} - $${amount} USD` : `${currentLabel} Plan - $${amount} USD`}</p>}
           </div>
         </div>
@@ -452,7 +454,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
             }`}
           >
-            🛒 {isAr ? 'بوتات التداول' : 'Trading Bots'}
+            🛒 {lt(lang, 575)}
           </button>
           <button
             onClick={() => setSection('plan')}
@@ -462,7 +464,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
             }`}
           >
-            ⚡ {isAr ? 'الخطط' : 'Plans'}
+            ⚡ {lt(lang, 424)}
           </button>
         </div>
       )}
@@ -472,14 +474,14 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           <p className="text-lg mb-4">{showBotDummy ? '🛒' : '⚡'}</p>
           <p className="text-sm font-bold text-slate-300 mb-5">
             {showBotDummy
-              ? (isAr ? 'هذه الصفحة لإتمام شراء البوتات. اختر بوتاً من المتجر أولاً.' : 'This page completes bot purchases. First pick a bot from the store.')
-              : (isAr ? 'هذه الصفحة لشراء الخطط. اختر خطة من صفحة الخطط أولاً.' : 'This page is for plans. Pick a plan from the plans page first.')}
+              ? (lt(lang, 557))
+              : (lt(lang, 558))}
           </p>
           <button
             onClick={showBotDummy ? onGoToStore : onGoToPlans}
             className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-black transition-all active:scale-95 shadow-lg ${showBotDummy ? 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/30' : 'bg-amber-500 hover:bg-amber-400 shadow-amber-500/30'}`}
           >
-            {showBotDummy ? (isAr ? 'الذهاب للمتجر' : 'Go to Store') : (isAr ? 'الذهاب للخطط' : 'Go to Plans')}
+            {showBotDummy ? (lt(lang, 272)) : (lt(lang, 271))}
           </button>
         </div>
       )}
@@ -487,7 +489,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       {!manageMode && showAddresses && !selectedNetwork && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6">
           <p className="text-sm text-amber-400 font-bold text-center">
-            {isAr ? 'اختر وسيلة الدفع. انسخ العنوان والمبلغ المحدد وأرسل المبلغ. يبدأ العداد فور النسخ.' : 'Choose a payment method. Copy the address and the exact amount, then send. The timer starts once copied.'}
+            {lt(lang, 128)}
           </p>
         </div>
       )}
@@ -502,12 +504,10 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         {botCopyLocked && (
           <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 mb-4 text-center">
             <p className="text-xs font-black text-rose-400">
-              {isAr
-                ? '🔒 حمّلت نسخة من هذا البوت مسبقاً. كل عملية دفع تتيح تحميل نسخة واحدة فقط.'
-                : '🔒 You already downloaded a copy of this bot. Each payment allows downloading one copy only.'}
+              {lt(lang, 34)}
             </p>
             <p className="text-[10px] text-rose-300/60 mt-1">
-              {isAr ? 'لتتمكن من التحميل مرة أخرى، يلزمك إتمام عملية دفع جديدة.' : 'To download again, a new payment is required.'}
+              {lt(lang, 562)}
             </p>
           </div>
         )}
@@ -516,7 +516,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         {usdtAddresses.length === 0 && (
           <div className="text-center py-8">
             <Wallet size={32} className="mx-auto mb-3 text-slate-500" />
-            <p className="text-sm text-slate-400">{isAr ? 'لم يتم إعداد عناوين الدفع بعد. اتصل بالمطور.' : 'No payment addresses configured yet.'}</p>
+            <p className="text-sm text-slate-400">{lt(lang, 364)}</p>
           </div>
         )}
 
@@ -539,7 +539,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
                 >
                   {copiedNetwork === item.method ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedNetwork === item.method ? (isAr ? 'تم النسخ' : 'Copied!') : (isAr ? 'نسخ العنوان' : 'Copy')}
+                  {copiedNetwork === item.method ? (lt(lang, 171)) : (lt(lang, 172))}
                 </button>
               </div>
               <div className="bg-black/40 rounded-xl px-4 py-3">
@@ -604,7 +604,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
                 >
                   {copiedAmountId === 'confirm_amt' ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedAmountId === 'confirm_amt' ? (isAr ? 'تم النسخ' : 'Copied!') : (isAr ? 'نسخ المبلغ' : 'Copy Amount')}
+                  {copiedAmountId === 'confirm_amt' ? (lt(lang, 171)) : (lt(lang, 174))}
                 </button>
               </div>
 
@@ -613,7 +613,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   <div className={`text-5xl font-black font-mono tabular-nums ${timerSeconds <= 60 ? 'text-red-400' : 'text-white'}`}>
                     {formatTime(timerSeconds)}
                   </div>
-                  <p className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">{isAr ? 'الوقت المتبقي' : 'Time Remaining'}</p>
+                  <p className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">{lt(lang, 561)}</p>
                 </div>
               </div>
 
@@ -630,7 +630,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                         startTimer(v);
                       }
                     }}
-                    placeholder={isAr ? 'بريدك الإلكتروني (إلزامي - أدخله لبدء المهلة)' : 'Your email (required - enter to start the wait period)'}
+                    placeholder={lt(lang, 626)}
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -640,9 +640,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 <>
                   <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl px-3 py-2.5 mb-3">
                     <p className="text-[11px] text-amber-300 text-center font-bold leading-relaxed">
-                      {isAr
-                        ? 'بعد إتمام التحويل، اضغط الزر أدناه لإرسال طلب تأكيد مرقّم. يُسجَّل وقت ضغطك بضبط تام بتوقيت غرينتش (دقيقة/ساعة/يوم/شهر/سنة) ليكون مرجع المقارنة. المراجعة تتم يدوياً من المطور خلال 10 دقائق إلى 48 ساعة.'
-                        : 'After sending the amount, press below to submit a numbered confirmation request. The exact GMT time of your click (minute/hour/day/month/year) is recorded as the reference. Review is done manually by the developer within 10 minutes to 48 hours.'}
+                      {lt(lang, 71)}
                     </p>
                   </div>
                   <button
@@ -655,8 +653,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                     }`}
                   >
                     {requestCreating
-                      ? (isAr ? '⏳ جاري إرسال الطلب...' : '⏳ Submitting request...')
-                      : (isAr ? '📨 أرسلت الدفع — اطلب تأكيد التحرير' : '📨 I have paid — request release')}
+                      ? (lt(lang, 7))
+                      : (lt(lang, 29))}
                   </button>
                 </>
               )}
@@ -664,17 +662,15 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               {requestStatus === 'pending' && (
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-center">
                   <div className="text-2xl font-black text-[#F59E0B] mb-1">
-                    {isAr ? `طلبك رقم #${requestNo}` : `Request #${requestNo}`}
+                    {ltp(lang, 651, String(requestNo))}
                   </div>
                   <p className="text-[11px] text-amber-200/80 leading-relaxed">
-                    {isAr
-                      ? 'تم تسجيل طلبك مع الوقت الدقيق بتوقيت غرينتش. يرجى الانتظار من 10 دقائق حتى 48 ساعة لمراجعة طلبك. بمجرد تأكيد الدفع والإفراج اليدوي من المطور سيتاح لك تحميل الملفات هنا.'
-                      : 'Your request was recorded with the exact GMT time. Please wait from 10 minutes up to 48 hours while your request is reviewed. Once the developer confirms the payment and release is done, your download will become available here.'}
+                    {lt(lang, 629)}
                   </p>
                   <div className="flex items-center justify-center gap-2 mt-3">
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                     <span className="text-[10px] text-amber-300 font-bold uppercase tracking-widest">
-                      {isAr ? 'قيد المراجعة اليدوية' : 'Under manual review'}
+                      {lt(lang, 585)}
                     </span>
                   </div>
                   <button
@@ -683,7 +679,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                     className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white transition-all text-xs font-black disabled:opacity-50"
                   >
                     <RefreshCw size={13} className={grantChecking ? 'animate-spin' : ''} />
-                    {isAr ? 'تحديث الحالة' : 'Refresh status'}
+                    {lt(lang, 455)}
                   </button>
                 </div>
               )}
@@ -705,26 +701,26 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                   }`}
                 >
                   {isBotSection
-                    ? (botGrantTs ? (isAr ? '🟢 تحميل البوت الآن' : '🟢 Download Bot Now') : (isAr ? '🔒 نسخة هذه الدفعة مُستهلَكة' : '🔒 Copy for this payment is spent'))
+                    ? (botGrantTs ? (lt(lang, 38)) : (lt(lang, 33)))
                     : '🟢 Activate Plan'}
                 </button>
               )}
 
               {timerSeconds <= 0 && sessionId && requestStatus === 'idle' && !paymentConfirmed && (
                 <div className="mt-3 space-y-2">
-                  <p className="text-[10px] text-red-400 text-center mb-2">{isAr ? 'انتهت مهلة الانتظار. يمكنك المتابعة أو إلغاء المعاملة.' : 'Wait period expired. Continue or cancel the transaction.'}</p>
+                  <p className="text-[10px] text-red-400 text-center mb-2">{lt(lang, 613)}</p>
                   <div className="flex gap-2">
                     <button
                       onClick={renewSession}
                       className="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-black text-xs uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/30"
                     >
-                      {isAr ? 'متابعة المعاملة (تجديد المهلة)' : 'Continue (renew)'}
+                      {lt(lang, 169)}
                     </button>
                     <button
                       onClick={cancelCurrentSession}
                       className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-red-400 hover:border-red-500/40 transition-all font-black text-xs uppercase tracking-widest"
                     >
-                      {isAr ? 'إلغاء المعاملة' : 'Cancel transaction'}
+                      {lt(lang, 123)}
                     </button>
                   </div>
                 </div>
@@ -738,7 +734,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
       {manageMode && (<>
         <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-4">
-          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">{isAr ? 'أسعار الخطط' : 'Plan Prices'}</h5>
+          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">{lt(lang, 423)}</h5>
           <div className="space-y-4">
             {['weekly', 'monthly', 'yearly'].map((key) => (
               <div key={key} className="flex items-center gap-3">
@@ -759,7 +755,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               onClick={saveSubPrices}
               className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
             >
-              <Check size={14} /> {isAr ? 'حفظ الأسعار' : 'Save Prices'}
+              <Check size={14} /> {lt(lang, 485)}
             </button>
           </div>
         </div>
@@ -767,8 +763,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         <div className="mt-4 bg-white/5 border border-white/10 rounded-2xl p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest">{isAr ? 'نظام الخطط المجانية' : 'Freemium System'}</h5>
-              <p className="text-[10px] text-slate-500 mt-1">{freemiumDisabled ? (isAr ? 'الكل وصول كامل - الخطط مخفية عن العملاء' : 'All full access - plans hidden from clients') : (isAr ? 'القيود مفعلة - الخطط مرئية للعملاء' : 'Restrictions active - plans visible to clients')}</p>
+              <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest">{lt(lang, 265)}</h5>
+              <p className="text-[10px] text-slate-500 mt-1">{freemiumDisabled ? (lt(lang, 76)) : (lt(lang, 471))}</p>
             </div>
             <button
               onClick={() => {
@@ -785,7 +781,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
               }`}
             >
               {freemiumDisabled ? <Shield size={16} /> : <ShieldOff size={16} />}
-              {freemiumDisabled ? (isAr ? 'مفعل: وصول كامل' : 'ON: Full Access') : (isAr ? 'معطل: قيود مفعلة' : 'OFF: Restricted')}
+              {freemiumDisabled ? (lt(lang, 387)) : (lt(lang, 384))}
             </button>
           </div>
         </div>
@@ -813,7 +809,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
       {!manageMode && showAddresses && (
         <p className="text-center text-[10px] text-slate-500 mt-4">
-          {isAr ? `USDT فقط — عملة مستقرة ثابتة بسعر $1.00. الوقت المتبقي: ${Math.floor(timerSeconds / 60)} دقيقة` : `USDT only — stable coin fixed at $1.00. Time remaining: ${Math.floor(timerSeconds / 60)} min`}
+          {ltp(lang, 652, String(Math.floor(timerSeconds / 60)))}
         </p>
       )}
     </>

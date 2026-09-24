@@ -1,6 +1,7 @@
 import React from 'react';
 import { getOpenStockExchanges, exchangeLabel } from '../lib/marketHours';
 import { Language, translations } from '../lib/i18n';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface MarketHoursIndicatorProps {
   lang: Language;
@@ -25,35 +26,25 @@ export default function MarketHoursIndicator({ lang, compact = false }: MarketHo
     const open = isCategoryOpen(key, now);
     let label: string;
     let status: string;
-    if (isAr) {
-      switch (key) {
-        case 'forex': label = t.forex; break;
-        case 'crypto': label = t.crypto; break;
-        case 'stocks': label = t.stocks; break;
-        case 'metals': label = t.metals; break;
-        default: label = key;
-      }
-    } else {
-      switch (key) {
-        case 'forex': label = 'Forex'; break;
-        case 'crypto': label = 'Crypto'; break;
-        case 'stocks': label = 'Stocks'; break;
-        case 'metals': label = 'Metals'; break;
-        default: label = key;
-      }
+    switch (key) {
+      case 'forex': label = t.forex; break;
+      case 'crypto': label = t.crypto; break;
+      case 'stocks': label = t.stocks; break;
+      case 'metals': label = t.metals; break;
+      default: label = t[key] || key;
     }
 
     if (key === 'stocks') {
       const openExchanges = getOpenStockExchanges(now);
       if (openExchanges.length > 0) {
-        status = openExchanges.map(ex => exchangeLabel(ex.key, isAr ? 'ar' : 'en')).join(isAr ? '، ' : ', ');
+        status = openExchanges.map(ex => exchangeLabel(ex.key, lang)).join(lang === 'ar' ? '، ' : ', ');
       } else {
-        status = isAr ? 'سوق مغلق' : 'Market Closed';
+        status = lt(lang, 315);
       }
     } else {
-      status = open ? (isAr ? 'سوق مفتوح' : 'Market Open') : (isAr ? 'سوق مغلق' : 'Market Closed');
+      status = open ? (lt(lang, 318)) : (lt(lang, 315));
     }
-    const statusShort = open ? (isAr ? 'مفتوح' : 'Open') : (isAr ? 'مغلق' : 'Closed');
+    const statusShort = open ? (lt(lang, 390)) : (lt(lang, 149));
     return { label, status, statusShort, open };
   };
 

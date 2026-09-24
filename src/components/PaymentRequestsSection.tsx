@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { RefreshCw, Check, X, Clock, Mail, Wallet, User, ShoppingCart, Crown, Hash, Globe, ShieldCheck } from 'lucide-react';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
+import { Language } from '../lib/i18n';
 import {
   PaymentRequest,
   fetchPaymentRequests,
@@ -9,7 +11,7 @@ import {
 } from '../services/paymentRequests';
 
 interface PaymentRequestsSectionProps {
-  lang: 'ar' | 'en';
+  lang: Language;
   developerEmail?: string;
 }
 
@@ -73,9 +75,9 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
   };
 
   const statusLabel = (s: PaymentRequest['status']) =>
-    s === 'approved' ? (isAr ? 'تم الإفراج' : 'Released')
-      : s === 'rejected' ? (isAr ? 'مرفوض' : 'Rejected')
-        : (isAr ? 'قيد المراجعة' : 'Pending');
+    s === 'approved' ? (lt(lang, 461))
+      : s === 'rejected' ? (lt(lang, 459))
+        : (lt(lang, 415));
 
   return (
     <div className="space-y-4">
@@ -84,19 +86,15 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
         <div className="flex items-center gap-2 mb-2">
           <ShieldCheck size={16} className="text-emerald-400" />
           <h5 className="text-xs font-black uppercase text-emerald-400 tracking-widest">
-            {isAr ? 'تأكيد يدوي — الإفراج من طرفك فقط' : 'Manual Confirmation — Release is yours only'}
+            {lt(lang, 311)}
           </h5>
         </div>
         <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-          {isAr
-            ? 'عندما يضغط العميل على «أرسلت الدفع»، يصل طلب مرقّم هنا يعرض بريد العميل وصنف المنتج وقيمته والتوقيت الدقيق بتوقيت غرينتش. قارن هذا التوقيت مع تاريخ وصول التحويل إلى محفظتك، ثم قرّر: أكّد الطلب وأفرج التحميل، أو ارفضه إن كان مزوّراً ولم يصل شيء لمحفظتك.'
-            : 'When a customer presses "I have paid", a numbered request arrives here showing the customer email, product type, price and the exact GMT time. Compare that timestamp with when the deposit reached your wallet, then decide: confirm the request and release the download, or reject it if it is fake and nothing arrived.'}
+          {lt(lang, 620)}
         </p>
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-300 font-bold">
           <Globe size={12} />
-          {isAr
-            ? 'توقيت غرينتش المذكور هو المرجع الوحيد لتأكيد أن المعاملة حقيقية — قارنه دائماً بتوقيت وصول الدفعة لمحفظتك.'
-            : 'The GMT time shown is the single reference to confirm a transaction is real — always compare it with the deposit arrival time in your wallet.'}
+          {lt(lang, 553)}
         </div>
       </div>
 
@@ -105,10 +103,10 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
         <div className="flex items-center justify-between gap-2 mb-3">
           <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
             <Hash size={14} className="text-[#F59E0B]" />
-            {isAr ? 'طلبات تأكيد الدفع' : 'Payment Confirmation Requests'}
+            {lt(lang, 411)}
             {pendingCount > 0 && (
               <span className="text-[10px] font-black text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full">
-                {pendingCount} {isAr ? 'جديد' : 'new'}
+                {pendingCount} {lt(lang, 348)}
               </span>
             )}
           </h5>
@@ -117,7 +115,7 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
               onClick={() => setFilter(filter === 'pending' ? 'all' : 'pending')}
               className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-black uppercase text-slate-400 hover:text-white transition-all"
             >
-              {filter === 'pending' ? (isAr ? 'عرض الكل' : 'Show all') : (isAr ? 'المعلّقة فقط' : 'Pending only')}
+              {filter === 'pending' ? (lt(lang, 509)) : (lt(lang, 417))}
             </button>
             <button
               onClick={load}
@@ -134,7 +132,7 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
           </div>
         ) : shown.length === 0 ? (
           <p className="text-center text-slate-500 text-sm py-8">
-            {isAr ? 'لا توجد طلبات حالياً' : 'No requests yet'}
+            {lt(lang, 370)}
           </p>
         ) : (
           <div className="space-y-2.5">
@@ -156,7 +154,7 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className="text-[10px] text-slate-500 flex items-center gap-1" title={new Date(req.createdAt).toLocaleString()}>
-                      <Clock size={11} /> {new Date(req.createdAt).toLocaleString(isAr ? 'ar-DZ' : 'en-GB')}
+                      <Clock size={11} /> {new Date(req.createdAt).toLocaleString(loc(lang))}
                     </span>
                     <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-black font-mono ${
                       req.status === 'pending'
@@ -196,14 +194,14 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
                       disabled={busyId === req.id}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-500 text-white font-black text-xs uppercase tracking-wider hover:bg-emerald-400 transition-all disabled:opacity-50"
                     >
-                      <Check size={14} /> {isAr ? 'تأكيد وإفراج التحميل' : 'Confirm & Release'}
+                      <Check size={14} /> {lt(lang, 164)}
                     </button>
                     <button
                       onClick={() => reject(req)}
                       disabled={busyId === req.id}
                       className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 font-black text-xs uppercase tracking-wider hover:bg-red-500/20 transition-all disabled:opacity-50"
                     >
-                      <X size={14} /> {isAr ? 'رفض' : 'Reject'}
+                      <X size={14} /> {lt(lang, 458)}
                     </button>
                   </div>
                 )}

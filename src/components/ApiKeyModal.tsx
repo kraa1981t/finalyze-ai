@@ -6,6 +6,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { User, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface ApiKeyModalProps {
   isOpen: boolean;
@@ -173,7 +174,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         </div>
         <div>
           <h3 className="text-xl font-bold text-white leading-tight">
-            {isAr ? 'مفتاح API' : 'API Key'}
+            {lt(lang, 84)}
           </h3>
           {isDeveloperSession() && (
             <span className="text-[10px] bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 rounded-full px-2.5 py-0.5 font-bold uppercase tracking-wider mt-1 inline-block">
@@ -192,7 +193,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         >
           <div className="absolute inset-0 bg-gradient-to-r from-sky-500/10 to-blue-500/10 opacity-50" />
           <Key size={18} className="shrink-0 text-sky-400 animate-spin" style={{ animationDuration: '6s' }} />
-          <span>{isAr ? 'أنشئ مفتاح Groq مجاني (موصى به للغاية وسريع)' : 'Create free Groq key (Highly Recommended)'}</span>
+          <span>{lt(lang, 182)}</span>
         </a>
 
         <a
@@ -202,27 +203,25 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           className="inline-flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-slate-300 transition-all bg-white/5 border border-white/10 hover:bg-white/10 py-2.5 rounded-xl font-bold w-full"
         >
           <Info size={14} className="shrink-0" />
-          {isAr ? 'أنشئ مفتاح Google Gemini مجاني' : 'Create free Google Gemini key'}
+          {lt(lang, 181)}
         </a>
       </div>
 
       <p className="text-slate-400 text-sm leading-relaxed mb-6">
-        {isAr
-          ? 'يرجى إدخال مفتاح Groq الخاص بك (موصى به لتجنب أي فشل في الاتصال وللحصول على تحليل مستقر وسريع) أو مفتاح Google البديل.'
-          : 'Please enter your Groq API key (highly recommended to avoid connection failures and get stable analysis) or Google Gemini key.'}
+        {lt(lang, 425)}
       </p>
 
       {typeof window !== 'undefined' && localStorage.getItem('finalyze_verify_link') && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6 text-center space-y-2">
           <p className="text-xs text-amber-400 font-bold">
-            {isAr ? '📧 تم إرسال رابط التفعيل إلى بريدك Gmail.' : '📧 Verification link sent to your Gmail.'}
+            {lt(lang, 28)}
           </p>
           <a
             href={(() => { try { return localStorage.getItem('finalyze_verify_link') || '#'; } catch { return '#'; } })()}
             target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-400 transition-all"
           >
-            {isAr ? 'فتح Gmail' : 'Open Gmail'}
+            {lt(lang, 393)}
           </a>
         </div>
       )}
@@ -231,7 +230,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         <div className="space-y-3 p-5 rounded-2xl bg-white/5 border border-white/5">
           <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-2 text-sky-400">
             <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-            {isAr ? 'مفتاح API' : 'API Key'}
+            {lt(lang, 84)}
           </h4>
 
           <div className="relative">
@@ -239,7 +238,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
               type={show ? 'text' : 'password'}
               value={keyValue}
               onChange={(e) => setKeyValue(e.target.value)}
-              placeholder={isAr ? 'الصق مفتاح API...' : 'Paste API key...'}
+              placeholder={lt(lang, 407)}
               autoComplete="off"
               className="w-full bg-black/40 border border-white/10 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
               dir="ltr"
@@ -279,7 +278,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           >
             <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
             <span className="text-xs text-emerald-400 leading-normal">
-              {isAr ? '✓ تم الحفظ بنجاح!' : '✓ Saved Successfully!'}
+              {lt(lang, 19)}
             </span>
           </motion.div>
         )}
@@ -300,12 +299,12 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           {isLoading ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              <span>{isAr ? 'جارٍ الحفظ...' : 'Saving...'}</span>
+              <span>{lt(lang, 490)}</span>
             </>
           ) : success ? (
-            <span>{isAr ? '✓ تم الحفظ!' : '✓ Saved!'}</span>
+            <span>{lt(lang, 20)}</span>
           ) : (
-            <span>{isAr ? 'حفظ' : 'Save'}</span>
+            <span>{lt(lang, 481)}</span>
           )}
         </button>
 
@@ -315,7 +314,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             className="w-full flex items-center justify-center gap-2 py-3 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/25 hover:text-red-300 font-bold rounded-xl transition-all text-xs tracking-wider uppercase"
           >
             <LogOut size={14} />
-            <span>{isAr ? 'تسجيل خروج' : 'Logout'}</span>
+            <span>{lt(lang, 304)}</span>
           </button>
         ) : (
           <button
@@ -323,7 +322,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             disabled={isLoading}
             className="w-full py-3 bg-white/5 border border-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300 font-bold rounded-xl transition-all text-xs tracking-wider uppercase"
           >
-            {isAr ? 'إلغاء' : 'Cancel'}
+            {lt(lang, 120)}
           </button>
         )}
       </div>
@@ -331,7 +330,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
       {isDeveloperSession() && (
         <div className="flex items-center gap-2 mt-4 text-[10px] text-emerald-400/60 justify-center">
           <Info size={12} />
-          <span>{isAr ? 'وضع المطور نشط — تم تجاوز المفتاح.' : 'Developer mode active — API key bypassed.'}</span>
+          <span>{lt(lang, 203)}</span>
         </div>
       )}
     </>

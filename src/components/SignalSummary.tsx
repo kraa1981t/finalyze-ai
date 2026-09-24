@@ -3,18 +3,24 @@ import { AnalysisResult } from '../types';
 import { TrendingUp, TrendingDown, DollarSign, Bitcoin, Gem, Activity } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language } from '../lib/i18n';
+import { pkick } from '../lib/i18nUI';
 
 interface SignalSummaryProps {
   signals: AnalysisResult[];
   lang: Language;
 }
 
-const CATEGORY_CONFIG: Record<string, { icon: any; color: string; labelAr: string; labelEn: string }> = {
-  forex: { icon: DollarSign, color: '#3B82F6', labelAr: 'الفوركس', labelEn: 'Forex' },
-  crypto: { icon: Bitcoin, color: '#F59E0B', labelAr: 'الكريبتو', labelEn: 'Crypto' },
-  stocks: { icon: Activity, color: '#8B5CF6', labelAr: 'الأسهم', labelEn: 'Stocks' },
-  metals: { icon: Gem, color: '#EC4899', labelAr: 'المعادن', labelEn: 'Metals' },
+const CATEGORY_CONFIG: Record<string, { icon: any; color: string; labelEn: string; labelAr: string; labelEs: string; labelRu: string; labelFr: string }> = {
+  forex: { icon: DollarSign, color: '#3B82F6', labelEn: 'Forex', labelAr: 'الفوركس', labelEs: 'Forex', labelRu: 'Форекс', labelFr: 'Forex' },
+  crypto: { icon: Bitcoin, color: '#F59E0B', labelEn: 'Crypto', labelAr: 'الكريبتو', labelEs: 'Cripto', labelRu: 'Крипто', labelFr: 'Crypto' },
+  stocks: { icon: Activity, color: '#8B5CF6', labelEn: 'Stocks', labelAr: 'الأسهم', labelEs: 'Acciones', labelRu: 'Акции', labelFr: 'Actions' },
+  metals: { icon: Gem, color: '#EC4899', labelEn: 'Metals', labelAr: 'المعادن', labelEs: 'Metales', labelRu: 'Металлы', labelFr: 'Métaux' },
 };
+
+const TLT = { titleEn: 'Signal Summary', titleAr: 'ملخص الإشارات', titleEs: 'Resumen de Señales', titleRu: 'Сводка сигналов', titleFr: 'Résumé des signaux' };
+const NETT = { netEn: 'Net', netAr: 'الصافي', netEs: 'Neto', netRu: 'Чистый', netFr: 'Net' };
+const BUYT = { buyEn: 'Buy', buyAr: 'شراء', buyEs: 'Comprar', buyRu: 'Покупка', buyFr: 'Achat' };
+const SELLT = { sellEn: 'Sell', sellAr: 'بيع', sellEs: 'Venta', sellRu: 'Продажа', sellFr: 'Vente' };
 
 const SYMBOL_CATEGORIES: Record<string, string[]> = {
   forex: [
@@ -68,18 +74,18 @@ export default function SignalSummary({ signals, lang }: SignalSummaryProps) {
     <div className="mb-6 rounded-2xl border border-brand-text/10 bg-brand-alt/40 backdrop-blur-md p-4">
       <h3 className={cn("text-[10px] font-black uppercase tracking-[0.2em] text-brand-muted mb-3 flex items-center gap-2", isRTL ? "flex-row-reverse" : "")}>
         <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-        {isRTL ? 'ملخص الإشارات' : 'Signal Summary'}
+        {pkick(lang, TLT, 'title')}
       </h3>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-        {categories.map(({ cat, buys, sells, net, color, icon: Icon, labelAr, labelEn }) => (
+        {categories.map(({ cat, buys, sells, net, color, icon: Icon }) => (
           <div key={cat} className="rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/20 p-3">
             <div className={cn("flex items-center gap-2 mb-2", isRTL ? "flex-row-reverse" : "")}>
               <div className="p-1.5 rounded-lg bg-[#F59E0B]">
                 <Icon size={14} className="text-black" />
               </div>
               <span className="text-[10px] font-black uppercase tracking-wider text-black">
-                {isRTL ? labelAr : labelEn}
+                {pkick(lang, cat, 'label')}
               </span>
             </div>
             <div className={cn("flex items-center gap-3", isRTL ? "flex-row-reverse" : "")}>
@@ -88,18 +94,18 @@ export default function SignalSummary({ signals, lang }: SignalSummaryProps) {
             </div>
             <div className={cn("mt-1 text-[10px] font-black", isRTL ? "text-right" : "text-left",
               net > 0 ? 'text-emerald-400' : net < 0 ? 'text-red-400' : 'text-slate-500')}>
-              {isRTL ? 'صافي' : 'Net'}: {net > 0 ? '+' : ''}{net}
+              {pkick(lang, NETT, 'net')}: {net > 0 ? '+' : ''}{net}
             </div>
           </div>
         ))}
       </div>
 
       <div className={cn("flex items-center gap-4 pt-2 border-t border-brand-text/5", isRTL ? "flex-row-reverse justify-end" : "")}>
-        <span className="text-xs font-black text-emerald-400">{totalBuys} ↑ {isRTL ? 'شراء' : 'Buy'}</span>
-        <span className="text-xs font-black text-red-400">{totalSells} ↓ {isRTL ? 'بيع' : 'Sell'}</span>
+        <span className="text-xs font-black text-emerald-400">{totalBuys} ↑ {pkick(lang, BUYT, 'buy')}</span>
+        <span className="text-xs font-black text-red-400">{totalSells} ↓ {pkick(lang, SELLT, 'sell')}</span>
         <span className={cn("text-xs font-black",
           totalNet > 0 ? 'text-emerald-400' : totalNet < 0 ? 'text-red-400' : 'text-slate-500')}>
-          {isRTL ? 'الصافي' : 'Net'}: {totalNet > 0 ? '+' : ''}{totalNet}
+          {pkick(lang, NETT, 'net')}: {totalNet > 0 ? '+' : ''}{totalNet}
         </span>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { Language, translations } from '../lib/i18n';
 import { playClick, initAudio } from '../lib/audioEngine';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
 import MarketHoursIndicator from './MarketHoursIndicator';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface ClientDashboardProps {
   results: AnalysisResult[];
@@ -15,18 +16,18 @@ interface ClientDashboardProps {
   onTrade?: (symbol: string) => void;
 }
 
-const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelAr: string; labelEn: string; symbolColor: string }> = {
-  [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', labelAr: 'إشارة شراء قوي', labelEn: 'Strong Buy Signal', symbolColor: '#00ff88' },
-  [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', labelAr: 'إشارة بيع قوي', labelEn: 'Strong Sell Signal', symbolColor: '#ff4444' },
-  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', labelAr: 'إشارة شراء', labelEn: 'Buy Signal', symbolColor: '#66ffaa' },
-  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', labelAr: 'إشارة بيع', labelEn: 'Sell Signal', symbolColor: '#ff5555' },
+const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelEn: string; labelAr: string; labelEs: string; labelRu: string; labelFr: string; symbolColor: string }> = {
+  [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', labelEn: 'Strong Buy Signal', labelAr: 'إشارة شراء قوي', labelEs: 'Compra Fuerte', labelRu: 'Сильная покупка', labelFr: 'Achat fort', symbolColor: '#00ff88' },
+  [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', labelEn: 'Strong Sell Signal', labelAr: 'إشارة بيع قوي', labelEs: 'Venta Fuerte', labelRu: 'Сильная продажа', labelFr: 'Vente forte', symbolColor: '#ff4444' },
+  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', labelEn: 'Buy Signal', labelAr: 'إشارة شراء', labelEs: 'Compra', labelRu: 'Покупка', labelFr: 'Achat', symbolColor: '#66ffaa' },
+  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', labelEn: 'Sell Signal', labelAr: 'إشارة بيع', labelEs: 'Venta', labelRu: 'Продажа', labelFr: 'Vente', symbolColor: '#ff5555' },
 };
 
-const CATEGORY_CONFIG: Record<string, { emoji: string; labelAr: string; labelEn: string; color: string; borderColor: string }> = {
-  forex: { emoji: '\uD83D\uDCB1', labelAr: 'الفوركس', labelEn: 'Forex', color: 'text-blue-400', borderColor: 'border-blue-500/30' },
-  crypto: { emoji: '\uD83E\uDDF1', labelAr: 'الكريبتو', labelEn: 'Crypto', color: 'text-purple-400', borderColor: 'border-purple-500/30' },
-  stocks: { emoji: '\uD83D\uDCC8', labelAr: 'الأسهم', labelEn: 'Stocks', color: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
-  metals: { emoji: '\uD83D\uDC8E', labelAr: 'المعادن', labelEn: 'Metals', color: 'text-orange-400', borderColor: 'border-orange-500/30' },
+const CATEGORY_CONFIG: Record<string, { emoji: string; labelEn: string; labelAr: string; labelEs: string; labelRu: string; labelFr: string; color: string; borderColor: string }> = {
+  forex: { emoji: '\uD83D\uDCB1', labelEn: 'Forex', labelAr: 'الفوركس', labelEs: 'Forex', labelRu: 'Форекс', labelFr: 'Forex', color: 'text-blue-400', borderColor: 'border-blue-500/30' },
+  crypto: { emoji: '\uD83E\uDDF1', labelEn: 'Crypto', labelAr: 'الكريبتو', labelEs: 'Cripto', labelRu: 'Крипто', labelFr: 'Crypto', color: 'text-purple-400', borderColor: 'border-purple-500/30' },
+  stocks: { emoji: '\uD83D\uDCC8', labelEn: 'Stocks', labelAr: 'الأسهم', labelEs: 'Acciones', labelRu: 'Акции', labelFr: 'Actions', color: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
+  metals: { emoji: '\uD83D\uDC8E', labelEn: 'Metals', labelAr: 'المعادن', labelEs: 'Metales', labelRu: 'Металлы', labelFr: 'Métaux', color: 'text-orange-400', borderColor: 'border-orange-500/30' },
 };
 
 function getSymbolCategory(symbol: string): string {
@@ -42,13 +43,17 @@ function getSymbolCategory(symbol: string): string {
   return 'forex';
 }
 
-const formatPublishDate = (timestamp: string, lang: string) => {
+const DAYS: Record<string, string[]> = {
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  ar: ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
+  es: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+  ru: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+  fr: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
+};
+const formatPublishDate = (timestamp: string, lang: Language) => {
   try {
     const date = new Date(timestamp);
-    const isAr = lang === 'ar';
-    const daysAr = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayName = isAr ? daysAr[date.getUTCDay()] : daysEn[date.getUTCDay()];
+    const dayName = DAYS[lang]?.[date.getUTCDay()] || DAYS.en[date.getUTCDay()];
     const hours = String(date.getUTCHours()).padStart(2, '0');
     const minutes = String(date.getUTCMinutes()).padStart(2, '0');
     return `${dayName} ${hours}:${minutes}`;
@@ -108,8 +113,8 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
             <Activity size={20} className="text-emerald-400" />
             <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
           </div>
-          <span className="text-sm font-black text-emerald-400">{isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}</span>
-          <span className="text-xs text-emerald-400/60 font-bold">{isAr ? 'يتم تحليل الفرض في الوقت الفعلي من المطور' : 'Opportunities synchronized in real-time from developer'}</span>
+          <span className="text-sm font-black text-emerald-400">{lt(lang, 92)}</span>
+          <span className="text-xs text-emerald-400/60 font-bold">{lt(lang, 399)}</span>
         </div>
         <MarketHoursIndicator lang={lang} />
         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -117,8 +122,8 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
             <div className="absolute inset-0 border-b-2 border-emerald-400 rounded-full animate-spin" />
             <div className="absolute inset-0 flex items-center justify-center"><Activity size={24} className="text-emerald-400" /></div>
           </div>
-          <h3 className="text-xl font-black text-white/60">{isAr ? 'في انتظار نشر فرض جديدة...' : 'Waiting for new opportunities...'}</h3>
-          <p className="text-sm text-white/40 mt-2">{isAr ? 'ستظهر الفرص القوية والعادية بمجرد نشرها من المطور' : 'Strong and regular opportunities will appear once published by developer'}</p>
+          <h3 className="text-xl font-black text-white/60">{lt(lang, 614)}</h3>
+          <p className="text-sm text-white/40 mt-2">{lt(lang, 528)}</p>
         </div>
       </div>
     );
@@ -132,8 +137,8 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
           <Activity size={20} className="text-emerald-400" />
           <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
         </div>
-        <span className="text-sm font-black text-emerald-400">{isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}</span>
-        <span className="text-xs text-emerald-400/60 font-bold">{isAr ? 'يتم مزامنة الفرص تلقائياً' : 'Opportunities synchronized in real-time'}</span>
+        <span className="text-sm font-black text-emerald-400">{lt(lang, 92)}</span>
+        <span className="text-xs text-emerald-400/60 font-bold">{lt(lang, 398)}</span>
         </div>
         <MarketHoursIndicator lang={lang} />
 
@@ -150,7 +155,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
             <div key={cat} className="space-y-2">
               <div className="flex items-center gap-2 px-2 py-1">
                 <span className="text-base">{cfg.emoji}</span>
-                <span className={`text-sm font-black ${cfg.color}`}>{isAr ? cfg.labelAr : cfg.labelEn}</span>
+                <span className={`text-sm font-black ${cfg.color}`}>{pkick(lang, cfg, 'label')}</span>
                 <span className="text-xs text-white/40 font-bold">({displaySignals.length})</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -171,7 +176,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
             <span className="text-base font-black text-white italic tracking-wider chart-symbol-name">{activeSymbol}</span>
             {activeResult && SIGNAL_META[activeResult.signal] && (
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${SIGNAL_META[activeResult.signal].bg} ${SIGNAL_META[activeResult.signal].color} border ${SIGNAL_META[activeResult.signal].border}`}>
-                {isAr ? SIGNAL_META[activeResult.signal].labelAr : SIGNAL_META[activeResult.signal].labelEn}
+                {pkick(lang, SIGNAL_META[activeResult.signal], 'label')}
               </span>
             )}
           </div>
@@ -201,7 +206,7 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
     <div data-card={cardKey} style={{ alignSelf: 'start', backgroundColor: 'rgba(var(--card-bg),0.88)' }} className="signal-card rounded-xl border-2 border-amber-600/40 transition-all overflow-hidden relative">
       {/* Very strong signal star */}
       {(res.signal === SignalType.STRONG_BUY || res.signal === SignalType.STRONG_SELL) && (
-        <div className="absolute top-1 right-1 z-20" title={isAr ? 'فرصة قوية جداً' : 'Very Strong Opportunity'}>
+        <div className="absolute top-1 right-1 z-20" title={lt(lang, 598)}>
           <svg width="36" height="36" viewBox="0 0 24 24" fill="white" className="drop-shadow-[0_0_8px_rgba(255,255,255,1)] animate-[pulse_1.5s_ease-in-out_infinite]">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
           </svg>
@@ -212,7 +217,7 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
       <button onClick={() => { onSelect(res.symbol); onClick?.(); }} className="md:hidden w-full px-3 py-2.5 flex items-center gap-3">
         <div className="flex flex-col items-start min-w-0 flex-1">
           <span className="text-lg font-black italic leading-none truncate max-w-full" style={{ color: meta.symbolColor }}>{res.symbol}</span>
-          <span className="text-[10px] font-black leading-tight mt-1 truncate max-w-full" style={{ color: meta.symbolColor }}>{isAr ? meta.labelAr : meta.labelEn}</span>
+          <span className="text-[10px] font-black leading-tight mt-1 truncate max-w-full" style={{ color: meta.symbolColor }}>{pkick(lang, meta, 'label')}</span>
           <span className="text-[9px] font-bold leading-tight mt-1 text-white/50">{formatPublishDate(res.timestamp, lang)}</span>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
@@ -227,7 +232,7 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
               res.sidewaysDirection === 'uptrend' ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' :
               res.sidewaysDirection === 'downtrend' ? 'text-red-300 bg-red-500/20 border-red-500/30' : ''
             }`}>
-              {res.isSideways ? (isAr ? 'عرضي' : 'Side') : res.sidewaysDirection === 'uptrend' ? (isAr ? 'صاعد' : 'Up') : res.sidewaysDirection === 'downtrend' ? (isAr ? 'هابط' : 'Down') : ''}
+              {res.isSideways ? (lt(lang, 510)) : res.sidewaysDirection === 'uptrend' ? (lt(lang, 592)) : res.sidewaysDirection === 'downtrend' ? (lt(lang, 210)) : ''}
             </span>
           )}
         </div>
@@ -240,7 +245,7 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
           <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
           <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{sl ? sl.toFixed(decimals) : '\u2014'}</span>
         </div>
-        <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
+        <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{pkick(lang, meta, 'label')}</span>
         <div className="flex items-center gap-2">
           <span className="text-xl sm:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
           {res.isSideways !== undefined && (
@@ -249,7 +254,7 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
               res.sidewaysDirection === 'uptrend' ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' :
               res.sidewaysDirection === 'downtrend' ? 'text-red-300 bg-red-500/20 border-red-500/30' : ''
             }`}>
-              {res.isSideways ? (isAr ? 'عرضي' : 'Side') : res.sidewaysDirection === 'uptrend' ? (isAr ? 'صاعد' : 'Up') : res.sidewaysDirection === 'downtrend' ? (isAr ? 'هابط' : 'Down') : ''}
+              {res.isSideways ? (lt(lang, 510)) : res.sidewaysDirection === 'uptrend' ? (lt(lang, 592)) : res.sidewaysDirection === 'downtrend' ? (lt(lang, 210)) : ''}
             </span>
           )}
           <div className="flex items-center gap-0.5">
@@ -262,17 +267,17 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
       <div className="flex gap-1.5 p-1.5 md:p-0 md:gap-0 md:block">
         {res.detailedReasons && res.detailedReasons.length > 0 && (
           <button onClick={(e) => { e.stopPropagation(); onDetail?.(res); }} className="flex-1 md:flex-none md:w-full py-1.5 md:py-2.5 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-[10px] md:text-xs uppercase tracking-wider flex items-center justify-center gap-2 rounded-md md:rounded-none">
-            <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+            <span>{lt(lang, 81)}</span>
             <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px]">{res.detailedReasons.length}</span>
           </button>
         )}
         {onTrade && (
-          <button onClick={(e) => { e.stopPropagation(); onTrade(res.symbol); }} className="flex-1 md:flex-none md:w-full py-1.5 md:py-2 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 transition-all text-[#F59E0B] text-[10px] md:text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 rounded-md md:rounded-none border-t-0 md:border-t md:border-[#F59E0B]/30" title={isAr ? `تداول ${res.symbol}` : `Trade ${res.symbol}`}>
+          <button onClick={(e) => { e.stopPropagation(); onTrade(res.symbol); }} className="flex-1 md:flex-none md:w-full py-1.5 md:py-2 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 transition-all text-[#F59E0B] text-[10px] md:text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 rounded-md md:rounded-none border-t-0 md:border-t md:border-[#F59E0B]/30" title={ltp(lang, 648, res.symbol)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 17l6-6 4 4 8-8" />
               <path d="M17 7h4v4" />
             </svg>
-            <span>{isAr ? 'تداول' : 'Trade'}</span>
+            <span>{lt(lang, 573)}</span>
           </button>
         )}
       </div>

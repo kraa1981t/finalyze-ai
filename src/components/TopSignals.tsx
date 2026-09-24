@@ -6,6 +6,7 @@ import { Language, translations } from '../lib/i18n';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
 import TradingViewEmbed from './TradingViewEmbed';
 import MarketHoursIndicator from './MarketHoursIndicator';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface TopSignalsProps {
   signals: AnalysisResult[];
@@ -17,18 +18,18 @@ interface TopSignalsProps {
   onTrade?: (symbol: string) => void;
 }
 
-const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelAr: string; labelEn: string; symbolColor: string }> = {
-  [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', labelAr: 'إشارة شراء قوي', labelEn: 'Strong Buy Signal', symbolColor: '#00ff88' },
-  [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', labelAr: 'إشارة بيع قوي', labelEn: 'Strong Sell Signal', symbolColor: '#ff4444' },
-  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', labelAr: 'إشارة شراء', labelEn: 'Buy Signal', symbolColor: '#66ffaa' },
-  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', labelAr: 'إشارة بيع', labelEn: 'Sell Signal', symbolColor: '#ff5555' },
+const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelEn: string; labelAr: string; labelEs: string; labelRu: string; labelFr: string; symbolColor: string }> = {
+  [SignalType.STRONG_BUY]: { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', labelEn: 'Strong Buy Signal', labelAr: 'إشارة شراء قوي', labelEs: 'Compra Fuerte', labelRu: 'Сильная покупка', labelFr: 'Achat fort', symbolColor: '#00ff88' },
+  [SignalType.STRONG_SELL]: { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/40', labelEn: 'Strong Sell Signal', labelAr: 'إشارة بيع قوي', labelEs: 'Venta Fuerte', labelRu: 'Сильная продажа', labelFr: 'Vente forte', symbolColor: '#ff4444' },
+  [SignalType.BUY]: { color: 'text-emerald-400/80', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', labelEn: 'Buy Signal', labelAr: 'إشارة شراء', labelEs: 'Compra', labelRu: 'Покупка', labelFr: 'Achat', symbolColor: '#66ffaa' },
+  [SignalType.SELL]: { color: 'text-red-400/80', bg: 'bg-red-500/10', border: 'border-red-500/20', labelEn: 'Sell Signal', labelAr: 'إشارة بيع', labelEs: 'Venta', labelRu: 'Продажа', labelFr: 'Vente', symbolColor: '#ff5555' },
 };
 
-const CATEGORY_CONFIG: Record<string, { emoji: string; labelAr: string; labelEn: string; color: string; borderColor: string }> = {
-  forex: { emoji: '\uD83D\uDCB1', labelAr: 'الفوركس', labelEn: 'Forex', color: 'text-blue-400', borderColor: 'border-blue-500/30' },
-  crypto: { emoji: '\uD83E\uDDF1', labelAr: 'الكريبتو', labelEn: 'Crypto', color: 'text-purple-400', borderColor: 'border-purple-500/30' },
-  stocks: { emoji: '\uD83D\uDCC8', labelAr: 'الأسهم', labelEn: 'Stocks', color: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
-  metals: { emoji: '\uD83D\uDC8E', labelAr: 'المعادن', labelEn: 'Metals', color: 'text-orange-400', borderColor: 'border-orange-500/30' },
+const CATEGORY_CONFIG: Record<string, { emoji: string; labelEn: string; labelAr: string; labelEs: string; labelRu: string; labelFr: string; color: string; borderColor: string }> = {
+  forex: { emoji: '\uD83D\uDCB1', labelEn: 'Forex', labelAr: 'الفوركس', labelEs: 'Forex', labelRu: 'Форекс', labelFr: 'Forex', color: 'text-blue-400', borderColor: 'border-blue-500/30' },
+  crypto: { emoji: '\uD83E\uDDF1', labelEn: 'Crypto', labelAr: 'الكريبتو', labelEs: 'Cripto', labelRu: 'Крипто', labelFr: 'Crypto', color: 'text-purple-400', borderColor: 'border-purple-500/30' },
+  stocks: { emoji: '\uD83D\uDCC8', labelEn: 'Stocks', labelAr: 'الأسهم', labelEs: 'Acciones', labelRu: 'Акции', labelFr: 'Actions', color: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
+  metals: { emoji: '\uD83D\uDC8E', labelEn: 'Metals', labelAr: 'المعادن', labelEs: 'Metales', labelRu: 'Металлы', labelFr: 'Métaux', color: 'text-orange-400', borderColor: 'border-orange-500/30' },
 };
 
 function getSymbolCategory(symbol: string): string {
@@ -44,13 +45,17 @@ function getSymbolCategory(symbol: string): string {
   return 'forex';
 }
 
-const formatPublishDate = (timestamp: string, lang: string) => {
+const DAYS: Record<string, string[]> = {
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  ar: ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
+  es: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+  ru: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+  fr: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
+};
+const formatPublishDate = (timestamp: string, lang: Language) => {
   try {
     const date = new Date(timestamp);
-    const isAr = lang === 'ar';
-    const daysAr = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const dayName = isAr ? daysAr[date.getUTCDay()] : daysEn[date.getUTCDay()];
+    const dayName = DAYS[lang]?.[date.getUTCDay()] || DAYS.en[date.getUTCDay()];
     const hours = String(date.getUTCHours()).padStart(2, '0');
     const minutes = String(date.getUTCMinutes()).padStart(2, '0');
     return `${dayName} ${hours}:${minutes}`;
@@ -80,7 +85,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
       </div>
       <div className="w-full bg-[#D1FAE5]/40 backdrop-blur-xl rounded-full h-3 border border-[#D1FAE5]/60 shadow-[0_0_25px_rgba(209,250,229,0.3)]" />
       <p className="text-center text-white/30 text-sm py-8">
-        {isAr ? 'لا توجد إشارات حالياً - ابدأ التحليل التلقائي لرؤية الإشارات' : 'No signals yet - start auto analysis to see signals'}
+        {lt(lang, 371)}
       </p>
     </div>
   );
@@ -127,7 +132,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
             <div className={cn("flex items-center gap-2 px-2 py-1 rounded-lg border", cfg.borderColor, "bg-brand-alt/60")}>
               <span className="text-base">{cfg.emoji}</span>
               <span className={cn("text-xs font-black uppercase tracking-widest", cfg.color)}>
-                {isAr ? cfg.labelAr : cfg.labelEn}
+                {pkick(lang, cfg, 'label')}
               </span>
               <span className="text-[10px] text-white/30 font-bold">({catSignals.length})</span>
             </div>
@@ -135,7 +140,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
 {strong.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {strong.map((res, idx) => (
-                  <SignalCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={(r) => {
+                  <SignalCard key={`s_${res.symbol}_${idx}`} res={res} isAr={isAr} lang={lang} onSelect={(r) => {
                     if (selectedSymbol === r.symbol) {
                       setSelectedSymbol(null);
                       setSelectedResult(null);
@@ -151,7 +156,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
 {top3.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {top3.map((res, idx) => (
-                  <SignalCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} onSelect={(r) => {
+                  <SignalCard key={`r_${res.symbol}_${idx}`} res={res} isAr={isAr} lang={lang} onSelect={(r) => {
                     if (selectedSymbol === r.symbol) {
                       setSelectedSymbol(null);
                       setSelectedResult(null);
@@ -175,7 +180,7 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
             <span className="text-base font-black text-white italic tracking-wider chart-symbol-name">{selectedSymbol}</span>
             {SIGNAL_META[selectedResult.signal] && (
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${SIGNAL_META[selectedResult.signal].bg} ${SIGNAL_META[selectedResult.signal].color} border ${SIGNAL_META[selectedResult.signal].border}`}>
-                {isAr ? SIGNAL_META[selectedResult.signal].labelAr : SIGNAL_META[selectedResult.signal].labelEn}
+                {pkick(lang, SIGNAL_META[selectedResult.signal], 'label')}
               </span>
             )}
           </div>
@@ -188,8 +193,8 @@ export default function TopSignals({ signals, onRemove, onSelect, onDetail, onCl
   );
 }
 
-function SignalCard({ res, isAr, onSelect, onDetail, onRemove, formatPublishDate, cardKey, isSelected, onTrade }: {
-  res: AnalysisResult; isAr: boolean;
+function SignalCard({ res, isAr, lang, onSelect, onDetail, onRemove, formatPublishDate, cardKey, isSelected, onTrade }: {
+  res: AnalysisResult; isAr: boolean; lang: Language;
   onSelect: (r: AnalysisResult) => void; onDetail: (r: AnalysisResult) => void; onRemove: (s: string) => void;
   formatPublishDate: (ts: string, lang: string) => string; cardKey: string; isSelected?: boolean;
   onTrade?: (symbol: string) => void;
@@ -206,7 +211,7 @@ const isStrong = res.signal === SignalType.STRONG_BUY || res.signal === SignalTy
     <div className={cn("signal-card rounded-2xl border-2 transition-all overflow-hidden relative shadow-lg", isSelected ? 'border-yellow-400 shadow-yellow-400/30' : 'border-amber-500/50')} style={{ backgroundColor: 'rgba(var(--card-bg),0.92)', alignSelf: 'stretch' }}>
       {/* Very strong signal star */}
       {isVeryStrong && (
-        <div className="absolute top-2 right-2 z-20" title={isAr ? 'فرصة قوية جداً' : 'Very Strong Opportunity'}>
+        <div className="absolute top-2 right-2 z-20" title={lt(lang, 598)}>
           <svg width="36" height="36" viewBox="0 0 24 24" fill="white" className="drop-shadow-[0_0_8px_rgba(255,255,255,1)] animate-[pulse_1.5s_ease-in-out_infinite]">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
           </svg>
@@ -219,7 +224,7 @@ const isStrong = res.signal === SignalType.STRONG_BUY || res.signal === SignalTy
           <span className="text-3xl md:text-xl font-black italic flex-shrink-0 text-center whitespace-nowrap" style={{ color: meta.symbolColor }}>{res.symbol}</span>
           <span className="text-lg md:text-sm font-black font-mono" style={{color:'#ff4444'}}>{slPrice ? slPrice.toFixed(decimals) : '—'}</span>
         </div>
-        <span className="text-xl md:text-base font-black text-center px-2 break-words" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
+        <span className="text-xl md:text-base font-black text-center px-2 break-words" style={{color: meta.symbolColor}}>{pkick(lang, meta, 'label')}</span>
         <div className="flex items-center gap-3 flex-wrap justify-center">
           <span className="text-3xl md:text-3xl font-black font-mono" style={{color:'#ffffff'}}>{res.confidence}%</span>
           {res.isSideways !== undefined && (
@@ -228,29 +233,29 @@ const isStrong = res.signal === SignalType.STRONG_BUY || res.signal === SignalTy
               res.sidewaysDirection === 'uptrend' ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' :
               res.sidewaysDirection === 'downtrend' ? 'text-red-300 bg-red-500/20 border-red-500/30' : ''
             }`}>
-              {res.isSideways ? (isAr ? 'عرضي' : 'Side') : res.sidewaysDirection === 'uptrend' ? (isAr ? 'صاعد' : 'Up') : res.sidewaysDirection === 'downtrend' ? (isAr ? 'هابط' : 'Down') : ''}
+              {res.isSideways ? (lt(lang, 510)) : res.sidewaysDirection === 'uptrend' ? (lt(lang, 592)) : res.sidewaysDirection === 'downtrend' ? (lt(lang, 210)) : ''}
             </span>
           )}
-          <span className="text-xs md:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, isAr ? 'ar' : 'en')}</span>
+          <span className="text-xs md:text-xs font-bold" style={{color:'rgba(255,255,255,0.85)'}}>{formatPublishDate(res.timestamp, lang)}</span>
         </div>
       </button>
 
       {/* Yellow Analysis Reasons button - directly under percentage */}
       {res.detailedReasons && res.detailedReasons.length > 0 && (
         <button onClick={(e) => { e.stopPropagation(); onDetail(res); }} className="w-full py-2.5 bg-[#F59E0B] hover:bg-[#d97706] transition-all text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2">
-          <span>{isAr ? 'اسباب التحليل' : 'Analysis Reasons'}</span>
+          <span>{lt(lang, 81)}</span>
           <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[9px]">{res.detailedReasons.length}</span>
         </button>
       )}
 
       {/* Trade button - small candlestick icon */}
       {onTrade && (
-        <button onClick={(e) => { e.stopPropagation(); onTrade(res.symbol); }} className="w-full py-2 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 border-t border-[#F59E0B]/30 transition-all flex items-center justify-center gap-2" title={isAr ? `تداول ${res.symbol}` : `Trade ${res.symbol}`}>
+        <button onClick={(e) => { e.stopPropagation(); onTrade(res.symbol); }} className="w-full py-2 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 border-t border-[#F59E0B]/30 transition-all flex items-center justify-center gap-2" title={ltp(lang, 648, res.symbol)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 17l6-6 4 4 8-8" />
             <path d="M17 7h4v4" />
           </svg>
-          <span className="text-[11px] font-black text-[#F59E0B] uppercase tracking-wider">{isAr ? 'تداول' : 'Trade'}</span>
+          <span className="text-[11px] font-black text-[#F59E0B] uppercase tracking-wider">{lt(lang, 573)}</span>
         </button>
       )}
 

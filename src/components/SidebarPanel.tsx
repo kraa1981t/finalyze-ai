@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Settings, Key, DollarSign, Users, Zap, User, Crown, Info, Lightbulb, Monitor, BarChart3, Smartphone, Tablet, TrendingUp, MessageCircle, LogIn, LogOut, Store, Receipt } from 'lucide-react';
 import { Language } from '../lib/i18n';
 import { User as FirebaseUser } from 'firebase/auth';
+import { lt } from '../lib/i18nUI';
 
 interface SidebarPanelProps {
   lang: Language;
@@ -22,27 +23,27 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
   const panelRef = useRef<HTMLDivElement>(null);
 
   const items = isDeveloper ? [
-    { icon: BarChart3, label: lang === 'ar' ? 'الأسعار الحية' : 'Live Prices', page: 'prices' as const, color: 'from-emerald-400 to-emerald-600' },
-    { icon: Zap, label: lang === 'ar' ? 'إعدادات التحليل التلقائي' : 'Auto Analysis Settings', page: 'radar' as const, color: 'from-amber-400 to-amber-600' },
-    { icon: Key, label: lang === 'ar' ? 'مفتاح API' : 'API Key', page: 'apiKey' as const, color: 'from-amber-400 to-amber-600' },
-    { icon: User, label: lang === 'ar' ? 'الملف الشخصي' : 'Profile', page: 'profile' as const, color: 'from-amber-400 to-amber-600' },
-    { icon: Settings, label: lang === 'ar' ? 'الإعدادات' : 'Settings', page: 'settings' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: BarChart3, label: lt(lang, 724), page: 'prices' as const, color: 'from-emerald-400 to-emerald-600' },
+    { icon: Zap, label: lt(lang, 701), page: 'radar' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: Key, label: lt(lang, 84), page: 'apiKey' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: User, label: lt(lang, 742), page: 'profile' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: Settings, label: lt(lang, 755), page: 'settings' as const, color: 'from-amber-400 to-amber-600' },
     ...(!freemiumDisabled ? [
-      { icon: DollarSign, label: lang === 'ar' ? 'الخطط' : 'Plans', page: 'plans' as const, color: 'from-amber-400 to-amber-600' },
+      { icon: DollarSign, label: lt(lang, 424), page: 'plans' as const, color: 'from-amber-400 to-amber-600' },
     ] : []),
-    { icon: Store, label: lang === 'ar' ? 'إعدادات المتجر' : 'Store Settings', page: 'storeSettings' as const, color: 'from-sky-400 to-sky-600' },
-    { icon: Receipt, label: lang === 'ar' ? 'معاملاتي' : 'My Transactions', page: 'transactions' as const, color: 'from-emerald-400 to-emerald-600' },
-    { icon: Store, label: lang === 'ar' ? 'عرض المتجر (اختبار)' : 'View Store (test)', page: 'store' as const, color: 'from-emerald-400 to-emerald-600' },
-    { icon: Users, label: lang === 'ar' ? 'مراقبة العملاء' : 'Client Monitor', page: 'clientMonitor' as const, color: 'from-amber-400 to-amber-600' },
-    { icon: BarChart3, label: lang === 'ar' ? 'إحصائيات الموقع' : 'Site Statistics', page: 'siteStats' as const, color: 'from-emerald-400 to-emerald-600' },
-    { icon: Monitor, label: lang === 'ar' ? 'إعلاناتي' : 'My Ads', page: 'ads' as const, color: 'from-purple-400 to-purple-600' },
+    { icon: Store, label: lt(lang, 527), page: 'storeSettings' as const, color: 'from-sky-400 to-sky-600' },
+    { icon: Receipt, label: lt(lang, 342), page: 'transactions' as const, color: 'from-emerald-400 to-emerald-600' },
+    { icon: Store, label: lt(lang, 777), page: 'store' as const, color: 'from-emerald-400 to-emerald-600' },
+    { icon: Users, label: lt(lang, 141), page: 'clientMonitor' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: BarChart3, label: lt(lang, 517), page: 'siteStats' as const, color: 'from-emerald-400 to-emerald-600' },
+    { icon: Monitor, label: lt(lang, 732), page: 'ads' as const, color: 'from-purple-400 to-purple-600' },
   ] : [
-    { icon: User, label: lang === 'ar' ? 'الملف الشخصي' : 'Profile', page: 'profile' as const, color: 'from-amber-400 to-amber-600' },
-    { icon: Receipt, label: lang === 'ar' ? 'معاملاتي' : 'My Transactions', page: 'transactions' as const, color: 'from-emerald-400 to-emerald-600' },
-    { icon: Info, label: lang === 'ar' ? 'نبذة عنا' : 'About Us', page: 'about' as const, color: 'from-amber-400 to-amber-600' },
-    { icon: Lightbulb, label: lang === 'ar' ? 'اقتراحاتكم' : 'Your Suggestions', page: 'suggestions' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: User, label: lt(lang, 742), page: 'profile' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: Receipt, label: lt(lang, 342), page: 'transactions' as const, color: 'from-emerald-400 to-emerald-600' },
+    { icon: Info, label: lt(lang, 694), page: 'about' as const, color: 'from-amber-400 to-amber-600' },
+    { icon: Lightbulb, label: lt(lang, 633), page: 'suggestions' as const, color: 'from-amber-400 to-amber-600' },
     ...(!freemiumDisabled ? [
-      { icon: Crown, label: lang === 'ar' ? 'شراء خطة' : 'Buy Plan', page: 'plans' as const, color: 'from-emerald-400 to-emerald-600' },
+      { icon: Crown, label: lt(lang, 706), page: 'plans' as const, color: 'from-emerald-400 to-emerald-600' },
     ] : []),
   ];
 
@@ -58,7 +59,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
     >
       <div className="px-5 py-4 border-b border-black/5">
         <h3 className="text-xs font-black uppercase tracking-widest text-black/50">
-          {lang === 'ar' ? 'لوحة التحكم' : 'Dashboard'}
+          {lt(lang, 711)}
         </h3>
       </div>
 
@@ -72,7 +73,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
             <TrendingUp size={20} />
           </div>
           <span className="text-sm font-black text-black min-w-0 leading-snug">
-            {lang === 'ar' ? 'التداول' : 'Trade'}
+            {lt(lang, 573)}
           </span>
         </button>
         <a
@@ -85,7 +86,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
             <MessageCircle size={20} />
           </div>
           <span className="text-sm font-black text-white min-w-0 leading-snug">
-            {lang === 'ar' ? 'تواصل معنا' : 'Contact Us'}
+            {lt(lang, 708)}
           </span>
         </a>
         {items.map((item, i) => {
@@ -142,7 +143,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
               className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#F59E0B] text-black font-black text-sm uppercase tracking-wider shadow-lg hover:bg-[#d97706] active:scale-95 transition-all md:hidden"
             >
               <LogIn size={18} />
-              {lang === 'ar' ? 'تسجيل الدخول' : 'Login'}
+              {lt(lang, 725)}
             </button>
           )
         )}
@@ -151,7 +152,7 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
       {isDeveloper && onPreview && (
         <div className="px-4 py-3 border-t border-black/5">
           <div className="text-[9px] font-black uppercase text-black/40 tracking-[0.2em] mb-2 px-1">
-            {lang === 'ar' ? 'معاينة' : 'Preview'}
+            {lt(lang, 741)}
           </div>
           <div className="flex gap-2">
             <button
@@ -159,14 +160,14 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
             >
               <Smartphone size={16} />
-              <span className="text-xs font-black">{lang === 'ar' ? 'هاتف' : 'Phone'}</span>
+              <span className="text-xs font-black">{lt(lang, 738)}</span>
             </button>
             <button
               onClick={() => { onPreview('tablet'); onClose(); }}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#F59E0B] border border-black/10 text-black hover:bg-[#d97706] transition-all shadow-md"
             >
               <Tablet size={16} />
-              <span className="text-xs font-black">{lang === 'ar' ? 'لوحي' : 'Tablet'}</span>
+              <span className="text-xs font-black">{lt(lang, 764)}</span>
             </button>
           </div>
         </div>

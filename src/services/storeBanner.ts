@@ -302,7 +302,7 @@ function motifGraphic(st: StrategyProfile): string {
 export function generateBotBanner(bot: StoreBot): string {
   const st = detectStrategy(bot);
   const name = esc((bot.name || 'Trading Bot').slice(0, 30));
-  const typeTxt = esc(typeLabelForCat(categoryOf(bot), typeOf(bot), true));
+  const typeTxt = esc(typeLabelForCat(categoryOf(bot), typeOf(bot), 'en'));
   const badge = esc(isFree(bot) ? 'FREE' : (bot.name || '').toLowerCase().includes('plus') ? 'PRO / UPGRADED' : st.badge);
   const tagAr = esc(st.taglineAr);
   const tagEn = esc(st.taglineEn);

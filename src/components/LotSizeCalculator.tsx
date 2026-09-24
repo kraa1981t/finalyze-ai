@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Minus, Plus, TrendingUp, TrendingDown, Shield, Zap } from 'lucide-react';
 import { getInstrumentConfig } from '../lib/positionMath';
+import { Language } from '../lib/i18n';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface LotSizeCalculatorProps {
   symbol: string;
@@ -8,7 +10,7 @@ interface LotSizeCalculatorProps {
   takeProfit: number;
   entryPrice?: number;
   signal: 'strong_buy' | 'buy' | 'sell' | 'strong_sell' | 'neutral' | 'no_entry';
-  lang: 'ar' | 'en';
+  lang: Language;
 }
 
 export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryPrice, signal, lang }: LotSizeCalculatorProps) {
@@ -18,11 +20,11 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
   // Signal type display with colors
   const signalDisplay = useMemo(() => {
     switch (signal) {
-      case 'strong_buy': return { text: isAr ? 'شراء قوي' : 'Strong Buy', color: 'text-emerald-400' };
-      case 'buy': return { text: isAr ? 'شراء' : 'Buy', color: 'text-emerald-400' };
-      case 'strong_sell': return { text: isAr ? 'بيع قوي' : 'Strong Sell', color: 'text-red-400' };
-      case 'sell': return { text: isAr ? 'بيع' : 'Sell', color: 'text-red-400' };
-      case 'neutral': return { text: isAr ? 'محايد' : 'Neutral', color: 'text-slate-300' };
+      case 'strong_buy': return { text: lt(lang, 529), color: 'text-emerald-400' };
+      case 'buy': return { text: lt(lang, 116), color: 'text-emerald-400' };
+      case 'strong_sell': return { text: lt(lang, 531), color: 'text-red-400' };
+      case 'sell': return { text: lt(lang, 495), color: 'text-red-400' };
+      case 'neutral': return { text: lt(lang, 346), color: 'text-slate-300' };
       default: return { text: '', color: 'text-white/60' };
     }
   }, [signal, isAr]);
@@ -123,7 +125,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
         <div className="flex-1 min-w-0 overflow-hidden bg-red-500/10 border border-red-500/20 rounded-lg p-1.5 text-center">
           <div className="flex items-center justify-center gap-1 mb-0.5">
             <TrendingDown size={12} className="text-red-400" />
-            <span className="text-[10px] text-red-400 font-bold uppercase">{isAr ? 'وقف الخسارة' : 'SL'}</span>
+            <span className="text-[10px] text-red-400 font-bold uppercase">{lt(lang, 519)}</span>
           </div>
           <span className="text-lg font-extrabold text-red-500 font-mono block">
             ${formatNum(calculations.slUsd, 2)}
@@ -141,7 +143,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
         <div className="flex-1 min-w-0 overflow-hidden bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5 text-center">
           <div className="flex items-center justify-center gap-1 mb-0.5">
             <TrendingUp size={12} className="text-emerald-400" />
-            <span className="text-[10px] text-emerald-400 font-bold uppercase">{isAr ? 'جني الأرباح' : 'TP'}</span>
+            <span className="text-[10px] text-emerald-400 font-bold uppercase">{lt(lang, 571)}</span>
           </div>
           <span className="text-lg font-extrabold text-emerald-500 font-mono block">
             ${formatNum(calculations.tpUsd, 2)}
@@ -156,12 +158,12 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
       <div className="flex items-center justify-center gap-1.5 py-0.5">
         <Zap size={12} className={isStrongSignal ? 'text-amber-400' : 'text-blue-400'} />
         <span className={`text-xs font-bold ${isStrongSignal ? 'text-amber-400' : 'text-blue-400'}`}>
-          {isStrongSignal ? (isAr ? 'إشارة قوية' : 'Strong Signal') : (isAr ? 'إشارة عادية' : 'Normal Signal')}
+          {isStrongSignal ? (lt(lang, 533)) : (lt(lang, 376))}
         </span>
       </div>
 
       <div className="flex items-center justify-center gap-2">
-        <span className="text-xs text-white/60 font-bold uppercase">{isAr ? 'الرصيد' : 'Balance'}</span>
+        <span className="text-xs text-white/60 font-bold uppercase">{lt(lang, 98)}</span>
         <div className="flex items-center gap-1">
           <button onClick={() => adjustBalance(-1)} className="w-7 h-7 rounded bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 active:scale-95">
             <Minus size={12} />
@@ -199,7 +201,7 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
       </div>
 
       <div className="flex flex-col items-center gap-1">
-        <span className="text-xs text-white/60 font-bold uppercase">{isAr ? 'اللوت' : 'Lot'}</span>
+        <span className="text-xs text-white/60 font-bold uppercase">{lt(lang, 305)}</span>
         <div className="flex items-center gap-2">
           <button
             onClick={() => adjustLot(-1)}
@@ -242,12 +244,12 @@ export default function LotSizeCalculator({ symbol, stopLoss, takeProfit, entryP
         <div className="flex items-center gap-1">
           <Shield size={12} className={riskColors[calculations.riskLevel]} />
           <span className={`font-bold ${riskColors[calculations.riskLevel]}`}>
-            {formatNum(calculations.riskOfBalance)}% {isAr ? 'مخاطرة' : 'risk'}
+            {formatNum(calculations.riskOfBalance)}% {lt(lang, 478)}
           </span>
         </div>
         <span className="text-white/30">|</span>
         <span className="text-white/60 font-mono">
-          1:{formatNum(Math.max(0.5, calculations.effectiveRR), 1)} {isAr ? 'عائد' : 'R:R'}
+          1:{formatNum(Math.max(0.5, calculations.effectiveRR), 1)} {lt(lang, 444)}
         </span>
       </div>
     </div>

@@ -93,6 +93,7 @@ export interface Translations {
   uploadCustom: string;
   startManualNow: string;
   clearAllResults: string;
+  bestSignals: string;
   useCandleMatch: string;
   candleMatchDailyThreshold: string;
   candleMatchWeeklyThreshold: string;
@@ -193,6 +194,7 @@ export const translations: Record<Language, Translations> = {
     uploadCustom: "Upload Custom Audio",
     startManualNow: "Start Manual Analysis Now",
     clearAllResults: "Clear All Results",
+    bestSignals: "Best Signals",
     useCandleMatch: "Candle Body Match Filter (Daily/Weekly/Monthly)",
     candleMatchDailyThreshold: "Daily Candle Body Threshold (pips)",
     candleMatchWeeklyThreshold: "Weekly Candle Body Threshold (pips)",
@@ -291,6 +293,7 @@ export const translations: Record<Language, Translations> = {
     uploadCustom: "رفع صوت مخصص",
     startManualNow: "بدء التحليل اليدوي الآن",
     clearAllResults: "مسح جميع النتائج",
+    bestSignals: "أفضل الإشارات",
     useCandleMatch: "فلتر تطابق جذوع الشموع (يومي/أسبوعي/شهري)",
     candleMatchDailyThreshold: "عتبة جذع الشمعة اليومية (بيبس)",
     candleMatchWeeklyThreshold: "عتبة جذع الشمعة الأسبوعية (بيبس)",
@@ -389,6 +392,7 @@ export const translations: Record<Language, Translations> = {
     uploadCustom: "Subir Audio Personalizado",
     startManualNow: "Iniciar Análisis Manual Ahora",
     clearAllResults: "Borrar Todos los Resultados",
+    bestSignals: "Mejores Señales",
     useCandleMatch: "Filtro de Coincidencia de Cuerpo de Vela (Diaria/Semanal/Mensual)",
     candleMatchDailyThreshold: "Umbral del Cuerpo de Vela Diaria (pips)",
     candleMatchWeeklyThreshold: "Umbral del Cuerpo de Vela Semanal (pips)",
@@ -487,6 +491,7 @@ export const translations: Record<Language, Translations> = {
     uploadCustom: "Загрузить свой звук",
     startManualNow: "Запустить ручной анализ сейчас",
     clearAllResults: "Очистить все результаты",
+    bestSignals: "Лучшие Сигналы",
     useCandleMatch: "Фильтр совпадения тела свечи (дневная/недельная/месячная)",
     candleMatchDailyThreshold: "Порог тела дневной свечи (пипсы)",
     candleMatchWeeklyThreshold: "Порог тела недельной свечи (пипсы)",
@@ -585,6 +590,7 @@ export const translations: Record<Language, Translations> = {
     uploadCustom: "Télécharger un Audio Personnalisé",
     startManualNow: "Lancer l’Analyse Manuelle Maintenant",
     clearAllResults: "Effacer Tous les Résultats",
+    bestSignals: "Meilleurs Signaux",
     useCandleMatch: "Filtre de Coincidence du Corps de Bougie (Quotidien/Hebdomadaire/Mensuel)",
     candleMatchDailyThreshold: "Seuil du Corps de Bougie Quotidienne (pips)",
     candleMatchWeeklyThreshold: "Seuil du Corps de Bougie Hebdomadaire (pips)",

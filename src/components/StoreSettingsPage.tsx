@@ -3,9 +3,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Wallet, Copy, Crown, Shield, ShieldOff, Timer } from 'lucide-react';
 import { StoreBot, StoreCategory, STORE_CATEGORIES, typesForCategory, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
 import { loadPaymentSettings, savePaymentSettings, PaymentAddress, PAYMENT_METHODS } from '../services/paymentSettings';
+import { Language } from '../lib/i18n';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface StoreSettingsPageProps {
-  lang: 'ar' | 'en';
+  lang: Language;
   onBack: () => void;
   freemiumDisabled?: boolean;
   onFreemiumToggle?: (v: boolean) => void;
@@ -66,7 +68,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
 
   const handleFile = (f: File) => {
     if (f.size > MAX_FILE_BYTES) {
-      setError(isAr ? 'الملف أكبر من 400 كيلوبايت. يرجى اختيار ملف أصغر.' : 'File exceeds 400 KB. Please choose a smaller file.');
+      setError(lt(lang, 255));
       return;
     }
     const reader = new FileReader();
@@ -79,7 +81,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
 
   const handleImage = async (f: File) => {
     if (!f.type.startsWith('image/')) {
-      setError(isAr ? 'الملف المختار ليس صورة. اختر صورة صالحة.' : 'Selected file is not an image. Choose a valid image.');
+      setError(lt(lang, 494));
       return;
     }
     setSuccess('');
@@ -88,18 +90,18 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
       setImage({ fileName: f.name, fileData: dataUrl });
       setError('');
     } catch {
-      setError(isAr ? 'تعذر قراءة الصورة. اختر صورة صالحة.' : 'Could not read the image. Choose a valid image.');
+      setError(lt(lang, 178));
     }
   };
 
   const handleAdd = async () => {
-    if (!name.trim()) { setError(isAr ? 'أدخل اسم المنتج' : 'Enter the product name'); return; }
-    if (!file) { setError(isAr ? 'اختر ملف المنتج (أي نوع)' : 'Choose the product file (any type)'); return; }
+    if (!name.trim()) { setError(lt(lang, 235)); return; }
+    if (!file) { setError(lt(lang, 132)); return; }
     const cents = Math.max(0, Math.round((parseFloat(priceInput) || 0) * 100));
     setAdding(true);
     try {
       if (new Blob([file.fileData, image?.fileData || '']).size > MAX_DOC_BYTES) {
-        setError(isAr ? 'حجم الملف مع الصورة كبير جداً. اختر ملف أصغر أو صورة أخف.' : 'File + image total is too large. Choose a smaller file or lighter image.');
+        setError(lt(lang, 254));
         setAdding(false);
         return;
       }
@@ -118,7 +120,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
           fileData: file.fileData,
           imageData: image?.fileData || '',
         });
-        setSuccess(isAr ? '✅ تم تحديث المنتج بنجاح' : '✅ Product updated successfully');
+        setSuccess(lt(lang, 16));
       } else {
         await addStoreBot({
           name: name.trim(),
@@ -135,14 +137,14 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
           imageData: image?.fileData || '',
           createdAt: Date.now(),
         });
-        setSuccess(isAr ? '✅ تمت إضافة المنتج بنجاح' : '✅ Product added successfully');
+        setSuccess(lt(lang, 15));
       }
       resetForm();
       refresh();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       const msg = err?.message || '';
-      setError(isAr ? 'فشل الإضافة: ' + msg : 'Failed to add: ' + msg);
+      setError(ltp(lang, 662, msg));
     }
     setAdding(false);
   };
@@ -221,7 +223,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
     };
     setEditSubPrices(clean);
     localStorage.setItem(SUBSCRIPTION_STORAGE_KEY, JSON.stringify(clean));
-    setSuccess(isAr ? '✅ تم حفظ أسعار الخطط' : '✅ Plan prices saved');
+    setSuccess(lt(lang, 14));
     setTimeout(() => setSuccess(''), 3000);
   };
 
@@ -229,7 +231,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
     const mins = Math.max(1, Number(editTimer) || 30);
     setEditTimer(mins);
     localStorage.setItem(TIMER_STORAGE_KEY, String(mins));
-    setSuccess(isAr ? `✅ تم حفظ مدة المهلة: ${mins} دقيقة` : `✅ Wait period saved: ${mins} minutes`);
+    setSuccess(ltp(lang, 663, String(mins)));
     setTimeout(() => setSuccess(''), 3000);
   };
 
@@ -248,7 +250,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
         <button onClick={onBack} className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all">
           <ArrowLeft size={18} />
         </button>
-        <h2 className="text-[30px] font-black text-white">{isAr ? 'إعدادات المتجر' : 'Store Settings'}</h2>
+        <h2 className="text-[30px] font-black text-white">{lt(lang, 527)}</h2>
       </div>
 
       {/* Plans & Payment — managed entirely from Store Settings */}
@@ -259,12 +261,10 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
       >
         <h3 className="text-2xl font-black uppercase text-amber-400 tracking-widest mb-1 flex items-center gap-3">
           <Crown size={24} />
-          {isAr ? 'الدفع والخطط' : 'Payments & Plans'}
+          {lt(lang, 413)}
         </h3>
         <p className="text-sm text-slate-400 mb-6">
-          {isAr
-            ? 'كل ما يخص البيع والدفع هنا: أسعار الخطط، تفعيل/تعطيل الخطط للعملاء، ومدة مهلة الدفع.'
-            : 'Everything about selling and payments lives here: plan prices, enabling/disabling plans for clients, and the payment wait period.'}
+          {lt(lang, 243)}
         </p>
 
         {/* Enable / disable plans for clients */}
@@ -272,12 +272,12 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h5 className="text-lg font-black text-white">
-                {isAr ? 'تفعيل / تعطيل الخطط للعملاء' : 'Enable / Disable Plans for Clients'}
+                {lt(lang, 229)}
               </h5>
               <p className="text-sm text-slate-400 mt-1">
                 {freemiumDisabled
-                  ? (isAr ? 'المفعّل الآن: جميع المنتجات مجانية ولا تظهر خطط للعملاء.' : 'Currently ON: all products free and plans are hidden from clients.')
-                  : (isAr ? 'المعطّل الآن: الخطط مرئية والقيود مفعلة للعملاء.' : 'Currently OFF: plans are visible and restrictions are active for clients.')}
+                  ? (lt(lang, 188))
+                  : (lt(lang, 187))}
               </p>
             </div>
             <button
@@ -290,19 +290,19 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
             >
               {freemiumDisabled ? <Shield size={18} /> : <ShieldOff size={18} />}
               {freemiumDisabled
-                ? (isAr ? 'مفعّل: وصول كامل' : 'ON: Full Access')
-                : (isAr ? 'معطّل: قيود مفعلة' : 'OFF: Restricted')}
+                ? (lt(lang, 388))
+                : (lt(lang, 385))}
             </button>
           </div>
         </div>
 
         {/* Plan prices */}
         <div className="bg-black/20 border border-white/10 rounded-xl p-4 mb-4">
-          <h5 className="text-lg font-black text-white mb-3">{isAr ? 'أسعار الخطط' : 'Plan Prices'}</h5>
+          <h5 className="text-lg font-black text-white mb-3">{lt(lang, 423)}</h5>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {(['weekly', 'monthly', 'yearly'] as const).map((key) => (
               <div key={key} className="flex items-center gap-2">
-                <span className="text-base font-black text-slate-300 uppercase w-24">{isAr ? (key === 'weekly' ? 'أسبوعي' : key === 'monthly' ? 'شهري' : 'سنوي') : key}</span>
+                <span className="text-base font-black text-slate-300 uppercase w-24">{key === 'weekly' ? lt(lang, 681) : key === 'monthly' ? lt(lang, 682) : lt(lang, 683)}</span>
                 <div className="flex items-center gap-1">
                   <span className="text-lg font-black text-white">$</span>
                   <input
@@ -320,7 +320,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
             onClick={saveSubPrices}
             className="mt-4 flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-base font-black"
           >
-            <Check size={16} /> {isAr ? 'حفظ أسعار الخطط' : 'Save Plan Prices'}
+            <Check size={16} /> {lt(lang, 484)}
           </button>
         </div>
 
@@ -328,7 +328,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
         <div className="bg-black/20 border border-white/10 rounded-xl p-4">
           <h5 className="text-lg font-black text-white mb-3 flex items-center gap-2">
             <Timer size={18} className="text-emerald-400" />
-            {isAr ? 'مدة مهلة الدفع' : 'Payment Wait Period'}
+            {lt(lang, 412)}
           </h5>
           <div className="flex items-center gap-3">
             <input
@@ -338,12 +338,12 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
               className="w-24 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-lg font-bold text-white outline-none focus:border-emerald-500"
               min="1"
             />
-            <span className="text-base text-slate-400">{isAr ? 'دقيقة' : 'minutes'}</span>
+            <span className="text-base text-slate-400">{lt(lang, 337)}</span>
             <button
               onClick={saveTimer}
               className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-base font-black"
             >
-              {isAr ? 'حفظ' : 'Save'}
+              {lt(lang, 481)}
             </button>
           </div>
         </div>
@@ -357,12 +357,10 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
       >
         <h3 className="text-2xl font-black uppercase text-emerald-400 tracking-widest mb-4 flex items-center gap-3">
           <Wallet size={24} />
-          {isAr ? 'عناوين الدفع' : 'Payment Addresses'}
+          {lt(lang, 410)}
         </h3>
         <p className="text-sm text-slate-400 mb-4">
-          {isAr
-            ? 'أضف عنواناً لكل شبكة USDT (العملات المستقرة فقط). ثابتة بسعر 1 USDT = $1 فلا حاجة لتحويل الأسعار. تأكيد الدفع يدوي بالكامل من طرفك.'
-            : 'Add a wallet address for each USDT network (stable coins only). Pegged at 1 USDT = $1, no price conversion is needed. Payment confirmation is fully manual on your side.'}
+          {lt(lang, 60)}
         </p>
 
         <div className="space-y-3">
@@ -377,7 +375,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                     <span className="text-sm font-black text-white">{def.label}</span>
                     {!def.stable && (
                       <span className="text-[10px] font-black uppercase bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-full px-2 py-0.5">
-                        {isAr ? 'سعر متحرك' : 'Volatile'}
+                        {lt(lang, 604)}
                       </span>
                     )}
                   </div>
@@ -390,7 +388,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                             className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
                           >
                             <Copy size={12} />
-                            {copiedMethod === def.method ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ' : 'Copy')}
+                            {copiedMethod === def.method ? (lt(lang, 170)) : (lt(lang, 173))}
                           </button>
                           <button
                             onClick={() => { setEditingMethod(def.method); setEditingAddress(saved.address); }}
@@ -411,7 +409,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
                         >
                           <Plus size={12} />
-                          {isAr ? 'إضافة عنوان' : 'Add Address'}
+                          {lt(lang, 61)}
                         </button>
                       )
                     )}
@@ -424,7 +422,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                       type="text"
                       value={editingAddress}
                       onChange={(e) => setEditingAddress(e.target.value)}
-                      placeholder={isAr ? 'أدخل عنوان المحفظة' : 'Enter wallet address'}
+                      placeholder={lt(lang, 236)}
                       className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-white outline-none focus:border-emerald-500"
                     />
                     <button
@@ -443,7 +441,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                   </div>
                 ) : (
                   <div className="text-xs font-mono text-slate-400 bg-black/30 rounded-lg px-3 py-2 break-all">
-                    {saved ? saved.address : <span className="text-red-400">{isAr ? 'لم يتم الإعداد بعد' : 'Not configured yet'}</span>}
+                    {saved ? saved.address : <span className="text-red-400">{lt(lang, 377)}</span>}
                   </div>
                 )}
               </div>
@@ -458,7 +456,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
         animate={{ opacity: 1, y: 0 }}
         className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8"
       >
-        <h3 className="text-2xl font-black uppercase text-amber-400 tracking-widest mb-4">{editingBot ? (isAr ? 'تعديل منتج' : 'Edit Product') : (isAr ? 'إضافة منتج جديد' : 'Add New Product')}</h3>
+        <h3 className="text-2xl font-black uppercase text-amber-400 tracking-widest mb-4">{editingBot ? (lt(lang, 218)) : (lt(lang, 64))}</h3>
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-2xl rounded-xl px-4 py-3 mb-4">{error}</div>
@@ -469,24 +467,24 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
 
         <div className="space-y-4">
           <div>
-            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'اسم المنتج' : 'Product Name'}</label>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{lt(lang, 434)}</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={isAr ? 'مثال: بوت الاتجاه الذكي' : 'e.g. Smart Trend Bot'}
+              placeholder={lt(lang, 216)}
               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white outline-none focus:border-amber-500"
             />
           </div>
 
           <div>
-            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'الوصف (بالعربية)' : 'Description (Arabic)'}</label>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{lt(lang, 202)}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               dir="rtl"
-              placeholder={isAr ? 'وصف مختصر لما يقدمه البوت...' : 'Short description of what the bot does...'}
+              placeholder={lt(lang, 508)}
               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white outline-none focus:border-amber-500 resize-none"
             />
           </div>
@@ -502,11 +500,11 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
             />
           </div>
 
-          <div>
-            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'القسم (التصنيف)' : 'Section (Category)'}</label>
+<div>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{lt(lang, 491)}</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {STORE_CATEGORIES.map((c) => (
-<button
+                <button
                   key={c.key}
                   type="button"
                   onClick={() => { setCategory(c.key); setType(''); }}
@@ -516,39 +514,37 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                       : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
                   }`}
                 >
-                  {isAr ? c.labelAr : c.labelEn}
+                  {pkick(lang, c, 'label')}
                 </button>
               ))}
             </div>
 
-          {typesForCategory(category).length > 0 && (
-            <div>
-              <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'نوع المنتج' : 'Product Type'}</label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {typesForCategory(category).map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setType(type === t.key ? '' : t.key)}
-                    className={`px-3 py-2.5 rounded-xl border-2 text-[15px] font-black transition-all ${
-                      type === t.key
-                        ? 'border-sky-500 bg-sky-500/15 text-sky-400'
-                        : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
-                    }`}
-                  >
-                    {isAr
-                      ? (category === 'bot' ? `بوت ${t.labelAr}` : category === 'indicator' ? `مؤشر ${t.labelAr}` : t.labelAr)
-                      : (category === 'bot' ? `Bot ${t.labelEn}` : category === 'indicator' ? `Indicator ${t.labelEn}` : t.labelEn)}
-                  </button>
-                ))}
+            {typesForCategory(category).length > 0 && (
+              <div>
+                <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{lt(lang, 435)}</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {typesForCategory(category).map((t) => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => setType(type === t.key ? '' : t.key)}
+                      className={`px-3 py-2.5 rounded-xl border-2 text-[15px] font-black transition-all ${
+                        type === t.key
+                          ? 'border-sky-500 bg-sky-500/15 text-sky-400'
+                          : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/25'
+                      }`}
+                    >
+                      {isAr ? ltp(lang, 679, pkick(lang, t, 'label')) : (category === 'bot' ? ltp(lang, 679, pkick(lang, t, 'label')) : category === 'indicator' ? ltp(lang, 680, pkick(lang, t, 'label')) : pkick(lang, t, 'label'))}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-            <p className="text-[13px] text-slate-500 mt-1.5">{isAr ? 'يظهر المنتج في هذا القسم داخل المتجر، مع صفين: مجاني (سعر 0) أعلى ثم مدفوع.' : 'The product appears under this section in the store, with two rows: free (price 0) on top then paid.'}</p>
+            )}
+            <p className="text-[13px] text-slate-500 mt-1.5">{lt(lang, 554)}</p>
           </div>
 
           <div>
-            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'السعر (اضبط 0 للمجاني)' : 'Price (0 = Free)'}</label>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{lt(lang, 430)}</label>
             <div className="flex items-center gap-2">
               <span className="text-2xl font-black text-white">$</span>
               <input
@@ -560,19 +556,19 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                 placeholder="0.00"
                 className="w-40 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white outline-none focus:border-amber-500"
               />
-              <span className="text-[15px] text-slate-500">{isAr ? 'أدنى سعر 1 سنت' : 'Minimum price 1 cent'}</span>
+              <span className="text-[15px] text-slate-500">{lt(lang, 336)}</span>
             </div>
           </div>
 
           <div>
-            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'ملف المنتج (أي نوع ملف)' : 'Product File (any file type)'}</label>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{lt(lang, 433)}</label>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all text-[15px] font-black"
               >
                 <Upload size={16} />
-                {isAr ? 'اختر ملف' : 'Choose File'}
+                {lt(lang, 130)}
               </button>
               <input
                 ref={fileInputRef}
@@ -590,19 +586,19 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                   </button>
                 </span>
               )}
-              {!file && <span className="text-[15px] text-slate-500">{isAr ? 'حتى 300 كيلوبايت' : 'Up to 300 KB'}</span>}
+              {!file && <span className="text-[15px] text-slate-500">{lt(lang, 593)}</span>}
             </div>
           </div>
 
           <div>
-            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'صورة تعكس آلية عمل البوت (اختياري)' : 'Image showing how the bot works (optional)'}</label>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{lt(lang, 281)}</label>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => imageInputRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 transition-all text-[15px] font-black"
               >
                 <ImagePlus size={16} />
-                {isAr ? 'اختر صورة' : 'Choose Image'}
+                {lt(lang, 131)}
               </button>
               <input
                 ref={imageInputRef}
@@ -622,7 +618,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                   </button>
                 </div>
               )}
-              {!image && <span className="text-[15px] text-slate-500">{isAr ? 'جميع الصور تُحجَّم تلقائياً لحجم موحّد بأبعاد أفقية أنيقة' : 'All images are auto-resized to one elegant horizontal size'}</span>}
+              {!image && <span className="text-[15px] text-slate-500">{lt(lang, 77)}</span>}
             </div>
           </div>
 
@@ -633,10 +629,10 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
           >
             {editingBot ? <Check size={18} /> : <Plus size={18} />}
             {adding
-              ? (isAr ? 'جاري الحفظ...' : 'Saving...')
+              ? (lt(lang, 489))
               : editingBot
-                ? (isAr ? 'حفظ التعديلات' : 'Save Changes')
-                : (isAr ? 'إضافة البوت' : 'Add Bot')}
+                ? (lt(lang, 483))
+                : (lt(lang, 62))}
           </button>
           {editingBot && (
             <button
@@ -644,7 +640,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
               className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-400 font-black text-xl uppercase tracking-wider hover:bg-white/10 hover:text-white active:scale-95 transition-all"
             >
               <X size={16} />
-              {isAr ? 'إلغاء التعديل' : 'Cancel Edit'}
+              {lt(lang, 121)}
             </button>
           )}
         </div>
@@ -652,7 +648,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
 
       {/* Existing bots */}
       <h3 className="text-2xl font-black uppercase text-slate-400 tracking-widest mb-4">
-        {isAr ? `المنتجات في المتجر (${bots.length})` : `Products in store (${bots.length})`}
+        {ltp(lang, 664, String(bots.length))}
       </h3>
 
       {loading ? (
@@ -661,7 +657,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
         </div>
       ) : bots.length === 0 ? (
         <div className="text-center py-16 text-slate-500 text-2xl">
-          {isAr ? 'لا توجد منتجات بعد. أضف أول منتج من الأعلى.' : 'No products yet. Add the first one above.'}
+          {lt(lang, 368)}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -682,7 +678,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                         {formatPrice(bot.price)}
                       </span>
                       <span className="inline-block px-2.5 py-0.5 rounded-lg text-[13px] font-black uppercase border border-sky-400/50 bg-sky-500/10 text-sky-400">
-                        {isAr ? (STORE_CATEGORIES.find(c => c.key === (bot.category || 'bot'))?.labelAr || 'بوتات') : (STORE_CATEGORIES.find(c => c.key === (bot.category || 'bot'))?.labelEn || 'Bots')}
+                        {pkick(lang, STORE_CATEGORIES.find(c => c.key === (bot.category || 'bot')) || { key: 'bot', labelEn: 'Bots', labelAr: 'بوتات', labelEs: 'Bots', labelRu: 'Боты', labelFr: 'Bots' }, 'label')}
                       </span>
                     </div>
                     {bot.fileName && (
@@ -696,19 +692,19 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                     className="shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-[15px] font-black uppercase transition-all bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20"
                   >
                     <Pencil size={14} />
-                    {isAr ? 'تعديل' : 'Edit'}
+                    {lt(lang, 217)}
                   </button>
                   <button
                     onClick={() => handleDelete(bot.id!)}
                     className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-[15px] font-black uppercase transition-all ${confirmId === bot.id ? 'bg-red-500 text-white' : 'bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20'}`}
                   >
-                    {confirmId === bot.id ? (<><Check size={12} /> {isAr ? 'تأكيد' : 'Confirm'}</>) : (<><Trash2 size={12} /> {isAr ? 'حذف' : 'Delete'}</>)}
+                    {confirmId === bot.id ? (<><Check size={12} /> {lt(lang, 161)}</>) : (<><Trash2 size={12} /> {lt(lang, 196)}</>)}
                   </button>
                 </div>
                 {bot.imageData && (
                   <img src={bot.imageData} alt={bot.name} className="w-full h-24 object-cover rounded-xl border border-white/10 mt-3" />
                 )}
-                {bot.description && <p className="text-[15px] text-slate-400 mt-3 leading-relaxed">{isAr ? (bot.descriptionAr || bot.description) : (bot.descriptionEn || bot.description)}</p>}
+                {bot.description && <p className="text-[15px] text-slate-400 mt-3 leading-relaxed">{lang === 'ar' ? (bot.descriptionAr || bot.description) : (bot.descriptionEn || bot.description)}</p>}
               </motion.div>
             ))}
           </AnimatePresence>

@@ -4,6 +4,7 @@ import { ArrowLeft, TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, S
 import { AnalysisResult, SignalType } from '../types';
 import { Language } from '../lib/i18n';
 import LotSizeCalculator from './LotSizeCalculator';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface AnalysisDetailPageProps {
   result: AnalysisResult;
@@ -25,12 +26,12 @@ function getSignalColor(signal: SignalType) {
 function getSignalLabel(signal: SignalType, lang: Language) {
   const isAr = lang === 'ar';
   switch (signal) {
-    case SignalType.STRONG_BUY: return isAr ? 'شراء قوي' : 'STRONG BUY';
-    case SignalType.BUY: return isAr ? 'شراء' : 'BUY';
-    case SignalType.STRONG_SELL: return isAr ? 'بيع قوي' : 'STRONG SELL';
-    case SignalType.SELL: return isAr ? 'بيع' : 'SELL';
-    case SignalType.NEUTRAL: return isAr ? 'محايد' : 'NEUTRAL';
-    default: return isAr ? 'لا إشارة' : 'NO ENTRY';
+    case SignalType.STRONG_BUY: return lt(lang, 530);
+    case SignalType.BUY: return lt(lang, 117);
+    case SignalType.STRONG_SELL: return lt(lang, 532);
+    case SignalType.SELL: return lt(lang, 496);
+    case SignalType.NEUTRAL: return lt(lang, 347);
+    default: return lt(lang, 361);
   }
 }
 
@@ -101,27 +102,27 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
 
   const generateAnalysisText = () => {
     const lines: string[] = [];
-    lines.push(`📊 ${isAr ? 'تحليل' : 'ANALYSIS'}: ${result.symbol} - ${getSignalLabel(result.signal, lang)}`);
-    lines.push(`${isAr ? 'الثقة' : 'CONFIDENCE'}: ${fmt(result.confidence)}%`);
-    lines.push(`${isAr ? 'التقني' : 'TECHNICAL'}: ${fmt(result.technicalScore)}% | ${isAr ? 'المشاعر' : 'SENTIMENT'}: ${fmt(result.sentimentScore)}%`);
+    lines.push(`📊 ${lt(lang, 80)}: ${result.symbol} - ${getSignalLabel(result.signal, lang)}`);
+    lines.push(`${lt(lang, 157)}: ${fmt(result.confidence)}%`);
+    lines.push(`${lt(lang, 549)}: ${fmt(result.technicalScore)}% | ${lt(lang, 504)}: ${fmt(result.sentimentScore)}%`);
     lines.push('');
     if (primaryReasons.length > 0) {
-      lines.push(`✅ ${isAr ? 'الشروط الأساسية' : 'PRIMARY CONDITIONS'}:`);
+      lines.push(`✅ ${lt(lang, 431)}:`);
       primaryReasons.forEach(r => lines.push(`  • ${r.check}: ${r.value} (${r.impact})`));
       lines.push('');
     }
     if (blockReasons.length > 0) {
-      lines.push(`🚫 ${isAr ? 'فلاتر المنع' : 'BLOCK FILTERS'}:`);
+      lines.push(`🚫 ${lt(lang, 108)}:`);
       blockReasons.forEach(r => lines.push(`  • ${r.check}: ${r.value} (${r.impact})`));
       lines.push('');
     }
     if (supportingReasons.length > 0) {
-      lines.push(`📋 ${isAr ? 'الشروط الداعمة' : 'SUPPORTING'}:`);
+      lines.push(`📋 ${lt(lang, 540)}:`);
       supportingReasons.forEach(r => lines.push(`  • ${r.check}: ${r.value}`));
       lines.push('');
     }
     if (result.summary) {
-      lines.push(`📝 ${isAr ? 'الملخص' : 'SUMMARY'}: ${result.summary}`);
+      lines.push(`📝 ${lt(lang, 538)}: ${result.summary}`);
     }
     lines.push('');
     lines.push(`⏰ ${new Date().toLocaleString()}`);
@@ -136,27 +137,42 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
   };
 
   const directionWord = result.direction === 'buy' || result.signal === SignalType.BUY || result.signal === SignalType.STRONG_BUY
-    ? (isAr ? 'صعودي' : 'bullish')
-    : (isAr ? 'هبوطي' : 'bearish');
+    ? (lt(lang, 113))
+    : (lt(lang, 103));
 
-  const narrativeParts: string[] = [];
-
-  narrativeParts.push(isAr
-    ? `تم اختيار الرمز ${result.symbol} كإشارة ${getSignalLabel(result.signal, lang)} بثقة ${fmt(result.confidence)}% نتيجة تظافر مجموعة من العوامل الفنية والاقتصادية والزخم السعري.`
-    : `Symbol ${result.symbol} was selected as a ${getSignalLabel(result.signal, lang)} signal with ${fmt(result.confidence)}% confidence, driven by a combination of technical, economic, and price-momentum factors.`);
-
-  narrativeParts.push(isAr
-    ? `من الناحية الفنية، بلغت درجة المؤشرات ${fmt(result.technicalScore)}% حيث أظهرت مؤشرات الشارت مثل RSI وEMA وحجم التداول اتجاهاً ${directionWord} واضحاً، مع إشارات اختراق للأطر الزمنية المتعددة وسحب سعري صحي قبل التحرك.`
-    : `Technically, the indicator score reached ${fmt(result.technicalScore)}% as chart indicators such as RSI, EMA, and volume showed a clear ${directionWord} trend, with breakouts across multiple timeframes and a healthy pullback before the move.`);
-
-  narrativeParts.push(isAr
-    ? `عزز ذلك زخم معنويات السوق الذي سجل ${fmt(result.sentimentScore)}%، حيث تدعم التدفقات المالية ونبرة الأخبار المالية اتجاه هذا الزوج، مما يرفع احتمالية استمرار الحركة نحو أهداف السعر المحددة.`
-    : `This was reinforced by market sentiment momentum at ${fmt(result.sentimentScore)}%, where capital flows and the tone of financial news favour this pair, increasing the probability of continuation toward the defined price targets.`);
-
-  narrativeParts.push(isAr
-    ? `كما لعبت العوامل الاقتصادية دوراً محورياً، إذ تدعم بيانات التضخم وأسعار الفائدة وقرارات البنوك المركزية التوجه الحالي، بينما يظل أثر الأخبار القادمة محسوباً بحذر لتجنب المفاجآت التي قد تغير مسار الحركة.`
-    : `Economic factors also played a pivotal role, as inflation data, interest rates, and central bank decisions support the current direction, while the impact of upcoming news remains carefully accounted for to avoid surprises.`);
-
+  const NARR: Record<string, string[]> = {
+    en: [
+      `Symbol ${result.symbol} was selected as a ${getSignalLabel(result.signal, lang)} signal with ${fmt(result.confidence)}% confidence, driven by a combination of technical, economic, and price-momentum factors.`,
+      `Technically, the indicator score reached ${fmt(result.technicalScore)}% as chart indicators such as RSI, EMA, and volume showed a clear ${directionWord} trend, with breakouts across multiple timeframes and a healthy pullback before the move.`,
+      `This was reinforced by market sentiment momentum at ${fmt(result.sentimentScore)}%, where capital flows and the tone of financial news favour this pair, increasing the probability of continuation toward the defined price targets.`,
+      `Economic factors also played a pivotal role, as inflation data, interest rates, and central bank decisions support the current direction, while the impact of upcoming news remains carefully accounted for to avoid surprises.`,
+    ],
+    ar: [
+      `تم اختيار الرمز ${result.symbol} كإشارة ${getSignalLabel(result.signal, lang)} بثقة ${fmt(result.confidence)}% نتيجة تظافر مجموعة من العوامل الفنية والاقتصادية والزخم السعري.`,
+      `من الناحية الفنية، بلغت درجة المؤشرات ${fmt(result.technicalScore)}% حيث أظهرت مؤشرات الشارت مثل RSI وEMA وحجم التداول اتجاهاً ${directionWord} واضحاً، مع إشارات اختراق للأطر الزمنية المتعددة وسحب سعري صحي قبل التحرك.`,
+      `عزز ذلك زخم معنويات السوق الذي سجل ${fmt(result.sentimentScore)}%، حيث تدعم التدفقات المالية ونبرة الأخبار المالية اتجاه هذا الزوج، مما يرفع احتمالية استمرار الحركة نحو أهداف السعر المحددة.`,
+      `كما لعبت العوامل الاقتصادية دوراً محورياً، إذ تدعم بيانات التضخم وأسعار الفائدة وقرارات البنوك المركزية التوجه الحالي، بينما يظل أثر الأخبار القادمة محسوباً بحذر لتجنب المفاجآت التي قد تغير مسار الحركة.`,
+    ],
+    es: [
+      `El símbolo ${result.symbol} fue seleccionado como señal de ${getSignalLabel(result.signal, lang)} con ${fmt(result.confidence)}% de confianza, impulsado por una combinación de factores técnicos, económicos y de momentum de precio.`,
+      `Técnicamente, la puntuación de los indicadores alcanzó ${fmt(result.technicalScore)}%, ya que indicadores gráficos como RSI, EMA y volumen mostraron una tendencia clara de ${directionWord}, con rupturas en múltiples marcos temporales y un retroceso saludable antes del movimiento.`,
+      `Esto se reforzó con el momentum del sentimiento de mercado en ${fmt(result.sentimentScore)}%, donde los flujos de capital y el tono de las noticias financieras favorecen este par, aumentando la probabilidad de continuación hacia los objetivos de precio definidos.`,
+      `Los factores económicos también desempeñaron un papel clave: los datos de inflación, las tasas de interés y las decisiones de los bancos centrales apoyan la dirección actual, mientras el impacto de las próximas noticias se contabiliza con cautela para evitar sorpresas.`,
+    ],
+    ru: [
+      `Символ ${result.symbol} был выбран как сигнал ${getSignalLabel(result.signal, lang)} с уверенностью ${fmt(result.confidence)}% на основе сочетания технических, экономических факторов и ценового импульса.`,
+      `Технически оценка индикаторов достигла ${fmt(result.technicalScore)}%: такие индикаторы графика, как RSI, EMA и объём, показали чёткую тенденцию ${directionWord}, с пробоями на нескольких таймфреймах и здоровой коррекцией перед движением.`,
+      `Это усилило импульс рыночных настроений на ${fmt(result.sentimentScore)}%: потоки капитала и тон финансовых новостей благоприятствуют этой паре, повышая вероятность продолжения движения к установленным ценовым целям.`,
+      `Экономические факторы также сыграли ключевую роль: данные по инфляции, процентным ставкам и решения центральных банков поддерживают текущее направление, а влияние предстоящих новостей тщательно учитывается, чтобы избежать сюрпризов.`,
+    ],
+    fr: [
+      `Le symbole ${result.symbol} a été sélectionné comme signal ${getSignalLabel(result.signal, lang)} avec ${fmt(result.confidence)}% de confiance, porté par une combinaison de facteurs techniques, économiques et de momentum des prix.`,
+      `Techniquement, le score des indicateurs a atteint ${fmt(result.technicalScore)}%, car des indicateurs graphiques tels que RSI, EMA et volume ont montré une tendance claire de ${directionWord}, avec des cassures sur plusieurs unités de temps et un repli sain avant le mouvement.`,
+      `Cela a été renforcé par le momentum du sentiment de marché à ${fmt(result.sentimentScore)}%, où les flux de capitaux et le ton des nouvelles financières favorisent cette paire, augmentant la probabilité de poursuite vers les objectifs de prix définis.`,
+      `Les facteurs économiques ont également joué un rôle central : les données d'inflation, les taux d'intérêt et les décisions des banques centrales soutiennent la direction actuelle, tandis que l'impact des prochaines nouvelles est soigneusement anticipé pour éviter les surprises.`,
+    ],
+  };
+  const narrativeParts: string[] = (NARR[lang] || NARR.en).map(t => t);
   const generateClientNarrative = () => narrativeParts.join(' ');
 
   return (
@@ -189,7 +205,7 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
           <button
             onClick={handleCopy}
             className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"
-            title={isAr ? 'نسخ التحليل' : 'Copy Analysis'}
+            title={lt(lang, 175)}
           >
             {copied ? <Check size={18} className="text-emerald-400" /> : <Clipboard size={18} className="text-white/70" />}
           </button>
@@ -205,22 +221,22 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
                 <BarChart3 size={28} className="text-blue-400 mx-auto mb-2" />
-                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'تقني' : 'Technical'}</div>
+                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 548)}</div>
                 <div className="text-5xl font-black text-blue-400">{fmt(result.technicalScore)}%</div>
               </div>
               <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
                 <Zap size={28} className="text-purple-400 mx-auto mb-2" />
-                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'مشاعر' : 'Sentiment'}</div>
+                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 503)}</div>
                 <div className="text-5xl font-black text-purple-400">{fmt(result.sentimentScore)}%</div>
               </div>
               <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
                 <Target size={28} className="text-emerald-400 mx-auto mb-2" />
-                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'ثقة' : 'Confidence'}</div>
+                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 156)}</div>
                 <div className={`text-5xl font-black ${colors.text}`}>{fmt(result.confidence)}%</div>
               </div>
               <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
                 <Waves size={28} className="text-cyan-400 mx-auto mb-2" />
-                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'الحجم' : 'Volume'}</div>
+                <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 605)}</div>
                 <div className={`text-5xl font-black ${volColor}`}>{volDisplay}</div>
                 {hasVol && <div className="text-xs text-white/30 mt-1 font-mono">{fmt(volScore!)} /100 (≥{volThreshold})</div>}
               </div>
@@ -243,7 +259,7 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
               <div className="flex items-center gap-2 mb-4">
                 <Zap size={22} className="text-[#F59E0B]" />
                 <span className="text-lg font-black text-[#F59E0B] uppercase tracking-wider">
-                  {isAr ? 'لماذا هذا التحليل؟' : 'Why this signal?'}
+                  {lt(lang, 621)}
                 </span>
               </div>
               <p className="text-lg leading-relaxed text-yellow-300 font-semibold" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
@@ -257,22 +273,22 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
             <BarChart3 size={28} className="text-blue-400 mx-auto mb-2" />
-            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'تقني' : 'Technical'}</div>
+            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 548)}</div>
             <div className="text-5xl font-black text-blue-400">{fmt(result.technicalScore)}%</div>
           </div>
           <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
             <Zap size={28} className="text-purple-400 mx-auto mb-2" />
-            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'مشاعر' : 'Sentiment'}</div>
+            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 503)}</div>
             <div className="text-5xl font-black text-purple-400">{fmt(result.sentimentScore)}%</div>
           </div>
           <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
             <Target size={28} className="text-emerald-400 mx-auto mb-2" />
-            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'ثقة' : 'Confidence'}</div>
+            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 156)}</div>
             <div className={`text-5xl font-black ${colors.text}`}>{fmt(result.confidence)}%</div>
           </div>
           <div className="bg-white/5 rounded-2xl p-6 border border-white/5 text-center">
             <Waves size={28} className="text-cyan-400 mx-auto mb-2" />
-            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'الحجم' : 'Volume'}</div>
+            <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 605)}</div>
             <div className={`text-5xl font-black ${volColor}`}>{volDisplay}</div>
             {hasVol && <div className="text-xs text-white/30 mt-1 font-mono">{fmt(volScore!)} /100 (≥{volThreshold})</div>}
           </div>
@@ -296,13 +312,13 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
         <div className="grid grid-cols-2 gap-3">
           {result.trendMaturity && (
             <div className="bg-white/5 rounded-xl p-5 border border-white/5">
-              <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'عمر الاتجاه' : 'Trend Age'}</div>
+              <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 579)}</div>
               <div className="text-lg font-black text-white capitalize">{result.trendMaturity} {result.trendAge ? `(${result.trendAge}c)` : ''}</div>
             </div>
           )}
           {result.microSignal && (
             <div className="bg-white/5 rounded-xl p-5 border border-white/5">
-              <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'عمر ما بعد السحب' : 'Pre-Pullback Age'}</div>
+              <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 429)}</div>
               <div className="text-lg font-black text-white capitalize">{result.microSignal} {result.microTF ? `(${result.microTF})` : ''}</div>
             </div>
           )}
@@ -314,7 +330,7 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
           )}
           {result.direction && (
             <div className="bg-white/5 rounded-xl p-5 border border-white/5">
-              <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{isAr ? 'الاتجاه' : 'Direction'}</div>
+              <div className="text-sm text-white/40 uppercase tracking-wider mb-1">{lt(lang, 205)}</div>
               <div className="flex items-center gap-2">
                 {result.direction === 'buy' ? <TrendingUp size={20} className="text-emerald-400" /> :
                  result.direction === 'sell' ? <TrendingDown size={20} className="text-red-400" /> :
@@ -329,15 +345,15 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
         <div className="rounded-2xl p-5 border border-white/10 bg-white/5">
           <div className="flex items-center gap-2 mb-4">
             <CandlestickChart size={22} className="text-[#F59E0B]" />
-            <span className="text-lg font-black text-white uppercase tracking-wider">{isAr ? 'تطابق الشموع' : 'CANDLE MATCH'}</span>
+            <span className="text-lg font-black text-white uppercase tracking-wider">{lt(lang, 125)}</span>
             {candleMatchReason ? (
               candleMatchReason.status === 'positive' ? (
-                <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-emerald-500/10 text-emerald-400">{isAr ? 'متطابقة' : 'MATCHED'}</span>
+                <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-emerald-500/10 text-emerald-400">{lt(lang, 320)}</span>
               ) : (
-                <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-red-500/10 text-red-400">{isAr ? 'غير متطابقة' : 'NOT MATCHED'}</span>
+                <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-red-500/10 text-red-400">{lt(lang, 379)}</span>
               )
             ) : (
-              <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-white/10 text-white/40">{isAr ? 'غير مفعّل' : 'DISABLED'}</span>
+              <span className="ml-auto px-3 py-1 rounded-lg text-sm font-black bg-white/10 text-white/40">{lt(lang, 208)}</span>
             )}
           </div>
           {candleMatchReason ? (
@@ -351,18 +367,18 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
                         <div className={`flex items-center gap-2 ${c.isBullish ? 'text-emerald-400' : 'text-red-400'}`}>
                           {c.isBullish ? <TrendingUp size={22} /> : <TrendingDown size={22} />}
                           <span className="text-lg font-black">
-                            {c.isBullish ? (isAr ? 'صاعد ▲' : 'Bullish ▲') : (isAr ? 'هابط ▼' : 'Bearish ▼')}
+                            {c.isBullish ? (lt(lang, 114)) : (lt(lang, 104))}
                           </span>
                         </div>
                         <span className={`text-sm font-bold px-2 py-0.5 rounded ${c.isBullish ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
-                          {c.isBullish ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
+                          {c.isBullish ? (lt(lang, 117)) : (lt(lang, 496))}
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
                         {c.body ? (
                           <>
                             <span className="text-2xl font-black font-mono text-white">{c.body}</span>
-                            <span className="text-sm text-white/40">{isAr ? '٪ ATR' : '% ATR'}</span>
+                            <span className="text-sm text-white/40">{lt(lang, 3)}</span>
                           </>
                         ) : (
                           <span className="text-sm text-white/40">{isAr ? '—' : '—'}</span>
@@ -378,13 +394,13 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
               <p className="text-sm text-white/40 mt-3 leading-relaxed">{candleMatchReason.impact}</p>
             </>
           ) : (
-            <div className="text-sm text-white/30 italic py-2">{isAr ? 'لم يتم تفعيل فلتر تطابق الشموع أو لا توجد بيانات كافية' : 'Candle match filter not enabled or insufficient data'}</div>
+            <div className="text-sm text-white/30 italic py-2">{lt(lang, 126)}</div>
           )}
         </div>
 
         {/* 6. Block Filters - always show */}
         <Section
-          title={isAr ? 'فلاتر المنع' : 'BLOCK FILTERS'}
+          title={lt(lang, 108)}
           icon={<ShieldX size={20} className="text-red-400" />}
           color="red"
           reasons={blockReasons}
@@ -395,7 +411,7 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
         {/* 7. Primary Conditions */}
         {primaryReasons.length > 0 && (
           <Section
-            title={isAr ? 'الشروط الأساسية' : 'PRIMARY CONDITIONS'}
+            title={lt(lang, 431)}
             icon={<ShieldCheck size={20} className="text-[#F59E0B]" />}
             color="amber"
             reasons={primaryReasons}
@@ -406,7 +422,7 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
         {/* 8. Supporting Conditions */}
         {supportingReasons.length > 0 && (
           <Section
-            title={isAr ? 'الشروط الداعمة' : 'SUPPORTING CONDITIONS'}
+            title={lt(lang, 541)}
             icon={<ShieldAlert size={20} className="text-blue-400" />}
             color="blue"
             reasons={supportingReasons}
@@ -417,7 +433,7 @@ export default function AnalysisDetailPage({ result, onBack, lang, isClient = fa
         {/* Summary */}
         {result.summary && (
           <div className="bg-white/5 rounded-xl p-5 border border-white/5">
-            <div className="text-sm text-white/40 uppercase tracking-wider mb-2">{isAr ? 'ملخص' : 'Summary'}</div>
+            <div className="text-sm text-white/40 uppercase tracking-wider mb-2">{lt(lang, 537)}</div>
             <p className="text-base text-white/70 leading-relaxed">{result.summary}</p>
           </div>
         )}
@@ -477,7 +493,7 @@ function Section({ title, icon, color, reasons, lang, alwaysShow }: {
             </div>
           </motion.div>
         )) : (
-          <div className="text-sm text-white/30 italic py-2">{isAr ? 'لا توجد فلاتر منع مُفعّلة' : 'No block filters triggered'}</div>
+          <div className="text-sm text-white/30 italic py-2">{lt(lang, 356)}</div>
         )}
       </div>
     </div>

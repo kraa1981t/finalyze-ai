@@ -1,4 +1,6 @@
 import { db } from '../lib/firebase';
+import type { Language } from '../lib/i18n';
+import { ltp, pkick } from '../lib/i18nUI';
 import { collection, getDocs, addDoc, deleteDoc, doc, setDoc, query, orderBy, updateDoc, where, getDoc } from 'firebase/firestore';
 
 export type StoreCategory = 'bot' | 'indicator' | 'plan' | 'other';
@@ -20,28 +22,29 @@ export interface StoreBot {
   createdAt: number;
 }
 
-export const STORE_CATEGORIES: { key: StoreCategory; labelAr: string; labelEn: string }[] = [
-  { key: 'bot', labelAr: 'بوتات', labelEn: 'Bots' },
-  { key: 'indicator', labelAr: 'مؤشرات', labelEn: 'Indicators' },
-  { key: 'plan', labelAr: 'خطط', labelEn: 'Plans' },
-  { key: 'other', labelAr: 'منتجات أخرى', labelEn: 'Other Products' },
+export type StoreCategoryLabel = { key: StoreCategory; labelEn: string; labelAr: string; labelEs: string; labelRu: string; labelFr: string; };
+export const STORE_CATEGORIES: StoreCategoryLabel[] = [
+  { key: 'bot', labelEn: 'Bots', labelAr: 'بوتات', labelEs: 'Bots', labelRu: 'Боты', labelFr: 'Bots' },
+  { key: 'indicator', labelEn: 'Indicators', labelAr: 'مؤشرات', labelEs: 'Indicadores', labelRu: 'Индикаторы', labelFr: 'Indicateurs' },
+  { key: 'plan', labelEn: 'Plans', labelAr: 'خطط', labelEs: 'Planes', labelRu: 'Планы', labelFr: 'Plans' },
+  { key: 'other', labelEn: 'Other Products', labelAr: 'منتجات أخرى', labelEs: 'Otros productos', labelRu: 'Другие товары', labelFr: 'Autres produits' },
 ];
 
 // Platform types shared by bots & indicators
-export const PLATFORM_TYPES: { key: string; labelAr: string; labelEn: string }[] = [
-  { key: 'mt5', labelAr: 'ميتا تريدر 5', labelEn: 'MetaTrader 5' },
-  { key: 'tradingview', labelAr: 'ترندنق فيو', labelEn: 'TradingView' },
-  { key: 'ctrader', labelAr: 'سي تريدر', labelEn: 'cTrader' },
+export const PLATFORM_TYPES: { key: string; labelEn: string; labelAr: string; labelEs: string; labelRu: string; labelFr: string }[] = [
+  { key: 'mt5', labelEn: 'MetaTrader 5', labelAr: 'ميتا تريدر 5', labelEs: 'MetaTrader 5', labelRu: 'MetaTrader 5', labelFr: 'MetaTrader 5' },
+  { key: 'tradingview', labelEn: 'TradingView', labelAr: 'ترندنق فيو', labelEs: 'TradingView', labelRu: 'TradingView', labelFr: 'TradingView' },
+  { key: 'ctrader', labelEn: 'cTrader', labelAr: 'سي تريدر', labelEs: 'cTrader', labelRu: 'cTrader', labelFr: 'cTrader' },
 ];
 
 // Types for "other products"
-export const OTHER_TYPES: { key: string; labelAr: string; labelEn: string }[] = [
-  { key: 'template', labelAr: 'قوالب مواقع', labelEn: 'Website Templates' },
-  { key: 'banner', labelAr: 'بنرات إعلانية', labelEn: 'Banners' },
-  { key: 'logo', labelAr: 'شعارات', labelEn: 'Logos' },
+export const OTHER_TYPES: { key: string; labelEn: string; labelAr: string; labelEs: string; labelRu: string; labelFr: string }[] = [
+  { key: 'template', labelEn: 'Website Templates', labelAr: 'قوالب مواقع', labelEs: 'Plantillas web', labelRu: 'Шаблоны сайтов', labelFr: 'Modèles de sites' },
+  { key: 'banner', labelEn: 'Banners', labelAr: 'بنرات إعلانية', labelEs: 'Banners', labelRu: 'Баннеры', labelFr: 'Bannières' },
+  { key: 'logo', labelEn: 'Logos', labelAr: 'شعارات', labelEs: 'Logotipos', labelRu: 'Логотипы', labelFr: 'Logos' },
 ];
 
-export function typesForCategory(cat: StoreCategory): { key: string; labelAr: string; labelEn: string }[] {
+export function typesForCategory(cat: StoreCategory): { key: string; labelEn: string; labelAr: string; labelEs: string; labelRu: string; labelFr: string }[] {
   if (cat === 'other') return OTHER_TYPES;
   if (cat === 'bot' || cat === 'indicator') return PLATFORM_TYPES;
   return [];
@@ -51,15 +54,16 @@ export function typeOf(bot: StoreBot): string {
   return bot.type || '';
 }
 
-export function typeLabel(key: string, isAr: boolean): string {
+export function typeLabel(key: string, lang: Language): string {
   const t = [...PLATFORM_TYPES, ...OTHER_TYPES].find((x) => x.key === key);
-  return isAr ? (t?.labelAr || '') : (t?.labelEn || '');
+  return pkick(lang, t, 'label');
 }
 
-export function typeLabelForCat(cat: StoreCategory, key: string, isAr: boolean): string {
-  const base = typeLabel(key, isAr);
-  if (cat === 'bot') return isAr ? `بوت ${base}` : `Bot ${base}`;
-  if (cat === 'indicator') return isAr ? `مؤشر ${base}` : `Indicator ${base}`;
+export function typeLabelForCat(cat: StoreCategory, key: string, lang: Language | boolean): string {
+  const l: Language = typeof lang === 'string' ? lang : 'en';
+  const base = typeLabel(key, l);
+  if (cat === 'bot') return ltp(l, 679, base);
+  if (cat === 'indicator') return ltp(l, 680, base);
   return base;
 }
 

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Code2, Trash2, RefreshCw, Phone, User, MessageSquare } from 'lucide-react';
 import { SiteRequest, fetchSiteRequests, markAllSiteRequestsRead, deleteSiteRequest } from '../services/paymentRequests';
+import { Language } from '../lib/i18n';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface SiteRequestsSectionProps {
-  lang: 'ar' | 'en';
+  lang: Language;
 }
 
 export default function SiteRequestsSection({ lang }: SiteRequestsSectionProps) {
@@ -37,17 +39,17 @@ export default function SiteRequestsSection({ lang }: SiteRequestsSectionProps) 
         <div>
           <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
             <Code2 size={18} className="text-[#F59E0B]" />
-            {isAr ? 'طلبات إنشاء المواقع' : 'Website Creation Requests'}
+            {lt(lang, 617)}
           </h3>
           <p className="text-xs font-bold text-slate-400 mt-0.5">
-            {isAr ? 'رسائل العملاء — تواصل معهم لمناقشة الطلب بالتفصيل' : 'Client messages — contact them to discuss the request in detail'}
+            {lt(lang, 140)}
           </p>
         </div>
         <button
           onClick={load}
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-white text-xs font-black uppercase tracking-wider transition-all"
         >
-          <RefreshCw size={13} /> {isAr ? 'تحديث' : 'Refresh'}
+          <RefreshCw size={13} /> {lt(lang, 453)}
         </button>
       </div>
 
@@ -57,7 +59,7 @@ export default function SiteRequestsSection({ lang }: SiteRequestsSectionProps) 
         </div>
       ) : items.length === 0 ? (
         <p className="text-sm font-bold text-center py-8 border border-dashed border-white/15 rounded-2xl text-slate-400">
-          {isAr ? 'لا توجد طلبات إنشاء مواقع بعد' : 'No website creation requests yet'}
+          {lt(lang, 375)}
         </p>
       ) : (
         <div className="flex flex-col gap-2">
@@ -78,7 +80,7 @@ export default function SiteRequestsSection({ lang }: SiteRequestsSectionProps) 
                   </span>
                   {!r.read && (
                     <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-black uppercase">
-                      {isAr ? 'جديد' : 'New'}
+                      {lt(lang, 349)}
                     </span>
                   )}
                 </div>
@@ -86,7 +88,7 @@ export default function SiteRequestsSection({ lang }: SiteRequestsSectionProps) 
                   <MessageSquare size={13} className="text-slate-400 mt-0.5 shrink-0" /> {r.message}
                 </p>
                 <p className="text-[10px] font-bold text-slate-500 mt-1.5">
-                  {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleString(isAr ? 'ar-EG' : 'en-US') : ''}
+                  {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleString(loc(lang)) : ''}
                 </p>
               </div>
               <button
@@ -94,7 +96,7 @@ export default function SiteRequestsSection({ lang }: SiteRequestsSectionProps) 
                 disabled={deleting === r.id}
                 className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 hover:text-red-300 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50"
               >
-                <Trash2 size={13} /> {isAr ? 'حذف' : 'Delete'}
+                <Trash2 size={13} /> {lt(lang, 196)}
               </button>
             </motion.div>
           ))}

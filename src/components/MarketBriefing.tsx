@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Sparkles, RefreshCw, Loader2, Globe2, AlertTriangle, CalendarDays } from 'lucide-react';
 import { Language } from '../lib/i18n';
+import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface BriefPayload {
   date: string;
@@ -118,24 +119,24 @@ export default function MarketBriefing({ lang }: { lang: Language }) {
           </div>
           <div>
             <h2 className="text-lg sm:text-xl font-black text-white">
-              {isAr ? 'التحليل اليومي للأسواق بالذكاء الاصطناعي' : 'Daily AI Market Briefing'}
+              {lt(lang, 192)}
             </h2>
             <p className="text-xs font-bold text-white/40 flex items-center gap-1">
               <CalendarDays size={11} className="text-[#F59E0B]" />
               {data?.generatedAt
-                ? new Date(data.generatedAt).toLocaleDateString(isAr ? 'ar-DZ' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-                : new Date().toLocaleDateString(isAr ? 'ar-DZ' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                ? new Date(data.generatedAt).toLocaleDateString(loc(lang), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                : new Date().toLocaleDateString(loc(lang), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {data?.brief ? (
-            <Pressable label={isAr ? 'توليد جديد' : 'Regenerate'} onClick={forceRegen} busy={generating} disabled={loading} />
+            <Pressable label={lt(lang, 456)} onClick={forceRegen} busy={generating} disabled={loading} />
           ) : null}
           {loading && (
             <span className="inline-flex items-center gap-1.5 text-sm font-black text-white/50">
               <Loader2 size={14} className="animate-spin text-[#F59E0B]" />
-              {isAr ? 'جاري التحليل...' : 'Analyzing...'}
+              {lt(lang, 82)}
             </span>
           )}
         </div>
@@ -145,20 +146,16 @@ export default function MarketBriefing({ lang }: { lang: Language }) {
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-bold rounded-xl px-4 py-3 flex items-start gap-2">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <span>
-            {isAr
-              ? 'تعذر توليد التحليل الآن. تحقق من اتصالك ثم حاول مرة أخرى.'
-              : 'Failed to generate the briefing right now. Check your connection and try again.'}
+            {lt(lang, 250)}
           </span>
         </div>
       )}
 
       {!loading && !error && !data?.brief && (
         <div className="bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-xl px-4 py-4 text-base text-white/70 leading-relaxed">
-          <p className="font-black text-[#F59E0B] mb-1">{isAr ? 'التحليل غير متاح حالياً' : 'Briefing not available yet'}</p>
+          <p className="font-black text-[#F59E0B] mb-1">{lt(lang, 112)}</p>
           <p>
-            {isAr
-              ? 'سيتولى الذكاء الاصطناعي كتابة تحليل يومي جديد بمجرد أن تتوفر مفاتيح الذكاء الاصطناعي على الخادم. الأسعار الحية في الأعلى تبقى دائماً محدثة وأكثر دقة.'
-              : 'The AI will write a fresh daily briefing as soon as AI keys are available on the server. The live prices above always stay up to date and accurate.'}
+            {lt(lang, 551)}
           </p>
         </div>
       )}
@@ -176,9 +173,9 @@ export default function MarketBriefing({ lang }: { lang: Language }) {
           <div className="space-y-4 border-l-0 lg:border-l-2 border-[#8B5CF6]/40 lg:pl-4" style={{ direction: 'rtl', textAlign: 'right' }}>
             <div className="flex items-center gap-2">
               <Globe2 size={16} className="text-[#8B5CF6]" />
-              <h3 className="text-base font-black text-white">{isAr ? 'النسخة العربية' : 'Arabic'}</h3>
+              <h3 className="text-base font-black text-white">{lt(lang, 87)}</h3>
             </div>
-            <Cell title={isAr ? 'نظرة عامة على الأسواق' : 'Market Overview'} body={brief.summaryAr} accent />
+            <Cell title={lt(lang, 319)} body={brief.summaryAr} accent />
             <Cell title="الذهب اليوم" body={brief.goldAr} />
             <Cell title="البيتكوين والعملات الرقمية" body={brief.btcAr} />
             <Cell title="الدينار الجزائري والصرف" body={brief.dzdAr} />
@@ -186,7 +183,7 @@ export default function MarketBriefing({ lang }: { lang: Language }) {
           <div className="space-y-4 border-l-0 lg:border-l-2 border-emerald-400/40 lg:pl-4" style={{ direction: 'ltr', textAlign: 'left' }}>
             <div className="flex items-center gap-2">
               <Globe2 size={16} className="text-emerald-400" />
-              <h3 className="text-base font-black text-white">{isAr ? 'النسخة الإنجليزية' : 'English'}</h3>
+              <h3 className="text-base font-black text-white">{lt(lang, 232)}</h3>
             </div>
             <Cell title="Market Overview" body={brief.summaryEn} accent />
             <Cell title="Gold Today" body={brief.goldEn} />
@@ -199,7 +196,7 @@ export default function MarketBriefing({ lang }: { lang: Language }) {
       {data?.news && data.news.length > 0 && (
         <div className="pt-2 border-t border-white/10">
           <p className="text-xs font-black text-white/40 uppercase tracking-widest mb-2">
-            {isAr ? 'أحدث عناوين الأخبار' : 'Latest Headlines'}
+            {lt(lang, 289)}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {data.news.slice(0, 5).map((n, i) => (
