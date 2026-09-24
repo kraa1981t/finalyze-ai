@@ -222,6 +222,11 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   // EURJPY order shows a small logical dollar amount instead of an absolute price.
   // Only runs on symbol change so typed SL/TP values are never wiped by price ticks.
   const lastFillSymbol = React.useRef<string | null>(null);
+  // Tracks whether the user manually edited the TP/SL dollar fields. When left
+  // untouched (auto-filled from a signal), opening the trade uses the signal's
+  // absolute TP/SL prices so chart levels always match the signal values.
+  const tpTouchedRef = React.useRef(false);
+  const slTouchedRef = React.useRef(false);
   useEffect(() => {
     if (matchedSignal && matchedSignal.stopLoss && matchedSignal.takeProfit) {
       const entry = matchedSignal.entryPrice || livePrice || 0;
@@ -234,9 +239,13 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         setSlPrice('');
         setTpPrice('');
       }
+      tpTouchedRef.current = false;
+      slTouchedRef.current = false;
     } else if (lastFillSymbol.current !== symbol) {
       setSlPrice('');
       setTpPrice('');
+      tpTouchedRef.current = false;
+      slTouchedRef.current = false;
     }
     lastFillSymbol.current = symbol;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -507,9 +516,11 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     const slAmount = parseFloat(slPrice);
     let tpVal: number | null = null;
     let slVal: number | null = null;
-    if (tpAmount > 0) tpVal = usdToPrice(symbol, tpAmount, livePrice, isBuy, qty, cat);
+    if (!tpTouchedRef.current && matchedSignal?.takeProfit) tpVal = matchedSignal.takeProfit;
+    else if (tpAmount > 0) tpVal = usdToPrice(symbol, tpAmount, livePrice, isBuy, qty, cat);
     else tpVal = matchedSignal?.takeProfit || null;
-    if (slAmount > 0) slVal = usdToPrice(symbol, slAmount, livePrice, !isBuy, qty, cat);
+    if (!slTouchedRef.current && matchedSignal?.stopLoss) slVal = matchedSignal.stopLoss;
+    else if (slAmount > 0) slVal = usdToPrice(symbol, slAmount, livePrice, !isBuy, qty, cat);
     else slVal = matchedSignal?.stopLoss || null;
     const tradeData = { symbol, category: cat, side, qty, entryPrice: livePrice, status: 'open' as const, tp: tpVal, sl: slVal, openedAt: Date.now() };
     let id: string;
@@ -526,6 +537,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     }
     setTrades((prev) => [{ id, ...tradeData }, ...prev]);
     setTpPrice(''); setSlPrice('');
+    tpTouchedRef.current = false;
+    slTouchedRef.current = false;
     setBusy(false);
     playOpenSound();
   }
@@ -636,7 +649,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     const base = parseFloat(raw);
     const val = isNaN(base) ? 0 : base;
     const next = Math.max(0, +(val + dir * 0.5).toFixed(2));
-    if (kind === 'tp') setTpPrice(String(next)); else setSlPrice(String(next));
+    if (kind === 'tp') { tpTouchedRef.current = true; setTpPrice(String(next)); } else { slTouchedRef.current = true; setSlPrice(String(next)); }
   };
 
   async function adjustSl(tradeId: string, newSl: number) {
@@ -1088,7 +1101,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                     type="text" inputMode="decimal" lang="en" dir="ltr"
                     placeholder="$"
                     value={tpPrice}
-                    onChange={(e) => setTpPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                    onChange={(e) => { tpTouchedRef.current = true; setTpPrice(e.target.value.replace(/[^0-9.]/g, '')); }}
                     className="flex-1 w-full min-w-0 h-11 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-emerald-500 placeholder:text-brand-text/25 placeholder:text-sm"
                     style={{ direction: 'ltr' }}
                   />
@@ -1103,7 +1116,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                     type="text" inputMode="decimal" lang="en" dir="ltr"
                     placeholder="$"
                     value={slPrice}
-                    onChange={(e) => setSlPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                    onChange={(e) => { slTouchedRef.current = true; setSlPrice(e.target.value.replace(/[^0-9.]/g, '')); }}
                     className="flex-1 w-full min-w-0 h-11 rounded-xl bg-black/40 border border-white/15 text-center text-base font-bold text-brand-text outline-none focus:border-red-500 placeholder:text-brand-text/25 placeholder:text-sm"
                     style={{ direction: 'ltr' }}
                   />
