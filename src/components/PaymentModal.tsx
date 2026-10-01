@@ -289,16 +289,16 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   }, [isOpen, buyerEmailFinal, isBotProduct, botPurchase?.id, requestNo]);
 
   useEffect(() => {
-    if (!isOpen || requestStatus !== 'pending' || !buyerEmailFinal) return;
+    if (!isOpen || manageMode || !buyerEmailFinal) return;
     let stopped = false;
     const check = async () => {
       const g = await checkUserGrant(buyerEmailFinal, isBotProduct ? 'bot' : 'plan', isBotProduct ? botPurchase?.id : undefined, isBotProduct ? undefined : (requestNo ?? undefined));
       if (!stopped && g) grantAccess(g);
     };
-    const interval = setInterval(check, 15000);
+    const interval = setInterval(check, 3000);
     check();
     return () => { stopped = true; clearInterval(interval); };
-  }, [isOpen, requestStatus, buyerEmailFinal, isBotProduct, botPurchase?.id, requestNo]);
+  }, [isOpen, manageMode, buyerEmailFinal, isBotProduct, botPurchase?.id, requestNo]);
 
   const refreshGrantStatus = async () => {
     if (!buyerEmailFinal) return;

@@ -279,15 +279,33 @@ export async function checkUserGrant(
   botId?: string,
   planReqNo?: number
 ): Promise<PaymentGrant | null> {
-  if (!email) return null;
+  const e = (email || '').toLowerCase().trim();
+  if (!e) return null;
+
+  // 1. Primary check via server endpoint (reliable, never blocked by Firebase client auth rules)
+  try {
+    const params = new URLSearchParams({ email: e, kind });
+    if (botId) params.set('botId', botId);
+    if (planReqNo) params.set('requestNo', String(planReqNo));
+    const resp = await fetch(`/api/payment-grant/check?${params.toString()}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data?.ok && data.grant) {
+        const g = deriveGrantExpiry(data.grant as PaymentGrant);
+        if (g.status === 'active' || !g.status) return g;
+      }
+    }
+  } catch (err) {
+    console.warn('Server grant check fetch failed:', err);
+  }
+
+  // 2. Fallback check via direct Firestore Client SDK
   const attempt = async (): Promise<PaymentGrant | null> => {
     let no = planReqNo;
-    if (kind === 'plan' && !no) no = await pendingRequestNoFor(email, kind, botId);
-    // A plan grant only exists AFTER a specific numbered request is approved. A
-    // fresh plan purchase has no request yet, so it must never auto-open from an
-    // older approval — require the request number.
+    if (kind === 'plan' && !no) no = await pendingRequestNoFor(e, kind, botId);
+    // A plan grant only exists AFTER a specific numbered request is approved.
     if (kind === 'plan' && !no) return null;
-    const snap = await getDoc(doc(db, GRANTS, grantDocId(email, kind, botId, kind === 'plan' ? no : undefined)));
+    const snap = await getDoc(doc(db, GRANTS, grantDocId(e, kind, botId, kind === 'plan' ? no : undefined)));
     if (!snap.exists()) return null;
     const g = deriveGrantExpiry({ id: snap.id, ...(snap.data() as any) } as PaymentGrant);
     return g.status === 'active' ? g : null;
@@ -295,12 +313,8 @@ export async function checkUserGrant(
   try {
     return await attempt();
   } catch {
-    // The read was refused: this browser has no Firebase identity for the
-    // payment address (the rules are right to refuse it). Register/sign in as
-    // that address — silently, it is the one the customer just paid with — and
-    // read once more. This is what un-sticks the waiting page.
     try {
-      if (await ensureClientIdentity(email)) return await attempt();
+      if (await ensureClientIdentity(e)) return await attempt();
     } catch {}
     return null;
   }
@@ -321,10 +335,26 @@ export async function fetchAllPlanGrants(): Promise<PaymentGrant[]> {
 }
 
 export async function fetchUserGrants(email: string): Promise<PaymentGrant[]> {
-  if (!email) return [];
+  const e = (email || '').toLowerCase().trim();
+  if (!e) return [];
+
+  // 1. Primary check via server endpoint
+  try {
+    const resp = await fetch(`/api/user-grants?email=${encodeURIComponent(e)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data?.ok && Array.isArray(data.grants)) {
+        return data.grants
+          .map((d: any) => deriveGrantExpiry(d as PaymentGrant))
+          .filter((g: PaymentGrant) => g.status === 'active' || !g.status);
+      }
+    }
+  } catch {}
+
+  // 2. Fallback check via direct Firestore Client SDK
   try {
     const snap = await getDocs(
-      query(collection(db, GRANTS), where('email', '==', email.toLowerCase()))
+      query(collection(db, GRANTS), where('email', '==', e))
     );
     return snap.docs
       .map((d) => deriveGrantExpiry({ id: d.id, ...(d.data() as any) } as PaymentGrant));

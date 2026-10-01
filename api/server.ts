@@ -2294,6 +2294,81 @@ const paymentDumpHandler = async (req: any, res: any) => {
 app.get("/api/payment-lookup", paymentLookupHandler);
 app.get("/api/payment-dump", paymentDumpHandler);
 
+// Client-accessible grant check endpoint — checks if developer released a grant for email
+app.get("/api/payment-grant/check", async (req: any, res: any) => {
+  try {
+    const email = String((req.query && req.query.email) || '').toLowerCase().trim();
+    const kind = String((req.query && req.query.kind) || 'plan');
+    const botId = req.query && req.query.botId ? String(req.query.botId) : undefined;
+    const requestNo = req.query && req.query.requestNo ? Number(req.query.requestNo) : undefined;
+    if (!email) return res.status(400).json({ ok: false, error: 'missing email' });
+
+    // 1. Direct ID lookup
+    if (kind === 'bot' && botId) {
+      const grantId = grantDocIdFs(email, 'bot', botId);
+      const grant = await fsGet('payment_grants', grantId);
+      if (grant && (grant.status === 'active' || !grant.status)) {
+        return res.json({ ok: true, grant: { id: grantId, ...grant } });
+      }
+    } else if (kind === 'plan' && requestNo) {
+      const grantId = grantDocIdFs(email, 'plan', undefined, requestNo);
+      const grant = await fsGet('payment_grants', grantId);
+      if (grant && grant.status === 'active') {
+        return res.json({ ok: true, grant: { id: grantId, ...grant } });
+      }
+    }
+
+    // 2. Scan all grants for this email
+    const all = await fsList('payment_grants');
+    const matching = all.filter((g) => {
+      const gEmail = String(g.email || '').toLowerCase().trim();
+      const gKind = String(g.kind || '');
+      const gStatus = String(g.status || '');
+      if (gEmail !== email) return false;
+      if (gKind !== kind) return false;
+      if (gStatus !== 'active') return false;
+      if (kind === 'bot' && botId && String(g.botId || '') !== botId) return false;
+      if (kind === 'plan' && requestNo && Number(g.requestNo) !== requestNo) return false;
+      return true;
+    });
+
+    if (matching.length > 0) {
+      matching.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+      return res.json({ ok: true, grant: matching[0] });
+    }
+
+    // 3. If plan without requestNo, return latest active plan grant
+    if (kind === 'plan' && !requestNo) {
+      const activePlans = all.filter((g) => {
+        return String(g.email || '').toLowerCase().trim() === email &&
+               String(g.kind || '') === 'plan' &&
+               String(g.status || '') === 'active';
+      });
+      if (activePlans.length > 0) {
+        activePlans.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+        return res.json({ ok: true, grant: activePlans[0] });
+      }
+    }
+
+    return res.json({ ok: true, grant: null });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Client-accessible user grants list endpoint
+app.get("/api/user-grants", async (req: any, res: any) => {
+  try {
+    const email = String((req.query && req.query.email) || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ ok: false, error: 'missing email' });
+    const all = await fsList('payment_grants');
+    const userGrants = all.filter((g) => String(g.email || '').toLowerCase().trim() === email);
+    return res.json({ ok: true, grants: userGrants });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Server-managed payment requests — persistence from the server, not the client.
 // The browser only ever reads/decides through these endpoints, so a numbered
