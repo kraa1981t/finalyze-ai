@@ -730,13 +730,11 @@ app.post("/api/ai-analysis", async (req, res) => {
   try {
     const { prompt, userApiKey } = req.body;
     
-    // Check if the user is a developer bypassing the key screen
-    const isDevBypass = userApiKey === '__dev_bypass__';
-    
-    // Use user-provided API key if available
-    let key = (userApiKey && userApiKey !== '__dev_bypass__') ? userApiKey.trim() : '';
+    // Developer system keys are NEVER mixed into client requests. Only the
+    // caller's own key is used, and it is never cached server-side.
+    const key = (userApiKey || '').trim();
 
-    if (!key && !isDevBypass) {
+    if (!key) {
       return res.status(400).json({ 
         error: "API Key is required. Please set your own Google Gemini or Groq API key in the settings modal." 
       });
@@ -744,46 +742,17 @@ app.post("/api/ai-analysis", async (req, res) => {
 
     let result: any = null;
 
-    if (key) {
-      // Use the client's custom key exclusively
-      if (key.startsWith('AIzaSy') || key.startsWith('AQ.')) {
-        result = await callGoogle(key, prompt);
-      } else {
-        result = await callGroq(key, prompt);
-      }
-      
-      // If client key failed, return their specific error immediately! Never fall back to system keys for normal clients.
-      if (!result || result.error || !result.content) {
-        const errMsg = result?.error || 'Your API key could not be successfully executed.';
-        return res.status(400).json({ error: errMsg });
-      }
-    } else if (isDevBypass) {
-      // ONLY developer bypass is allowed to use the server-side system keys
-      const systemGeminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-      const systemGroqKey = process.env.GROQ_API_KEY;
-
-      let fallbackSuccess = false;
-
-      if (systemGeminiKey) {
-        const sysResult = await callGoogle(systemGeminiKey, prompt);
-        if (sysResult && sysResult.content) {
-          result = sysResult;
-          fallbackSuccess = true;
-        }
-      }
-      
-      if (!fallbackSuccess && systemGroqKey) {
-        const sysResult = await callGroq(systemGroqKey, prompt);
-        if (sysResult && sysResult.content) {
-          result = sysResult;
-          fallbackSuccess = true;
-        }
-      }
-
-      if (!fallbackSuccess) {
-        const errMsg = result?.error || 'No active server API keys could be successfully executed.';
-        return res.status(503).json({ error: errMsg });
-      }
+    // Use the client's custom key exclusively
+    if (key.startsWith('AIzaSy') || key.startsWith('AQ.')) {
+      result = await callGoogle(key, prompt);
+    } else {
+      result = await callGroq(key, prompt);
+    }
+    
+    // If client key failed, return their specific error immediately! Never fall back to system keys.
+    if (!result || result.error || !result.content) {
+      const errMsg = result?.error || 'Your API key could not be successfully executed.';
+      return res.status(400).json({ error: errMsg });
     }
 
     // If we reach here, we are guaranteed to have result.content

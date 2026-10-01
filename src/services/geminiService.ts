@@ -2,9 +2,10 @@ import { MarketType, AnalysisResult, TradingStyle, SignalType, StrategySettings 
 import { DEFAULT_STRATEGY_SETTINGS } from "../constants";
 import { fetchMarketContext } from "./marketContextService";
 import { onRateLimited, waitIfRateLimited } from "./rateLimitTracker";
-import { fetchMarketDataDirect, callAIDirect } from './apiDirect';
+import { fetchMarketDataDirect } from './apiDirect';
+import { callAIServer } from './aiPool';
 import { getCorrelationGroup } from "./portfolioRiskService";
-import { lt } from "../lib/i18nUI";
+import { readClientOwnKeyForEmails, clientEmailsFor, currentUserEmail, isDeveloperKeyAllowed } from '../lib/clientScope';
 
 // Result cache: same symbol+timeframe+style returns same result for 5 minutes
 const _resultCache = new Map<string, { result: AnalysisResult; ts: number }>();
@@ -70,36 +71,42 @@ function endOfCurrentWeek(): Date {
   return end;
 }
 
+/**
+ * Resolves the API key for an analysis run.
+ *
+ * SECURITY: for a CLIENT (non-developer) the ONLY acceptable key is the one that
+ * client saved under their own email. The shared slots (finalyze_key1_value,
+ * finalyze_key2_value, the legacy slot, the session mirror and the
+ * finalyze_api_key cookie) hold the DEVELOPER's key and must never be handed to
+ * a paying client — otherwise one key serves every customer.
+ *
+ * An empty string means "no own key": callers must route the client to the key
+ * gate instead of running an analysis on someone else's key.
+ */
 export function getApiKey(): string {
   try {
-    // 1. Primary key (enabled check)
-    const k1 = localStorage.getItem('finalyze_key1_value');
-    const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
-    if (k1 && k1en) return k1;
-    // 2. Legacy key
-    const oldKey = localStorage.getItem('finalyze_user_groq_api_key');
-    if (oldKey) return oldKey;
-    // 3. Secondary key (fallback)
-    const k2 = localStorage.getItem('finalyze_key2_value');
-    if (k2) return k2;
-    // 4. SessionStorage mirror (survives cross-tab navigation)
-    const ss = sessionStorage.getItem('finalyze_key_mirror');
-    if (ss) {
-      localStorage.setItem('finalyze_key1_value', ss);
-      localStorage.setItem('finalyze_key1_enabled', 'true');
-      return ss;
-    }
-    // 5. Cookie (most persistent ΓÇö survives redeploy, browser restart)
-    const cookie = document.cookie.split('; ').find(r => r.startsWith('finalyze_api_key='));
-    if (cookie) {
-      const val = decodeURIComponent(cookie.split('=')[1]);
-      if (val) {
-        localStorage.setItem('finalyze_key1_value', val);
-        localStorage.setItem('finalyze_key1_enabled', 'true');
-        sessionStorage.setItem('finalyze_key_mirror', val);
-        return val;
+    if (isDeveloperKeyAllowed()) {
+      // Developer/admin: the shared slots are fine.
+      const runtime = sessionStorage.getItem('finalyze_runtime_client_key');
+      if (runtime) return runtime;
+      const k1 = localStorage.getItem('finalyze_key1_value');
+      const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
+      if (k1 && k1en) return k1;
+      const oldKey = localStorage.getItem('finalyze_user_groq_api_key');
+      if (oldKey) return oldKey;
+      const k2 = localStorage.getItem('finalyze_key2_value');
+      if (k2) return k2;
+      const ssDev = sessionStorage.getItem('finalyze_key_mirror');
+      if (ssDev) return ssDev;
+      const cookieDev = document.cookie.split('; ').find(r => r.startsWith('finalyze_api_key='));
+      if (cookieDev) {
+        const val = decodeURIComponent(cookieDev.split('=')[1] || '');
+        if (val) return val;
       }
+      return '';
     }
+    // Client: strictly the key this client saved under their own email(s).
+    return readClientOwnKeyForEmails(clientEmailsFor(currentUserEmail()));
   } catch {}
   return '';
 }
@@ -1239,16 +1246,16 @@ Return ONLY valid JSON:
   "confidence": number (0-100),
   "summary": "string ΓÇö 2-3 sentence summary",
   "detailedReasons": [
-    {"check": "RSI", "value": "62.5", "status": "neutral", "impact": "${lt(lang, 637)}"},
-    {"check": "EMA Cross", "value": "bullish", "status": "positive", "impact": "${lt(lang, 638)}"},
-    {"check": "Trend Direction", "value": "uptrend", "status": "positive", "impact": "${lt(lang, 639)}"},
-    {"check": "Trend Age Zone", "value": "mature (32c)", "status": "positive", "impact": "${lt(lang, 640)}"},
-    {"check": "Volume Surge", "value": "true", "status": "positive", "impact": "${lt(lang, 641)}"},
-    {"check": "Supply/Demand", "value": "demand 1.085", "status": "positive", "impact": "${lt(lang, 642)}"},
-    {"check": "Micro Alignment", "value": "aligned", "status": "positive", "impact": "${lt(lang, 643)}"},
-    {"check": "Fear&Greed", "value": "45/100", "status": "neutral", "impact": "${lt(lang, 644)}"},
-    {"check": "News Sentiment", "value": "2 positive", "status": "positive", "impact": "${lt(lang, 645)}"},
-    {"check": "Economic Events", "value": "none", "status": "neutral", "impact": "${lt(lang, 646)}"},
+    {"check": "RSI", "value": "62.5", "status": "neutral", "impact": "${isAr ? '\u0627\u0644\u0632\u062e\u0645 \u0645\u062a\u0648\u0627\u0632\u0646 \u0644\u0627 \u0642\u0631\u0627\u0626\u0637 \u0645\u0637\u0644\u0642\u0629' : 'Momentum balanced, no extreme reading'}"},
+    {"check": "EMA Cross", "value": "bullish", "status": "positive", "impact": "${isAr ? '\u0627\u0644\u0645\u062a\u0646\u0627\u0633\u0642 9 \u0641\u0648\u0642 9 \u0627\u0644\u0645\u062a\u0646\u0627\u0633\u0642 21 \u064a\u062f\u0639\u0645 \u0627\u0644\u0627\u062a\u062c\u0627\u0647 \u0627\u0644\u0635\u0627\u0639\u062f' : '9 EMA above 21 EMA supports upward bias'}"},
+    {"check": "Trend Direction", "value": "uptrend", "status": "positive", "impact": "${isAr ? '\u0627\u0644\u0633\u0639\u0631 \u064a\u0635\u0646\u0639 \u0642\u0645\u0648\u0627\u062a \u0623\u0639\u0644\u0649 \u0648\u0646\u0642\u0627\u0637 \u0623\u0639\u0644\u0649' : 'Price making higher highs and higher lows'}"},
+    {"check": "Trend Age Zone", "value": "mature (32c)", "status": "positive", "impact": "${isAr ? '\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u0646\u0636\u062c \u062a\u0633\u0645\u062d \u0628\u0627\u0644\u062b\u0642\u0629 \u0627\u0644\u0643\u0627\u0645\u0644\u0629' : 'Mature zone allows full confidence'}"},
+    {"check": "Volume Surge", "value": "true", "status": "positive", "impact": "${isAr ? '\u0627\u0632\u062f\u062d\u0627\u0632 \u0627\u0644\u062d\u062c\u0645 \u064a\u062a\u0623\u0643\u062f \u0627\u0644\u0643\u0633\u0631 \u0627\u0644\u0645\u0647\u0646\u064a' : 'Volume spike confirms breakout momentum'}"},
+    {"check": "Supply/Demand", "value": "demand 1.085", "status": "positive", "impact": "${isAr ? '\u0627\u0644\u0633\u0639\u0631 \u064a\u0633\u062a\u0648\u064a \u0639\u0644\u0649 \u0645\u0646\u0637\u0642\u0629 \u0637\u0644\u0628 \u0642\u0648\u064a\u0629' : 'Price resting on strong demand zone'}"},
+    {"check": "Micro Alignment", "value": "aligned", "status": "positive", "impact": "${isAr ? '\u0627\u0644\u0625\u0637\u0627\u0631 \u0627\u0644\u0632\u0645\u0646\u064a \u0627\u0644\u0635\u063a\u064a\u0631 \u064a\u062a\u0623\u0643\u062f \u0627\u0644\u0627\u062a\u062c\u0627\u0647 \u0627\u0644\u0631\u0626\u064a\u0633\u064a' : 'Lower timeframe confirms macro direction'}"},
+    {"check": "Fear&Greed", "value": "45/100", "status": "neutral", "impact": "${isAr ? '\u0645\u0648\u0627\u0644\u0641\u0629 \u0627\u0644\u0633\u0648\u0642 \u0645\u062a\u0648\u0627\u0632\u0646\u0629 \u0644\u0627 \u0642\u0631\u0627\u0626\u0637' : 'Market sentiment balanced, no extreme'}"},
+    {"check": "News Sentiment", "value": "2 positive", "status": "positive", "impact": "${isAr ? '\u062a\u062f\u0641\u0639 \u0623\u062e\u0628\u0627\u0631 \u0645\u0639\u062f\u064a\u0629 \u064a\u062f\u0639\u0645 \u0627\u0644\u0627\u062a\u062c\u0627\u0647' : 'Favorable news flow supports direction'}"},
+    {"check": "Economic Events", "value": "none", "status": "neutral", "impact": "${isAr ? '\u0644\u0627 \u062a\u0648\u062c\u062f \u0623\u062d\u062f\u0627\u062b \u0627\u0644\u062a\u0623\u062b\u064a\u0631 \u0627\u0644\u0639\u0627\u0644\u064a\u0629 \u0627\u0644\u0642\u0627\u062f\u0645\u0629' : 'No upcoming high-impact events'}"},
   ],
   "technicalScore": number,
   "sentimentScore": number,
@@ -1259,8 +1266,9 @@ Return ONLY valid JSON:
   "takeProfit": number
 }`;
 
-    const keyValue = getApiKey() || '';
-    if (keyValue) mirrorApiKey(keyValue);
+    // Analysis runs on the developer's key pool through the server. The browser
+    // holds no key at all, so there is nothing to validate, mirror or leak here —
+    // and the server refuses any account without a running plan.
 
     // Age zone limits ΓÇö needed by local fallback
     const totalAge = metrics?.totalAge || 0;
@@ -1277,7 +1285,7 @@ Return ONLY valid JSON:
     var aiResponse: any = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       await waitIfRateLimited();
-      aiResponse = await callAIDirect(technicalPrompt, keyValue);
+      aiResponse = await callAIServer(technicalPrompt);
       if (!aiResponse?.error) break;
       if (aiResponse.error === 'rate_limited') { onRateLimited(); await new Promise(r => setTimeout(r, 8000)); continue; }
       if (attempt < 1) await new Promise(r => setTimeout(r, 2000));

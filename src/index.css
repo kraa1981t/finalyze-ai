@@ -530,3 +530,22 @@ body.light .panel-strip .strip-title {
   stroke: #ffffff !important;
 }
 
+/* ── Solid dark-brown toggle buttons (Symbols / Chart / Order Ticket / Live Prices)
+   cream text forced in BOTH themes. The duplicated class gives the necessary
+   specificity to beat the light-mode rules that recolor .uppercase.tracking-wider
+   and .text-white into dark green (unreadable on the brown buttons). ── */
+.tog-btn,
+.tog-btn * {
+  color: #FEF3C7 !important;
+}
+.tog-btn svg {
+  color: #FEF3C7 !important;
+}
+.light .tog-btn.tog-btn,
+.light .tog-btn.tog-btn * {
+  color: #FEF3C7 !important;
+}
+.light .tog-btn.tog-btn svg {
+  color: #FEF3C7 !important;
+}
+

@@ -2,7 +2,6 @@ import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Settings, Key, DollarSign, X } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
-import { lt } from '../lib/i18nUI';
 
 interface DashboardPanelProps {
   isOpen: boolean;
@@ -29,9 +28,9 @@ export default function DashboardPanel({ isOpen, onClose, lang, onOpenSettings, 
   }, [isOpen, onClose]);
 
   const items = [
-    { icon: Settings, label: lt(lang, 760), action: () => { onOpenSettings(); onClose(); } },
-    { icon: Key, label: lt(lang, 84), action: () => { onOpenApiKey(); onClose(); } },
-    { icon: DollarSign, label: lt(lang, 424), action: () => { onOpenSubscription(); onClose(); } },
+    { icon: Settings, label: lang === 'ar' ? 'الاستراتيجية' : 'Strategy', action: () => { onOpenSettings(); onClose(); } },
+    { icon: Key, label: lang === 'ar' ? 'المفتاح' : 'API Key', action: () => { onOpenApiKey(); onClose(); } },
+    { icon: DollarSign, label: lang === 'ar' ? 'الخطط' : 'Plans', action: () => { onOpenSubscription(); onClose(); } },
   ];
 
   return (
@@ -52,7 +51,7 @@ export default function DashboardPanel({ isOpen, onClose, lang, onOpenSettings, 
             <div className="max-w-7xl mx-auto px-6 py-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-black uppercase tracking-widest text-black/60">
-                  {lt(lang, 711)}
+                  {lang === 'ar' ? 'لوحة القيادة' : 'Dashboard'}
                 </h2>
                 <button
                   onClick={onClose}

@@ -4,7 +4,6 @@ import { Zap, Activity, Layers, Sparkles, Clock, Music, Volume2, CheckCircle, Cr
 import { AutoAnalysisSettings } from '../types';
 import { Language } from '../lib/i18n';
 import { playStart, playSuccess, playFail, playCompletion } from '../lib/audioEngine';
-import { lt } from '../lib/i18nUI';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
@@ -54,12 +53,12 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
       <div className="bg-brand-alt rounded-2xl border border-white/10 p-6 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-black text-brand-text">
-            {lt(lang, 746)}
+            {lang === 'ar' ? 'نظام الرادار' : 'Radar System'}
           </h3>
           <p className="text-sm text-brand-muted mt-1">
             {autoSettings.isEnabled
-              ? (lt(lang, 744))
-              : (lt(lang, 745))}
+              ? (lang === 'ar' ? 'الرادار نشط' : 'Radar Active')
+              : (lang === 'ar' ? 'الرادار متوقف' : 'Radar Off')}
           </p>
         </div>
         <button
@@ -88,7 +87,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
         <div className="flex items-center gap-3 text-brand-muted">
           <Music size={18} className="text-[#F59E0B]" />
           <span className="text-xs font-black uppercase tracking-widest text-brand-text/90">
-            {lt(lang, 757)}
+            {lang === 'ar' ? 'التنبيهات الصوتية' : 'Sound Alerts'}
           </span>
         </div>
 
@@ -97,10 +96,10 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-xs font-bold text-brand-text">
-              {lt(lang, 690)}
+              {lang === 'ar' ? '1. تنبيه فرصة جديدة' : '1. New Opportunity Alert'}
             </span>
           </div>
-          <button onClick={() => playSuccess(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lt(lang, 765)}>
+          <button onClick={() => playSuccess(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
             <Volume2 size={14} />
           </button>
         </div>
@@ -110,10 +109,10 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-amber-400" />
             <span className="text-xs font-bold text-brand-text">
-              {lt(lang, 691)}
+              {lang === 'ar' ? '2. تنبيه انتهاء الدورة' : '2. Cycle Completion Alert'}
             </span>
           </div>
-          <button onClick={() => playCompletion(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lt(lang, 765)}>
+          <button onClick={() => playCompletion(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
             <Volume2 size={14} />
           </button>
         </div>
@@ -123,10 +122,10 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-blue-400" />
             <span className="text-xs font-bold text-brand-text">
-              {lt(lang, 692)}
+              {lang === 'ar' ? '3. تنبيه إتمام التحليل' : '3. Analysis Complete Alert'}
             </span>
           </div>
-          <button onClick={() => playFail(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lt(lang, 765)}>
+          <button onClick={() => playFail(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
             <Volume2 size={14} />
           </button>
         </div>
@@ -137,7 +136,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
             <div className="flex items-center gap-2">
               <Volume2 size={16} className="text-[#F59E0B]" />
               <span className="text-xs font-black uppercase tracking-widest text-brand-text/90">
-                {lt(lang, 786)}
+                {lang === 'ar' ? 'مستوى الصوت' : 'Volume'}
               </span>
             </div>
             <span className="text-sm font-mono font-black text-[#F59E0B]">{Math.round(autoSettings.volume * 100)}%</span>
@@ -156,15 +155,15 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
         <div className="flex items-center gap-3 text-brand-muted">
           <Layers size={18} className="text-[#F59E0B]" />
           <span className="text-xs font-black uppercase tracking-widest text-brand-text/90">
-            {lt(lang, 729)}
+            {lang === 'ar' ? 'السوق' : 'Market'}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { id: 'forex', label: lt(lang, 715) },
-            { id: 'crypto', label: lt(lang, 709) },
-            { id: 'stocks', label: lt(lang, 758) },
-            { id: 'metals', label: lt(lang, 731) }
+            { id: 'forex', label: lang === 'ar' ? 'فوركس' : 'Forex' },
+            { id: 'crypto', label: lang === 'ar' ? 'كريبتو' : 'Crypto' },
+            { id: 'stocks', label: lang === 'ar' ? 'الأسهم' : 'Stocks' },
+            { id: 'metals', label: lang === 'ar' ? 'معادن' : 'Metals' }
           ].map((cat) => {
             const isSelected = selectedList.includes(cat.id);
             return (
@@ -200,7 +199,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           <div className="flex items-center gap-2 text-brand-muted">
             <Zap size={16} className="text-orange-500" />
             <span className="text-xs font-black uppercase tracking-widest text-brand-text/90">
-              {lt(lang, 752)}
+              {lang === 'ar' ? 'الفحص كل' : 'Scan Every'}
             </span>
           </div>
           <select
@@ -221,7 +220,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           <div className="flex items-center gap-2 text-brand-muted">
             <Sparkles size={16} className="text-[#F59E0B]" />
             <span className="text-xs font-black uppercase tracking-widest text-brand-text/90">
-              {lt(lang, 760)}
+              {lang === 'ar' ? 'الاستراتيجية' : 'Strategy'}
             </span>
           </div>
           <select
@@ -232,12 +231,12 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
               !hasActivePlan ? "border-amber-500/40" : "border-brand-text/10"
             )}
           >
-            <option value="scalping">{lt(lang, 751)}</option>
-            <option value="day_trading">{lt(lang, 712)}</option>
-            <option value="swing_trading">{lt(lang, 763)}</option>
+            <option value="scalping">{lang === 'ar' ? 'سكالبينج' : 'Scalping'}</option>
+            <option value="day_trading">{lang === 'ar' ? 'تداول يومي' : 'Day Trading'}</option>
+            <option value="swing_trading">{lang === 'ar' ? 'سوينغ' : 'Swing Trading'}</option>
           </select>
           {!hasActivePlan && (
-            <p className="text-[10px] text-amber-400 font-bold">{lt(lang, 717)}</p>
+            <p className="text-[10px] text-amber-400 font-bold">{lang === 'ar' ? 'المجاني: تداول يومي فقط' : 'Free: Day Trading only'}</p>
           )}
         </div>
       </div>
@@ -247,7 +246,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
         <div className="flex items-center gap-2 text-brand-muted">
           <Clock size={18} />
           <span className="text-xs font-black uppercase tracking-widest text-brand-text/90">
-            {lt(lang, 768)}
+            {lang === 'ar' ? 'الإطار الزمني' : 'Timeframe'}
           </span>
         </div>
         <div className="grid grid-cols-4 gap-3">
@@ -272,7 +271,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           })}
         </div>
         {!hasActivePlan && (
-          <p className="text-[10px] text-amber-400 font-bold">{lt(lang, 716)}</p>
+          <p className="text-[10px] text-amber-400 font-bold">{lang === 'ar' ? 'المجاني: إطار يومي فقط' : 'Free: 1d timeframe only'}</p>
         )}
       </div>
 
@@ -284,10 +283,10 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
         {saved ? (
           <>
             <CheckCircle size={18} />
-            {lt(lang, 487)}
+            {lang === 'ar' ? 'تم الحفظ ✓' : 'Saved ✓'}
           </>
         ) : (
-          lt(lang, 486)
+          lang === 'ar' ? 'حفظ الإعدادات' : 'Save Settings'
         )}
       </button>
 
@@ -297,9 +296,9 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           const subPrices = (() => { try { return JSON.parse(localStorage.getItem('subscription_prices') || '{}'); } catch { return {}; } })();
           const prices = { weekly: subPrices.weekly ?? 2, monthly: subPrices.monthly ?? 6, yearly: subPrices.yearly ?? 60 };
           const plans = [
-            { key: 'weekly', label: lt(lang, 681), price: prices.weekly, desc: lt(lang, 693), color: 'from-sky-500 to-sky-600', border: 'border-sky-500/30' },
-            { key: 'monthly', label: lt(lang, 682), price: prices.monthly, desc: lt(lang, 719), color: 'from-emerald-500 to-emerald-600', border: 'border-emerald-500/30', popular: true },
-            { key: 'yearly', label: lt(lang, 683), price: prices.yearly, desc: lt(lang, 704), color: 'from-amber-500 to-orange-600', border: 'border-amber-500/30', best: true },
+            { key: 'weekly', label: lang === 'ar' ? 'أسبوعي' : 'Weekly', price: prices.weekly, desc: lang === 'ar' ? 'تحليل مؤسسي لمدة 7 أيام' : '7 days analysis', color: 'from-sky-500 to-sky-600', border: 'border-sky-500/30' },
+            { key: 'monthly', label: lang === 'ar' ? 'شهري' : 'Monthly', price: prices.monthly, desc: lang === 'ar' ? 'وصول كامل للسوق' : 'Full market access', color: 'from-emerald-500 to-emerald-600', border: 'border-emerald-500/30', popular: true },
+            { key: 'yearly', label: lang === 'ar' ? 'سنوي' : 'Yearly', price: prices.yearly, desc: lang === 'ar' ? 'أفضل قيمة + دعم VIP' : 'Best value + VIP', color: 'from-amber-500 to-orange-600', border: 'border-amber-500/30', best: true },
           ];
           return (
           <motion.div
@@ -322,8 +321,8 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
                     <Crown size={22} className="text-white" />
                   </div>
                   <div className="text-left">
-                    <h3 className="text-lg font-black text-white">{lt(lang, 740)}</h3>
-                    <p className="text-xs text-slate-400">{lt(lang, 702)}</p>
+                    <h3 className="text-lg font-black text-white">{lang === 'ar' ? 'ميزة مميزة' : 'Premium Feature'}</h3>
+                    <p className="text-xs text-slate-400">{lang === 'ar' ? 'هذه الميزة متاحة فقط للمشتركين' : 'Available for subscribers only'}</p>
                   </div>
                 </div>
                 <button
@@ -358,19 +357,19 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
                     {plan.popular && (
                       <span className="mt-2 text-[9px] text-emerald-400 font-black uppercase tracking-widest flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                        {lt(lang, 718)}
+                        {lang === 'ar' ? 'للوصول الكامل' : 'Full Access'}
                       </span>
                     )}
                     {plan.best && (
                       <span className="mt-2 text-[9px] text-amber-400 font-black uppercase tracking-widest flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                        {lt(lang, 718)}
+                        {lang === 'ar' ? 'الوصول الكامل' : 'Full Access'}
                       </span>
                     )}
                     {plan.key === 'weekly' && (
                       <span className="mt-2 text-[9px] text-sky-400 font-black uppercase tracking-widest flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                        {lt(lang, 771)}
+                        {lang === 'ar' ? 'جرب لمدة أسبوع' : 'Try for a week'}
                       </span>
                     )}
                   </div>
@@ -381,13 +380,13 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
                 onClick={() => { setShowUpgradeOverlay(false); onUpgrade?.(); }}
                 className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-black text-sm uppercase tracking-widest shadow-lg hover:opacity-90 transition-all active:scale-95"
               >
-                {lt(lang, 761)}
+                {lang === 'ar' ? 'اشترك الآن وتمتع بكامل الصلاحية' : 'Subscribe Now & Unlock All Features'}
               </button>
               <button
                 onClick={() => setShowUpgradeOverlay(false)}
                 className="text-xs text-slate-500 hover:text-white underline transition-colors"
               >
-                {lt(lang, 736)}
+                {lang === 'ar' ? 'لا شكراً، استمر مع الخطة المجانية' : 'No thanks, continue with free plan'}
               </button>
             </motion.div>
           </motion.div>

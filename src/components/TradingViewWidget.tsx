@@ -341,10 +341,22 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           const p = allPropsRef.current;
           const levels = [p.entryPrice, p.sl, p.tp, livePriceRef.current].filter((n) => n != null && isFinite(n as number)) as number[];
           if (!base || !levels.length) return base;
+          // Only fold levels into the price scale when they sit within a sane
+          // distance of the current candle range. Far-away trade levels (e.g. a
+          // wide stop) must NOT stretch the axis, or the candles get squashed
+          // into a sliver (or disappear entirely). They still render as lines,
+          // just off-screen when out of the visible band, like a native chart.
+          const lo = base.priceRange.minValue;
+          const hi = base.priceRange.maxValue;
+          const span = hi - lo;
+          const margin = Number.isFinite(span) && span > 0 ? Math.max(span, Math.abs(hi) * 1e-4) : Math.abs(hi) * 0.02;
+          const within = (v: number) => v >= lo - margin && v <= hi + margin;
+          const nearby = levels.filter(within);
+          if (!nearby.length) return base;
           return {
             priceRange: {
-              minValue: Math.min(base.priceRange.minValue, ...levels),
-              maxValue: Math.max(base.priceRange.maxValue, ...levels),
+              minValue: Math.min(lo, ...nearby),
+              maxValue: Math.max(hi, ...nearby),
             },
           };
         },

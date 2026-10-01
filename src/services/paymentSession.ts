@@ -89,15 +89,20 @@ function removeLocal(id: string): void {
 
 const remoteRef = (id: string) => doc(db, COLLECTION, id);
 
+// The list rule matches `buyerEmail` against the session's lowercased email, so
+// the value stored in Firestore must always be lowercased too.
+const normalizeSession = <T extends Partial<PaymentSession>>(s: T): T =>
+  s.buyerEmail ? { ...s, buyerEmail: s.buyerEmail.toLowerCase().trim() } : s;
+
 async function remoteSet(s: PaymentSession): Promise<void> {
   try {
-    await setDoc(remoteRef(s.id), s as any, { merge: true });
+    await setDoc(remoteRef(s.id), normalizeSession(s) as any, { merge: true });
   } catch {}
 }
 
 async function remotePatch(id: string, patch: Partial<PaymentSession>): Promise<void> {
   try {
-    await updateDoc(remoteRef(id), patch as any);
+    await updateDoc(remoteRef(id), normalizeSession(patch) as any);
   } catch {
     const cur = getCachedSession(id);
     if (cur) await remoteSet({ ...cur, ...patch, updatedAt: Date.now() });
@@ -110,9 +115,14 @@ async function remoteDelete(id: string): Promise<void> {
   } catch {}
 }
 
-async function remoteList(): Promise<PaymentSession[]> {
+async function remoteList(email?: string): Promise<PaymentSession[]> {
   try {
-    const snap = await getDocs(query(collection(db, COLLECTION), where('deviceId', '==', getDeviceId()), where('status', 'in', ['active', 'pending'])));
+    // Payment sessions carry amounts and provider ids, so the rules only hand
+    // them to the account that owns them. Querying by device alone cannot prove
+    // ownership and is refused, so a client must scope the read by its email.
+    const e = (email || '').toLowerCase().trim();
+    if (!e) return [];
+    const snap = await getDocs(query(collection(db, COLLECTION), where('buyerEmail', '==', e)));
     return snap.docs.map((d) => ({ ...(d.data() as any) })) as PaymentSession[];
   } catch {
     return [];
@@ -130,7 +140,7 @@ async function remoteListByEmail(email: string): Promise<PaymentSession[]> {
 
 export async function loadSessions(email?: string): Promise<PaymentSession[]> {
   const local = readLocalSessions();
-  const remote = await remoteList();
+  const remote = await remoteList(email);
   const merged: Map<string, PaymentSession> = new Map();
   local.forEach((s) => merged.set(s.id, s));
   remote.forEach((s) => merged.set(s.id, s));
@@ -145,7 +155,7 @@ export async function loadSessions(email?: string): Promise<PaymentSession[]> {
 // device + email so a customer can see every transaction they ever started.
 export async function loadAllSessions(email?: string): Promise<PaymentSession[]> {
   const local = readLocalSessions();
-  const remote = await remoteList();
+  const remote = await remoteList(email);
   const merged: Map<string, PaymentSession> = new Map();
   local.forEach((s) => merged.set(s.id, s));
   remote.forEach((s) => merged.set(s.id, s));

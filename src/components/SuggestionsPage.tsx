@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Lightbulb, Plus, Check, User, ThumbsUp, Trophy, X, Trash2, AlertTriangle } from 'lucide-react';
 import { Language } from '../lib/i18n';
 import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, increment, serverTimestamp, query, where, setDoc } from 'firebase/firestore';
-import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
+import { collection, addDoc, getDocs, getDoc, updateDoc, deleteDoc, doc, increment, serverTimestamp, query, where, setDoc } from 'firebase/firestore';
 
 interface Suggestion {
   id: string;
@@ -23,9 +22,10 @@ interface SuggestionsPageProps {
   isDeveloper?: boolean;
   onClearCount?: () => void;
   onHideCount?: (n: number) => void;
+  userUid?: string;
 }
 
-export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = false, onClearCount, onHideCount }: SuggestionsPageProps) {
+export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = false, onClearCount, onHideCount, userUid }: SuggestionsPageProps) {
   const isAr = lang === 'ar';
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
@@ -39,19 +39,25 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const hiddenDocId = isDeveloper ? 'dev_hidden_suggestions' : `hidden_${userName || 'anonymous'}`;
+  // Keyed by the Firebase uid so the preferences document belongs to exactly one
+  // account. Keying by a typed display name let anyone read or overwrite another
+  // account's list.
+  const hiddenDocId = userUid ? `hidden_${userUid}` : 'dev_hidden_suggestions';
 
   const fetchHidden = async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'userPreferences'), where('__name__', '==', hiddenDocId)));
-      if (!snap.empty) {
-        const data = snap.docs[0].data();
+      const snap = userUid ? await getDoc(doc(db, 'userPreferences', hiddenDocId)) : null;
+      if (snap?.exists()) {
+        const data = snap.data();
         setHiddenIds(new Set(data.hiddenIds || []));
       }
     } catch {}
   };
 
   const saveHidden = async (ids: Set<string>) => {
+    // Only write a preferences document we are actually allowed to own: the
+    // uid-keyed one. Never the shared developer document.
+    if (!userUid) return;
     try {
       await setDoc(doc(db, 'userPreferences', hiddenDocId), { hiddenIds: [...ids] }, { merge: true });
     } catch {}
@@ -80,7 +86,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
       setSuggestions(data);
     } catch (err: any) {
       console.error('Failed to fetch suggestions:', err);
-      setError(lt(lang, 251));
+      setError(isAr ? 'فشل تحميل الاقتراحات' : 'Failed to load suggestions');
     } finally {
       setLoading(false);
     }
@@ -118,7 +124,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
       await fetchSuggestions();
     } catch (err: any) {
       console.error('Failed to submit suggestion:', err);
-      setError(lt(lang, 252));
+      setError(isAr ? 'فشل إرسال الاقتراح' : 'Failed to submit suggestion');
     } finally {
       setSubmitting(false);
     }
@@ -154,7 +160,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
       }
     } catch (err) {
       console.error('Failed to delete:', err);
-      setError(lt(lang, 248));
+      setError(isAr ? 'فشل الحذف' : 'Failed to delete');
     } finally {
       setDeleting(null);
     }
@@ -178,7 +184,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
       setConfirmDeleteAll(false);
     } catch (err) {
       console.error('Failed to delete all:', err);
-      setError(lt(lang, 249));
+      setError(isAr ? 'فشل حذف الكل' : 'Failed to delete all');
     } finally {
       setDeleting(null);
     }
@@ -206,7 +212,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         className="flex items-center gap-2 text-white/60 hover:text-white transition-colors group"
       >
         <ArrowLeft size={20} className={`group-hover:-translate-x-1 transition-transform ${isAr ? 'rotate-180' : ''}`} />
-        <span className="text-sm font-bold">{lt(lang, 97)}</span>
+        <span className="text-sm font-bold">{isAr ? 'رجوع' : 'Back'}</span>
       </button>
 
       {/* Header */}
@@ -220,13 +226,13 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         </div>
         <h1 className="text-3xl font-black text-white">
           {isDeveloper
-            ? (lt(lang, 142))
-            : (lt(lang, 633))}
+            ? (isAr ? 'مقترحات العملاء' : 'Client Suggestions')
+            : (isAr ? 'اقتراحاتك' : 'Your Suggestions')}
         </h1>
         <p className="text-white/60 text-sm max-w-2xl mx-auto">
           {isDeveloper
-            ? (lt(lang, 309))
-            : (lt(lang, 506))}
+            ? (isAr ? 'إدارة وحذف مقترحات العملاء' : 'Manage and delete client suggestions')
+            : (isAr ? 'شاركنا أفكارك لتطوير الموقع. إذا حصل اقتراحك على أكثر من 50% من مجموع الأصوات، سنقوم بتطبيقه!' : 'Share your ideas to improve the site. If your suggestion gets more than 50% of total votes, we will implement it!')}
         </p>
       </motion.div>
 
@@ -234,17 +240,17 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-brand-alt rounded-2xl border border-white/10 p-4 text-center">
           <div className="text-2xl font-black text-[#F59E0B]">{visibleSuggestions.length}</div>
-          <div className="text-xs text-white/40 font-bold">{lt(lang, 568)}</div>
+          <div className="text-xs text-white/40 font-bold">{isAr ? 'إجمالي الاقتراحات' : 'Total Suggestions'}</div>
         </div>
         <div className="bg-brand-alt rounded-2xl border border-white/10 p-4 text-center">
           <div className="text-2xl font-black text-[#F59E0B]">{totalVotes}</div>
-          <div className="text-xs text-white/40 font-bold">{lt(lang, 570)}</div>
+          <div className="text-xs text-white/40 font-bold">{isAr ? 'إجمالي الأصوات' : 'Total Votes'}</div>
         </div>
         <div className="bg-brand-alt rounded-2xl border border-white/10 p-4 text-center">
           <div className="text-2xl font-black text-[#F59E0B]">
             {visibleSuggestions.filter(s => isImplementable(s.votes)).length}
           </div>
-          <div className="text-xs text-white/40 font-bold">{lt(lang, 282)}</div>
+          <div className="text-xs text-white/40 font-bold">{isAr ? 'تم تطبيقها' : 'Implemented'}</div>
         </div>
       </div>
 
@@ -256,7 +262,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
             className="inline-flex items-center gap-2 bg-[#F59E0B] text-black px-6 py-3 rounded-xl font-black text-sm hover:bg-[#d97706] transition-all shadow-lg hover:shadow-xl active:scale-95"
           >
             <Plus size={18} />
-            {lt(lang, 65)}
+            {isAr ? 'أضف اقتراح' : 'Add Suggestion'}
           </button>
         )}
         {isDeveloper && visibleSuggestions.length > 0 && (
@@ -265,20 +271,20 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
               <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/40 rounded-xl px-4 py-3">
                 <AlertTriangle size={18} className="text-red-400" />
                 <span className="text-sm font-bold text-red-400">
-                  {lt(lang, 198)}
+                  {isAr ? 'حذف الكل؟' : 'Delete all?'}
                 </span>
                 <button
                   onClick={handleDeleteAll}
                   disabled={deleting === 'all'}
                   className="bg-red-500 text-white px-4 py-1.5 rounded-lg text-xs font-black hover:bg-red-600 transition-all"
                 >
-                  {deleting === 'all' ? (lt(lang, 200)) : (lt(lang, 625))}
+                  {deleting === 'all' ? (isAr ? 'جاري الحذف...' : 'Deleting...') : (isAr ? 'نعم' : 'Yes')}
                 </button>
                 <button
                   onClick={() => setConfirmDeleteAll(false)}
                   className="bg-white/10 text-white px-4 py-1.5 rounded-lg text-xs font-black hover:bg-white/20 transition-all"
                 >
-                  {lt(lang, 120)}
+                  {isAr ? 'إلغاء' : 'Cancel'}
                 </button>
               </div>
             ) : (
@@ -287,7 +293,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                 className="inline-flex items-center gap-2 bg-red-500/20 border border-red-500/40 text-red-400 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-500/30 transition-all"
               >
                 <Trash2 size={18} />
-                {lt(lang, 197)}
+                {isAr ? 'حذف الكل' : 'Delete All'}
               </button>
             )}
           </>
@@ -305,7 +311,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
           >
             <Check size={20} className="text-emerald-400" />
             <span className="text-sm font-black text-emerald-400">
-              {lt(lang, 632)}
+              {isAr ? 'تم إضافة اقتراحك بنجاح!' : 'Your suggestion has been added!'}
             </span>
           </motion.div>
         )}
@@ -348,7 +354,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
             >
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-black text-white">
-                  {lt(lang, 353)}
+                  {isAr ? 'اقتراح جديد' : 'New Suggestion'}
                 </h3>
                 <button onClick={() => setShowForm(false)} className="text-white/40 hover:text-white">
                   <X size={20} />
@@ -358,25 +364,25 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="text-xs font-bold text-white/60 block mb-1.5">
-                    {lt(lang, 628)}
+                    {isAr ? 'اسمك' : 'Your Name'}
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder={lt(lang, 239)}
+                    placeholder={isAr ? 'أدخل اسمك' : 'Enter your name'}
                     required
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#F59E0B]/50"
                   />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-white/60 block mb-1.5">
-                    {lt(lang, 631)}
+                    {isAr ? 'اقتراحك' : 'Your Suggestion'}
                   </label>
                   <textarea
                     value={text}
                     onChange={e => setText(e.target.value)}
-                    placeholder={lt(lang, 623)}
+                    placeholder={isAr ? 'اكتب اقتراحك هنا...' : 'Write your suggestion here...'}
                     required
                     rows={4}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#F59E0B]/50 resize-none"
@@ -388,8 +394,8 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                   className="w-full bg-[#F59E0B] text-black py-3 rounded-xl font-black text-sm hover:bg-[#d97706] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting
-                    ? (lt(lang, 536))
-                    : (lt(lang, 535))}
+                    ? (isAr ? 'جاري الإرسال...' : 'Submitting...')
+                    : (isAr ? 'إرسال' : 'Submit')}
                 </button>
               </form>
             </motion.div>
@@ -401,13 +407,13 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
       {loading ? (
         <div className="text-center py-12">
           <div className="w-8 h-8 border-b-2 border-[#F59E0B] rounded-full animate-spin mx-auto" />
-          <p className="text-white/40 text-sm mt-3">{lt(lang, 303)}</p>
+          <p className="text-white/40 text-sm mt-3">{isAr ? 'جاري التحميل...' : 'Loading...'}</p>
         </div>
       ) : visibleSuggestions.length === 0 ? (
         <div className="text-center py-12 space-y-3">
           <Lightbulb size={40} className="text-white/20 mx-auto" />
           <p className="text-white/40 text-sm">
-            {lt(lang, 372)}
+            {isAr ? 'لا توجد اقتراحات بعد.' : 'No suggestions yet.'}
           </p>
         </div>
       ) : (
@@ -437,7 +443,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                       {implementable && (
                         <span className="flex items-center gap-1 bg-[#F59E0B]/20 text-[#F59E0B] text-[10px] font-black px-2 py-0.5 rounded-full">
                           <Trophy size={10} />
-                          {lt(lang, 283)}
+                          {isAr ? 'تم التطبيقة' : 'Implemented'}
                         </span>
                       )}
                     </div>
@@ -449,7 +455,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                         onClick={() => handleDeleteOne(s.id)}
                         disabled={deleting === s.id}
                         className="p-2 rounded-xl bg-red-500/10 text-red-400/60 hover:bg-red-500/20 hover:text-red-400 transition-all"
-                        title={lt(lang, 196)}
+                        title={isAr ? 'حذف' : 'Delete'}
                       >
                         {deleting === s.id ? (
                           <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
@@ -483,8 +489,8 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                     />
                   </div>
                   <div className="flex justify-between text-[10px] text-white/30 font-bold">
-                    <span>{pct}% {lt(lang, 381)}</span>
-                    {implementable && <span>{lt(lang, 21)}</span>}
+                    <span>{pct}% {isAr ? 'من الأصوات' : 'of votes'}</span>
+                    {implementable && <span>{isAr ? '✓ سيُطبق' : '✓ Will be implemented'}</span>}
                   </div>
                 </div>
               </motion.div>

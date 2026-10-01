@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Key, Eye, EyeOff, CheckCircle2, AlertTriangle, LogOut, Loader2, Info } from 'lucide-react';
+import { Key, Eye, EyeOff, CheckCircle2, AlertTriangle, LogOut, Loader2, Info, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
+import { isDeveloperEmail } from '../lib/clientIds';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { User, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
+
+type KeyProvider = 'gemini' | 'groq';
+
+const PROVIDER_KEY = 'finalyze_key1_provider';
+
+function detectProvider(value: string, stored?: string | null): KeyProvider {
+  const v = (value || '').trim();
+  if (v.startsWith('AIza') || v.startsWith('AQ.')) return 'gemini';
+  if (v.startsWith('gsk_')) return 'groq';
+  if (stored === 'gemini' || stored === 'groq') return stored;
+  return 'groq';
+}
+
+/** Provider implied by the key itself, or null when the format is unfamiliar. */
+function autoProviderOf(value: string): KeyProvider | null {
+  const v = (value || '').trim();
+  if (v.startsWith('AIza') || v.startsWith('AQ.')) return 'gemini';
+  if (v.startsWith('gsk_')) return 'groq';
+  return null;
+}
 
 interface ApiKeyModalProps {
   isOpen: boolean;
@@ -30,23 +50,35 @@ function loadKey(): { value: string; enabled: boolean } {
   }
 }
 
-function saveKey(value: string) {
+function saveKey(value: string, provider: KeyProvider) {
   localStorage.setItem('finalyze_key1_value', value);
   localStorage.setItem('finalyze_key1_enabled', 'true');
+  localStorage.setItem(PROVIDER_KEY, provider);
   try {
     sessionStorage.setItem('finalyze_key_mirror', value);
-    document.cookie = `finalyze_api_key=${encodeURIComponent(value)}; path=/; max-age=31536000; SameSite=Lax`;
   } catch {}
+}
+
+function maskKey(v: string): string {
+  const k = (v || '').trim();
+  if (!k) return '';
+  if (k.length <= 10) return k.slice(0, 3) + '••••';
+  return `${k.slice(0, 6)}••••••${k.slice(-4)}`;
 }
 
 export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, onSaved, onLogout, asPage }: ApiKeyModalProps) {
   const [keyValue, setKeyValue] = useState(() => loadKey().value);
+  const [provider, setProvider] = useState<KeyProvider>(() => detectProvider(loadKey().value, localStorage.getItem(PROVIDER_KEY)));
   const [show, setShow] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const isAr = lang === 'ar';
+  const currentKey = loadKey().value;
+  const currentProvider = detectProvider(currentKey, localStorage.getItem(PROVIDER_KEY));
+  const hasCurrentKey = !!currentKey;
+  const isReplacing = hasCurrentKey && keyValue.trim() !== currentKey.trim();
 
   // Migrate old key on first mount
   useEffect(() => {
@@ -57,12 +89,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
     }
   }, []);
 
-  const DEV_EMAILS = ['taybekraa@gmail.com', 'kraakraa109@gmail.com', 'bachasalman69@gmail.com'];
-  const isDeveloperSession = () => {
-    if (!user) return false;
-    const email = (user.email || '').toLowerCase().trim();
-    return DEV_EMAILS.includes(email);
-  };
+  const isDeveloperSession = () => isDeveloperEmail(user?.email);
 
   useEffect(() => {
     if (isOpen) {
@@ -87,6 +114,18 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
 
     const val = keyValue.trim();
     setIsLoading(true);
+
+    // Any key can be saved. The provider is derived from the key itself, so
+    // pasting a Gemini key is never rejected by a stale provider selection.
+    // A key in an unfamiliar format is still saved under the chosen provider.
+    let effectiveProvider = provider;
+    if (val) {
+      const auto = autoProviderOf(val);
+      if (auto) {
+        effectiveProvider = auto;
+        setProvider(auto);
+      }
+    }
 
     if (!val) {
       // Clear key action
@@ -119,8 +158,9 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
       return;
     }
 
-    // Normal save key action
-    saveKey(val);
+    // Normal save key action. Saving a DIFFERENT key replaces the old one
+    // outright — the previous key is wiped from every slot, never kept as backup.
+    saveKey(val, effectiveProvider);
     localStorage.removeItem('finalyze_user_groq_api_key');
     localStorage.removeItem('finalyze_key2_value');
     localStorage.removeItem('finalyze_key2_provider');
@@ -136,7 +176,6 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
 
         // Register client with API key when new user saves key
         const userEmail = user.email || '';
-        const isGeminiKey = val.startsWith('AIzaSy');
         try {
           const response = await fetch('/api/register-client-with-key', {
             method: 'POST',
@@ -144,7 +183,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             body: JSON.stringify({
               email: userEmail,
               uid: user.uid,
-              apiKeyType: isGeminiKey ? 'gemini' : 'groq'
+              apiKeyType: effectiveProvider
             })
           });
           if (response.ok) {
@@ -174,7 +213,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         </div>
         <div>
           <h3 className="text-xl font-bold text-white leading-tight">
-            {lt(lang, 84)}
+            {isAr ? 'مفتاح API' : 'API Key'}
           </h3>
           {isDeveloperSession() && (
             <span className="text-[10px] bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 rounded-full px-2.5 py-0.5 font-bold uppercase tracking-wider mt-1 inline-block">
@@ -193,7 +232,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
         >
           <div className="absolute inset-0 bg-gradient-to-r from-sky-500/10 to-blue-500/10 opacity-50" />
           <Key size={18} className="shrink-0 text-sky-400 animate-spin" style={{ animationDuration: '6s' }} />
-          <span>{lt(lang, 182)}</span>
+          <span>{isAr ? 'أنشئ مفتاح Groq مجاني (موصى به للغاية وسريع)' : 'Create free Groq key (Highly Recommended)'}</span>
         </a>
 
         <a
@@ -203,42 +242,105 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           className="inline-flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-slate-300 transition-all bg-white/5 border border-white/10 hover:bg-white/10 py-2.5 rounded-xl font-bold w-full"
         >
           <Info size={14} className="shrink-0" />
-          {lt(lang, 181)}
+          {isAr ? 'أنشئ مفتاح Google Gemini مجاني' : 'Create free Google Gemini key'}
         </a>
       </div>
 
       <p className="text-slate-400 text-sm leading-relaxed mb-6">
-        {lt(lang, 425)}
+        {isAr
+          ? 'يرجى إدخال مفتاح Groq الخاص بك (موصى به لتجنب أي فشل في الاتصال وللحصول على تحليل مستقر وسريع) أو مفتاح Google البديل.'
+          : 'Please enter your Groq API key (highly recommended to avoid connection failures and get stable analysis) or Google Gemini key.'}
       </p>
 
       {typeof window !== 'undefined' && localStorage.getItem('finalyze_verify_link') && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6 text-center space-y-2">
           <p className="text-xs text-amber-400 font-bold">
-            {lt(lang, 28)}
+            {isAr ? '📧 تم إرسال رابط التفعيل إلى بريدك Gmail.' : '📧 Verification link sent to your Gmail.'}
           </p>
           <a
             href={(() => { try { return localStorage.getItem('finalyze_verify_link') || '#'; } catch { return '#'; } })()}
             target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-400 transition-all"
           >
-            {lt(lang, 393)}
+            {isAr ? 'فتح Gmail' : 'Open Gmail'}
           </a>
         </div>
       )}
 
       <div className="mb-6">
-        <div className="space-y-3 p-5 rounded-2xl bg-white/5 border border-white/5">
+        <div className="space-y-4 p-5 rounded-2xl bg-white/5 border border-white/5">
           <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-2 text-sky-400">
             <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-            {lt(lang, 84)}
+            {isAr ? 'مفتاح API' : 'API Key'}
           </h4>
+
+          {/* Provider picker — Gemini or Groq */}
+          <div>
+            <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+              {isAr ? 'مزوّد المفتاح' : 'Key Provider'}
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { id: 'gemini' as KeyProvider, label: 'Google Gemini', hint: 'AIza…' },
+                { id: 'groq' as KeyProvider, label: 'Groq', hint: 'gsk_…' },
+              ]).map((p) => {
+                const active = provider === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setProvider(p.id)}
+                    disabled={isLoading || success}
+                    className={`text-right px-4 py-3 rounded-xl border-2 transition-all active:scale-[0.98] disabled:opacity-50 ${
+                      active
+                        ? 'bg-sky-500/20 border-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.25)]'
+                        : 'bg-black/30 border-white/10 hover:border-white/25'
+                    }`}
+                  >
+                    <span className={`block text-sm font-black ${active ? 'text-sky-300' : 'text-slate-300'}`}>{p.label}</span>
+                    <span className="block text-[10px] font-mono text-slate-500 mt-0.5" dir="ltr">{p.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {hasCurrentKey && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
+              <div className="flex-1 min-w-0">
+                <span className="block text-[10px] font-black uppercase tracking-wider text-emerald-400">
+                  {isAr ? 'المفتاح الحالي' : 'Current Key'}
+                </span>
+                <span className="block text-xs font-mono text-slate-300 mt-1 truncate" dir="ltr">
+                  {currentProvider === 'gemini' ? 'Gemini' : 'Groq'} · {maskKey(currentKey)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setKeyValue(''); setError(null); setSuccess(false); }}
+                disabled={isLoading || success}
+                title={isAr ? 'حذف المفتاح' : 'Delete key'}
+                className="p-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 hover:text-red-300 transition-all disabled:opacity-50 flex-shrink-0"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          )}
+
+          {isReplacing && (
+            <p className="text-[11px] text-amber-400 font-bold leading-relaxed">
+              {isAr
+                ? '⚠️ عند الحفظ سيُحذف المفتاح القديم نهائياً ويُستبدل بالمفتاح الجديد.'
+                : '⚠️ On save the old key is permanently deleted and replaced by the new one.'}
+            </p>
+          )}
 
           <div className="relative">
             <input
               type={show ? 'text' : 'password'}
               value={keyValue}
               onChange={(e) => setKeyValue(e.target.value)}
-              placeholder={lt(lang, 407)}
+              placeholder={isAr ? 'الصق مفتاح API...' : 'Paste API key...'}
               autoComplete="off"
               className="w-full bg-black/40 border border-white/10 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 rounded-xl px-5 py-4.5 text-sm font-mono text-brand-text outline-none transition-all pr-12 text-right"
               dir="ltr"
@@ -253,6 +355,22 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
               </button>
             </div>
           </div>
+
+          {/* Any key is accepted — this shows the provider detected from the key. */}
+          {keyValue.trim() && (
+            <div className="flex items-center gap-2">
+              <Info size={13} className="shrink-0 text-sky-400" />
+              <span className="text-[11px] text-slate-400 font-bold">
+                {isAr ? 'المزوّد المكتشف: ' : 'Detected provider: '}
+                <span className="text-sky-300 font-black">
+                  {(autoProviderOf(keyValue) ?? provider) === 'gemini' ? 'Google Gemini' : 'Groq'}
+                </span>
+                {autoProviderOf(keyValue)
+                  ? (isAr ? ' — سيُضبط تلقائياً' : ' — will be set automatically')
+                  : (isAr ? ' — سيُحفظ تحت المزوّد المختار' : ' — will be saved under the selected provider')}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -278,7 +396,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           >
             <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
             <span className="text-xs text-emerald-400 leading-normal">
-              {lt(lang, 19)}
+              {isAr ? '✓ تم الحفظ بنجاح!' : '✓ Saved Successfully!'}
             </span>
           </motion.div>
         )}
@@ -299,12 +417,16 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
           {isLoading ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              <span>{lt(lang, 490)}</span>
+              <span>{isAr ? 'جارٍ الحفظ...' : 'Saving...'}</span>
             </>
           ) : success ? (
-            <span>{lt(lang, 20)}</span>
+            <span>{isAr ? '✓ تم الحفظ!' : '✓ Saved!'}</span>
+          ) : !keyValue.trim() && hasCurrentKey ? (
+            <span>{isAr ? 'حذف المفتاح' : 'Delete Key'}</span>
+          ) : isReplacing ? (
+            <span>{isAr ? 'استبدال المفتاح' : 'Replace Key'}</span>
           ) : (
-            <span>{lt(lang, 481)}</span>
+            <span>{isAr ? 'حفظ' : 'Save'}</span>
           )}
         </button>
 
@@ -314,7 +436,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             className="w-full flex items-center justify-center gap-2 py-3 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/25 hover:text-red-300 font-bold rounded-xl transition-all text-xs tracking-wider uppercase"
           >
             <LogOut size={14} />
-            <span>{lt(lang, 304)}</span>
+            <span>{isAr ? 'تسجيل خروج' : 'Logout'}</span>
           </button>
         ) : (
           <button
@@ -322,7 +444,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
             disabled={isLoading}
             className="w-full py-3 bg-white/5 border border-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300 font-bold rounded-xl transition-all text-xs tracking-wider uppercase"
           >
-            {lt(lang, 120)}
+            {isAr ? 'إلغاء' : 'Cancel'}
           </button>
         )}
       </div>
@@ -330,7 +452,7 @@ export default function ApiKeyModal({ isOpen, onClose, isBlocking, lang, user, o
       {isDeveloperSession() && (
         <div className="flex items-center gap-2 mt-4 text-[10px] text-emerald-400/60 justify-center">
           <Info size={12} />
-          <span>{lt(lang, 203)}</span>
+          <span>{isAr ? 'وضع المطور نشط — تم تجاوز المفتاح.' : 'Developer mode active — API key bypassed.'}</span>
         </div>
       )}
     </>

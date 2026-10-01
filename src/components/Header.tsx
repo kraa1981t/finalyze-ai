@@ -7,17 +7,16 @@ import { initAudio } from '../lib/audioEngine';
 import { BASE_URL } from '../lib/firebase';
 import { SYMBOL_CATEGORIES, ALL_SYMBOLS_DB } from '../constants';
 import { fetchUrgentNews } from '../services/urgentNews';
-import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
-const PROGRESS_CATEGORY_CONFIG: Record<string, { emoji: string; labelEn: string; labelAr: string; labelEs: string; labelRu: string; labelFr: string }> = {
-  forex: { emoji: '\uD83D\uDCB1', labelEn: 'Forex', labelAr: 'فوركس', labelEs: 'Forex', labelRu: 'Форекс', labelFr: 'Forex' },
-  crypto: { emoji: '\uD83E\uDDF1', labelEn: 'Crypto', labelAr: 'كريبتو', labelEs: 'Cripto', labelRu: 'Крипто', labelFr: 'Crypto' },
-  stocks_us: { emoji: '\uD83C\uDDFA\uD83C\uDDF8', labelEn: 'US Stocks', labelAr: 'أسهم أمريكا', labelEs: 'Acciones EE. UU.', labelRu: 'Акции США', labelFr: 'Actions US' },
-  stocks_eu: { emoji: '\uD83C\uDDEA\uD83C\uDDFA', labelEn: 'EU Stocks', labelAr: 'أسهم أوروبا', labelEs: 'Acciones UE', labelRu: 'Акции ЕС', labelFr: 'Actions UE' },
-  stocks_jp: { emoji: '\uD83C\uDDEF\uD83C\uDDF5', labelEn: 'JP Stocks', labelAr: 'أسهم اليابان', labelEs: 'Acciones JP', labelRu: 'Акции Японии', labelFr: 'Actions JP' },
-  metals: { emoji: '\uD83D\uDC8E', labelEn: 'Metals', labelAr: 'معادن', labelEs: 'Metales', labelRu: 'Металлы', labelFr: 'Métaux' },
+const PROGRESS_CATEGORY_CONFIG: Record<string, { emoji: string; labelAr: string; labelEn: string }> = {
+  forex: { emoji: '\uD83D\uDCB1', labelAr: 'فوركس', labelEn: 'Forex' },
+  crypto: { emoji: '\uD83E\uDDF1', labelAr: 'كريبتو', labelEn: 'Crypto' },
+  stocks_us: { emoji: '\uD83C\uDDFA\uD83C\uDDF8', labelAr: 'أسهم أمريكا', labelEn: 'US Stocks' },
+  stocks_eu: { emoji: '\uD83C\uDDEA\uD83C\uDDFA', labelAr: 'أسهم أوروبا', labelEn: 'EU Stocks' },
+  stocks_jp: { emoji: '\uD83C\uDDEF\uD83C\uDDF5', labelAr: 'أسهم اليابان', labelEn: 'JP Stocks' },
+  metals: { emoji: '\uD83D\uDC8E', labelAr: 'معادن', labelEn: 'Metals' },
 };
 
 function detectProgressCategory(symbol: string): { key: string; cfg?: typeof PROGRESS_CATEGORY_CONFIG[string] } {
@@ -69,13 +68,13 @@ interface HeaderProps {
   freemiumDisabled?: boolean;
   storeVisited?: boolean;
   compact?: boolean;
+  planClient?: boolean;
+  onOpenMyPlan?: () => void;
+  onStartClientAutoAnalysis?: () => void;
 }
 
 const LANGUAGES: { code: Language, label: string }[] = [
   { code: 'en', label: 'English' },
-  { code: 'es', label: 'Español' },
-  { code: 'ru', label: 'Русский' },
-  { code: 'fr', label: 'Français' },
   { code: 'ar', label: 'العربية' },
 ];
 
@@ -110,6 +109,9 @@ export default function Header({
   freemiumDisabled = false,
   storeVisited = false,
   compact = false,
+  planClient = false,
+  onOpenMyPlan,
+  onStartClientAutoAnalysis,
 }: HeaderProps) {
   const t = translations[lang];
   const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
@@ -119,25 +121,25 @@ export default function Header({
   // staying frozen on the last SYNCED/progress state until a scan finishes.
   const liveAnalysisActive = !!(analysisProgress && autoSettings.isEnabled);
 
-  const TIMEFRAME_LABELS: Record<string, { ar: string; en: string; es?: string; ru?: string; fr?: string }> = {
-    '15m': { ar: '15 دقيقة', en: '15min', es: '15min', ru: '15 мин', fr: '15min' },
-    '1h':  { ar: 'ساعة',     en: '1hr',  es: '1h',    ru: '1 ч',   fr: '1h' },
-    '4h':  { ar: '4 ساعات',  en: '4hr',  es: '4h',    ru: '4 ч',   fr: '4h' },
-    '1d':  { ar: 'يومي',     en: 'Daily',  es: 'Diario',   ru: 'День',  fr: 'Quotidien' },
-    '1w':  { ar: 'أسبوعي',   en: 'Weekly', es: 'Semanal',  ru: 'Неделя', fr: 'Hebdomadaire' },
-    '1M':  { ar: 'شهري',     en: 'Monthly',es: 'Mensual',  ru: 'Месяц', fr: 'Mensuel' },
-    '1Y':  { ar: 'سنوي',     en: 'Yearly', es: 'Anual',    ru: 'Год',   fr: 'Annuel' },
+  const TIMEFRAME_LABELS: Record<string, { ar: string; en: string }> = {
+    '15m': { ar: '15 دقيقة', en: '15min' },
+    '1h':  { ar: 'ساعة',     en: '1hr' },
+    '4h':  { ar: '4 ساعات',  en: '4hr' },
+    '1d':  { ar: 'يومي',     en: 'Daily' },
+    '1w':  { ar: 'أسبوعي',   en: 'Weekly' },
+    '1M':  { ar: 'شهري',     en: 'Monthly' },
+    '1Y':  { ar: 'سنوي',     en: 'Yearly' },
   };
   const tfLabel = TIMEFRAME_LABELS[autoSettings.timeframe] || { ar: autoSettings.timeframe, en: autoSettings.timeframe };
 
-  const ANALYSIS_LABELS: Record<string, { ar: string; en: string; es?: string; ru?: string; fr?: string }> = {
-    '15m': { ar: 'التحليل الربع ساعي', en: '15-Min Analysis', es: 'Análisis de 15 min', ru: 'Анализ за 15 минут', fr: 'Analyse 15 min' },
-    '1h':  { ar: 'التحليل الساعي',     en: 'Hourly Analysis', es: 'Análisis por horas', ru: 'Почасовой анализ', fr: 'Analyse horaire' },
-    '4h':  { ar: 'التحليل الربعاوي',   en: '4-Hour Analysis', es: 'Análisis de 4 horas', ru: 'Анализ за 4 часа', fr: 'Analyse de 4 heures' },
-    '1d':  { ar: 'التحليل اليومي',     en: 'Daily Analysis', es: 'Análisis diario', ru: 'Дневной анализ', fr: 'Analyse quotidienne' },
-    '1w':  { ar: 'التحليل الأسبوعي',   en: 'Weekly Analysis', es: 'Análisis semanal', ru: 'Недельный анализ', fr: 'Analyse hebdomadaire' },
-    '1M':  { ar: 'التحليل الشهري',     en: 'Monthly Analysis', es: 'Análisis mensual', ru: 'Месячный анализ', fr: 'Analyse mensuelle' },
-    '1Y':  { ar: 'التحليل السنوي',     en: 'Yearly Analysis', es: 'Análisis anual', ru: 'Годовой анализ', fr: 'Analyse annuelle' },
+  const ANALYSIS_LABELS: Record<string, { ar: string; en: string }> = {
+    '15m': { ar: 'التحليل الربع ساعي', en: '15-Min Analysis' },
+    '1h':  { ar: 'التحليل الساعي',     en: 'Hourly Analysis' },
+    '4h':  { ar: 'التحليل الربعاوي',   en: '4-Hour Analysis' },
+    '1d':  { ar: 'التحليل اليومي',     en: 'Daily Analysis' },
+    '1w':  { ar: 'التحليل الأسبوعي',   en: 'Weekly Analysis' },
+    '1M':  { ar: 'التحليل الشهري',     en: 'Monthly Analysis' },
+    '1Y':  { ar: 'التحليل السنوي',     en: 'Yearly Analysis' },
   };
   const analysisLabel = ANALYSIS_LABELS[autoSettings.timeframe] || tfLabel;
 
@@ -215,22 +217,22 @@ export default function Header({
         <div className="fixed inset-0 z-[100]" onClick={() => setShowLogoutConfirm(false)}>
           <div className={`absolute top-[60px] w-64 bg-brand-alt border border-brand-text/10 rounded-xl shadow-2xl overflow-hidden z-[100] ${lang === 'ar' ? 'left-4' : 'right-4'}`} onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-white/10">
-              <p className="text-sm font-black text-white">{lt(lang, 304)}</p>
+              <p className="text-sm font-black text-white">{lang === 'ar' ? 'تسجيل الخروج' : 'Logout'}</p>
             </div>
             <div className="px-4 py-3">
-              <p className="text-xs text-white/60 mb-3">{lt(lang, 699)}</p>
+              <p className="text-xs text-white/60 mb-3">{lang === 'ar' ? 'هل أنت متأكد؟' : 'Are you sure?'}</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowLogoutConfirm(false)}
                   className="flex-1 px-3 py-1.5 rounded-lg border border-white/20 text-white/60 text-xs font-bold hover:bg-white/10 transition-colors"
                 >
-                  {lt(lang, 120)}
+                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                 </button>
                 <button
                   onClick={() => { setShowLogoutConfirm(false); onLogout(); }}
                   className="flex-1 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors"
                 >
-                  {lt(lang, 304)}
+                  {lang === 'ar' ? 'خروج' : 'Logout'}
                 </button>
               </div>
             </div>
@@ -245,7 +247,7 @@ export default function Header({
           <div className="absolute top-0 left-0 bottom-0 w-[85%] max-w-[340px] bg-[#D1FAE5] shadow-2xl overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between px-4 py-4 border-b border-black/10">
               <span className="text-sm font-black text-black uppercase tracking-wider">
-                {lt(lang, 730)}
+                {lang === 'ar' ? 'القائمة' : 'Menu'}
               </span>
               <button
                 onClick={() => setShowMobileMenu(false)}
@@ -273,17 +275,17 @@ export default function Header({
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black uppercase tracking-[0.2em] leading-none">
-                      {lt(lang, 700)}
+                      {lang === 'ar' ? 'التحليل التلقائي' : 'Auto Analysis'}
                     </span>
                     <span className={cn(
                       "text-[12px] font-black uppercase tracking-wider leading-tight",
                       clientRadarRunning || showRadarComplete ? 'text-white' : 'text-emerald-400'
                     )}>
                       {clientRadarRunning
-                        ? (lt(lang, 780))
+                        ? (lang === 'ar' ? '⏳ انتظار...' : '⏳ Waiting...')
                         : showRadarComplete
-                          ? (lt(lang, 783))
-                          : (lt(lang, 51))
+                          ? (lang === 'ar' ? '✅ تم' : '✅ Done')
+                          : (lang === 'ar' ? 'نشط' : 'Active')
                       }
                     </span>
                   </div>
@@ -296,7 +298,7 @@ export default function Header({
                   <div className="flex items-center gap-2">
                     <Zap size={18} className={autoSettings.isEnabled ? 'text-emerald-400' : 'text-black/50'} fill={autoSettings.isEnabled ? "currentColor" : "none"} />
                     <span className="text-xs font-black text-black uppercase">
-                      {lt(lang, 700)}
+                      {lang === 'ar' ? 'التحليل التلقائي' : 'Auto Analysis'}
                     </span>
                   </div>
                   <button
@@ -325,7 +327,7 @@ export default function Header({
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
                     <span className="text-xs font-black text-black uppercase">
-                      {lt(lang, 697)} {analysisProgress.index + 1}/{analysisProgress.total}
+                      {lang === 'ar' ? 'جاري التحليل' : 'Analyzing'} {analysisProgress.index + 1}/{analysisProgress.total}
                     </span>
                   </div>
                   <span className="text-[10px] font-bold text-black/70 mt-1 block truncate">{analysisProgress.current}</span>
@@ -335,7 +337,7 @@ export default function Header({
               {/* Divider: Navigation */}
               <div className="border-t border-black/10 pt-2">
                 <span className="text-[9px] font-black uppercase text-black/40 tracking-[0.2em] px-2">
-                  {lt(lang, 733)}
+                  {lang === 'ar' ? 'التنقل' : 'Navigation'}
                 </span>
               </div>
 
@@ -344,19 +346,19 @@ export default function Header({
               <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('trade'); }}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl border border-black/10 bg-[#F59E0B]/30 hover:bg-[#F59E0B]/50 transition-all shadow-sm">
                 <TrendingUp size={18} className="text-[#F59E0B]" />
-                <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lt(lang, 573)}</span>
+                <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lang === 'ar' ? 'التداول' : 'Trade'}</span>
               </button>
               <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('prices'); }}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl border border-black/10 bg-emerald-500/20 hover:bg-emerald-500/40 transition-all shadow-sm">
                 <BarChart3 size={18} className="text-emerald-500" />
-                <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lt(lang, 724)}</span>
+                <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lang === 'ar' ? 'الأسعار الحية' : 'Live Prices'}</span>
               </button>
               {isDeveloper ? (
                 <>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('radar'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Zap size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lt(lang, 701)}</span>
+                    <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lang === 'ar' ? 'إعدادات التحليل التلقائي' : 'Auto Analysis Settings'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('manualAnalysis'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-all shadow-sm">
@@ -364,44 +366,44 @@ export default function Header({
                       <path d="M12 20h9" />
                       <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                     </svg>
-                    <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lt(lang, 728)}</span>
+                    <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lang === 'ar' ? 'التحليل اليدوي' : 'Manual Analysis'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('apiKey'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Key size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 84)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'مفتاح API' : 'API Key'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('profile'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <UserIcon size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 742)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'الملف الشخصي' : 'Profile'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('settings'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Settings size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 755)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'الإعدادات' : 'Settings'}</span>
                   </button>
                   {!freemiumDisabled && (
                     <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('plans'); }}
                       className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                       <DollarSign size={18} className="text-[#F59E0B]" />
-                      <span className="text-xs font-black text-black uppercase">{lt(lang, 424)}</span>
+                      <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'الخطط' : 'Plans'}</span>
                     </button>
                   )}
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('storeSettings'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Store size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 527)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'إعدادات المتجر' : 'Store Settings'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('store'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all shadow-sm">
                     <Store size={18} className="text-emerald-500" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 777)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'عرض المتجر (اختبار)' : 'View Store (test)'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('clientMonitor'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Users size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 141)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'مراقبة العملاء' : 'Client Monitor'}</span>
                   </button>
                   {/* Suggestions - Developer */}
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('suggestions'); }}
@@ -414,17 +416,17 @@ export default function Header({
                         </span>
                       )}
                     </div>
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 762)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'المقترحات' : 'Suggestions'}</span>
                     {newSuggestionsCount > 0 && (
                       <span className="mr-auto text-[10px] font-black text-[#F59E0B] bg-[#F59E0B]/20 px-2 py-0.5 rounded-full">
-                        {newSuggestionsCount} {lt(lang, 348)}
+                        {newSuggestionsCount} {lang === 'ar' ? 'جديد' : 'new'}
                       </span>
                     )}
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('ads'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-[#F59E0B]/20 hover:bg-[#F59E0B]/40 transition-all shadow-sm">
                     <Monitor size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 732)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'إعلاناتي' : 'My Ads'}</span>
                   </button>
                 </>
               ) : (
@@ -432,37 +434,47 @@ export default function Header({
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('profile'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <UserIcon size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 742)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'الملف الشخصي' : 'Profile'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('about'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Info size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 694)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'نبذة عنا' : 'About Us'}</span>
                   </button>
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('suggestions'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Lightbulb size={18} className="text-[#F59E0B]" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 633)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'اقتراحاتكم' : 'Your Suggestions'}</span>
                   </button>
-                  {!freemiumDisabled && (
-                    <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('plans'); }}
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-emerald-500/20 hover:bg-emerald-500/40 transition-all shadow-sm">
-                      <Crown size={18} className="text-emerald-500" />
-                      <span className="text-xs font-black text-black uppercase">{lt(lang, 706)}</span>
-                    </button>
-                  )}
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('store'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-sky-500/20 hover:bg-sky-500/40 transition-all shadow-sm">
                     <Store size={18} className="text-sky-500" />
-                    <span className="text-xs font-black text-black uppercase">{lt(lang, 705)}</span>
+                    <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'متجر البوتات' : 'Bots Store'}</span>
                   </button>
+{planClient && (
+                    <>
+                      <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('radar'); }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
+                        <Zap size={18} className="text-[#F59E0B]" />
+                        <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lang === 'ar' ? 'إعدادات التحليل التلقائي' : 'Auto Analysis Settings'}</span>
+                      </button>
+                      <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('manualAnalysis'); }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-all shadow-sm">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-red-600">
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg>
+                        <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">{lang === 'ar' ? 'التحليل اليدوي' : 'Manual Analysis'}</span>
+                      </button>
+                    </>
+                  )}
                 </>
               )}
 
               {/* Divider: Tools */}
               <div className="border-t border-black/10 pt-2">
                 <span className="text-[9px] font-black uppercase text-black/40 tracking-[0.2em] px-2">
-                  {lt(lang, 769)}
+                  {lang === 'ar' ? 'الأدوات' : 'Tools'}
                 </span>
               </div>
 
@@ -475,7 +487,7 @@ export default function Header({
               >
                 <MessageCircle size={18} className="text-[#0084FF]" />
                 <span className="text-xs font-black text-black uppercase">
-                  {lt(lang, 708)}
+                  {lang === 'ar' ? 'تواصل معنا' : 'Contact Us'}
                 </span>
               </a>
 
@@ -488,7 +500,7 @@ export default function Header({
                   {isDark ? <Sun size={16} className="text-black" /> : <Moon size={16} className="text-black" />}
                 </div>
                 <span className="text-xs font-black text-black uppercase">
-                  {lt(lang, 766)}
+                  {lang === 'ar' ? 'المظهر' : 'Theme'}
                 </span>
                 <span className="mr-auto text-[10px] font-bold text-black/50">
                   {isDark ? '☀️' : '🌙'}
@@ -503,7 +515,7 @@ export default function Header({
                 >
                   <Globe size={18} className="text-black" />
                   <span className="text-xs font-black text-black uppercase">
-                    {lt(lang, 723)}
+                    {lang === 'ar' ? 'اللغة' : 'Language'}
                   </span>
                   <span className="mr-auto text-[10px] font-bold text-[#F59E0B] uppercase bg-[#F59E0B]/20 px-2 py-0.5 rounded-full">
                     {lang.toUpperCase()}
@@ -531,7 +543,7 @@ export default function Header({
               {isDeveloper && onPreview && (
                 <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10">
                   <span className="text-xs font-black text-black uppercase">
-                    {lt(lang, 741)}
+                    {lang === 'ar' ? 'معاينة' : 'Preview'}
                   </span>
                   <div className="flex gap-1 ml-auto">
                     <button
@@ -553,7 +565,7 @@ export default function Header({
               {/* Divider: Account */}
               <div className="border-t border-black/10 pt-2">
                 <span className="text-[9px] font-black uppercase text-black/40 tracking-[0.2em] px-2">
-                  {lt(lang, 695)}
+                  {lang === 'ar' ? 'الحساب' : 'Account'}
                 </span>
               </div>
 
@@ -600,7 +612,7 @@ export default function Header({
       {isMarketClosedToday() && (
         <div className="bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.3em] py-1.5 flex items-center justify-center gap-2 px-4 text-center">
           <AlertTriangle size={12} className="animate-pulse" />
-          {lt(lang, 781)}
+          {lang === 'ar' ? '⚠️ تنبيه: الأسواق العالمية (فوركس/أسهم) مغلقة اليوم - الرادار يعمل على العملات الرقمية فقط' : '⚠️ ALERT: GLOBAL MARKETS (FOREX/STOCKS) ARE CLOSED TODAY - RADAR ACTIVE ON CRYPTO ONLY'}
           <AlertTriangle size={12} className="animate-pulse" />
         </div>
       )}
@@ -655,7 +667,7 @@ export default function Header({
               <button
                 onClick={() => setShowMobileMenu(true)}
                 className="flex md:hidden p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0"
-                title={lt(lang, 730)}
+                title={lang === 'ar' ? 'القائمة' : 'Menu'}
               >
                 <Menu size={22} />
               </button>
@@ -669,32 +681,34 @@ export default function Header({
                 <button
                   onClick={() => onNavigatePage?.('prices')}
                   className={cn(
-                    "hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#4E342E] hover:bg-[#3E2723] text-white shadow-lg shadow-black/30 active:scale-95 transition-all border border-black/10 flex-shrink-0",
+                    "tog-btn hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#3E2723] hover:bg-[#4E342E] shadow-lg shadow-black/30 active:scale-95 transition-all border border-black/10 flex-shrink-0",
                     newsFlash && "animate-flash-fast"
                   )}
-                  title={lt(lang, 724)}
+                  title={lang === 'ar' ? 'الأسعار الحية' : 'Live Prices'}
                 >
                   <BarChart3 size={24} className="flex-shrink-0" />
                   <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                    {lt(lang, 724)}
+                    {lang === 'ar' ? 'الأسعار الحية' : 'Live Prices'}
                   </span>
                 </button>
               )}
-              {/* Store | Client desktop only (developer uses sidebar item) — flashing "مجاني" inside the icon, widens horizontally */}
+              {/* Store + My Plan | client — Store back in its previous spot (directly left of the Trade icon). When a paid plan is active, the My Plan icon sits DIRECTLY BENEATH the Store icon (vertical stack). */}
               {!isDeveloper && (
-              <button
-                onClick={() => onNavigatePage?.('store')}
-                className="hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/30 active:scale-95 transition-all border border-black/10 flex-shrink-0"
-                title={lt(lang, 705)}
-              >
-                <Store size={24} className="flex-shrink-0" />
-                <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                  {lt(lang, 759)}
-                </span>
-                <span className={cn("px-2 py-0.5 rounded-lg bg-white text-sky-600 text-xs font-black uppercase tracking-wider whitespace-nowrap leading-none", !storeVisited && 'animate-flash-fast')}>
-                  {lt(lang, 263)}
-                </span>
-              </button>
+                <div className="hidden md:flex flex-col gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => onNavigatePage?.('store')}
+                    className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/30 active:scale-95 transition-all border border-black/10 flex-shrink-0"
+                    title={lang === 'ar' ? 'متجر البوتات' : 'Bots Store'}
+                  >
+                    <Store size={24} className="flex-shrink-0" />
+                    <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
+                      {lang === 'ar' ? 'المتجر' : 'Store'}
+                    </span>
+                    <span className={cn("px-2 py-0.5 rounded-lg bg-white text-sky-600 text-xs font-black uppercase tracking-wider whitespace-nowrap leading-none", !storeVisited && 'animate-flash-fast')}>
+                      {lang === 'ar' ? 'مجاني' : 'Free'}
+                    </span>
+                  </button>
+                </div>
               )}
 
               {/* Trade Now | MOBILE: moved to sidebar (hidden md:flex) */}
@@ -704,7 +718,7 @@ export default function Header({
               >
                 <TrendingUp size={24} className="flex-shrink-0" />
                 <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                  {lt(lang, 573)}
+                  {lang === 'ar' ? 'تداول' : 'Trade'}
                 </span>
               </button>
 
@@ -727,7 +741,7 @@ export default function Header({
               {isDeveloper && (
                 <button
                   onClick={() => onNavigatePage?.('transactions')}
-                  title={lt(lang, 747)}
+                  title={lang === 'ar' ? 'الطلبات والمعاملات' : 'Requests & transactions'}
                   className="hidden md:flex relative p-3 rounded-xl bg-emerald-500 text-white hover:bg-emerald-400 transition-all shadow-md flex-shrink-0"
                 >
                   <Bell size={22} />
@@ -749,8 +763,9 @@ export default function Header({
                 <MessageCircle size={22} />
               </a>
 
-              {/* Auto Analysis + Sync Status + Timeframe Indicator */}
-              {isDeveloper ? (
+              {/* Auto Analysis + Sync Status + Timeframe Indicator — same rich radar toggle for the developer AND any client with an active paid plan. Plan clients also get the plan action row under the market pills in ClientDashboard. */}
+              {isDeveloper || planClient ? (
+            <div className="flex-shrink-0">
             <div className="relative flex-shrink-0">
             <button
               onClick={() => {
@@ -797,22 +812,23 @@ export default function Header({
                     const { cfg } = detectProgressCategory(analysisProgress.current);
                     return (
                       <span className="text-[16px] font-black text-yellow-300 whitespace-nowrap leading-none">
-                        {cfg ? `${cfg.emoji} ${pkick(lang, cfg, 'label')}` : analysisProgress.current}
+                        {cfg ? (lang === 'ar' ? `${cfg.emoji} ${cfg.labelAr}` : `${cfg.emoji} ${cfg.labelEn}`) : analysisProgress.current}
                       </span>
                     );
                   })()}
                 </button>
-                {!isPWA && (
+                {!isPWA && isDeveloper && (
                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-50">
                     <div className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#002395] border border-[#001A6B] text-white shadow-md flex-shrink-0 whitespace-nowrap">
                       <CalendarDays size={24} className="flex-shrink-0" />
                       <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                        {pick(lang, analysisLabel)}
+                        {lang === 'ar' ? analysisLabel.ar : analysisLabel.en}
                       </span>
                     </div>
                   </div>
                 )}
-            </div>
+                </div>
+              </div>
               ) : (
             <div className="relative flex-shrink-0">
                 <div className={cn(
@@ -833,7 +849,7 @@ export default function Header({
                     <div className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#002395] border border-[#001A6B] text-white shadow-md flex-shrink-0 whitespace-nowrap">
                       <CalendarDays size={24} className="flex-shrink-0" />
                       <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                        {pick(lang, analysisLabel)}
+                        {lang === 'ar' ? analysisLabel.ar : analysisLabel.en}
                       </span>
                     </div>
                   </div>
@@ -852,7 +868,7 @@ export default function Header({
                     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                   </svg>
                   <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                    {lt(lang, 727)}
+                    {lang === 'ar' ? 'يدوي' : 'MANUAL'}
                   </span>
                 </button>
               )}
@@ -931,7 +947,7 @@ export default function Header({
                 <button
                   onMouseDown={(e) => { e.stopPropagation(); onToggleSidebar(); }}
                   className="hidden md:flex p-3 rounded-xl bg-[#F59E0B] text-black hover:bg-[#d97706] transition-all shadow-md flex-shrink-0 items-center justify-center"
-                  title={lt(lang, 730)}
+                  title={lang === 'ar' ? 'القائمة' : 'Menu'}
                 >
                   <Menu size={24} />
                 </button>

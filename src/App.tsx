@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, OAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where, setDoc, query, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -23,13 +23,13 @@ import { AnalysisResult, StrategySettings, AutoAnalysisSettings, MarketType, Tra
 import { DEFAULT_STRATEGY_SETTINGS, DEFAULT_AUTO_SETTINGS, SYMBOL_CATEGORIES, ALL_SYMBOLS_DB, SYMBOL_GROUPS, FREE_SYMBOLS, STOCKS_BY_EXCHANGE } from './constants';
 import { getOpenStockExchanges, exchangeLabel, StockExchangeKey, OpenExchange } from './lib/marketHours';
 import { Language, translations } from './lib/i18n';
-import { analyzeMarket, getApiKey } from './services/geminiService';
+import { analyzeMarket } from './services/geminiService';
 import { waitIfRateLimited } from './services/rateLimitTracker';
 import { resolveConflicts } from './services/portfolioRiskService';
 import ApiKeyModal from './components/ApiKeyModal';
 import SubscriptionModal from './components/SubscriptionModal';
 import PaymentModal from './components/PaymentModal';
-import { getUnreadDevNotificationCount, getUnreadSiteRequestCount, fetchUserGrants } from './services/paymentRequests';
+import { getUnreadDevNotificationCount, getUnreadSiteRequestCount, fetchUserGrants, fetchUserGrantsForEmails, activateClientPlan, revokeClientPlanGrants } from './services/paymentRequests';
 import ProfilePage from './components/ProfilePage';
 import TransactionsPage from './components/TransactionsPage';
 import AboutPage from './components/AboutPage';
@@ -38,15 +38,19 @@ import TradeNowPage from './components/TradeNowPage';
 import StorePage from './components/StorePage';
 import SeoPricesPage from './pages/SeoPricesPage';
 import StoreSettingsPage from './components/StoreSettingsPage';
+import KeyPoolPanel from './components/KeyPoolPanel';
 import { StoreBot, fetchStoreBots } from './services/storeService';
-import { PaymentSession } from './services/paymentSession';
+import { PaymentSession, getLastEmail } from './services/paymentSession';
+import { ensureClientIdentity, silentClientLogin } from './services/clientIdentity';
 
+/**
+ * True when THIS client has a key of their own saved under their email(s).
+ * Deliberately ignores the shared developer slots (finalyze_key1_value,
+ * finalyze_user_groq_api_key) — a client must never inherit someone else's key.
+ */
 function hasAnyStoredKey(): boolean {
   try {
-    const k1 = localStorage.getItem('finalyze_key1_value');
-    const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
-    const oldKey = localStorage.getItem('finalyze_user_groq_api_key');
-    return (!!k1 && k1en) || !!oldKey;
+    return !!readClientOwnKeyForEmails(clientEmailsFor(currentUserEmail()));
   } catch { return false; }
 }
 import ClientMonitor from './components/ClientMonitor';
@@ -54,22 +58,27 @@ import SiteStatsPage from './components/SiteStatsPage';
 import AdsManager from './components/AdsManager';
 import { AdSlot } from './components/AdsManager';
 import RadarSettingsPage from './components/RadarSettingsPage';
-import { lt, ltp } from './lib/i18nUI';
+import MyPlanModal from './components/MyPlanModal';
+import { StorePlan, fetchPlans, planLabel, planFeatures } from './services/storePlans';
+import { clientDocId, isDeveloperEmail, DEVELOPER_EMAILS } from './lib/clientIds';
+import { clientScopeKey, writeClientOwnKey, readClientOwnKey, clearClientOwnKey, rememberBuyerEmail, clientEmailsFor, readClientOwnKeyForEmails, applyRuntimeAnalysisKey, replaceClientOwnKey, forgetClientOwnKey, purgeOwnKeyForEmail, detectKeyProvider, setCurrentUserEmail, currentUserEmail } from './lib/clientScope';
+import { isGoogleOrMicrosoftEmail, AuthProviderId } from './lib/authPolicy';
 
+
+export type PageType = 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'manualResults' | 'store' | 'storeSettings' | 'transactions' | 'prices' | 'myPlan';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
+  const [redirectingProvider, setRedirectingProvider] = useState<AuthProviderId | null>(null);
   const [manualAuthUrl, setManualAuthUrl] = useState<string | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string; durationDays: number } | null>(null);
   const [botPurchase, setBotPurchase] = useState<StoreBot | null>(null);
   const [resumeSessionId, setResumeSessionId] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => {
-    const k1 = localStorage.getItem('finalyze_key1_value');
-    const k1en = localStorage.getItem('finalyze_key1_enabled') !== 'false';
-    return (!!k1 && k1en) || hasAnyStoredKey();
+    return hasAnyStoredKey();
   });
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
   const [detailResult, setDetailResult] = useState<AnalysisResult | null>(null);
@@ -82,7 +91,10 @@ export default function App() {
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [lang, setLang] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'en');
+  const [lang, setLang] = useState<Language>(() => {
+    const stored = localStorage.getItem('language');
+    return (stored === 'ar' || stored === 'en') ? (stored as Language) : 'en';
+  });
   useEffect(() => {
     localStorage.setItem('language', lang);
   }, [lang]);
@@ -132,16 +144,16 @@ export default function App() {
     }
     setNeedsApiKeyState(email);
   };
-  const getPageFromHash = (): 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'transactions' | 'prices' => {
+
+  const getPageFromHash = (): PageType => {
     const hash = window.location.hash.slice(1);
-    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings', 'transactions', 'prices'].includes(hash)) return hash as any;
+    if (['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'manualResults', 'store', 'storeSettings', 'transactions', 'prices', 'myPlan'].includes(hash)) return hash as any;
     return 'main';
   };
-  type ActivePage = 'main' | 'settings' | 'apiKey' | 'plans' | 'radar' | 'paymentSettings' | 'clientMonitor' | 'profile' | 'about' | 'suggestions' | 'ads' | 'siteStats' | 'trade' | 'manualAnalysis' | 'store' | 'storeSettings' | 'transactions' | 'prices';
-  const [activePage, setActivePage] = useState<ActivePage>(getPageFromHash);
-  const navStackRef = useRef<ActivePage[]>([]);
+  const [activePage, setActivePage] = useState<PageType>(getPageFromHash);
+  const navStackRef = useRef<string[]>([]);
 
-  const navigateTo = (page: any) => {
+  const navigateTo = (page: PageType) => {
     if (page !== activePage) {
       navStackRef.current.push(activePage);
       setActivePage(page);
@@ -152,7 +164,7 @@ export default function App() {
   const goBack = () => {
     if (navStackRef.current.length > 0) {
       const prev = navStackRef.current.pop()!;
-      setActivePage(prev);
+      setActivePage(prev as PageType);
     } else {
       setActivePage('main');
     }
@@ -186,7 +198,7 @@ export default function App() {
   const [showRadarComplete, setShowRadarComplete] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'phone' | 'tablet' | null>(null);
   const prevRadarRunningRef = useRef(false);
-  const [activeSubscription, setActiveSubscription] = useState<{ label: string; amount: number; expiryDate: string } | null>(() => {
+  const [activeSubscription, setActiveSubscription] = useState<{ label: string; amount: number; expiryDate: string; requestNo?: number; durationDays?: number } | null>(() => {
     try {
       const saved = localStorage.getItem('active_subscription');
       if (!saved) return null;
@@ -199,16 +211,139 @@ export default function App() {
     } catch { return null; }
   });
 
-  const DEV_EMAILS = ['taybekraa@gmail.com', 'kraakraa109@gmail.com', 'bachasalman69@gmail.com'];
+  // When an active subscribed plan reaches its expiry, close the paid features
+  // automatically and return to the free plan (the client's key is kept, so no
+  // re-entry is required for later renewals).
+  useEffect(() => {
+    if (!activeSubscription?.expiryDate) return;
+    const t = setInterval(() => {
+      try {
+        const saved = localStorage.getItem('active_subscription');
+        if (!saved) return;
+        const sub = JSON.parse(saved);
+        if (sub?.expiryDate && new Date(sub.expiryDate) < new Date()) {
+          localStorage.removeItem('active_subscription');
+          setActiveSubscription(null);
+        }
+      } catch {}
+    }, 60 * 1000);
+    return () => clearInterval(t);
+  }, [activeSubscription?.expiryDate]);
 
-  const isDeveloperSession = () => {
+  const DEV_EMAILS = DEVELOPER_EMAILS;
+
+const isDeveloperSession = () => {
     if (!user) return false;
     const email = (user.email || '').toLowerCase().trim();
     return DEV_EMAILS.includes(email);
   };
-
-  const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis'];
-  const effectivePage = (DEV_ONLY_PAGES.includes(activePage) && !isDeveloperSession()) ? 'main' : activePage;
+  const DEV_ONLY_PAGES: PageType[] = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis'];
+  const isAr = lang === 'ar';
+  const cxn = clientScopeKey(user?.email || '', '');
+  const cxnSigKey = `${cxn}__signals`;
+  const cxnCustomKey = `${cxn}__custom_symbols`;
+  const cxnHiddenKey = `${cxn}__hidden_symbols`;
+  const cxnAutoKey = `${cxn}__auto_settings`;
+  const cxnPaidKey = `${cxn}__paid_mode`;
+  // freeModeChosen: the client explicitly chose "Return to Free Plan". It is a
+  // PERSISTED opt-out, so the grants poll below stops re-activating paid mode
+  // (that is exactly why the button used to do nothing). Cleared when the plan
+  // is activated again or a new payment arrives.
+  const cxnFreeKey = `${cxn}__free_mode`;
+  const [freeModeChosen, setFreeModeChosen] = useState<boolean>(() => {
+    try { return localStorage.getItem(cxnFreeKey) === 'true'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(cxnFreeKey, freeModeChosen ? 'true' : 'false'); } catch {}
+  }, [cxnFreeKey, freeModeChosen]);
+  const freeModeOverride = () => {
+    try { return localStorage.getItem(cxnFreeKey) === 'true'; } catch { return false; }
+  };
+  // Keep the signed-in identity in sync. When the account actually changes, the
+  // previous email's leftover key is deleted so a stale browser key can never be
+  // reused on the new account.
+  const lastSignedInEmail = useRef<string | null>(null);
+  useEffect(() => {
+    const cur = (user?.email || '').toLowerCase().trim();
+    const prev = lastSignedInEmail.current;
+    if (prev && prev !== cur) forgetClientOwnKey(prev);
+    lastSignedInEmail.current = cur || null;
+    setCurrentUserEmail(cur);
+  }, [user?.email]);
+  // paidMode: whether the client currently USES the paid plan features. Owned plan
+  // stays stored (activeSubscription) even in free mode until its period ends.
+  const [paidMode, setPaidMode] = useState<boolean>(() => {
+    try { return localStorage.getItem(cxnPaidKey) !== 'false'; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(cxnPaidKey, paidMode ? 'true' : 'false'); } catch {}
+  }, [cxnPaidKey, paidMode]);
+  // ownsPaidPlan: the account OWNS a paid plan, whether or not it is currently in
+  // use. Storage scoping keys off this so returning to free never orphans data.
+  const ownsPaidPlan = !isDeveloperSession() && !!activeSubscription;
+  // isPlanClient: paid features are CURRENTLY in use. It must include paidMode —
+  // otherwise "Return to Free Plan" flips a flag nothing reads and the button
+  // looks completely dead.
+  const isPlanClient = ownsPaidPlan && paidMode;
+  // A plan with an expiryDate that has already passed is EXPIRED: no paid
+  // features at all, even if the client still has a saved key. A fresh payment
+  // (with a new grant confirmed by the developer) is required to reopen them.
+  const subscriptionActive = !!activeSubscription && (!activeSubscription.expiryDate || new Date(activeSubscription.expiryDate) > new Date());
+  // Analysis runs on the developer's key pool, so a client needs NO key of their
+  // own: an approved plan is released the moment you confirm it, and this flag
+  // simply means "this account may run analysis right now".
+  const planKeyed = isDeveloperSession() || subscriptionActive;
+  const planClientActive = subscriptionActive && paidMode;
+  // The dashboard plan row (and the My Plan page) exist ONLY while the plan is
+  // actually running: not expired, and not in free mode. When free, the plan is
+  // still owned and can be re-activated from the store's Plans section.
+  const showPlanControls = subscriptionActive && paidMode;
+  const openMyPlan = () => { if (showPlanControls) navigateTo('myPlan'); };
+  const [showMyPlan, setShowMyPlan] = useState(false);
+  const [autoAnalyzeToken, setAutoAnalyzeToken] = useState(0);
+  const [myPlans, setMyPlans] = useState<StorePlan[]>([]);
+  useEffect(() => { fetchPlans().then(setMyPlans).catch(() => {}); }, []);
+  const myPlanFeatures = useMemo(() => {
+    if (!activeSubscription) return [] as string[];
+    const byLabel = myPlans.find((p) => planLabel(p, isAr) === activeSubscription.label);
+    const byPrice = myPlans.find((p) => Number(p.priceUsd) === activeSubscription.amount);
+    const p = byLabel || byPrice;
+    return p ? planFeatures(p, isAr) : [];
+  }, [myPlans, activeSubscription, isAr]);
+  const returnToFreePlan = () => {
+    // Persist the opt-out first: the grants poll must not switch paid mode back on.
+    setFreeModeChosen(true);
+    setPaidMode(false);
+    setShowMyPlan(false);
+    navigateTo('main');
+  };
+  const activatePaidPlan = () => {
+    // Guard on OWNERSHIP, not on current mode: while in free mode isPlanClient is
+    // false by design, and guarding on it made re-activation a silent no-op.
+    if (!ownsPaidPlan) return;
+    setFreeModeChosen(false);
+    setPaidMode(true);
+    setShowMyPlan(false);
+    if (user?.email) {
+      activateClientPlan(user.email, activeSubscription?.requestNo ?? null).catch(() => {});
+    }
+    navigateTo('main');
+  };
+  // Client deletes/cancels their plan (active OR pending-key). Revokes the plan
+  // grants server-side (so the grants poll can't reactivate it), clears the
+  // local subscription, and returns to free mode.
+  const deleteClientPlan = async () => {
+    if (user?.email) {
+      await revokeClientPlanGrants(user.email).catch(() => {});
+    }
+    try { localStorage.removeItem('active_subscription'); } catch {}
+    setActiveSubscription(null);
+    setFreeModeChosen(false);
+    setPaidMode(false);
+    setShowMyPlan(false);
+    navigateTo('main');
+  };
+  const effectivePage: PageType = (DEV_ONLY_PAGES.includes(activePage) && !isDeveloperSession() && !((activePage === 'manualAnalysis' || activePage === 'manualResults') && isPlanClient)) ? 'main' : activePage;
 
   const [storeVisited, setStoreVisited] = useState(false);
   useEffect(() => {
@@ -217,7 +352,7 @@ export default function App() {
 
   // CLIENT: Mirror results from developer via Firestore ΓÇö poll collection every 10s, NO orderBy
   useEffect(() => {
-    if (isDeveloperSession()) return;
+    if (isDeveloperSession() || isPlanClient) return;
     // Allow if user is logged in OR if login is not required (guest mode)
     if (!user && clientLoginRequired) return;
     console.log('[CLIENT] Setting up Firestore polling for shared_results');
@@ -282,14 +417,14 @@ export default function App() {
         if (isFirstLoad && !hasPlayedFirstSound && results.length > 0) {
           hasPlayedFirstSound = true;
           const symbols = results.map((r: any) => r.symbol).join(' ΓÇó ');
-          setNewSignalAlert(ltp(lang, 787, symbols));
+          setNewSignalAlert(lang === 'ar' ? `\u062a\u0646\u0628\u064a\u0647 \u0641\u0631\u0635\u0629 \u062c\u062f\u064a\u062f\u0629 \u2014 ${symbols}` : `New Opportunity Alert \u2014 ${symbols}`);
           setTimeout(() => setNewSignalAlert(null), 10000);
           try { playAudio('success'); } catch {}
         }
         // Play sound when any new opportunity arrives
         else if (hasNewSignal) {
           const newSymbols = newSignals.map((r: any) => r.symbol).join(' ΓÇó ');
-          setNewSignalAlert(ltp(lang, 787, newSymbols));
+          setNewSignalAlert(lang === 'ar' ? `\u062a\u0646\u0628\u064a\u0647 \u0641\u0631\u0635\u0629 \u062c\u062f\u064a\u062f\u0629 \u2014 ${newSymbols}` : `New Opportunity Alert \u2014 ${newSymbols}`);
           setTimeout(() => setNewSignalAlert(null), 10000);
           try { playAudio('success'); } catch {}
         }
@@ -311,7 +446,23 @@ export default function App() {
       console.log('[CLIENT] Cleaning up Firestore polling');
       clearInterval(interval);
     };
-  }, [user, lang]);
+  }, [user, lang, isPlanClient]);
+
+  // CLIENT PLAN: load per-client scoped signals & auto settings when the plan view is active
+  useEffect(() => {
+    if (!isPlanClient) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(cxnSigKey) || '[]');
+      if (Array.isArray(saved)) setClientSignals(saved.filter((s: any) => !s.isSideways));
+    } catch {}
+    try {
+      const savedAuto = localStorage.getItem(cxnAutoKey);
+      if (savedAuto) {
+        const parsed = JSON.parse(savedAuto);
+        if (parsed && typeof parsed === 'object') setAutoSettings((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {}
+  }, [isPlanClient, cxnSigKey, cxnAutoKey]);
 
   // CLIENT: Sync freemium state from Firestore
   useEffect(() => {
@@ -402,12 +553,21 @@ export default function App() {
 
   const hasActivePlan = useMemo((): boolean => {
     if (isDeveloperSession()) return true;
-    if (activeSubscription && new Date(activeSubscription.expiryDate) > new Date()) return true;
+    // A paid-plan client has an active plan when they're in paid mode AND own an
+    // active (started) subscription. Whether their key is entered OR pending, the
+    // analysis UI must not stay locked once a real paid plan is live — so if the
+    // plan is started (real future expiryDate) treat it as active whether or not
+    // the key was entered yet. If the plan is pending-key (no expiry), only the
+    // gate / key flows unlock it.
+    if (planClientActive) return true;
+    // The client entered THEIR OWN key: the analysis UI is unlocked (they own an
+    // active or granted plan attached to an email that holds a key).
+    if (planKeyed) return true;
+    if (activeSubscription && paidMode && activeSubscription.expiryDate && new Date(activeSubscription.expiryDate) > new Date()) return true;
     if (freemiumDisabled) return true;
-    // Double-check localStorage directly as failsafe
     if (localStorage.getItem('finalyze_freemium_disabled') === 'true') return true;
     return false;
-  }, [user, activeSubscription, freemiumDisabled]);
+  }, [user, activeSubscription, freemiumDisabled, planClientActive, paidMode, planKeyed]);
   
   
   interface ClientRecord {
@@ -453,15 +613,97 @@ export default function App() {
     }
   };
 
+  // One-time repair for duplicate rows of the same customer. It covers BOTH
+  // stores the Monitor shows: Firestore (stray random ids from before the
+  // email-keyed ids) and the localStorage cache the table is fed from. It runs
+  // ONLY from your signed-in session, is idempotent, and deletes a row only
+  // after its data is on the surviving copy.
+  const mergeDuplicateClients = async (): Promise<{ merged: number; removed: number }> => {
+    let merged = 0;
+    let removed = 0;
+    const score = (r: any) =>
+      (r.status === 'verified' ? 4 : 0) + (r.plan === 'paid' ? 2 : 0) + (r.uid ? 1 : 0);
+    const key = (e: any) => String(e || '').toLowerCase().trim();
+    const group = (rows: any[]) => {
+      const byEmail = new Map<string, any[]>();
+      for (const r of rows) {
+        const e = key(r.email);
+        if (!e || !e.includes('@')) continue;
+        if (!byEmail.has(e)) byEmail.set(e, []);
+        byEmail.get(e)!.push(r);
+      }
+      return byEmail;
+    };
+
+    // 1) Firestore: collapse every stray id onto the email-keyed document.
+    try {
+      const snap = await getDocs(query(collection(db, 'clients'), orderBy('rank', 'asc')));
+      const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+      for (const [, list] of group(rows)) {
+        const canonicalId = clientDocId(list[0].email);
+        const canonical = list.find((r) => r.id === canonicalId);
+        const others = list.filter((r) => r.id !== canonicalId);
+        if (!others.length) continue;
+        const best = [...list].sort((a, b) => score(b) - score(a))[0];
+        if (canonical) {
+          const patch: any = {};
+          for (const k of Object.keys(best)) {
+            if (k !== 'id' && canonical[k] === undefined) patch[k] = best[k];
+          }
+          if (Object.keys(patch).length) {
+            await setDoc(doc(db, 'clients', canonicalId), patch, { merge: true });
+          }
+        } else {
+          const { id: _drop, ...rest } = best;
+          await setDoc(doc(db, 'clients', canonicalId), rest);
+        }
+        merged++;
+        for (const r of others) {
+          await deleteDoc(doc(db, 'clients', r.id));
+          removed++;
+        }
+      }
+    } catch (e) {
+      console.warn('merge firestore clients failed:', e);
+    }
+
+    // 2) localStorage cache — where the table's rows live today.
+    try {
+      const local: ClientRecord[] = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
+      const deduped: ClientRecord[] = [];
+      for (const [, list] of group(local)) {
+        if (list.length > 1) {
+          merged++;
+          removed += list.length - 1;
+        }
+        deduped.push([...list].sort((a, b) => score(b) - score(a))[0]);
+      }
+      if (deduped.length !== local.length) {
+        localStorage.setItem('finalyze_clients', JSON.stringify(deduped));
+      }
+    } catch (e) {
+      console.warn('merge local clients failed:', e);
+    }
+
+    await fetchClients();
+    return { merged, removed };
+  };
+
   const saveClientRecord = async (uid: string, email: string) => {
     try {
-      const existing = await getDocs(query(collection(db, 'clients'), where('uid', '==', uid)));
-      if (!existing.empty) return;
-      const count = (await getDocs(collection(db, 'clients'))).size;
-      await addDoc(collection(db, 'clients'), {
-        email, uid, status: 'inactive', plan: 'free', planExpiry: null,
-        registeredAt: serverTimestamp(), rank: count + 1,
-      });
+      const id = clientDocId(email);
+      // Read ONLY this client's own document. A client is not allowed to list
+      // the collection, so the row's rank/status/plan are never recomputed here —
+      // an existing record is left exactly as the developer set it.
+      const snap = await getDoc(doc(db, 'clients', id));
+      if (!snap.exists()) {
+        await setDoc(doc(db, 'clients', id), {
+          email, uid, status: 'inactive', plan: 'free', planExpiry: null,
+          registeredAt: serverTimestamp(), rank: 0,
+        });
+      } else if (!snap.data()?.uid) {
+        await setDoc(doc(db, 'clients', id), { uid }, { merge: true });
+      }
     } catch (e) {
       console.warn('Failed to save client record:', e);
     }
@@ -531,13 +773,9 @@ export default function App() {
     // Remove from banned list
     const banned: string[] = JSON.parse(localStorage.getItem('finalyze_banned_emails') || '[]');
     localStorage.setItem('finalyze_banned_emails', JSON.stringify(banned.filter(e => e !== lowerEmail)));
-    fetchClients();
-  };
-
-  const renewClientPlan = async (clientId: string, days: number) => {
-    const exp = new Date();
-    exp.setDate(exp.getDate() + days);
-    await updateDoc(doc(db, 'clients', clientId), { plan: 'paid', planExpiry: exp.toISOString() });
+    // Delete the client's OWN api key, so a deleted client comes back as a brand
+    // new customer: no analysis until they buy a plan and save a fresh key.
+    purgeOwnKeyForEmail(lowerEmail);
     fetchClients();
   };
 
@@ -643,12 +881,12 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'store', 'storeSettings', 'transactions', 'prices'];
-    const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis', 'storeSettings'];
+    const VALID_PAGES = ['settings', 'apiKey', 'plans', 'radar', 'paymentSettings', 'clientMonitor', 'profile', 'about', 'suggestions', 'ads', 'siteStats', 'trade', 'manualAnalysis', 'manualResults', 'store', 'storeSettings', 'transactions', 'prices', 'myPlan'];
+    const DEV_ONLY_PAGES = ['clientMonitor', 'ads', 'siteStats', 'manualAnalysis', 'manualResults', 'storeSettings'];
     const onHashChange = () => {
       const hash = window.location.hash.slice(1);
       if (!VALID_PAGES.includes(hash)) { setActivePage('main'); return; }
-      if (DEV_ONLY_PAGES.includes(hash) && !isDeveloperSession()) { setActivePage('main'); return; }
+      if (DEV_ONLY_PAGES.includes(hash) && !isDeveloperSession() && !((hash === 'manualAnalysis' || hash === 'manualResults') && isPlanClient)) { setActivePage('main'); return; }
       setActivePage(hash as any);
     };
     window.addEventListener('hashchange', onHashChange);
@@ -766,6 +1004,7 @@ export default function App() {
   };
   const saveAutoSettings = async () => {
     localStorage.setItem('auto_settings', JSON.stringify(autoSettings));
+    if (ownsPaidPlan) localStorage.setItem(cxnAutoKey, JSON.stringify(autoSettings));
     // Developer: save to Firestore so clients get the alert settings
     if (isDeveloperSession()) {
       try {
@@ -908,7 +1147,7 @@ export default function App() {
       setTopSignals([...strong, ...regular]);
 
       if (hasBrandNewSymbol) {
-        setNewSignalAlert(lt(lang, 784));
+        setNewSignalAlert(lang === 'ar' ? '\u2705 \u0644\u0642\u062f \u0631\u0635\u0629 \u062a\u062f\u0627\u0648\u0644 \u0642\u0648\u064a\u0629 \u062c\u062f\u064a\u062f\u0629!' : '\u2705 New strong trading opportunity detected!');
         setTimeout(() => setNewSignalAlert(null), 8000);
         setTimeout(() => {
           try { initAudio(); } catch {}
@@ -1034,6 +1273,12 @@ export default function App() {
   const runRadarScan = useCallback(async () => {
     const s = autoSettingsRef.current;
     if (!s.isEnabled) return;
+    // A free account never runs analysis: the server refuses its requests, so we
+    // stop it here instead of burning the shared keys on guaranteed failures.
+    if (!isDeveloperSession() && !isPlanClient) {
+      setAutoSettings((prev) => ({ ...prev, isEnabled: false }));
+      return;
+    }
 
     // Ensure audio is unlocked (may be called before first user click if radar auto-starts)
     try { initAudio(); } catch {}
@@ -1064,8 +1309,8 @@ export default function App() {
     let hidden: string[] = [];
     let custom: string[] = [];
     try {
-      hidden = JSON.parse(localStorage.getItem('finalyze_hidden_symbols') || '[]');
-      custom = JSON.parse(localStorage.getItem('finalyze_custom_symbols') || '[]');
+      hidden = JSON.parse(localStorage.getItem(ownsPaidPlan ? cxnHiddenKey : 'finalyze_hidden_symbols') || '[]');
+      custom = JSON.parse(localStorage.getItem(ownsPaidPlan ? cxnCustomKey : 'finalyze_custom_symbols') || '[]');
     } catch {}
 
     // Track ALL results from this scan directly (not via batched React state)
@@ -1122,7 +1367,7 @@ export default function App() {
                 scanResults.push(r);
                 setClientSignals(prev => {
                   const u = [...prev.filter(x => x.symbol !== r.symbol), r];
-                  localStorage.setItem('finalyze_client_signals', JSON.stringify(u.slice(-100)));
+                  localStorage.setItem(ownsPaidPlan ? cxnSigKey : 'finalyze_client_signals', JSON.stringify(u.slice(-100)));
                   return u.slice(-100);
                 });
               }
@@ -1150,14 +1395,14 @@ export default function App() {
         setProgress({ current: sym, total: syms.length, index: scanResults.length, failed: scanFailed, exchange: exchange ? exchangeLabel(exchange.key, lang) : undefined });
           await new Promise(r => setTimeout(r, 3000));
         } else {
-          const key = getApiKey();
-          const d = (key.startsWith('AIzaSy') || key.startsWith('AQ.')) ? 3500 : 2500;
-          await new Promise(r => setTimeout(r, d));
+          // Paced between symbols so a scan never hammers the shared key pool.
+          await new Promise(r => setTimeout(r, 2500));
         }
       }
     }
 
     // Save results to Firestore for clients ΓÇö only if there are results
+    if (!isPlanClient) {
     try {
       const merged = signalsRef.current || [];
       if (merged.length > 0) {
@@ -1176,8 +1421,10 @@ export default function App() {
       console.warn('Firestore sync failed:', e);
       setLastSyncStatus({ ok: false, error: String(e), time: Date.now() });
     }
+    }
 
     // Save alerts to Firestore for clients
+    if (!isPlanClient) {
     try {
       await Promise.race([
         setDoc(doc(db, 'shared_alerts', 'latest'), {
@@ -1190,17 +1437,18 @@ export default function App() {
     } catch (e) {
       console.warn('Firestore save failed:', e);
     }
+    }
 
     // Clear progress
     setProgress(null);
-  }, [settings, lang, hasActivePlan, user]);
+  }, [settings, lang, hasActivePlan, user, isPlanClient]);
 
   // Radar lifecycle: start on toggle-ON, stop on toggle-OFF
   const prevRadarEnabledRef = useRef(false);
   const radarFirstRenderRef = useRef(true);
 
   useEffect(() => {
-    if (!isDeveloperSession()) return;
+    if (!isDeveloperSession() && !planClientActive) return;
 
     const isOn = autoSettings.isEnabled;
     const wasOn = prevRadarEnabledRef.current;
@@ -1230,6 +1478,7 @@ export default function App() {
           setAutoSettings(prev => {
             const next = { ...prev, lastFinishedAt: nowTs };
             localStorage.setItem('auto_settings', JSON.stringify(next));
+            if (ownsPaidPlan) localStorage.setItem(cxnAutoKey, JSON.stringify(next));
             return next;
           });
         } catch {}
@@ -1348,10 +1597,9 @@ export default function App() {
         const email = savedUser.email || '';
 
         // Check if the user is a developer:
-        const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
+        const activeDevEmail = localStorage.getItem('finalyze_dev_email') || DEVELOPER_EMAILS[0];
         const isDeveloper = email === activeDevEmail ||
-                            email === 'bachasalman69@gmail.com' || 
-                            email === 'taybekraa@gmail.com' || 
+                            isDeveloperEmail(email) ||
                             email.includes('dev');
 
         if (isDeveloper) {
@@ -1393,17 +1641,31 @@ export default function App() {
 
     // 2. Standard Firebase Auth listener
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      // Don't let state changes override custom persistent session if it is set
-      if (localStorage.getItem('finalyze_auth_user')) {
-        setLoading(false);
-        return;
+      // A cached session must never mask the LIVE Firebase identity: after a
+      // purchase registers this browser under the payment address, the cached
+      // copy can go stale — the real signed-in account wins (localStorage is
+      // trivially forgeable, an idToken is not). The developer's own cached
+      // session is still respected so the tools keep working.
+      const cachedRaw = localStorage.getItem('finalyze_auth_user');
+      if (cachedRaw) {
+        let cachedEmail = '';
+        try { cachedEmail = String(JSON.parse(cachedRaw)?.email || '').toLowerCase().trim(); } catch {}
+        const liveEmail = (u?.email || '').toLowerCase().trim();
+        const cachedIsDev = DEVELOPER_EMAILS.includes(cachedEmail) || cachedEmail.includes('dev');
+        const stale = !!liveEmail && liveEmail !== cachedEmail && !cachedIsDev;
+        if (!stale) {
+          setLoading(false);
+          return;
+        }
+        localStorage.removeItem('finalyze_auth_user');
+        localStorage.removeItem('finalyze_auth_timestamp');
       }
       
       if (u) {
         setUser(u);
         const email = u.email || '';
-        const activeDevEmail = localStorage.getItem('finalyze_dev_email') || 'bachasalman69@gmail.com';
-        const isDeveloper = email === activeDevEmail || email === 'bachasalman69@gmail.com' || email === 'taybekraa@gmail.com' || email.includes('dev');
+        const activeDevEmail = localStorage.getItem('finalyze_dev_email') || DEVELOPER_EMAILS[0];
+        const isDeveloper = email === activeDevEmail || isDeveloperEmail(email) || email.includes('dev');
 
         // Fetch clients list for developer session
         if (isDeveloper) {
@@ -1420,8 +1682,9 @@ export default function App() {
         };
         localStorage.setItem('finalyze_auth_user', JSON.stringify(mockCompactUser));
         localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
-        const localKey = localStorage.getItem('finalyze_key1_value') || localStorage.getItem('finalyze_user_groq_api_key');
+        const localKey = readClientOwnKeyForEmails(clientEmailsFor(u.email));
         if (localKey) {
+          applyRuntimeAnalysisKey(localKey);
           setHasApiKey(true);
         } else {
           try {
@@ -1430,10 +1693,9 @@ export default function App() {
               const data = userDoc.data();
               if (data?.groqApiKey || data?.geminiApiKey) {
                 const ak = data.groqApiKey || data.geminiApiKey;
-                localStorage.setItem('finalyze_user_groq_api_key', ak);
-                localStorage.setItem('finalyze_key1_value', ak);
-                localStorage.setItem('finalyze_key1_provider', 'groq');
-                try { sessionStorage.setItem('finalyze_key_mirror', ak); document.cookie = `finalyze_api_key=${encodeURIComponent(ak)}; path=/; max-age=31536000; SameSite=Lax`; } catch {}
+                // Store under THIS account's email only — never in the shared
+                // slots, which belong to the developer.
+                writeClientOwnKey(ak, u.email || null);
                 setHasApiKey(true);
               } else {
                 setHasApiKey(false);
@@ -1455,6 +1717,49 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // ── Automatic customer sign-in ───────────────────────────────────────────
+  // The free plan itself needs NO login — a visitor walks straight in. What
+  // restores itself is the BUYER: their purchase saved a random password in
+  // this browser only, and it signs them back in silently on every visit, so
+  // the plan, the key and the notifications always resolve to their own email.
+  // A restored session with no real Firebase identity behind it would be given
+  // no private data by the rules, so it is repaired here — or dropped, which
+  // puts the visitor back to a normal free session instead of a broken one.
+  useEffect(() => {
+    if (loading) return;
+    let savedEmail = '';
+    try {
+      const saved = JSON.parse(localStorage.getItem('finalyze_auth_user') || 'null');
+      savedEmail = String(saved?.email || '').toLowerCase().trim();
+    } catch {}
+
+    const authEmail = (auth.currentUser?.email || '').toLowerCase().trim();
+
+    if (savedEmail) {
+      if (DEVELOPER_EMAILS.includes(savedEmail)) return;
+      if (authEmail === savedEmail) return;
+      (async () => {
+        const ok = await ensureClientIdentity(savedEmail);
+        const nowAuthed = (auth.currentUser?.email || '').toLowerCase().trim();
+        if (!ok && !nowAuthed) {
+          localStorage.removeItem('finalyze_auth_user');
+          localStorage.removeItem('finalyze_auth_timestamp');
+          setUser(null);
+          setLoading(false);
+        }
+      })().catch(() => {});
+      return;
+    }
+
+    if (user) return;
+    (async () => {
+      const ok = await silentClientLogin();
+      if (ok) return;
+      const paid = getLastEmail();
+      if (paid) await ensureClientIdentity(paid);
+    })().catch(() => {});
+  }, [loading, user]);
+
   // Load clients from localStorage on mount (always, regardless of auth state)
   useEffect(() => {
     const localClients = JSON.parse(localStorage.getItem('finalyze_clients') || '[]');
@@ -1467,11 +1772,12 @@ export default function App() {
 
   // Redirect non-dev users away from dev-only pages
   useEffect(() => {
-    if (!loading && !isDeveloperSession() && DEV_ONLY_PAGES.includes(activePage)) {
+    const canOpenManual = (activePage === 'manualAnalysis' || activePage === 'manualResults') && isPlanClient;
+    if (!loading && !isDeveloperSession() && DEV_ONLY_PAGES.includes(activePage) && !canOpenManual) {
       setActivePage('main');
       window.location.hash = '';
     }
-  }, [loading, user, activePage]);
+  }, [loading, user, activePage, isPlanClient]);
 
   // Load custom audios from IndexedDB on startup
   useEffect(() => {
@@ -1549,7 +1855,7 @@ export default function App() {
             setUser(mockUser);
             persistNeedsApiKey(null);
           } else {
-            alert(lt(lang, 782));
+            alert(lang === 'ar' ? '\u26a0\ufe0f \u0631\u0628\u0637 \u0627\u0644\u062a\u062d\u0642\u0642 \u063a\u064a\u0631 \u0635\u0627\u0644\u062d \u0623\u0648 \u0645\u0646\u062a\u0647\u064a.' : '\u26a0\ufe0f Invalid or expired verification link.');
             window.history.replaceState({}, '', window.location.pathname);
           }
         } catch (e) {
@@ -1562,7 +1868,7 @@ export default function App() {
 
   const processGoogleUser = async (email: string, displayName?: string, photoURL?: string) => {
     // Developer emails ΓåÆ sign in directly
-    if (email === 'taybekraa@gmail.com' || email === 'bachasalman69@gmail.com' || email.includes('dev')) {
+    if (isDeveloperEmail(email) || email.includes('dev')) {
       localStorage.setItem('finalyze_auth_user', JSON.stringify({ uid: 'dev_' + email.replace(/[^a-zA-Z0-9]/g, ''), email, displayName: 'Developer', emailVerified: true }));
       localStorage.setItem('finalyze_auth_timestamp', Date.now().toString());
       setUser({ uid: 'dev_' + email.replace(/[^a-zA-Z0-9]/g, ''), email, displayName: 'Developer', emailVerified: true } as User);
@@ -1573,19 +1879,24 @@ export default function App() {
     }
 
     try {
-      const existingSnap = await getDocs(query(collection(db, 'clients'), where('email', '==', email)));
-      const existing = existingSnap.docs[0]?.data();
+      // Site sign-in is unrestricted: direct Google login, exactly as before.
+      // The Google/Microsoft restriction applies ONLY to buying a paid plan.
+      // Read this client's OWN record by its deterministic id — a client is not
+      // allowed to run a collection query, and must never see another row.
+      const existingSnap = await getDoc(doc(db, 'clients', clientDocId(email)));
+      const existing = existingSnap.exists() ? existingSnap.data() : null;
+      // Bind this Google/Microsoft login to the payment email if it differs, so
+      // the plan, its key and My Plan resolve to the same identity from now on.
+      rememberBuyerEmail(email, email);
 
       if (existing?.groqApiKey && !hasAnyStoredKey()) {
-        const ak = existing.groqApiKey;
-        localStorage.setItem('finalyze_user_groq_api_key', ak);
-        localStorage.setItem('finalyze_key1_value', ak);
-        localStorage.setItem('finalyze_key1_provider', 'groq');
-        try { sessionStorage.setItem('finalyze_key_mirror', ak); } catch {}
+        // Restore THIS client's own key, scoped to their email. Writing it into
+        // the shared slots would hand one customer's key to the next.
+        writeClientOwnKey(existing.groqApiKey, email);
       }
 
       if (isBannedEmail(email) || existing?.status === 'banned') {
-        setLoginError(lt(lang, 767));
+        setLoginError(lang === 'ar' ? '\u062d\u0635\u0631 \u0627\u0644\u062d\u0633\u0627\u0628 \u0645\u062d\u0638\u0648\u0638. \u0644\u0627 \u064a\u0645\u0643\u0646\u0643 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644.' : 'This account is banned. You cannot log in.');
         setRedirecting(false);
         return;
       }
@@ -1606,13 +1917,18 @@ export default function App() {
       }
 
       try {
-        if (existingSnap.docs[0]) {
-          await updateDoc(doc(db, 'clients', existingSnap.docs[0].id), { status: 'verified', plan: 'free' });
+        // Deterministic id + get, never a collection query: a client may only
+        // touch their own record. plan/planExpiry are NOT written on login —
+        // only the developer (or a payment) sets them, so signing in can never
+        // wipe a running plan.
+        const cid = clientDocId(email);
+        const existing = await getDoc(doc(db, 'clients', cid));
+        if (existing.exists()) {
+          await setDoc(doc(db, 'clients', cid), { status: 'verified' }, { merge: true });
         } else {
-          const count = (await getDocs(collection(db, 'clients'))).size;
-          await addDoc(collection(db, 'clients'), {
+          await setDoc(doc(db, 'clients', cid), {
             email, status: 'verified', plan: 'free', planExpiry: null,
-            registeredAt: serverTimestamp(), rank: count + 1,
+            registeredAt: serverTimestamp(), rank: 0,
           });
         }
       } catch (e) { console.warn('Firestore save on login failed:', e); }
@@ -1705,14 +2021,48 @@ export default function App() {
       try {
         const grants = await fetchUserGrants(user.email!);
         if (stopped) return;
-        const active = grants.filter((g) => g.kind === 'plan' && g.status === 'active' && g.expiryDate && new Date(g.expiryDate) > new Date());
-        if (!active.length) return;
-        const best = active.sort((a, b) => new Date(b.expiryDate!).getTime() - new Date(a.expiryDate!).getTime())[0];
+        // An active plan grant may or may not have started yet. A grant WITHOUT
+        // expiryDate is a legacy row from before approval released plans
+        // automatically; the server recomputes its calendar on the next approval.
+        const planGrants = grants.filter((g) => g.kind === 'plan' && g.status === 'active');
+        if (!planGrants.length) return;
+const started = planGrants
+          .filter((g) => g.expiryDate && !isNaN(new Date(g.expiryDate).getTime()) && new Date(g.expiryDate) > new Date())
+          .sort((a, b) => new Date(b.expiryDate!).getTime() - new Date(a.expiryDate!).getTime());
+        const pendingKey = planGrants.filter((g) => !g.expiryDate || isNaN(new Date(g.expiryDate).getTime()));
+        const best = started[0] || pendingKey[0];
+        if (!best) return;
+        // Every period the developer approved is kept, so the first release is the
+        // earliest start and the visible end is the latest expiry (stacking).
+        const starts = planGrants
+          .map((g) => (g.activatedAt ? new Date(g.activatedAt).getTime() : 0))
+          .filter((n) => isFinite(n) && n > 0);
+        const firstReleaseIso = starts.length
+          ? new Date(Math.min(...starts)).toISOString()
+          : new Date(best.createdAt).toISOString();
+        const subs = {
+          label: best.planLabel || 'Plan',
+          amount: best.amountUsd || 0,
+          // The client's FIRST release is the earliest activatedAt across every
+          // approved period, while the end date is the LATEST one — that is what
+          // makes renewals stack instead of replacing each other.
+          activatedAt: firstReleaseIso,
+          firstReleasedAt: firstReleaseIso,
+          expiryDate: best.expiryDate || '',
+          requestNo: best.requestNo,
+          durationDays: best.durationDays,
+          planUnit: best.planUnit,
+          planUnits: best.planUnits,
+        };
         setActiveSubscription((prev) => {
-          if (prev && new Date(prev.expiryDate) >= new Date(best.expiryDate!)) return prev;
-          const sub = { label: best.planLabel || 'Plan', amount: 0, activatedAt: new Date(best.createdAt).toISOString(), expiryDate: best.expiryDate! };
-          try { localStorage.setItem('active_subscription', JSON.stringify(sub)); } catch {}
-          return sub;
+          // Keep the FURTHEST end date ever seen, so a renewal is never shortened
+          // by a slower poll landing on an older grant first.
+          const prevEnd = prev && prev.expiryDate ? new Date(prev.expiryDate).getTime() : 0;
+          const thisEnd = subs.expiryDate ? new Date(subs.expiryDate).getTime() : 0;
+          if (prevEnd && prevEnd > thisEnd) return prev;
+          try { localStorage.setItem('active_subscription', JSON.stringify(subs)); } catch {}
+          if (!freeModeOverride()) setPaidMode(true);
+          return subs;
         });
       } catch {}
     };
@@ -1721,7 +2071,7 @@ export default function App() {
     return () => { stopped = true; clearInterval(interval); };
   }, [user?.email]);
 
-  const handleLogin = async () => {
+  const handleLogin = async (which: AuthProviderId = 'google') => {
     setActivePage('main');
     setPaymentPlan(null);
     setAnalysisResults(null);
@@ -1729,26 +2079,30 @@ export default function App() {
     setLoginError(null);
     setManualAuthUrl(null);
     setRedirecting(true);
+    setRedirectingProvider(which);
     try {
-      const provider = new GoogleAuthProvider();
+      const provider = which === 'microsoft' ? new OAuthProvider('microsoft.com') : new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
       const email = result?.user?.email || result?.user?.providerData?.[0]?.email || '';
       if (!email) { throw new Error('no_email'); }
+      // Site sign-in is direct and unrestricted. The Google/Microsoft rule is
+      // enforced only when a paid plan is purchased (see PaymentModal).
       await processGoogleUser(email, result.user.displayName || undefined, result.user.photoURL || undefined);
     } catch (error: any) {
-      console.error("=== Google sign-in ERROR ===", error);
+      console.error("=== OAuth sign-in ERROR ===", error);
       if (error.code === 'auth/popup-closed-by-user') {
         setLoginError('\u0644\u0642\u062f \u0623\u063a\u0644\u0642\u062a \u0646\u0627\u0641\u0630\u0629 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644. \u062a\u0639\u064a\u062f \u0644\u0644\u0645\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.');
       } else if (error.code === 'auth/unauthorized-domain') {
-        setLoginError(`\u062d\u0635\u0631 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 (${window.location.hostname}) \u063a\u064a\u0631 \u0645\u0635\u063a\u064a\u0631 \u0639\u0644\u0649 Firebase.`);
+        setLoginError(`\u062d\u0635\u0631 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 (${window.location.hostname}) \u063a\u064a\u0631 \u0645\u0635\u063a\u0651\u064a\u0631 \u0639\u0644\u0649 Firebase.`);
       } else if (error.message === 'no_email') {
-        setLoginError('\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0627\u0644\u0645\u0631\u0636\u064a \u0628\u0647. \u062a\u0639\u064a\u062f \u0644\u0644\u0645\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.');
+        setLoginError('\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0627\u0644\u0645\u0631\u0636\u064a \u0628\u0647. \u062a\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.');
       } else {
-        setLoginError(`Google sign-in error: ${error.code || error.message}`);
+        setLoginError(`Sign-in error: ${error.code || error.message}`);
       }
     } finally {
       setRedirecting(false);
+      setRedirectingProvider(null);
     }
   };
 
@@ -1838,12 +2192,14 @@ export default function App() {
             loginError={loginError}
             onClearError={() => { setLoginError(null); setPendingVerifyLink(null); }}
             redirecting={redirecting}
+            redirectingProvider={redirectingProvider}
             manualAuthUrl={manualAuthUrl}
           />
         )}
       </AnimatePresence>
 
-      {/* Blocking API Key overlay ΓÇö REMOVED for clients. API key is only managed via Settings (developer only). */}
+      {/* CLIENT PLAN: no gate and no key. The developer's approval releases the
+          plan immediately and analysis runs on the shared key pool. */}
 
       <Header 
         user={user} onLogin={handleLogin} onLogout={handleLogout} 
@@ -1855,6 +2211,13 @@ export default function App() {
         hasApiKey={hasApiKey || isDeveloperSession()}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isDeveloper={isDeveloperSession()}
+        planClient={isPlanClient}
+        onOpenMyPlan={() => setShowMyPlan(true)}
+        onStartClientAutoAnalysis={() => {
+          try { initAudio(); } catch {}
+          setAutoSettings(prev => ({ ...prev, isEnabled: !prev.isEnabled }));
+          setIsSidebarOpen(false);
+        }}
         lastSyncStatus={lastSyncStatus}
         analysisProgress={progress}
         isAnalyzing={isAnalyzing}
@@ -1886,6 +2249,12 @@ export default function App() {
             customAvatar={localStorage.getItem('finalyze_custom_avatar')}
             onLogin={handleLogin}
             onLogout={handleLogout}
+            planClient={isPlanClient}
+            onStartClientAutoAnalysis={() => {
+              try { initAudio(); } catch {}
+              setAutoSettings(prev => ({ ...prev, isEnabled: !prev.isEnabled }));
+              setIsSidebarOpen(false);
+            }}
           />
         )}
       </AnimatePresence>
@@ -1906,7 +2275,7 @@ export default function App() {
             className="bg-brand-alt border-b border-red-500/20 py-2 text-center"
           >
             <span className="text-red-500 text-[10px] font-black uppercase tracking-widest">
-              {lt(lang, 735)}
+              {lang === 'ar' ? '\u0644\u0627 \u062a\u0648\u062c\u062f \u0625\u0634\u0627\u0631\u0627\u062a \u0642\u0648\u064a\u0629 \u062d\u0627\u0644\u064a\u0627\u064b' : 'No strong signals currently'}
             </span>
           </motion.div>
         )}
@@ -1914,7 +2283,7 @@ export default function App() {
       
       <main className={`flex-grow w-full relative transition-all duration-300 ${effectivePage === 'trade' ? 'pt-[104px] md:pt-[132px] pb-3 px-0 max-w-none' : 'max-w-7xl mx-auto px-4 pt-[144px] md:pt-[340px] pb-8'}`}>
         {/* Dedicated pages (from dashboard) */}
-        {effectivePage !== 'main' && (!needsApiKey || effectivePage === 'store' || effectivePage === 'plans' || effectivePage === 'storeSettings' || effectivePage === 'paymentSettings' || effectivePage === 'prices') && (
+        {effectivePage !== 'main' && (!needsApiKey || effectivePage === 'store' || effectivePage === 'plans' || effectivePage === 'storeSettings' || effectivePage === 'paymentSettings' || effectivePage === 'prices' || effectivePage === 'myPlan' || (effectivePage as string) === 'manualResults' || ((effectivePage === 'manualAnalysis' || (effectivePage as string) === 'manualResults') && isPlanClient) || (effectivePage === 'radar' && isPlanClient)) && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
 
              {effectivePage === 'settings' && (
@@ -1929,6 +2298,23 @@ export default function App() {
                 asPage
                 lang={lang}
                 onDeleteClientResults={handleClearAll}
+                planClient={isPlanClient}
+                planKeyEntered={planKeyed}
+              />
+            )}
+
+            {effectivePage === 'myPlan' && showPlanControls && activeSubscription && (
+              <MyPlanModal
+                asPage
+                lang={lang}
+                plan={activeSubscription}
+                features={myPlanFeatures}
+                paidMode={paidMode}
+                onClose={() => navigateTo('main')}
+                onReturnToFree={returnToFreePlan}
+                onActivate={activatePaidPlan}
+                onDeletePlan={deleteClientPlan}
+                email={user?.email || clientEmailsFor(user?.email)[0] || ''}
               />
             )}
 
@@ -1967,25 +2353,69 @@ export default function App() {
                 lang={lang}
                 botPurchase={botPurchase}
                 sectionTab={botPurchase ? 'bot' : 'plan'}
-                buyerEmail={user?.email || ''}
+                buyerEmail={
+                  isGoogleOrMicrosoftEmail(user?.email)
+                    ? (user?.email || '')
+                    : ''
+                }
                 buyerName={user?.displayName || ''}
                 planDurationDays={paymentPlan?.durationDays}
                 resumeSessionId={resumeSessionId}
                 onBotPaid={() => { setResumeSessionId(null); setBotPurchase(null); setPaymentPlan(null); goBack(); }}
                 onGoToStore={() => { setResumeSessionId(null); setPaymentPlan(null); setBotPurchase(null); navigateTo('store'); }}
                 onGoToPlans={() => { setResumeSessionId(null); setPaymentPlan(null); setBotPurchase(null); navigateTo('plans'); }}
-                onConfirm={() => {
+                onConfirm={async () => {
                   const plan = paymentPlan!;
-                  const expiryDate = new Date();
-                  expiryDate.setDate(expiryDate.getDate() + plan.durationDays);
+                  const buyerEmail = user?.email || '';
+                  const subExpiry = new Date();
+                  subExpiry.setDate(subExpiry.getDate() + (plan.durationDays || 30));
+                  if (buyerEmail) {
+                    // A successful payment REGISTERS the client on the site under
+                    // their payment email: this becomes their identity, so the
+                    // plan, the key gate and My Plan all resolve to one account.
+                    rememberBuyerEmail(buyerEmail, buyerEmail);
+                    setCurrentUserEmail(buyerEmail);
+                    // Make the client visible in Client Monitor with a running paid
+                    // plan (the crown tag), whether this is their first purchase
+                    // or a renewal. Without this the buyer would only get a
+                    // localStorage subscription and never show up as a client.
+                    try {
+                      // Deterministic id: the payer writes ONLY their own record.
+                      const payload = {
+                        status: 'verified',
+                        plan: 'paid',
+                        planExpiry: subExpiry.toISOString(),
+                        autoRegistered: true,
+                        updatedAt: serverTimestamp(),
+                      };
+                      await setDoc(doc(db, 'clients', clientDocId(buyerEmail)), {
+                        email: buyerEmail.toLowerCase().trim(),
+                        ...payload,
+                        registeredAt: serverTimestamp(),
+                        rank: 0,
+                      }, { merge: true });
+                      fetchClients();
+                    } catch (e) { console.warn('Auto client registration on payment failed:', e); }
+                  }
                   const sub = {
                     label: plan.label,
                     amount: plan.amount,
                     activatedAt: new Date().toISOString(),
-                    expiryDate: expiryDate.toISOString(),
+                    expiryDate: subExpiry.toISOString(),
+                    requestNo: undefined,
+                    durationDays: plan.durationDays,
                   };
                   localStorage.setItem('active_subscription', JSON.stringify(sub));
                   setActiveSubscription(sub);
+                  // Re-derive from THIS client's own key only, so a first-time
+                  // buyer is forced through the key gate even if some shared key
+                  // happens to be present in the browser.
+                          // A new payment reopens paid mode immediately. If this client has
+                  // their own key saved under their email, the gate is skipped and
+                  // plan features open directly; otherwise the gate page appears
+                  // (first purchase OR renewed plan without a saved key).
+                  setPaidMode(true);
+                  setFreeModeChosen(false);
                    setResumeSessionId(null);
                    setPaymentPlan(null);
                    navigateTo('main');
@@ -2012,10 +2442,10 @@ export default function App() {
                 clients={clients}
                 lang={lang}
                 onRefresh={fetchClients}
+                onMergeDuplicates={mergeDuplicateClients}
                 onBan={banClient}
                 onDelete={deleteClientRecord}
                 onDeleteByEmail={deleteClientByEmail}
-                onRenew={renewClientPlan}
                 freemiumDisabled={freemiumDisabled}
                 onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); setDoc(doc(db, 'shared_settings', 'freemium'), { disabled: v, updatedAt: Date.now() }).catch(console.warn); }}
                 clientLoginRequired={clientLoginRequired}
@@ -2112,6 +2542,7 @@ export default function App() {
                 lang={lang}
                 onBack={() => navigateTo('about')}
                 userName={user?.displayName || user?.email || ''}
+                userUid={user?.uid || ''}
                 isDeveloper={isDeveloperSession()}
                 onHideCount={(n) => setNewSuggestionsCount(prev => Math.max(0, prev - n))}
               />
@@ -2134,28 +2565,46 @@ export default function App() {
                   setPaymentPlan({ amount: bot.price / 100, label: '', durationDays: 0 });
                   navigateTo('plans');
                 }}
+                onBuyPlan={(plan) => {
+                  setResumeSessionId(null);
+                  setBotPurchase(null);
+                  setPaymentPlan({ amount: plan.priceUsd, label: (isAr ? plan.labelAr : plan.labelEn) || plan.key, durationDays: plan.durationDays });
+                  navigateTo('plans');
+                }}
+                customerPlan={activeSubscription}
+                planKeyEntered={planKeyed}
+                paidMode={paidMode}
+                onCustomerEnterKey={() => { setPaidMode(true); }}
+                onCustomerUseFree={() => setPaidMode(false)}
+                onCustomerUsePaid={() => { setPaidMode(true); }}
+                onCustomerDeletePlan={() => { deleteClientPlan(); }}
               />
             )}
 
             {effectivePage === 'storeSettings' && isDeveloperSession() && (
-              <StoreSettingsPage
-                lang={lang}
-                onBack={goBack}
-                freemiumDisabled={freemiumDisabled}
-                onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); setDoc(doc(db, 'shared_settings', 'freemium'), { disabled: v, updatedAt: Date.now() }).catch(console.warn); }}
-              />
+              <div className="max-w-4xl mx-auto px-4 space-y-10">
+                <StoreSettingsPage
+                  lang={lang}
+                  onBack={goBack}
+                  freemiumDisabled={freemiumDisabled}
+                  onFreemiumToggle={(v: boolean) => { setFreemiumDisabled(v); localStorage.setItem('finalyze_freemium_disabled', v ? 'true' : 'false'); setDoc(doc(db, 'shared_settings', 'freemium'), { disabled: v, updatedAt: Date.now() }).catch(console.warn); }}
+                />
+                <KeyPoolPanel lang={lang} />
+              </div>
             )}
 
-            {effectivePage === 'manualAnalysis' && isDeveloperSession() && (
+            {effectivePage === 'manualAnalysis' && (isDeveloperSession() || isPlanClient) && (
               <div className="max-w-4xl mx-auto px-4 py-8">
                 <h2 className="text-2xl font-black text-brand-text mb-6 text-center">
-                  {lt(lang, 728)}
+                  {lang === 'ar' ? 'التحليل اليدوي' : 'Manual Analysis'}
                 </h2>
                 <AnalysisForm
                   user={user} lang={lang} settings={settings}
                   hasActivePlan={hasActivePlan}
                   onUpgrade={() => navigateTo('plans')}
-                  onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); try { playStart(autoSettings.volume || 0.5); } catch {} }}
+                  autoStartToken={isPlanClient ? autoAnalyzeToken : 0}
+                  onAutoStartConsumed={() => setAutoAnalyzeToken(0)}
+                  onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); try { playStart(autoSettings.volume || 0.5); } catch {} navigateTo('manualResults'); }}
                   onProgress={(current, total, index, failed) => setProgress({ current, total, index, failed })}
                   onResult={(results) => {
                     const day = new Date().getUTCDay();
@@ -2171,11 +2620,70 @@ export default function App() {
                     setAnalysisError(null);
                     setProgress(null);
                     updateTopSignals(filtered);
-                    playAudio('fail');
+                    // Same end-of-scan notification as the developer account:
+                    // completion tone, then a "new opportunity" alert + success tone
+                    // only when a strong signal (strong_buy/strong_sell) was found.
+                    const strong = filtered.filter(r => r.signal === 'strong_buy' || r.signal === 'strong_sell');
+                    if (strong.length > 0) {
+                      const alerted = strong.map(r => r.symbol).join(' · ');
+                      setNewSignalAlert(lang === 'ar' ? '✅ لقد ربحت رصة تداول قوية جديدة! — ' + alerted : `✅ New strong trading opportunity detected! — ${alerted}`);
+                      setTimeout(() => setNewSignalAlert(null), 8000);
+                      try { playAudio('success'); } catch {}
+                    } else {
+                      try { playAudio('completion'); } catch {}
+                    }
                   }}
-                  onError={(errMsg, allFailed) => { setAnalysisResults(null); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); }}
+                  onError={(errMsg, allFailed) => { setAnalysisResults(null); setAnalysisError(errMsg || null); setIsAnalyzing(false); setProgress(null); try { playAudio('fail'); } catch {} }}
                 />
                 <ConnectionStatus lang={lang} />
+              </div>
+            )}
+
+            {effectivePage === 'manualResults' && (
+              <div className="max-w-4xl mx-auto px-4 py-8">
+                {isAnalyzing ? (
+                  <div className="flex flex-col items-center justify-center p-8 space-y-8 min-h-[50vh]">
+                    <div className="relative w-24 h-24">
+                      <div className="absolute inset-0 border-b-2 border-primary rounded-full animate-spin" />
+                      <div className="absolute inset-0 flex items-center justify-center text-primary">
+                        <TrendingUp size={32} />
+                      </div>
+                    </div>
+                    <div className="text-center space-y-2">
+                      <h2 className="text-2xl font-bold text-brand-text">{t.analyzing}</h2>
+                      {progress && (
+                        <div className="text-primary font-black animate-pulse">
+                          {progress.current} ({progress.index + 1}/{progress.total})
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : analysisResults ? (
+                  <>
+                    <h2 className="text-2xl font-black text-brand-text mb-2 text-center">
+                      {lang === 'ar' ? 'نتائج التحليل اليدوي' : 'Manual Analysis Results'}
+                    </h2>
+                    {!analysisResults.some(r => r.signal === 'strong_buy' || r.signal === 'strong_sell') && (
+                      <div className="bg-brand-alt border border-red-500/20 py-2 px-4 mb-6 text-center rounded-xl">
+                        <span className="text-red-500 text-[10px] font-black uppercase tracking-widest">
+                          {lang === 'ar' ? 'لا توجد إشارات قوية حالياً' : 'No strong signals currently'}
+                        </span>
+                      </div>
+                    )}
+                    {analysisError && (
+                      <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                        <p className="text-amber-400 text-sm font-medium">{analysisError}</p>
+                      </div>
+                    )}
+                    <AnalysisResultView
+                      results={analysisResults}
+                      lang={lang}
+                      settings={settings}
+                      onDetail={(r) => { setAnalysisResults(null); setDetailResult(r); }}
+                      onTrade={(sym) => { try { sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol: sym })); } catch {} navigateTo('trade'); }}
+                    />
+                  </>
+                ) : null}
               </div>
             )}
           </motion.div>
@@ -2224,12 +2732,13 @@ export default function App() {
         {!isDeveloperSession() && !analysisResults && !isAnalyzing && effectivePage === 'main' && (
           <div className="max-w-7xl mx-auto px-4">
             <AdSlot position="header" lang={lang} />
-            <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} onDetail={setClientDetailResult} onTrade={(sym) => { try { sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol: sym })); } catch {} navigateTo('trade'); }} />
+            <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} onDetail={setClientDetailResult} showPlanActions={showPlanControls} freeModeChosen={freeModeChosen} onActivatePaidPlan={activatePaidPlan} autoAnalysisOn={autoSettings.isEnabled} onOpenMyPlan={openMyPlan} onNavigateManual={() => navigateTo('manualAnalysis')} onNavigateRadar={() => navigateTo('radar')} onToggleAutoAnalysis={() => { initAudio(); setAutoSettings({ ...autoSettings, isEnabled: !autoSettings.isEnabled }); }} onTrade={(sym) => { try { sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol: sym })); } catch {} navigateTo('trade'); }} />
           </div>
         )}
 
-        {/* Loading view - separate, no overlap with form */}
-        {isAnalyzing && (
+        {/* Loading view - separate, no overlap with form. On the dedicated
+            manualResults page the same progress UI is rendered inline instead. */}
+        {isAnalyzing && effectivePage !== 'manualResults' && (
           <div className="flex flex-col items-center justify-center p-8 space-y-8 min-h-[60vh]">
             <div className="relative w-24 h-24">
               <div className="absolute inset-0 border-b-2 border-primary rounded-full animate-spin" />
@@ -2248,14 +2757,15 @@ export default function App() {
           </div>
         )}
 
-        {/* Results */}
-        {analysisResults && !isAnalyzing && (
+        {/* Results - main page (developer / auto-analysis results). Manual analysis
+            results render on their own dedicated `manualResults` page instead. */}
+        {analysisResults && !isAnalyzing && effectivePage === 'main' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             {analysisError && (
               <div className="max-w-4xl mx-auto mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                 <p className="text-amber-400 text-sm font-medium">{analysisError}</p>
                 <button onClick={() => { setAnalysisResults(null); setAnalysisError(null); }} className="mt-2 text-xs text-amber-400 hover:text-amber-300 underline">
-                  {lt(lang, 770)}
+                  {lang === 'ar' ? '\u062a\u0639\u064a\u062f \u0644\u0644\u0645\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649' : 'Try again'}
                 </button>
               </div>
             )}
@@ -2270,7 +2780,7 @@ export default function App() {
             className="fixed bottom-6 right-6 z-[90] flex items-center gap-3 bg-[#F59E0B] hover:bg-[#d97706] transition-all rounded-2xl px-5 py-4 shadow-2xl shadow-[#F59E0B]/30 active:scale-95 group"
           >
             <ArrowLeft size={22} className="text-black group-hover:-translate-x-1 transition-transform" />
-            <span className="text-sm font-black text-black">{lt(lang, 720)}</span>
+            <span className="text-sm font-black text-black">{lang === 'ar' ? '\u0639\u0648\u062f\u0629 \u0644\u0644\u062e\u0644\u0641' : 'Go back'}</span>
           </button>
         )}
       </main>

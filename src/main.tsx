@@ -5,7 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { initMoneytizer } from './lib/moneytizer';
 import './index.css';
 
-window.__BUILD = 'v3.1.0';
+(window as any).__BUILD = 'v3.1.0';
 initMoneytizer();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

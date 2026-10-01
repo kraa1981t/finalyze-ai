@@ -3,27 +3,27 @@ import { ShieldCheck, Zap, Globe, BarChart3, TrendingUp, Languages, Loader2, Che
 import { motion } from 'motion/react';
 import { Language } from '../lib/i18n';
 import { BASE_URL } from '../lib/firebase';
-import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
+import { AuthProviderId } from '../lib/authPolicy';
 
 interface LoginOverlayProps {
-  onLogin: () => void;
+  onLogin: (provider: AuthProviderId) => void;
   lang: Language;
   onLangChange?: (l: Language) => void;
   loginError: string | null;
   onClearError: () => void;
   redirecting?: boolean;
+  redirectingProvider?: AuthProviderId | null;
   manualAuthUrl?: string | null;
+  /** Extra context shown above the buttons (e.g. a paid plan awaiting sign-in). */
+  notice?: string | null;
 }
 
 const LANGUAGES: { code: Language; label: string; flag: string }[] = [
   { code: 'en', label: 'English', flag: '🇺🇸' },
   { code: 'ar', label: 'العربية', flag: '🇸🇦' },
-  { code: 'fr', label: 'Français', flag: '🇫🇷' },
-  { code: 'es', label: 'Español', flag: '🇪🇸' },
-  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
 ];
 
-export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, onClearError, redirecting, manualAuthUrl }: LoginOverlayProps) {
+export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, onClearError, redirecting, redirectingProvider, manualAuthUrl, notice }: LoginOverlayProps) {
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [showLangPicker, setShowLangPicker] = useState(false);
 
@@ -116,14 +116,16 @@ export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, 
                 <span className="text-emerald-400 text-sm font-black uppercase tracking-wider">Free Signal Access</span>
               </div>
               <p className="text-slate-300 text-sm leading-relaxed">
-                {lt(lang, 516)}
+                {isAr
+                  ? 'سجل الآن واحصل على أفضل إشارة دخول قوية على جميع الأسواق وكل أنواع الرموز مجاناً!'
+                  : 'Sign up now and get the best strong entry signals across all markets and all symbol types — completely free!'}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-6">
               {[
-                { icon: <BarChart3 size={18} />, label: lt(lang, 449) },
-                { icon: <Globe size={18} />, label: lt(lang, 270) },
+                { icon: <BarChart3 size={18} />, label: isAr ? 'تحليل لحظي' : 'Real-time Analysis' },
+                { icon: <Globe size={18} />, label: isAr ? 'تغطية عالمية' : 'Global Coverage' },
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-3 text-slate-300 justify-end">
                   <span className="text-sm font-medium">{item.label}</span>
@@ -151,41 +153,54 @@ export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, 
             <div className="mb-6 p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 relative z-10 text-center space-y-5">
               <div className="flex items-center gap-2 text-emerald-400 justify-center font-bold text-sm">
                 <ShieldCheck size={18} />
-                <span>{lt(lang, 513)}</span>
+                <span>{isAr ? 'تسجيل الدخول' : 'Sign In'}</span>
               </div>
 
               {/* Promotional line inside card */}
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
                 <p className="text-emerald-400 text-xs font-bold">
-                  {lt(lang, 23)}
+                  {isAr
+                    ? '🎯 سجّل مجاناً واحصل على إشارات قوية لكل الأسواق'
+                    : '🎯 Sign up free & get strong signals for all markets'}
                 </p>
               </div>
 
+              {notice && (
+                <div className="bg-sky-500/10 border border-sky-500/30 rounded-xl p-3">
+                  <p className="text-sky-300 text-[11px] font-bold leading-relaxed text-center">{notice}</p>
+                </div>
+              )}
+
               <p className="text-xs text-slate-400 text-center">
                 {redirecting
-                  ? (lt(lang, 451))
-                  : (lt(lang, 515))}
+                  ? (isAr ? 'جاري التوجيه...' : 'Redirecting...')
+                  : (isAr ? 'سجل دخول بحساب Google' : 'Sign in with your Google account')}
               </p>
 
               <button
-                onClick={onLogin}
+                onClick={() => onLogin('google')}
                 disabled={redirecting}
                 className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-4 rounded-2xl transition-all text-sm shadow-lg active:scale-98 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {redirecting ? (
                   <Loader2 size={18} className="animate-spin" />
                 ) : (
-                  <Globe size={18} />
+                  <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                  </svg>
                 )}
                 {redirecting
-                  ? (lt(lang, 452))
-                  : (lt(lang, 514))}
+                  ? (isAr ? 'جاري...' : 'Redirecting...')
+                  : (isAr ? 'تسجيل دخول بـ Google' : 'Sign In with Google')}
               </button>
 
               {manualAuthUrl && (
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-center space-y-2">
                   <p className="text-[11px] text-amber-400 font-bold">
-                    {lt(lang, 8)}
+                    {isAr ? '⚠️ فشل التوجيه التلقائي' : '⚠️ Auto-redirect failed'}
                   </p>
                   <a
                     href={manualAuthUrl}
@@ -193,7 +208,7 @@ export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, 
                     rel="noopener noreferrer"
                     className="inline-block w-full bg-amber-500 hover:bg-amber-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all"
                   >
-                    {lt(lang, 24)}
+                    {isAr ? '👆 اضغط هنا' : '👆 Click here to Sign In'}
                   </a>
                 </div>
               )}
@@ -206,11 +221,11 @@ export default function LoginOverlay({ onLogin, lang, onLangChange, loginError, 
             )}
 
             <div className="flex items-center justify-center pt-2 border-t border-white/5 text-[9px] text-slate-500">
-              <span>Google Secure Verification</span>
+              <span>Google &amp; Microsoft Secure Verification</span>
             </div>
 
             <p className="mt-4 text-center text-xs text-slate-500">
-              {lt(lang, 359)}
+              {isAr ? 'لا يوجد التزام، يمكنك الإلغاء في أي وقت' : 'No commitment, cancel anytime.'}
             </p>
           </motion.div>
         </div>

@@ -1,3 +1,5 @@
+import { getClientOwnKeyForAnalysis } from '../lib/clientScope';
+
 // Remove outlier candles whose range (high-low) exceeds median*5.
 // This is a frontend safety-net: even if the API returns stale Twelve Data
 // with corrupted daily candles, they get stripped before chart/analysis.
@@ -420,8 +422,8 @@ export async function callAIDirect(prompt: string, apiKey: string): Promise<any>
       const groqResult = await callGroqDirect(prompt, apiKey);
       if (!groqResult?.error) return groqResult;
       if (attempt === 0) { await new Promise(r => setTimeout(r, 3000)); continue; }
-      // If Groq fails, try Gemini as fallback
-      const k2 = localStorage.getItem('finalyze_key2_value') || localStorage.getItem('finalyze_key1_value');
+      // If Groq fails, try Gemini as fallback — using THIS client's own key only.
+      const k2 = getClientOwnKeyForAnalysis();
       if (k2 && k2 !== apiKey) {
         const gemResult = await callAIDirect(prompt, k2);
         if (!gemResult?.error) return gemResult;
@@ -434,8 +436,8 @@ export async function callAIDirect(prompt: string, apiKey: string): Promise<any>
       const gemResult = await callGeminiDirect(prompt, apiKey);
       if (!gemResult?.error) return gemResult;
       if (attempt === 0) { await new Promise(r => setTimeout(r, 3000)); continue; }
-      // If Gemini fails, try Groq as fallback
-      const k2 = localStorage.getItem('finalyze_key2_value') || localStorage.getItem('finalyze_key1_value');
+      // If Gemini fails, try Groq as fallback — using THIS client's own key only.
+      const k2 = getClientOwnKeyForAnalysis();
       if (k2 && k2 !== apiKey) {
         const groqResult = await callAIDirect(prompt, k2);
         if (!groqResult?.error) return groqResult;
@@ -525,4 +527,47 @@ async function callGroqDirect(prompt: string, apiKey: string): Promise<any> {
     }
   }
   return { error: 'Groq: All models exhausted' };
+}
+
+// Verify an API key actually works before the client activates their plan.
+// Gemini keys start with AIzaSy/AQ., Groq keys with gsk_. Uses the cheapest
+// probe (list models) so an invalid/expired key is caught immediately.
+export async function validateAiKeyDirect(key: string): Promise<{ ok: boolean; error?: string }> {
+  const k = (key || '').trim();
+  if (!k) return { ok: false, error: 'No API key provided' };
+  const isGemini = k.startsWith('AIzaSy') || k.startsWith('AQ.');
+  const isGroq = k.startsWith('gsk_');
+  if (isGemini) {
+    try {
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 15000);
+      const resp = await fetch(`${GEMINI_BASE}/models?key=${encodeURIComponent(k)}`, { signal: ac.signal });
+      clearTimeout(timeout);
+      if (resp.ok) return { ok: true };
+      const err = await resp.json().catch(() => ({}));
+      return { ok: false, error: err?.error?.message || `Google AI: HTTP ${resp.status}` };
+    } catch (e: any) {
+      if (e.name === 'AbortError') return { ok: false, error: 'Google AI: request timed out' };
+      return { ok: false, error: 'Google AI: network error' };
+    }
+  }
+  if (isGroq) {
+    try {
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 15000);
+      const resp = await fetch(`${GROQ_BASE}/models`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${k}` },
+        signal: ac.signal,
+      });
+      clearTimeout(timeout);
+      if (resp.ok) return { ok: true };
+      const err = await resp.json().catch(() => ({}));
+      return { ok: false, error: err?.error?.message || `Groq: HTTP ${resp.status}` };
+    } catch (e: any) {
+      if (e.name === 'AbortError') return { ok: false, error: 'Groq: request timed out' };
+      return { ok: false, error: 'Groq: network error' };
+    }
+  }
+  return { ok: false, error: 'Unrecognized key format. Use Google Gemini (AIza...) or Groq (gsk_...)' };
 }

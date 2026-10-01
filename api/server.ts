@@ -2,6 +2,8 @@ import express from "express";
 import nodemailer from "nodemailer";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 const FALLBACK_PRICES = {
   bitcoin: { usd: 67000 }, ethereum: { usd: 3200 }, litecoin: { usd: 85 },
@@ -14,6 +16,22 @@ const ONSITE_CHAIN_MAP: Record<string, string> = { btc: 'btc/main', ltc: 'ltc/ma
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ── Caller identity passthrough ─────────────────────────────────────────────
+// Firestore is protected by rules that key every private collection off the
+// SIGNED-IN account (request.auth). The public API key alone is anonymous, so
+// the browser forwards its own Firebase ID token and the server replays it on
+// the Firestore REST call — authorization stays entirely inside the rules.
+// No token (cron, anonymous) simply means an anonymous request: the rules
+// accept the open collections and reject the private ones.
+const fsAuthStore = new AsyncLocalStorage<string | null>();
+
+app.use((req, _res, next) => {
+  const raw = req.headers.authorization;
+  const value = typeof raw === "string" ? raw.trim() : "";
+  const token = value ? (value.toLowerCase().startsWith("bearer ") ? value : `Bearer ${value}`) : null;
+  fsAuthStore.run(token, () => next());
+});
 
 // API Route: Health check
 app.get("/api/health", (req, res) => {
@@ -1001,75 +1019,207 @@ app.post("/api/save-stable", async (req, res) => {
   }
 });
 
-// API Route: AI Analysis Proxy — Groq (gsk_) or Google Gemini (AIzaSy)
+// API Route: AI Analysis — runs on the developer's shared key pool.
+//
+// The browser NEVER sends a key and never receives one. It only proves WHO it is
+// (Firebase ID token) and WHAT it paid for (a running plan grant), and this
+// server picks a healthy key from the pool for the upstream call. A client
+// without a running plan is refused here, which is the only enforcement point
+// that cannot be bypassed from the browser.
+// The ID token may arrive in the body or as a bearer header. Either way it is
+// verified against Firebase before it is believed.
+function callerToken(req: any): string {
+  const header = String((req?.headers && req.headers.authorization) || '');
+  const fromHeader = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : header.trim();
+  return String((req?.body || {}).idToken || req?.query?.idToken || fromHeader || '');
+}
+
+// One pooled completion, trying the least-used healthy keys in turn. Returns the
+// raw text, or '' when the pool is empty or every key is failing.
+async function poolCompletion(prompt: string): Promise<string> {
+  const candidates = await pickPoolKeys();
+  if (!candidates.length) return '';
+  let lastError = '';
+  for (const entry of candidates.slice(0, 4)) {
+    const result = entry.provider === 'gemini'
+      ? await callGoogle(entry.key, prompt, 25000)
+      : await callGroq(entry.key, prompt, 25000);
+    if (result && result.content && !result.error) {
+      await markPoolSuccess(entry);
+      return result.content;
+    }
+    lastError = (result && result.error) || 'upstream error';
+    await markPoolFailure(entry, lastError);
+  }
+  console.warn('poolCompletion failed:', lastError);
+  return '';
+}
+
 app.post("/api/ai-analysis", async (req, res) => {
   try {
-    const { prompt, userApiKey } = req.body;
-    
-    // Check if the user is a developer bypassing the key screen
-    const isDevBypass = userApiKey === '__dev_bypass__';
-    
-    // Use user-provided API key if available
-    let key = (userApiKey && userApiKey !== '__dev_bypass__') ? userApiKey.trim() : '';
+    const prompt = String((req.body || {}).prompt || '');
+    if (!prompt) return res.status(400).json({ error: 'prompt required' });
 
-    if (!key && !isDevBypass) {
-      return res.status(400).json({ 
-        error: "API Key is required. Please set your own Google Gemini or Groq API key in the settings modal." 
-      });
+    const caller = await verifyCallerToken(callerToken(req));
+    if (!caller) return res.status(401).json({ error: 'sign_in_required' });
+
+    if (!isDeveloperAddress(caller.email)) {
+      const plan = await runningPlanFor(caller.email);
+      if (!plan) return res.status(403).json({ error: 'no_plan' });
     }
 
-    let result: any = null;
-
-    if (key) {
-      // Use the client's custom key exclusively
-      if (key.startsWith('AIzaSy') || key.startsWith('AQ.')) {
-        result = await callGoogle(key, prompt);
-      } else {
-        result = await callGroq(key, prompt);
-      }
-      
-      // If client key failed, return their specific error immediately! Never fall back to system keys for normal clients.
-      if (!result || result.error || !result.content) {
-        const errMsg = result?.error || 'Your API key could not be successfully executed.';
-        return res.status(400).json({ error: errMsg });
-      }
-    } else if (isDevBypass) {
-      // ONLY developer bypass is allowed to use the server-side system keys
-      const systemGeminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-      const systemGroqKey = process.env.GROQ_API_KEY;
-
-      let fallbackSuccess = false;
-
-      if (systemGeminiKey) {
-        const sysResult = await callGoogle(systemGeminiKey, prompt);
-        if (sysResult && sysResult.content) {
-          result = sysResult;
-          fallbackSuccess = true;
-        }
-      }
-      
-      if (!fallbackSuccess && systemGroqKey) {
-        const sysResult = await callGroq(systemGroqKey, prompt);
-        if (sysResult && sysResult.content) {
-          result = sysResult;
-          fallbackSuccess = true;
-        }
-      }
-
-      if (!fallbackSuccess) {
-        const errMsg = result?.error || 'No active server API keys could be successfully executed.';
-        return res.status(503).json({ error: errMsg });
-      }
+    const candidates = await pickPoolKeys();
+    if (!candidates.length) {
+      return res.status(503).json({ error: 'no_keys_available' });
     }
 
-    // If we reach here, we are guaranteed to have result.content
-    return res.json({ choices: [{ message: { content: result.content } }] });
+    let lastError = '';
+    for (const entry of candidates.slice(0, 4)) {
+      const result = entry.provider === 'gemini'
+        ? await callGoogle(entry.key, prompt, 25000)
+        : await callGroq(entry.key, prompt, 25000);
+      if (result && result.content && !result.error) {
+        await markPoolSuccess(entry);
+        return res.json({ choices: [{ message: { content: result.content } }] });
+      }
+      lastError = (result && result.error) || 'upstream error';
+      await markPoolFailure(entry, lastError);
+    }
+
+    const throttled = /rate|quota|limit|429|402|403|overload|billing|credit/i.test(lastError);
+    return res.status(throttled ? 429 : 502).json({ error: throttled ? 'rate_limited' : lastError });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-async function callGroq(apiKey: string, prompt: string) {
+// ── Developer key pool management ───────────────────────────────────────────
+// Everything here is developer-only, enforced twice: the endpoint rejects a
+// non-developer ID token, and the Firestore rules refuse the write itself.
+function requireDeveloper(req: any, res: any): Promise<string | null> {
+  return verifyCallerToken(callerToken(req))
+    .then((caller) => {
+      if (!caller) { res.status(401).json({ ok: false, error: 'sign_in_required' }); return null; }
+      if (!isDeveloperAddress(caller.email)) { res.status(403).json({ ok: false, error: 'developer_only' }); return null; }
+      return caller.email;
+    })
+    .catch(() => { res.status(401).json({ ok: false, error: 'sign_in_required' }); return null; });
+}
+
+const poolEntrySummary = (p: PoolEntry) => ({
+  id: p.id,
+  label: p.label,
+  provider: p.provider,
+  masked: maskKey(p.key),
+  enabled: p.enabled,
+  createdAt: p.createdAt,
+  lastUsedAt: p.lastUsedAt,
+  useCount: p.useCount,
+  failCount: p.failCount,
+  disabledUntil: p.disabledUntil,
+  cooling: p.disabledUntil > Date.now(),
+  lastError: p.lastError,
+});
+
+app.get("/api/key-pool", async (req: any, res: any) => {
+  const dev = await requireDeveloper(req, res);
+  if (!dev) return;
+  try {
+    if (!poolMasterKey()) {
+      return res.status(500).json({ ok: false, error: 'AI_POOL_SECRET is not set on the server' });
+    }
+    const pool = await loadKeyPool();
+    return res.json({ ok: true, items: pool.map(poolEntrySummary) });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Cheapest possible validity probe before a key is trusted with client traffic.
+async function probeProviderKey(key: string, provider: 'groq' | 'gemini'): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 12000);
+    const url = provider === 'gemini'
+      ? `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`
+      : 'https://api.groq.com/openai/v1/models';
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: provider === 'gemini' ? {} : { Authorization: `Bearer ${key}` },
+      signal: ac.signal,
+    });
+    clearTimeout(timeout);
+    if (resp.ok) return { ok: true };
+    const body: any = await resp.json().catch(() => ({}));
+    return { ok: false, error: String(body?.error?.message || `HTTP ${resp.status}`) };
+  } catch (e: any) {
+    return { ok: false, error: e.name === 'AbortError' ? 'timeout' : e.message };
+  }
+}
+
+app.post("/api/key-pool", async (req: any, res: any) => {
+  const dev = await requireDeveloper(req, res);
+  if (!dev) return;
+  try {
+    const key = String((req.body || {}).key || '').trim();
+    const label = String((req.body || {}).label || '').trim().slice(0, 60);
+    const provider = poolProviderOf(key);
+    if (!provider) {
+      return res.status(400).json({ ok: false, error: 'Unrecognized key. Use Groq (gsk_…) or Google Gemini (AIza…).' });
+    }
+    const probe = await probeProviderKey(key, provider);
+    if (!probe.ok) {
+      return res.status(400).json({ ok: false, error: `The provider rejected this key: ${probe.error || 'unknown'}` });
+    }
+    const id = `key_${createHash('sha256').update(key).digest('hex').slice(0, 16)}`;
+    const sealed = encryptPoolValue(key);
+    const existing = await fsGet('shared_ai_keys', id);
+    await fsPatch('shared_ai_keys', id, {
+      provider,
+      label: label || `${provider} ${maskKey(key)}`,
+      // A key that is already known-bad starts disabled, so re-adding it after a
+      // quota reset does not silently resume a dead key.
+      enabled: existing ? existing.enabled !== false : true,
+      ...sealed,
+    });
+    const pool = await loadKeyPool();
+    const saved = pool.find((p) => p.id === id);
+    return res.json({ ok: true, item: saved ? poolEntrySummary(saved) : null, total: pool.length });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.post("/api/key-pool-toggle", async (req: any, res: any) => {
+  const dev = await requireDeveloper(req, res);
+  if (!dev) return;
+  try {
+    const id = String((req.body || {}).id || '');
+    const enabled = (req.body || {}).enabled !== false;
+    if (!id) return res.status(400).json({ ok: false, error: 'missing id' });
+    const doc = await fsGet('shared_ai_keys', id);
+    if (!doc) return res.status(404).json({ ok: false, error: 'key not found' });
+    await fsPatch('shared_ai_keys', id, { enabled, disabledUntil: enabled ? 0 : Number(doc.disabledUntil || 0) }, ['enabled', 'disabledUntil']);
+    return res.json({ ok: true, id, enabled });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.delete("/api/key-pool", async (req: any, res: any) => {
+  const dev = await requireDeveloper(req, res);
+  if (!dev) return;
+  try {
+    const id = String((req.body || {}).id || req.query?.id || '');
+    if (!id) return res.status(400).json({ ok: false, error: 'missing id' });
+    await fsDelete('shared_ai_keys', id);
+    return res.json({ ok: true, id });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+async function callGroq(apiKey: string, prompt: string, timeoutMs = 5000) {
   const models = [process.env.GROQ_MODEL || "llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
   let lastError = 'Groq: all models exhausted due to rate limits or invalid key';
   for (const model of models) {
@@ -1084,7 +1234,7 @@ async function callGroq(apiKey: string, prompt: string) {
     };
     try {
       const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), 5000);
+      const timeout = setTimeout(() => ac.abort(), timeoutMs);
       const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -1113,13 +1263,13 @@ async function callGroq(apiKey: string, prompt: string) {
   return { error: lastError };
 }
 
-async function callGoogle(apiKey: string, prompt: string) {
+async function callGoogle(apiKey: string, prompt: string, timeoutMs = 5000) {
   const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
   let lastError = 'Google: all models exhausted due to rate limits or invalid key';
   for (const model of models) {
     try {
       const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), 5000);
+      const timeout = setTimeout(() => ac.abort(), timeoutMs);
       
       let resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
         method: 'POST',
@@ -1367,14 +1517,15 @@ app.post("/api/briefing", async (req, res) => {
       news = [...n1, ...n2].slice(0, 8);
     } catch {}
 
-    const sysKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GROQ_API_KEY;
+    // The AI half of the briefing runs on the SAME pooled keys as analysis, and
+    // only for an account with a running plan. The prices/news half stays free
+    // and open, so nothing here can be used to burn a developer key.
     let brief: any = null;
-    if (sysKey) {
-      const aiResult = sysKey.startsWith('AIzaSy') || sysKey.startsWith('AQ.')
-        ? await callGoogle(sysKey, buildBriefingPrompt(prices, news, todayStr))
-        : await callGroq(sysKey, buildBriefingPrompt(prices, news, todayStr));
-      if (aiResult && aiResult.content) {
-        try { brief = JSON.parse(aiResult.content); } catch { brief = null; }
+    const caller = await verifyCallerToken(callerToken(req));
+    if (caller && (isDeveloperAddress(caller.email) || (await runningPlanFor(caller.email)))) {
+      const text = await poolCompletion(buildBriefingPrompt(prices, news, todayStr));
+      if (text) {
+        try { brief = JSON.parse(text); } catch { brief = null; }
       }
     }
 
@@ -1383,7 +1534,7 @@ app.post("/api/briefing", async (req, res) => {
       prices,
       news,
       brief,
-      hasSystemKey: !!sysKey,
+      hasSystemKey: !!brief,
       generatedAt: Date.now(),
     };
     if (brief) _briefingCache.set(todayStr, payload);
@@ -1415,6 +1566,225 @@ let coinRatesCache: CoinRate[] | null = null;
 
 type Json = Record<string, any>;
 
+// ── Shared AI key pool ──────────────────────────────────────────────────────
+// The keys paying clients run their analysis on. The plaintext key exists ONLY
+// in this process's memory: it is stored in Firestore as AES-256-GCM ciphertext
+// sealed with AI_POOL_SECRET (a server-only environment variable), and it is
+// never returned to any HTTP response. That is what makes the keys unusable
+// outside this site — a client cannot read them, and a Firestore dump is
+// ciphertext.
+const DEVELOPER_EMAIL_LIST = [
+  'albertaparks1t@gmail.com',
+  'bachasalman69@gmail.com',
+  'taybekraa@gmail.com',
+  'kraakraa109@gmail.com',
+];
+
+function poolMasterKey(): Buffer | null {
+  const raw = String(process.env.AI_POOL_SECRET || '').trim();
+  return raw ? createHash('sha256').update(raw, 'utf8').digest() : null;
+}
+
+function encryptPoolValue(plain: string): { cipher: string; iv: string; tag: string } {
+  const key = poolMasterKey();
+  if (!key) throw new Error('AI_POOL_SECRET is not set on the server');
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const body = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+  return { cipher: body.toString('base64'), iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64') };
+}
+
+function decryptPoolValue(doc: Json): string {
+  const key = poolMasterKey();
+  if (!key || !doc || !doc.cipher) return '';
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(String(doc.iv || ''), 'base64'));
+    decipher.setAuthTag(Buffer.from(String(doc.tag || ''), 'base64'));
+    return Buffer.concat([decipher.update(Buffer.from(String(doc.cipher), 'base64')), decipher.final()]).toString('utf8');
+  } catch {
+    // A wrong/rotated AI_POOL_SECRET lands here: refuse the key rather than
+    // sending garbage upstream.
+    return '';
+  }
+}
+
+function poolProviderOf(key: string): 'groq' | 'gemini' | '' {
+  const k = (key || '').trim();
+  if (k.startsWith('AIza') || k.startsWith('AQ.')) return 'gemini';
+  if (k.startsWith('gsk_')) return 'groq';
+  return '';
+}
+
+function maskKey(key: string): string {
+  const k = (key || '').trim();
+  if (k.length <= 10) return k ? `${k.slice(0, 3)}…` : '';
+  return `${k.slice(0, 6)}…${k.slice(-4)}`;
+}
+
+interface PoolEntry {
+  id: string;
+  key: string;
+  provider: 'groq' | 'gemini' | '';
+  label: string;
+  enabled: boolean;
+  createdAt: number;
+  lastUsedAt: number;
+  useCount: number;
+  failCount: number;
+  disabledUntil: number;
+  lastError: string;
+}
+
+async function loadKeyPool(): Promise<PoolEntry[]> {
+  const docs = await fsList('shared_ai_keys');
+  return docs.map((d) => ({
+    id: String(d.id),
+    key: decryptPoolValue(d),
+    provider: String(d.provider || '') as PoolEntry['provider'],
+    label: String(d.label || ''),
+    enabled: d.enabled !== false,
+    createdAt: Number(d.createdAt || 0),
+    lastUsedAt: Number(d.lastUsedAt || 0),
+    useCount: Number(d.useCount || 0),
+    failCount: Number(d.failCount || 0),
+    disabledUntil: Number(d.disabledUntil || 0),
+    lastError: String(d.lastError || ''),
+  }));
+}
+
+// Least-used first, so a pool is shared evenly instead of hammering one key
+// until it hits its quota. Keys in cooldown (quota/rate-limit) are skipped
+// entirely; a client never waits on a key that is already known to be spent.
+async function pickPoolKeys(): Promise<PoolEntry[]> {
+  const now = Date.now();
+  const pool = (await loadKeyPool()).filter((p) => p.provider && p.key);
+  return pool
+    .filter((p) => p.enabled && p.disabledUntil <= now)
+    .sort((a, b) => a.useCount - b.useCount || a.lastUsedAt - b.lastUsedAt);
+}
+
+async function markPoolSuccess(entry: PoolEntry): Promise<void> {
+  await fsPatch(
+    'shared_ai_keys',
+    entry.id,
+    { useCount: entry.useCount + 1, lastUsedAt: Date.now(), failCount: 0, lastError: '', disabledUntil: 0 },
+    ['useCount', 'lastUsedAt', 'failCount', 'lastError', 'disabledUntil']
+  ).catch(() => {});
+}
+
+// A dead key must not be handed to the next client: it is put in cooldown and,
+// when the provider says the key itself is bad, disabled outright so the panel
+// shows the problem instead of silently burning requests.
+async function markPoolFailure(entry: PoolEntry, errorText: string): Promise<void> {
+  const err = String(errorText || '');
+  const badKey = /invalid|unauthorized|401|403_api|forbidden|api key not valid/i.test(err);
+  const quota = /quota|billing|402|insufficient|exceeded your current quota|spend|credits/i.test(err);
+  const rate = /rate|429|too many|overloaded|503|timeout|timed out/i.test(err);
+  const cooldown = badKey ? 24 * 60 * 60 * 1000 : quota ? 6 * 60 * 60 * 1000 : rate ? 10 * 60 * 1000 : 60 * 1000;
+  await fsPatch(
+    'shared_ai_keys',
+    entry.id,
+    {
+      failCount: entry.failCount + 1,
+      lastError: err.slice(0, 200),
+      lastUsedAt: Date.now(),
+      disabledUntil: Date.now() + cooldown,
+      ...(badKey ? { enabled: false } : {}),
+    },
+    ['failCount', 'lastError', 'lastUsedAt', 'disabledUntil', ...(badKey ? ['enabled'] : [])]
+  ).catch(() => {});
+}
+
+// Verifies a Firebase ID token for real (signature + expiry are checked by
+// Google) and returns the account it belongs to. Nothing in this server trusts
+// an email from a request body.
+async function verifyCallerToken(idToken: string): Promise<{ email: string; uid: string } | null> {
+  const token = String(idToken || '').trim();
+  if (!token) return null;
+  try {
+    const resp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FS_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: token }),
+    });
+    if (!resp.ok) return null;
+    const data: any = await resp.json();
+    const user = data && data.users && data.users[0];
+    const email = String((user && user.email) || '').toLowerCase().trim();
+    if (!email) return null;
+    return { email, uid: String((user && user.localId) || '') };
+  } catch {
+    return null;
+  }
+}
+
+function isDeveloperAddress(email: string): boolean {
+  return DEVELOPER_EMAIL_LIST.includes(String(email || '').toLowerCase().trim());
+}
+
+// The entitlement a client is running RIGHT NOW, read straight from the grants
+// (the only document a client can never forge) using the caller's own token.
+async function runningPlanFor(email: string): Promise<{ expiry: string; label: string } | null> {
+  // Filtered by THIS client's own email: the query is provable against the
+  // rules, so the caller can never see — or be refused because of — anyone
+  // else's plan.
+  const grants = await fsListWhere('payment_grants', 'email', String(email || '').toLowerCase());
+  const now = Date.now();
+  const mine = grants
+    .filter(
+      (g) =>
+        String(g.email || '').toLowerCase() === email &&
+        String(g.kind || '') === 'plan' &&
+        String(g.status || '') === 'active' &&
+        !!g.expiryDate &&
+        new Date(String(g.expiryDate)).getTime() > now
+    )
+    .sort((a, b) => new Date(String(b.expiryDate)).getTime() - new Date(String(a.expiryDate)).getTime());
+  return mine.length ? { expiry: String(mine[0].expiryDate), label: String(mine[0].planLabel || '') } : null;
+}
+
+// ── Plan periods: real calendar units, counted in Greenwich (UTC) ───────────
+// A monthly plan is one calendar month, not 30 days, and a yearly plan is one
+// calendar year (so 29 February is handled). Everything is computed with UTC
+// getters/setters, which is exactly the GMT clock the plan is displayed in.
+type PlanUnit = 'day' | 'week' | 'month' | 'year';
+
+function inferPlanUnit(planLabel: unknown, durationDays: unknown, explicit?: unknown): PlanUnit {
+  const ex = String(explicit || '').toLowerCase().trim();
+  if (ex === 'day' || ex === 'daily') return 'day';
+  if (ex === 'week' || ex === 'weekly') return 'week';
+  if (ex === 'month' || ex === 'monthly') return 'month';
+  if (ex === 'year' || ex === 'yearly' || ex === 'annual') return 'year';
+  const label = String(planLabel || '').toLowerCase();
+  if (/يومي|يوميّة|يومياً|daily|single day|24 hour/.test(label)) return 'day';
+  if (/أسبوع|اسبوع|اسبوع|weekly|week/.test(label)) return 'week';
+  if (/سنوي|سنوية|سنويا|yearly|annual|year/.test(label)) return 'year';
+  if (/شهري|شهرية|شهريا|monthly|month/.test(label)) return 'month';
+  const days = Number(durationDays || 0);
+  if (days > 0 && days <= 1) return 'day';
+  if (days > 1 && days <= 7) return 'week';
+  if (days > 7 && days <= 31) return 'month';
+  if (days > 31) return 'year';
+  return 'month';
+}
+
+/** Adds `count` whole calendar units to `fromMs`, in UTC, clamping the day. */
+function addPlanPeriod(fromMs: number, unit: PlanUnit, count = 1): number {
+  const n = Number.isFinite(count) && count > 0 ? Math.round(count) : 1;
+  const d = new Date(fromMs);
+  if (unit === 'day') { d.setUTCDate(d.getUTCDate() + n); return d.getTime(); }
+  if (unit === 'week') { d.setUTCDate(d.getUTCDate() + 7 * n); return d.getTime(); }
+  const day = d.getUTCDate();
+  const month = d.getUTCMonth();
+  d.setUTCDate(1);
+  if (unit === 'month') d.setUTCMonth(month + n);
+  else d.setUTCFullYear(d.getUTCFullYear() + n);
+  // Jan 31 + 1 month must land on Feb 28/29, not roll into March.
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  return d.getTime();
+}
+
 function toFsValue(v: any): Json {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === 'string') return { stringValue: v };
@@ -1441,9 +1811,19 @@ const fsDocBody = (data: Json) => ({ fields: Object.fromEntries(Object.entries(d
 const docIdFromName = (name: string) => String(name).split('/').pop() || '';
 const sanitizeFs = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
 
-function grantDocIdFs(email: string, kind: string, botId?: string): string {
-  const key = kind === 'bot' ? `bot_${botId || 'unknown'}` : 'plan';
+function grantDocIdFs(email: string, kind: string, botId?: string, planReqNo?: number | string): string {
+  // Bots are keyed per-product (bot_<id>). Plans are keyed PER REQUEST
+  // (plan_<requestNo>) so a repeated purchase with the same email can never
+  // match an older plan grant — each plan waits for its own developer approval.
+  const key = kind === 'bot' ? `bot_${botId || 'unknown'}` : `plan_${planReqNo ? String(planReqNo) : 'none'}`;
   return `${sanitizeFs(email)}__${key}`;
+}
+
+// Replays the caller's Firebase ID token (captured by the middleware) onto the
+// Firestore REST call so request.auth in the rules is this request's user.
+function fsAuthHeaders(): Record<string, string> {
+  const token = fsAuthStore.getStore();
+  return token ? { Authorization: token } : {};
 }
 
 async function fsList(collectionName: string): Promise<Json[]> {
@@ -1451,7 +1831,7 @@ async function fsList(collectionName: string): Promise<Json[]> {
   let pageToken = '';
   for (let i = 0; i < 10; i++) {
     const url = `${FS_BASE}/${collectionName}?key=${FS_KEY}&pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
-    const resp = await fetch(url);
+    const resp = await fetch(url, { headers: fsAuthHeaders() });
     if (!resp.ok) {
       console.error(`fsList ${collectionName} failed: HTTP ${resp.status} ${await resp.text()}`);
       break;
@@ -1464,8 +1844,43 @@ async function fsList(collectionName: string): Promise<Json[]> {
   return out;
 }
 
+// A list that is filtered BY the field the rules check. Firestore refuses an
+// unfiltered list on payment_grants for a client (the rule is per-document, so
+// the query has to be provable), which is why every client-scoped read here goes
+// through this instead of fsList.
+async function fsListWhere(collectionName: string, field: string, value: string): Promise<Json[]> {
+  const out: Json[] = [];
+  try {
+    const query = {
+      structuredQuery: {
+        from: [{ collectionId: collectionName }],
+        where: { fieldFilter: { field: { fieldPath: field }, op: 'EQUAL', value: { stringValue: value } } },
+        limit: 300,
+      },
+    };
+    const resp = await fetch(`${FS_BASE}:runQuery?key=${FS_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...fsAuthHeaders() },
+      body: JSON.stringify(query),
+    });
+    if (!resp.ok) {
+      console.error(`fsListWhere ${collectionName}.${field} failed: HTTP ${resp.status} ${await resp.text()}`);
+      return out;
+    }
+    const raw = await resp.json();
+    for (const row of raw || []) {
+      const d = row && row.document;
+      if (!d || !d.fields) continue;
+      out.push({ id: docIdFromName(d.name), ...Object.fromEntries(Object.entries(d.fields).map(([k, v]) => [k, fromFsValue(v)])) });
+    }
+  } catch (e: any) {
+    console.error(`fsListWhere ${collectionName} threw:`, e?.message || e);
+  }
+  return out;
+}
+
 async function fsGet(collectionName: string, id: string): Promise<Json | null> {
-  const resp = await fetch(`${FS_BASE}/${collectionName}/${encodeURIComponent(id)}?key=${FS_KEY}`);
+  const resp = await fetch(`${FS_BASE}/${collectionName}/${encodeURIComponent(id)}?key=${FS_KEY}`, { headers: fsAuthHeaders() });
   if (!resp.ok) return null;
   const d: any = await resp.json();
   if (!d.fields) return null;
@@ -1473,10 +1888,17 @@ async function fsGet(collectionName: string, id: string): Promise<Json | null> {
 }
 
 async function fsPatch(collectionName: string, id: string, data: Json, mask?: string[]): Promise<void> {
-  const qs = mask && mask.length ? '&' + mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&') : '';
+  // Firestore REST: PATCH WITHOUT an updateMask replaces the whole document —
+  // which silently erased every other field (decision writes wiped the payment
+  // request, and the client record lost its email/plan on approval). Every call
+  // here means "merge these fields", so a mask is always sent.
+  const fields = mask && mask.length ? mask : Object.keys(data);
+  // An empty mask would mean "replace the document with nothing" — never.
+  if (!fields.length) return;
+  const qs = '&' + fields.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
   const resp = await fetch(`${FS_BASE}/${collectionName}/${encodeURIComponent(id)}?key=${FS_KEY}${qs}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...fsAuthHeaders() },
     body: JSON.stringify(fsDocBody(data)),
   });
   if (!resp.ok) throw new Error(`Firestore patch ${collectionName}/${id} failed: ${resp.status}`);
@@ -1485,7 +1907,7 @@ async function fsPatch(collectionName: string, id: string, data: Json, mask?: st
 async function fsAdd(collectionName: string, data: Json): Promise<void> {
   const resp = await fetch(`${FS_BASE}/${collectionName}?key=${FS_KEY}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...fsAuthHeaders() },
     body: JSON.stringify(fsDocBody(data)),
   });
   if (!resp.ok) throw new Error(`Firestore add ${collectionName} failed: ${resp.status}`);
@@ -1494,10 +1916,59 @@ async function fsAdd(collectionName: string, data: Json): Promise<void> {
 async function fsSet(collectionName: string, id: string, data: Json): Promise<void> {
   const resp = await fetch(`${FS_BASE}/${collectionName}/${encodeURIComponent(id)}?key=${FS_KEY}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...fsAuthHeaders() },
     body: JSON.stringify(fsDocBody(data)),
   });
   if (!resp.ok) throw new Error(`Firestore set ${collectionName}/${id} failed: ${resp.status}`);
+}
+
+async function fsDelete(collectionName: string, id: string): Promise<void> {
+  const resp = await fetch(`${FS_BASE}/${collectionName}/${encodeURIComponent(id)}?key=${FS_KEY}`, {
+    method: 'DELETE',
+    headers: fsAuthHeaders(),
+  });
+  if (!resp.ok && resp.status !== 404) throw new Error(`Firestore delete ${collectionName}/${id} failed: ${resp.status}`);
+}
+
+// ── Client Monitor records ──────────────────────────────────────────────────
+// The developer must always see a buyer in Client Monitor the moment a plan is
+// released, even if the client never reopens the site, and the crown tag must
+// track the plan's real period. Done server-side so it cannot depend on the
+// client's browser (which is also what makes it reliable across devices).
+function clientDocId(email: string): string {
+  return String(email || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
+}
+
+async function upsertClientRecord(email: string, patch: Json, opts: { create?: boolean } = {}): Promise<void> {
+  const e = String(email || '').toLowerCase().trim();
+  if (!e || !e.includes('@')) return;
+  const id = clientDocId(e);
+  try {
+    const existing = await fsGet('clients', id);
+    if (existing) {
+      // The FIRST release never moves: a renewal extends the end date, but the
+      // date the client originally paid for stays exactly as it was.
+      if (patch.firstReleasedAt && existing.firstReleasedAt) {
+        patch = { ...patch, firstReleasedAt: existing.firstReleasedAt };
+      }
+      await fsPatch('clients', id, patch);
+      return;
+    }
+    if (opts.create === false) return;
+    const all = await fsList('clients');
+    await fsSet('clients', id, {
+      email: e,
+      status: 'verified',
+      plan: 'free',
+      planExpiry: null,
+      autoRegistered: true,
+      registeredAt: Date.now(),
+      rank: all.length + 1,
+      ...patch,
+    });
+  } catch (e: any) {
+    console.error('upsertClientRecord failed for', e, e?.message || '');
+  }
 }
 
 // Mark every notification that refers to a given request number as read, so the
@@ -1560,7 +2031,7 @@ async function releasePaymentRequest(req: Json, now: number, source: string): Pr
     decidedBy: source,
   }, ['status', 'decidedAt', 'decidedBy']);
 
-  const grantId = grantDocIdFs(req.buyerEmail, req.kind, req.botId);
+  const grantId = grantDocIdFs(req.buyerEmail, req.kind, req.botId, req.kind === 'plan' ? req.requestNo : undefined);
   const grant: Json = {
     email: (req.buyerEmail || '').toLowerCase(),
     kind: req.kind,
@@ -1571,9 +2042,11 @@ async function releasePaymentRequest(req: Json, now: number, source: string): Pr
     botName: req.botName || null,
     planLabel: req.planLabel || null,
   };
+  // The plan grace period does NOT start at release. It starts only when the
+  // client enters their key and begins using the paid plan (/api/plan-activate),
+  // so a pending-key plan never burns days waiting inside the gate.
   if (req.kind === 'plan') {
-    const days = Number(req.durationDays) > 0 ? Number(req.durationDays) : 30;
-    grant.expiryDate = new Date(now + days * 86400000).toISOString();
+    grant.durationDays = Number(req.durationDays) > 0 ? Number(req.durationDays) : 30;
   }
   await fsPatch('payment_grants', grantId, grant);
 
@@ -1852,6 +2325,11 @@ app.post("/api/payment-request/create", async (req: any, res: any) => {
       botName: b.botName,
       planLabel: b.planLabel,
       durationDays: b.durationDays,
+      // The calendar unit is decided ONCE, when the order is placed, and travels
+      // with the request — so the period granted at approval is exactly the one
+      // the client bought (a month is a month, not 30 days).
+      planUnit: kind === 'plan' ? inferPlanUnit(b.planLabel, b.durationDays, b.planUnit) : undefined,
+      planUnits: kind === 'plan' ? (Number(b.planUnits) > 0 ? Number(b.planUnits) : 1) : undefined,
       amountUsd: amount,
       coinId: b.coinId,
       coinName: b.coinName,
@@ -1888,7 +2366,9 @@ app.get("/api/payment-requests-list", async (_req: any, res: any) => {
   try {
     const items = await fsList('payment_requests');
     items.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
-    return res.json({ ok: true, items });
+    const hidden = await fsGet('shared_settings', 'dev_hidden_transactions');
+    const hiddenIds: string[] = Array.isArray(hidden?.ids) ? (hidden.ids as string[]) : [];
+    return res.json({ ok: true, items, hiddenIds });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e.message });
   }
@@ -1913,9 +2393,10 @@ app.post("/api/payment-request-decision", async (req: any, res: any) => {
       decidedBy: developerEmail,
     });
     if (action === 'approve') {
-      const grantId = grantDocIdFs(String(reqDoc.buyerEmail || ''), String(reqDoc.kind || 'bot'), reqDoc.botId);
+      const buyerEmail = String(reqDoc.buyerEmail || '').toLowerCase().trim();
+      const grantId = grantDocIdFs(buyerEmail, String(reqDoc.kind || 'bot'), reqDoc.botId, String(reqDoc.kind) === 'plan' ? reqDoc.requestNo : undefined);
       const grant: Json = {
-        email: String(reqDoc.buyerEmail || '').toLowerCase(),
+        email: buyerEmail,
         kind: reqDoc.kind || 'bot',
         botId: reqDoc.botId,
         botName: reqDoc.botName,
@@ -1924,11 +2405,58 @@ app.post("/api/payment-request-decision", async (req: any, res: any) => {
         requestNo: reqDoc.requestNo,
         createdAt: now,
       };
+      let released: { startAt: number; expiryDate: string; unit: PlanUnit } | null = null;
       if (String(reqDoc.kind) === 'plan') {
-        const days = Number(reqDoc.durationDays) > 0 ? Number(reqDoc.durationDays) : 30;
-        grant.expiryDate = new Date(now + days * 86400000).toISOString();
+        // DIRECT RELEASE: approving is the release. There is no key to enter and
+        // no waiting screen — the plan is live from this instant.
+        //
+        // The clock is a real calendar period counted in GMT: daily = 24h,
+        // weekly = 7 days, monthly = one calendar month, yearly = one calendar
+        // year. Buying again while a plan is still running EXTENDS it from the
+        // moment the current one ends, so paid time is never thrown away.
+        const unit = inferPlanUnit(reqDoc.planLabel, reqDoc.durationDays, reqDoc.planUnit);
+        const count = Number(reqDoc.planUnits) > 0 ? Number(reqDoc.planUnits) : 1;
+        const days = Number(reqDoc.durationDays) > 0 ? Number(reqDoc.durationDays) : 0;
+        const existing = await fsList('payment_grants');
+        const runningUntil = existing
+          .filter(
+            (g) =>
+              String(g.email || '').toLowerCase() === buyerEmail &&
+              String(g.kind || '') === 'plan' &&
+              String(g.status || '') === 'active' &&
+              !!g.expiryDate &&
+              new Date(String(g.expiryDate)).getTime() > now
+          )
+          .reduce((max, g) => Math.max(max, new Date(String(g.expiryDate)).getTime()), 0);
+        const startAt = Math.max(now, runningUntil);
+        const expiryDate = new Date(addPlanPeriod(startAt, unit, count)).toISOString();
+        released = { startAt, expiryDate, unit };
+        grant.durationDays = days || undefined;
+        grant.planUnit = unit;
+        grant.planUnits = count;
+        grant.activatedAt = startAt;
+        grant.expiryDate = expiryDate;
+        grant.releasedAt = now;
       }
-      await fsSet('payment_grants', grantId, grant);
+      // Merge, never replace: a re-approval must not wipe an already-started
+      // clock (activatedAt/expiryDate) that the client already earned.
+      await fsPatch('payment_grants', grantId, grant);
+      if (String(reqDoc.kind) === 'plan' && released) {
+        // The buyer is listed in Client Monitor with their email exactly as they
+        // typed it, and the crown appears the moment the plan is released.
+        await upsertClientRecord(buyerEmail, {
+          autoRegistered: true,
+          approvedAt: now,
+          releasedAt: released.startAt,
+          // Kept at the very first release by upsertClientRecord, so a renewal
+          // only moves the expiry and never the start date.
+          firstReleasedAt: released.startAt,
+          plan: 'paid',
+          planExpiry: released.expiryDate,
+          planLabel: reqDoc.planLabel || '',
+          planUnit: released.unit,
+        });
+      }
       await fsAdd('dev_notifications', {
         type: 'approved',
         requestNo: reqDoc.requestNo,
@@ -1942,6 +2470,115 @@ app.post("/api/payment-request-decision", async (req: any, res: any) => {
     }
     await markRequestNotifsRead(reqDoc.requestNo);
     return res.json({ ok: true, status: action === 'approve' ? 'approved' : 'rejected' });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Dev-only: hide a transaction from the developer purchase history. The client
+// data (request + grant) stays untouched — the entry only disappears from the
+// developer account view.
+app.post("/api/payment-request-hide", async (req: any, res: any) => {
+  try {
+    const id = String((req.body || {}).id || '');
+    if (!id) return res.status(400).json({ ok: false, error: 'missing id' });
+    const doc = await fsGet('shared_settings', 'dev_hidden_transactions');
+    const ids: string[] = Array.isArray(doc?.ids) ? (doc.ids as string[]) : [];
+    if (!ids.includes(id)) ids.push(id);
+    await fsPatch('shared_settings', 'dev_hidden_transactions', { ids, updatedAt: Date.now() }, ['ids', 'updatedAt']);
+    return res.json({ ok: true });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Legacy safety net. Plans are now RELEASED at approval time with their full
+// calendar period already written, so this normally finds every grant already
+// started and changes nothing. It still exists for grants created before that
+// change, and uses the same GMT calendar maths so a period can never disagree
+// with the one the developer granted.
+app.post("/api/plan-activate", async (req: any, res: any) => {
+  try {
+    // The email is taken from the VERIFIED session, never from the body: a client
+    // must not be able to start somebody else's clock.
+    const caller = await verifyCallerToken(callerToken(req));
+    if (!caller) return res.status(401).json({ ok: false, error: 'sign_in_required' });
+    const email = String(caller.email || '').toLowerCase().trim();
+    const requestNo = Number((req.body || {}).requestNo) || null;
+    if (!email) return res.status(400).json({ ok: false, error: 'missing email' });
+    const grants = await fsListWhere('payment_grants', 'email', email);
+    const mine = grants.filter((g) =>
+      String(g.email || '').toLowerCase() === email &&
+      String(g.kind || '') === 'plan' &&
+      String(g.status || '') === 'active' &&
+      (!requestNo || Number(g.requestNo) === requestNo)
+    );
+    const now = Date.now();
+    // Running total, updated as each period is granted, so two legacy pending
+    // periods can never be handed the SAME start instant.
+    let runningUntil = mine
+      .filter((g) => !!g.expiryDate && new Date(String(g.expiryDate)).getTime() > now)
+      .reduce((max, g) => Math.max(max, new Date(String(g.expiryDate)).getTime()), 0);
+    let activated = 0;
+    for (const g of mine) {
+      if (g.expiryDate) continue; // already started — keep original period
+      const unit = inferPlanUnit(g.planLabel, g.durationDays, g.planUnit);
+      const count = Number(g.planUnits) > 0 ? Number(g.planUnits) : 1;
+      const startAt = Math.max(now, runningUntil);
+      const expiryDate = new Date(addPlanPeriod(startAt, unit, count)).toISOString();
+      runningUntil = new Date(expiryDate).getTime();
+      await fsPatch('payment_grants', g.id!, { planUnit: unit, planUnits: count, expiryDate, activatedAt: startAt, releasedAt: now }, ['planUnit', 'planUnits', 'expiryDate', 'activatedAt', 'releasedAt']);
+      // The plan is now RUNNING: the client gets the crown in Client Monitor,
+      // and it disappears by itself once this expiryDate passes.
+      await upsertClientRecord(email, {
+        plan: 'paid',
+        planExpiry: expiryDate,
+        planLabel: g.planLabel || '',
+        planUnit: unit,
+        autoRegistered: true,
+      });
+      activated++;
+    }
+    return res.json({ ok: true, activated });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Developer-only purchase history: every plan/bot purchase with a GMT date,
+// newest first. Client data (requests + grants) is untouched — a deleted entry
+// only disappears from the developer view.
+app.get("/api/transaction-history", async (_req: any, res: any) => {
+  try {
+    const items = await fsList('payment_requests');
+    items.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+    return res.json({ ok: true, items });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Client plan deletion: revoke every active plan grant for the email so the plan
+// is truly gone and cannot be re-activated by the grants poll on next login.
+app.post("/api/plan-revoke", async (req: any, res: any) => {
+  try {
+    // Verified session only. Trusting a body email here would let any client
+    // cancel somebody else's plan.
+    const caller = await verifyCallerToken(callerToken(req));
+    if (!caller) return res.status(401).json({ ok: false, error: 'sign_in_required' });
+    const email = String(caller.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ ok: false, error: 'missing email' });
+    const grants = await fsListWhere('payment_grants', 'email', email);
+    const mine = grants.filter((g) => String(g.email || '').toLowerCase() === email && String(g.kind || '') === 'plan');
+    await Promise.all(
+      mine
+        .filter((g) => String(g.status || '') === 'active')
+        .map((g) => fsPatch('payment_grants', g.id!, { status: 'revoked', revokedAt: Date.now() }, ['status', 'revokedAt']))
+    );
+    // Drop the crown: the plan is gone, so Client Monitor must show them as a
+    // free client again.
+    await upsertClientRecord(email, { plan: 'free', planExpiry: null, planRevokedAt: Date.now() });
+    return res.json({ ok: true });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e.message });
   }

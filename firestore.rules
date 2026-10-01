@@ -1,125 +1,238 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
-    }
 
-    // Clients collection — allow read/write for registration and verification
-    match /clients/{clientId} {
-      allow read, write: if true;
-    }
-
+    // ── Identity helpers ────────────────────────────────────────────────────
+    // Every private collection below is keyed off the SIGNED-IN Firebase account
+    // (request.auth), never off a value the caller can put in the body. An
+    // unauthenticated request (the server polling with the public API key) is
+    // therefore a separate, explicitly-listed case — it is never treated as a
+    // client and can never reach another client's data.
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return (isSignedIn() && request.auth.uid == userId) || userId != null;
+    function authEmail() {
+      return isSignedIn() && request.auth.token.email != null
+        ? request.auth.token.email.lower()
+        : '';
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    // The developer (you). Full read access to client records, and the only
+    // identity allowed to decide a purchase or hand out a plan grant.
+    function isDeveloper() {
+      return authEmail() in [
+        'albertaparks1t@gmail.com',
+        'bachasalman69@gmail.com',
+        'taybekraa@gmail.com',
+        'kraakraa109@gmail.com'
+      ];
     }
 
-    match /analysisResults/{resultId} {
-      allow read, write: if true;
+    // ── Per-client private data ─────────────────────────────────────────────
+    // A client only ever reaches rows carrying THEIR OWN email. `get` is limited
+    // to that single row and `list` to the developer, so no client can page
+    // through the customer list.
+    match /clients/{clientId} {
+      function isOwnerClientEmail() {
+        return isSignedIn() && resource.data.email is string
+          && resource.data.email.lower() == authEmail();
+      }
+      function writesOwnClientEmail() {
+        return isSignedIn() && request.resource.data.email is string
+          && request.resource.data.email.lower() == authEmail();
+      }
+      // A client registers and maintains their OWN row, but can never raise
+      // their own entitlement: plan/planExpiry may only be written as free/null
+      // or left exactly as they are. Only the developer raises them, which is
+      // what makes the crown in Client Monitor trustworthy.
+      function ownerMayCreateOwn() {
+        return writesOwnClientEmail()
+          && (!('plan' in request.resource.data)
+              || request.resource.data.plan == 'free')
+          && (!('planExpiry' in request.resource.data)
+              || request.resource.data.planExpiry == null);
+      }
+      function ownerMayUpdateOwn() {
+        return isOwnerClientEmail() && writesOwnClientEmail()
+          && (!('plan' in request.resource.data)
+              || request.resource.data.plan == 'free'
+              || (('plan' in resource.data)
+                  && request.resource.data.plan == resource.data.plan))
+          && (!('planExpiry' in request.resource.data)
+              || request.resource.data.planExpiry == null
+              || (('planExpiry' in resource.data)
+                  && request.resource.data.planExpiry == resource.data.planExpiry));
+      }
+      allow get: if isDeveloper() || isOwnerClientEmail();
+      // A list rule must be provable from the query alone, so it compares the
+      // stored field to the session's email directly (values are stored
+      // lowercased, the caller always passes a lowercased value too).
+      allow list: if isDeveloper() || (isSignedIn() && resource.data.email == authEmail());
+      allow create: if isDeveloper() || ownerMayCreateOwn();
+      allow update: if isDeveloper() || ownerMayUpdateOwn();
+      allow delete: if isDeveloper();
     }
 
+    // Per-account UI preferences (hidden suggestions, view state). Keyed by uid.
     match /userPreferences/{userId} {
-      allow read, write: if true;
+      allow get, list: if isDeveloper() || (isSignedIn() && request.auth.uid == userId);
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update, delete: if isDeveloper() || (isSignedIn() && request.auth.uid == userId);
     }
 
-    // Shared results — anyone can read/write (clients may be anonymous)
-    match /shared_results/{docId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Shared alerts — anyone can read/write
-    match /shared_alerts/{docId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Shared radar status — developer writes running state, clients read to show banner
-    match /shared_status/{docId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Shared settings (freemium state, client login toggle) — anyone can read/write
-    match /shared_settings/{docId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Bots store — developers write bots, anyone reads and buys
-    match /store_bots/{botId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Bot purchases ledger — clients record purchases, developer reads
-    match /store_purchases/{purchaseId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Payment sessions — in-progress transactions saved by clients (resume across devices)
+    // Payment sessions hold amounts and provider session ids — owner only.
     match /payment_sessions/{sessionId} {
-      allow read, write: if true;
+      allow get: if isDeveloper()
+        || (isSignedIn() && resource.data.buyerEmail is string
+            && resource.data.buyerEmail.lower() == authEmail());
+      allow list: if isDeveloper()
+        || (isSignedIn() && resource.data.buyerEmail is string
+            && resource.data.buyerEmail.lower() == authEmail());
+      allow create: if isDeveloper()
+        || (isSignedIn() && request.resource.data.buyerEmail is string
+            && request.resource.data.buyerEmail.lower() == authEmail());
+      allow update: if isDeveloper()
+        || (isSignedIn()
+            && resource.data.buyerEmail is string
+            && request.resource.data.buyerEmail is string
+            && resource.data.buyerEmail.lower() == authEmail()
+            && request.resource.data.buyerEmail.lower() == authEmail());
+      allow delete: if isDeveloper()
+        || (isSignedIn() && resource.data.buyerEmail is string
+            && resource.data.buyerEmail.lower() == authEmail());
     }
 
-    // Site ads config — developer writes, anyone reads
-    match /config/{docId} {
-      allow read: if true;
+    // Bot purchase ledger — owner + developer.
+    match /store_purchases/{purchaseId} {
+      allow get: if isDeveloper()
+        || (isSignedIn() && resource.data.email is string
+            && resource.data.email.lower() == authEmail());
+      allow list: if isDeveloper()
+        || (isSignedIn() && resource.data.email == authEmail());
+      allow create: if isDeveloper()
+        || (isSignedIn() && request.resource.data.email is string
+            && request.resource.data.email.lower() == authEmail());
+      allow update, delete: if isDeveloper();
+    }
+
+    // ── Plan grants: the single most sensitive collection ───────────────────
+    // A grant is what unlocks a paid plan, so it must be IMPOSSIBLE for a client
+    // (or any visitor) to create one — that would be a free plan for anyone.
+    // Only the developer creates a grant, from their own signed-in session.
+    // A client may read their own grant, and may only touch the timing/status of
+    // a grant that already exists for them (start the clock, cancel the plan).
+    match /payment_grants/{grantId} {
+      allow get: if isDeveloper()
+        || (isSignedIn() && resource.data.email is string
+            && resource.data.email.lower() == authEmail());
+      allow list: if isDeveloper()
+        || (isSignedIn() && resource.data.email == authEmail());
+      allow create: if isDeveloper();
+      // The owner may only operate on a grant that is already theirs: start the
+      // clock once, consume it, or give it up. Identity fields are locked, the
+      // release-time expiryDate can never be created or moved by the owner, and
+      // the start instant must be a real Timestamp within 5 minutes of SERVER
+      // time — so the owner can never hand themselves a longer plan.
+      allow update: if isDeveloper()
+        || (isSignedIn()
+            && resource.data.email is string
+            && request.resource.data.email is string
+            && resource.data.email.lower() == authEmail()
+            && request.resource.data.email.lower() == authEmail()
+            && request.resource.data.status in ['active', 'revoked', 'consumed']
+            && resource.data.kind == request.resource.data.kind
+            && (!('durationDays' in request.resource.data)
+                || (('durationDays' in resource.data)
+                    && request.resource.data.durationDays == resource.data.durationDays))
+            && (!('expiryDate' in request.resource.data)
+                || (('expiryDate' in resource.data)
+                    && request.resource.data.expiryDate == resource.data.expiryDate))
+            && ('activatedAt' in resource.data
+                ? request.resource.data.activatedAt == resource.data.activatedAt
+                : (!('activatedAt' in request.resource.data)
+                    || (request.resource.data.activatedAt is timestamp
+                        && request.resource.data.activatedAt <= request.time
+                        && request.time - duration.value(5, 'm') <= request.resource.data.activatedAt)))
+            // Approval facts are the developer's: the owner may never move the
+            // approval instant (the plan clock is derived from it), the request
+            // number, or the plan label.
+            && (!('createdAt' in resource.data)
+                || request.resource.data.createdAt == resource.data.createdAt)
+            && (!('requestNo' in resource.data)
+                || request.resource.data.requestNo == resource.data.requestNo)
+            && (!('planLabel' in resource.data)
+                || request.resource.data.planLabel == resource.data.planLabel));
+      allow delete: if isDeveloper();
+    }
+
+    // Payment requests: a client submits their own and reads only their own.
+    // Creation stays open because the server's payment poller submits detected
+    // transfers without a session; a forged row still needs YOUR approval before
+    // any plan is granted, so it cannot be used to unlock anything.
+    match /payment_requests/{requestId} {
+      allow get: if isDeveloper()
+        || (isSignedIn() && resource.data.buyerEmail is string
+            && resource.data.buyerEmail.lower() == authEmail());
+      allow list: if isDeveloper()
+        || (isSignedIn() && resource.data.buyerEmail is string
+            && resource.data.buyerEmail.lower() == authEmail());
+      allow create: if request.resource.data.buyerEmail is string;
+      allow update, delete: if isDeveloper();
+    }
+
+    // Developer notifications — only you read them. The payment poller still
+    // writes them without a session, so writes stay open.
+    match /dev_notifications/{notifId} {
+      allow read: if isDeveloper();
       allow write: if true;
     }
 
-    // Payment confirmation requests — clients create numbered requests, developer approves
-    match /payment_requests/{requestId} {
-      allow read, write: if true;
+    // ── Shared AI key pool (the keys paying clients run analysis on) ─────────
+    // The key VALUE is never stored here in plain text: the server encrypts it
+    // with AES-256-GCM (AI_POOL_SECRET, a server-only env var) before writing it,
+    // and decrypts it only in memory for the upstream call. So even a full dump
+    // of this collection yields ciphertext that is useless outside the server.
+    //
+    // Read is open to any signed-in account on purpose: the analysis endpoint
+    // runs as the CALLER (it replays their ID token onto Firestore so the rules
+    // above stay authoritative), and it has to fetch the pool on their behalf.
+    // Write stays developer-only — nobody but you can add, disable or delete a
+    // key, and no client can ever read back what they are running on.
+    match /shared_ai_keys/{keyId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isDeveloper();
     }
 
-    // Payment grants — written by developer approval, read by the buyer to unlock
-    match /payment_grants/{grantId} {
-      allow read, write: if true;
-    }
-
-    // Developer notifications — created on payment events, read by the developer
-    match /dev_notifications/{notifId} {
-      allow read, write: if true;
-    }
-
-    // Suggestions — anyone can read/write
-    match /suggestions/{suggestionId} {
-      allow read, write: if true;
-    }
-
-    // Analytics — anyone can read/write (for anonymous tracking)
-    match /analytics_counters/{docId} {
-      allow read, write: if true;
-    }
-
-    match /analytics_views/{docId} {
-      allow read, write: if true;
-    }
-
-    match /analytics_clicks/{docId} {
-      allow read, write: if true;
-    }
-
-    // Paper trading — each signed-in user owns exactly one virtual account
+    // ── Virtual trading: already per-uid, kept as is ────────────────────────
     match /paper_accounts/{userId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Paper trading — trades are private to the user who created them
     match /paper_trades/{tradeId} {
       allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ── Public, non-personal data (unchanged) ───────────────────────────────
+    // None of these carry a client's identity: shared analysis output, market
+    // status, public store catalogue, the public suggestion board, counters.
+    match /shared_results/{docId} { allow read, write: if true; }
+    match /shared_alerts/{docId} { allow read, write: if true; }
+    match /shared_status/{docId} { allow read, write: if true; }
+    match /shared_settings/{docId} { allow read, write: if true; }
+    match /store_bots/{botId} { allow read, write: if true; }
+    match /config/{docId} { allow read, write: if true; }
+    match /analysisResults/{resultId} { allow read, write: if true; }
+    match /suggestions/{suggestionId} { allow read, write: if true; }
+    match /analytics_counters/{docId} { allow read, write: if true; }
+    match /analytics_views/{docId} { allow read, write: if true; }
+    match /analytics_clicks/{docId} { allow read, write: if true; }
+
+    // Everything not matched above stays closed.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

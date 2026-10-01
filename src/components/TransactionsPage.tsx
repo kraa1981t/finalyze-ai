@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, XCircle, Receipt, CheckCircle2, Clock, Store } from 'lucide-react';
+import { ArrowLeft, RefreshCw, XCircle, Receipt, CheckCircle2, Clock, Store, Trash2 } from 'lucide-react';
 import { Language } from '../lib/i18n';
 import { loadAllSessions, cancelSession, PaymentSession } from '../services/paymentSession';
-import { fetchPaymentRequests, fetchUserGrants, PaymentRequest, PaymentGrant } from '../services/paymentRequests';
-import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
+import { fetchPaymentRequests, fetchUserPaymentRequests, fetchUserGrants, fetchDevHistory, fetchDevHiddenTransactionIds, hideTransactionFromDev, PaymentRequest, PaymentGrant } from '../services/paymentRequests';
 import PaymentRequestsSection from './PaymentRequestsSection';
 import SiteRequestsSection from './SiteRequestsSection';
 
@@ -43,13 +42,15 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
   const [rows, setRows] = useState<TxRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [devHistory, setDevHistory] = useState<PaymentRequest[]>([]);
+  const [devHidden, setDevHidden] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     if (!autoEmail) return;
     setLoading(true);
     const [sessions, requests, grants] = await Promise.all([
       loadAllSessions(autoEmail),
-      fetchPaymentRequests(),
+      isDeveloper ? fetchPaymentRequests() : fetchUserPaymentRequests(autoEmail),
       fetchUserGrants(autoEmail),
     ]);
     const email = autoEmail.toLowerCase();
@@ -98,9 +99,16 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
 
     const list = [...merged.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     setRows(list);
+
+    if (isDeveloper) {
+      const [history, hidden] = await Promise.all([fetchDevHistory(), fetchDevHiddenTransactionIds()]);
+      if (history) setDevHistory(history || []);
+      setDevHidden(hidden || []);
+    }
+
     setLoaded(true);
     setLoading(false);
-  }, [autoEmail]);
+  }, [autoEmail, isDeveloper]);
 
   useEffect(() => {
     if (autoEmail) load();
@@ -111,15 +119,20 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
     load();
   };
 
+  const handleDevDelete = async (id: string) => {
+    await hideTransactionFromDev(id);
+    load();
+  };
+
   const isAr = lang === 'ar';
   const pendingCount = rows.filter((r) => r.status === 'active' || r.status === 'pending').length;
   const stLabel = (st: RowStatus): string => {
     switch (st) {
-      case 'active': return lt(lang, 52);
-      case 'pending': return lt(lang, 416);
-      case 'confirmed': return lt(lang, 167);
-      case 'cancelled': return lt(lang, 124);
-      case 'completed': return lt(lang, 155);
+      case 'active': return isAr ? 'قيد الانتظار' : 'Active';
+      case 'pending': return isAr ? 'قيد التأكيد' : 'Pending';
+      case 'confirmed': return isAr ? 'تم التأكيد — متاح للتحميل' : 'Confirmed — ready';
+      case 'cancelled': return isAr ? 'ملغاة' : 'Cancelled';
+      case 'completed': return isAr ? 'مكتملة' : 'Completed';
     }
   };
   const stClass = (st: RowStatus): string => {
@@ -142,20 +155,75 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
           <div>
             <h2 className="text-xl font-black text-white flex items-center gap-2">
               <Receipt size={20} className="text-[#F59E0B]" />
-              {isDeveloper ? (lt(lang, 191)) : (lt(lang, 342))}
+              {isDeveloper ? (isAr ? 'تأكيد معاملات العملاء' : 'Customer Payment Confirmations') : (isAr ? 'معاملاتي' : 'My Transactions')}
             </h2>
             <p className="text-sm font-bold text-slate-400 mt-0.5">
               {isDeveloper
-                ? (lt(lang, 477))
-                : (lt(lang, 635))}
+                ? (isAr ? 'افحص الطلبات، قارن توقيت غرينتش، ثم أكّد أو ارفض لتحرير التحميل.' : 'Review requests, compare the GMT time, then approve or reject to release downloads.')
+                : (isAr ? 'سجل معاملاتك: المكتملة، الملغاة، والقيد التأكيد/الانتظار.' : 'Your transactions: confirmed, cancelled, pending, and active.')}
             </p>
           </div>
         </div>
 
         {isDeveloper && (
           <div className="mb-6">
-            <PaymentRequestsSection lang={lang} developerEmail={autoEmail} />
-            <SiteRequestsSection lang={lang} />
+            <PaymentRequestsSection lang={lang === 'ar' ? 'ar' : 'en'} developerEmail={autoEmail} />
+            <SiteRequestsSection lang={lang === 'ar' ? 'ar' : 'en'} />
+          </div>
+        )}
+
+        {isDeveloper && (
+          <div className="mb-6 rounded-2xl bg-white/5 border border-white/10 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-black uppercase tracking-wider text-slate-400">
+                {isAr ? 'سجل المشتريات (تاريخ)' : 'Purchase History (dates)'}
+              </label>
+              <button
+                onClick={load}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-white text-xs font-black uppercase tracking-wider transition-all"
+              >
+                <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+                {isAr ? 'تحديث' : 'Refresh'}
+              </button>
+            </div>
+            {devHistory.length === 0 ? (
+              <p className="text-xs text-slate-500 font-bold text-center py-3">
+                {isAr ? 'لا توجد مشتريات بعد' : 'No purchases yet'}
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {devHistory
+                  .filter((r) => !devHidden.includes(r.id || ''))
+                  .map((r) => (
+                    <div key={r.id || `r_${r.requestNo}`} className="flex items-center gap-2 flex-wrap rounded-xl bg-black/25 border border-white/10 p-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-black text-white truncate">
+                          {r.kind === 'bot' ? (r.botName || 'Bot') : (r.planLabel || 'Plan')}
+                          <span className="text-slate-400 font-bold"> · {r.buyerName || r.buyerEmail}</span>
+                        </p>
+                        <p className="text-xs text-slate-400 font-bold truncate mt-0.5">
+                          ${Number(r.amountUsd || 0).toFixed(2)} USDT
+                          {r.requestNo ? ` · #${r.requestNo}` : ''}
+                        </p>
+                        <p className="text-xs text-slate-500 font-bold mt-0.5 flex items-center gap-1">
+                          <Clock size={12} />
+                          {fmtGmt(r.createdAt)}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider ${stClass(r.status === 'approved' ? 'confirmed' : r.status === 'rejected' ? 'cancelled' : 'pending')}`}>
+                        {stLabel(r.status === 'approved' ? 'confirmed' : r.status === 'rejected' ? 'cancelled' : 'pending')}
+                      </span>
+                      <button
+                        onClick={() => handleDevDelete(r.id || '')}
+                        className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/40 text-red-400 hover:bg-red-500/20 text-xs font-black uppercase tracking-wider transition-all"
+                      >
+                        <Trash2 size={12} />
+                        {isAr ? 'مسح' : 'Clear'}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -166,21 +234,23 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
             </span>
             <p className="text-sm text-amber-300 font-bold">
-              {ltp(lang, 792, String(pendingCount), pendingCount > 1 ? 's' : '')}
+              {isAr
+                ? `لديك ${pendingCount} معاملة معلقة — استأنفها أو انتظر التأكيد`
+                : `You have ${pendingCount} pending transaction${pendingCount > 1 ? 's' : ''} — resume or wait for confirmation`}
             </p>
           </div>
         )}
 
         <div className="flex items-center justify-between mb-3">
           <label className="text-sm font-black uppercase tracking-wider text-slate-400">
-            {lt(lang, 578)}
+            {isAr ? 'قائمة المعاملات' : 'Transaction list'}
           </label>
           <button
             onClick={load}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-white text-xs font-black uppercase tracking-wider transition-all"
           >
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-            {lt(lang, 453)}
+            {isAr ? 'تحديث' : 'Refresh'}
           </button>
         </div>
 
@@ -189,12 +259,12 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
             onClick={load}
             className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white text-sm font-black uppercase tracking-wider transition-all"
           >
-            {lt(lang, 600)}
+            {isAr ? 'عرض المعاملات' : 'View transactions'}
           </button>
         ) : rows.length === 0 ? (
           <div className="rounded-2xl bg-white/5 border border-white/10 p-6 text-center">
             <Receipt size={28} className="mx-auto mb-2 text-slate-500" />
-            <p className="text-sm text-slate-400 font-bold">{lt(lang, 373)}</p>
+            <p className="text-sm text-slate-400 font-bold">{isAr ? 'لا توجد معاملات بعد' : 'No transactions yet'}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -210,8 +280,8 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
                     </p>
                     <p className="text-xs text-slate-500 font-bold mt-0.5 flex items-center gap-1">
                       <Clock size={12} />
-                      {lt(lang, 183)} {fmtGmt(t.createdAt)}
-                      {t.decidedAt ? ` · ${lt(lang, 195)} ${fmtGmt(t.decidedAt)}` : ''}
+                      {isAr ? 'أنشئت بتوقيت غرينتش:' : 'Created (GMT):'} {fmtGmt(t.createdAt)}
+                      {t.decidedAt ? ` · ${isAr ? 'الحسم:' : 'decided:'} ${fmtGmt(t.decidedAt)}` : ''}
                     </p>
                   </div>
                   <span className={`shrink-0 px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider ${stClass(t.status)}`}>
@@ -225,7 +295,7 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F59E0B] text-black font-black text-xs uppercase tracking-wider hover:bg-[#d97706] transition-all"
                     >
                       <RefreshCw size={12} />
-                      {lt(lang, 474)}
+                      {isAr ? 'متابعة المعاملة' : 'Resume'}
                     </button>
                   )}
                   {t.status === 'active' && t.session && (
@@ -234,13 +304,13 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-red-400 hover:border-red-500/40 text-xs font-black uppercase tracking-wider transition-all"
                     >
                       <XCircle size={12} />
-                      {lt(lang, 120)}
+                      {isAr ? 'إلغاء' : 'Cancel'}
                     </button>
                   )}
                   {t.status === 'confirmed' && t.grant && (
                     <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-black uppercase tracking-wider">
                       <CheckCircle2 size={12} />
-                      {lt(lang, 213)}
+                      {isAr ? 'تم إفراج التحميل' : 'Download released'}
                     </span>
                   )}
                   {t.status === 'confirmed' && (
@@ -249,13 +319,13 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-black text-xs uppercase tracking-wider hover:bg-emerald-400 transition-all"
                     >
                       <Store size={12} />
-                      {lt(lang, 273)}
+                      {isAr ? 'التحميل من المتجر' : 'Go to Store to download'}
                     </button>
                   )}
                   {(t.status === 'cancelled') && (
                     <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-black uppercase tracking-wider">
                       <XCircle size={12} />
-                      {lt(lang, 460)}
+                      {isAr ? 'تم الرفض / الإلغاء' : 'Rejected / cancelled'}
                     </span>
                   )}
                 </div>

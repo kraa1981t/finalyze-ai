@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw, Pencil, Check, XCircle, Trash2, Maximize, Minimize } from 'lucide-react';
+import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw, Pencil, Check, XCircle, Trash2, Maximize, Minimize, ChevronUp, ChevronDown } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { AnalysisResult } from '../types';
 import { SYMBOL_CATEGORIES } from '../constants';
@@ -14,7 +14,6 @@ import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSugg
 import { playOpenSound, playCloseSound, playDragTick } from '../lib/tradeSounds';
 import { pricesToUsd, usdToPrice, slAmountUSD, notionalInUSD } from '../lib/positionMath';
 import { toTvSymbol as toTvSymbolShared } from '../lib/tvSymbol';
-import { lt, ltp, pick, pkick, loc } from '../lib/i18nUI';
 
 interface TradeNowPageProps {
   lang: Language;
@@ -28,10 +27,10 @@ const HIDDEN_KEY = 'paper_trading_hidden_symbols';
 const ADDED_CAT_KEY = 'paper_trading_added_by_category';
 
 const CATEGORY_TABS = [
-  { key: 'forex', labelEn: 'Forex', labelAr: 'الفوركس', labelEs: 'Forex', labelRu: 'Форекс', labelFr: 'Forex', emoji: '\uD83D\uDCB1' },
-  { key: 'crypto', labelEn: 'Crypto', labelAr: 'الكريبتو', labelEs: 'Cripto', labelRu: 'Крипто', labelFr: 'Crypto', emoji: '\uD83E\uDDF1' },
-  { key: 'stocks', labelEn: 'Stocks', labelAr: 'الأسهم', labelEs: 'Acciones', labelRu: 'Акции', labelFr: 'Actions', emoji: '\uD83D\uDCC8' },
-  { key: 'metals', labelEn: 'Metals', labelAr: 'المعادن', labelEs: 'Metales', labelRu: 'Металлы', labelFr: 'Métaux', emoji: '\uD83D\uDC8E' },
+  { key: 'forex', labelAr: 'الفوركس', labelEn: 'Forex', emoji: '\uD83D\uDCB1' },
+  { key: 'crypto', labelAr: 'الكريبتو', labelEn: 'Crypto', emoji: '\uD83E\uDDF1' },
+  { key: 'stocks', labelAr: 'الأسهم', labelEn: 'Stocks', emoji: '\uD83D\uDCC8' },
+  { key: 'metals', labelAr: 'المعادن', labelEn: 'Metals', emoji: '\uD83D\uDC8E' },
 ];
 
 function loadCustomSymbols(): string[] {
@@ -175,6 +174,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [platform, setPlatform] = useState<'chart' | 'mt5'>('chart');
   const [symbolsCollapsed, setSymbolsCollapsed] = useState(false);
   const [ticketCollapsed, setTicketCollapsed] = useState(true);
+  const [chartCollapsed, setChartCollapsed] = useState(false);
 
   // Persist work place across manual refresh (sessionStorage) - clears when browser/tab closed
   useEffect(() => {
@@ -188,15 +188,16 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         if (s.platform) setPlatform(s.platform);
         if (typeof s.symbolsCollapsed === 'boolean') setSymbolsCollapsed(s.symbolsCollapsed);
         if (typeof s.ticketCollapsed === 'boolean') setTicketCollapsed(s.ticketCollapsed);
+        if (typeof s.chartCollapsed === 'boolean') setChartCollapsed(s.chartCollapsed);
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     try {
-      sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol, category, tab, platform, symbolsCollapsed, ticketCollapsed }));
+      sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol, category, tab, platform, symbolsCollapsed, ticketCollapsed, chartCollapsed }));
     } catch {}
-  }, [symbol, category, tab, platform, symbolsCollapsed, ticketCollapsed]);
+  }, [symbol, category, tab, platform, symbolsCollapsed, ticketCollapsed, chartCollapsed]);
 
   const store = getTradeStore(user);
 
@@ -483,7 +484,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     // Block opening when the market for this asset is closed (weekend/hours).
     // Crypto trades 24/7 and is always allowed.
     if (!isMarketOpen(pendingCat, symbol)) {
-      setToast(lt(lang, 317));
+      setToast(isAr
+        ? 'السوق مغلق لهذا الأصل، لا يمكن فتح صفقة. التداول متاح حالياً للكريبتو فقط (24/7).'
+        : 'Market is closed for this asset — cannot open a trade. Trading is currently available for crypto only (24/7).');
       setTimeout(() => setToast(null), 3500);
       return;
     }
@@ -492,7 +495,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     // Check that the resulting trade's margin fits within the account balance
     const requiredMargin = notionalInUSD(pendingCat, symbol, livePrice, qty) / leverage;
     if (requiredMargin > balance) {
-      setToast(ltp(lang, 791, '$' + requiredMargin.toFixed(0), '$' + balance.toFixed(0)));
+      setToast(isAr
+        ? `هامش غير كافٍ (مطلوب $${requiredMargin.toFixed(0)} / الرصيد $${balance.toFixed(0)})`
+        : `Insufficient margin (need $${requiredMargin.toFixed(0)} / balance $${balance.toFixed(0)})`);
       setTimeout(() => setToast(null), 3000);
       setBusy(false);
       return;
@@ -534,7 +539,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     const exit = priceOf(t);
     if (!exit) return;
     if (!isMarketOpen(t.category, t.symbol)) {
-      setToast(lt(lang, 316));
+      setToast(isAr
+        ? 'السوق مغلق لهذا الأصل، لا يمكن إغلاق الصفقة حالياً. الكريبتو يعمل 24/7.'
+        : 'Market is closed for this asset — cannot close the trade now. Crypto trades 24/7.');
       setTimeout(() => setToast(null), 3500);
       return;
     }
@@ -546,7 +553,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     const open = tradesRef.current.filter((t) => t.status === 'open');
     const closable = open.filter((t) => priceMapRef.current[t.symbol] != null);
     if (closable.length === 0) {
-      setToast(lt(lang, 358));
+      setToast(isAr ? 'لا توجد صفقات يمكن إغلاقها (لا توجد أسعار حالية)' : 'No closable open trades (no current price)');
       setTimeout(() => setToast(null), 3000);
       return;
     }
@@ -579,7 +586,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     setBalance(newBalance);
     setTrades((prev) => prev.map((x) => closedMap[x.id] ? { ...x, ...closedMap[x.id] } : x));
     setBusy(false);
-    setToast(ltp(lang, 665, String(closable.length)));
+    setToast(isAr ? `تم إغلاق ${closable.length} صفقة دفعة واحدة` : `Closed ${closable.length} trades at once`);
     setTimeout(() => setToast(null), 2500);
     playCloseSound();
   }
@@ -600,7 +607,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     setTrades((prev) => prev.filter((x) => x.status !== 'closed'));
     setBusy(false);
     setConfirmClear(false);
-    setToast(lt(lang, 278));
+    setToast(isAr ? 'تم مسح السجل' : 'History cleared');
     setTimeout(() => setToast(null), 2000);
   }
 
@@ -628,7 +635,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   useEffect(() => {
     const t = setTimeout(() => window.dispatchEvent(new Event('resize')), 120);
     return () => clearTimeout(t);
-  }, [symbolsCollapsed, ticketCollapsed]);
+  }, [symbolsCollapsed, ticketCollapsed, chartCollapsed]);
 
   // Manually adjust a TP/SL USD amount by $0.50 steps (up or down)
   const adjustPrice = (kind: 'tp' | 'sl', dir: number) => {
@@ -706,7 +713,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     // current price right after setting the levels.
     levelCooldownRef.current[t.id] = Date.now() + 10000;
     setEditId(null);
-    setToast(lt(lang, 521));
+    setToast(isAr ? 'تم تحديث الوقف/الهدف' : 'SL/TP updated');
     setTimeout(() => setToast(null), 2000);
   }
 
@@ -721,7 +728,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
         localStorage.setItem('paper_trading_data', JSON.stringify(raw));
       } catch {}
     }
-    setToast(ltp(lang, 666, String(newLev)));
+    setToast(isAr ? `تم تغيير الرافعة إلى 1:${newLev}` : `Leverage set to 1:${newLev}`);
     setTimeout(() => setToast(null), 2000);
   }
 
@@ -792,7 +799,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           <div className="w-9 h-9 rounded-xl bg-[#F59E0B] flex items-center justify-center shadow-lg shadow-[#F59E0B]/30">
             <TrendingUp size={20} className="text-black" />
           </div>
-          <span className="text-lg font-black text-brand-text">{lt(lang, 96)}</span>
+          <span className="text-lg font-black text-brand-text">{isAr ? 'تداول تلقائي' : 'Automatic Trading'}</span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -801,75 +808,104 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               platform === 'chart' ? 'bg-emerald-500 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'
             }`}
           >
-            📊 {lt(lang, 127)}
+            📊 {isAr ? 'الشارت' : 'Chart'}
           </button>
           <button
             onClick={() => window.open('https://metatraderweb.app', '_blank', 'noopener,noreferrer')}
             className="px-6 py-2 rounded-2xl text-[20px] font-black uppercase transition-all leading-none bg-sky-500 text-black hover:bg-sky-400 cursor-pointer active:scale-95"
-            title={lt(lang, 395)}
+            title={isAr ? 'افتح منصة MT5 الحقيقية في تبويب جديد لتسجيل الدخول والتداول' : 'Open the live MT5 platform in a new tab to log in and trade'}
           >
-            📈 {lt(lang, 341)} ↗
+            📈 {isAr ? 'MT5 ويب' : 'MT5 Web'} ↗
           </button>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
-            <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{lt(lang, 98)}</div>
-            <div className="text-base font-black text-emerald-400">${balance.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
-          </div>
-          <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
-            <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{lt(lang, 241)}</div>
-            <div className={`text-base font-black ${unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>${equity.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
-          </div>
-          <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
-            <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{lt(lang, 394)}</div>
-            <div className={`text-base font-black ${unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtMoney(unrealizedPnl)}</div>
-          </div>
-          <div
-            className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[120px]"
-            title={lt(lang, 314)}
+        <div className="flex items-end justify-between gap-2 flex-wrap w-full">
+          <button
+            onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
+            className={`tog-btn flex items-center gap-2 px-6 py-3 rounded-xl text-base font-black uppercase tracking-wider border transition-all active:scale-95 shrink-0 bg-[#3E2723] text-amber-100 ${
+              symbolsCollapsed ? 'border-[#F59E0B]/70 shadow-lg shadow-black/30' : 'border-white/15 hover:bg-[#4E342E]'
+            }`}
+            title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
           >
-            <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{lt(lang, 313)}</div>
-            <div className={`text-base font-black ${stats.marginLevel >= 100 ? 'text-emerald-400' : stats.marginLevel > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
-              {stats.marginLevel > 0 ? `${stats.marginLevel.toLocaleString('en-US')}%` : '—'}
+            {symbolsCollapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+            {isAr ? 'الرموز' : 'Symbols'}
+          </button>
+          <div className="flex flex-col items-center gap-1 min-w-0">
+            <button
+              onClick={() => setChartCollapsed(!chartCollapsed)}
+              className={`tog-btn flex items-center gap-2 px-6 py-3 rounded-xl text-base font-black uppercase tracking-wider border transition-all active:scale-95 shrink-0 bg-[#3E2723] text-amber-100 ${
+                chartCollapsed ? 'border-[#F59E0B]/70 shadow-lg shadow-black/30' : 'border-white/15 hover:bg-[#4E342E]'
+              }`}
+              title={chartCollapsed ? (isAr ? 'توسيع الشارت' : 'Expand chart') : (isAr ? 'طي الشارت' : 'Collapse chart')}
+            >
+              {chartCollapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+              {isAr ? 'الشارت' : 'Chart'}
+            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
+                <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'الرصيد' : 'Balance'}</div>
+                <div className="text-base font-black text-emerald-400">${balance.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+              </div>
+              <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
+                <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'الإجمالي' : 'Equity'}</div>
+                <div className={`text-base font-black ${unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>${equity.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+              </div>
+              <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
+                <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'ربح مفتوح' : 'Open P&L'}</div>
+                <div className={`text-base font-black ${unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtMoney(unrealizedPnl)}</div>
+              </div>
+              <div
+                className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[120px]"
+                title={isAr ? 'مستوى الهامش = الإجمالي ÷ الهامش المستخدم × 100' : 'Margin Level = Equity ÷ Used Margin × 100'}
+              >
+                <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'مستوى الهامش' : 'Margin Level'}</div>
+                <div className={`text-base font-black ${stats.marginLevel >= 100 ? 'text-emerald-400' : stats.marginLevel > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {stats.marginLevel > 0 ? `${stats.marginLevel.toLocaleString('en-US')}%` : '—'}
+                </div>
+              </div>
+              <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
+                <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{isAr ? 'الرافعة' : 'Leverage'}</div>
+                <select
+                  value={leverage}
+                  onChange={(e) => changeLeverage(Number(e.target.value))}
+                  className="bg-transparent text-base font-black text-sky-300 focus:outline-none cursor-pointer text-center w-full"
+                  title={isAr ? 'الرافعة المالية' : 'Financial leverage'}
+                >
+                  {LEVERAGE_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt} className="bg-[#0a0f1a] text-white">1:{opt}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={() => { setResetInput(''); setShowReset(true); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/40 text-red-300 font-black uppercase shadow-lg shadow-red-500/10 active:scale-95 transition-all"
+              >
+                <RotateCcw size={16} />
+                {isAr ? 'إعادة تعيين' : 'Reset'}
+              </button>
             </div>
           </div>
-          <div className="px-4 py-1.5 rounded-xl bg-black/30 border border-white/10 text-center min-w-[110px]">
-            <div className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">{lt(lang, 291)}</div>
-            <select
-              value={leverage}
-              onChange={(e) => changeLeverage(Number(e.target.value))}
-              className="bg-transparent text-base font-black text-sky-300 focus:outline-none cursor-pointer text-center w-full"
-              title={lt(lang, 256)}
-            >
-              {LEVERAGE_OPTIONS.map((opt) => (
-                <option key={opt} value={opt} className="bg-[#0a0f1a] text-white">1:{opt}</option>
-              ))}
-            </select>
-          </div>
           <button
-            onClick={() => { setResetInput(''); setShowReset(true); }}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/40 text-red-300 font-black uppercase shadow-lg shadow-red-500/10 active:scale-95 transition-all"
+            onClick={() => setTicketCollapsed(!ticketCollapsed)}
+            className={`tog-btn flex items-center gap-2 px-6 py-3 rounded-xl text-base font-black uppercase tracking-wider border transition-all active:scale-95 shrink-0 bg-[#3E2723] text-amber-100 ${
+              ticketCollapsed ? 'border-[#F59E0B]/70 shadow-lg shadow-black/30' : 'border-white/15 hover:bg-[#4E342E]'
+            }`}
+            title={ticketCollapsed ? (isAr ? 'فتح لوحة الصفقات' : 'Open order ticket') : (isAr ? 'طي لوحة الصفقات' : 'Collapse order ticket')}
           >
-            <RotateCcw size={16} />
-            {lt(lang, 466)}
+            {ticketCollapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+            {isAr ? 'فتح صفقات' : 'Order Ticket'}
           </button>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row items-stretch gap-2 lg:overflow-x-auto">
         {/* LEFT: Symbol Selector panel (400px, collapsible) */}
-        <div className={`order-1 flex-shrink-0 rounded-2xl border backdrop-blur-sm transition-all duration-300 ease-in-out ${symbolsCollapsed ? 'panel-strip w-full h-14 lg:w-12 lg:h-auto flex flex-row lg:flex-col items-center justify-center gap-2 px-3 lg:px-0' : 'w-full h-[260px] p-2 space-y-1 flex flex-col border-white/10 bg-black/20 lg:w-auto lg:flex-[0_0_26%] lg:min-w-[240px] lg:max-w-[400px] lg:h-[82vh] lg:min-h-[580px]'}`}>
-          <div className={`flex items-center gap-1 ${symbolsCollapsed ? 'flex-row lg:flex-col justify-center gap-2' : 'justify-between'}`}>
-            {symbolsCollapsed && (
-              <span className="strip-title cursor-pointer text-sm font-black uppercase tracking-wider lg:[writingMode:vertical-rl]" onClick={() => setSymbolsCollapsed(false)}>{lt(lang, 544)}</span>
-            )}
-            {!symbolsCollapsed && (
-              <span className="panel-title cursor-pointer text-sm font-black uppercase tracking-wider" onClick={() => setSymbolsCollapsed(true)}>{lt(lang, 544)}</span>
-            )}
+        <div className={`order-1 flex-shrink-0 rounded-2xl border backdrop-blur-sm transition-all duration-300 ease-in-out ${symbolsCollapsed ? 'hidden' : 'w-full h-[260px] p-2 space-y-1 flex flex-col border-white/10 bg-black/20 lg:w-auto lg:flex-[0_0_26%] lg:min-w-[240px] lg:max-w-[400px] lg:h-[82vh] lg:min-h-[580px]'}`}>
+          <div className="flex items-center gap-1 justify-between">
+            <span className="panel-title cursor-pointer text-sm font-black uppercase tracking-wider" onClick={() => setSymbolsCollapsed(true)}>{isAr ? 'الرموز' : 'Symbols'}</span>
             <button
               onClick={() => setSymbolsCollapsed(!symbolsCollapsed)}
               className="w-12 h-12 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90 shrink-0"
-              title={symbolsCollapsed ? (lt(lang, 246)) : (lt(lang, 154))}
+              title={symbolsCollapsed ? (isAr ? 'توسيع الرموز' : 'Expand symbols') : (isAr ? 'طي الرموز' : 'Collapse symbols')}
             >
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
                 <path d={symbolsCollapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} />
@@ -889,7 +925,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                       : 'bg-sky-500/10 text-sky-300 border-sky-500/20 hover:bg-sky-500/20'
                   }`}
                 >
-                  {tabC.emoji} {pkick(lang, tabC, 'label')}
+                  {tabC.emoji} {isAr ? tabC.labelAr : tabC.labelEn}
                 </button>
               ))}
               {customSymbols.length > 0 && (
@@ -901,7 +937,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                       : 'bg-sky-500/10 text-sky-300 border-sky-500/20 hover:bg-sky-500/20'
                   }`}
                 >
-                  👁️ {lt(lang, 615)} ({customSymbols.length})
+                  👁️ {isAr ? 'المشاهد' : 'Watch'} ({customSymbols.length})
                 </button>
               )}
             </div>
@@ -910,12 +946,12 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             <div className="flex flex-wrap gap-1.5 flex-1 overflow-y-auto content-start min-h-0">
               {symbols.length === 0 && category !== 'custom' && (
                 <span className="text-sm font-bold text-brand-text/40 py-2">
-                  {lt(lang, 374)}
+                  {isAr ? 'لا رموز ظاهرة' : 'No visible symbols'}
                 </span>
               )}
               {category === 'custom' && customSymbols.length === 0 && (
                 <span className="text-sm font-bold text-brand-text/40 py-2">
-                  {lt(lang, 66)}
+                  {isAr ? 'أضف رمزك الأول من حقل البحث أعلاه' : 'Add your first symbol from the search field above'}
                 </span>
               )}
               {symbols.map((sym) => {
@@ -934,7 +970,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); isCustom ? removeCustomSymbol(sym) : hideSymbol(sym); }}
-                      title={ltp(lang, 667, sym)}
+                      title={isAr ? `حذف ${sym}` : `Remove ${sym}`}
                       className="absolute top-0 right-0 w-5 h-5 rounded-bl-lg rounded-tr-xl bg-red-500/80 hover:bg-red-600 text-white flex items-center justify-center opacity-70 group-hover:opacity-100 transition-all"
                     >
                       <X size={11} strokeWidth={3} />
@@ -960,7 +996,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                     if (e.key === 'Escape') setShowSuggestions(false);
                   }}
                   onFocus={() => setShowSuggestions(true)}
-                  placeholder={lt(lang, 83)}
+                  placeholder={isAr ? 'أي رمز TradingView — NYSE:JNJ أو BINANCE:BTCUSDT أو اكتب الرمز مباشرة' : 'Any TradingView symbol — NYSE:JNJ, BINANCE:BTCUSDT, or type directly'}
                   className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 px-4 text-base font-bold text-brand-text outline-none focus:border-sky-500 placeholder:text-brand-text/30 placeholder:font-medium placeholder:text-sm"
                 />
                 <button
@@ -969,7 +1005,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   className="h-11 px-5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-black font-black uppercase flex items-center gap-2 transition-all active:scale-95"
                 >
                   <Plus size={18} />
-                  {lt(lang, 59)}
+                  {isAr ? 'إضافة' : 'Add'}
                 </button>
               </div>
 
@@ -988,10 +1024,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="text-lg flex-shrink-0">{isCustom ? '➕' : catEmoji(s.cat)}</span>
                           <span className="text-sm font-black text-brand-text" dir="ltr">{s.symbol}</span>
-                          <span className="text-xs font-bold text-brand-text/50 truncate">{s.name}</span>
+                          <span className="text-xs font-bold text-brand-text/50 truncate">{isAr ? s.name : s.name}</span>
                         </div>
                         <span className={`flex-shrink-0 text-[10px] font-black uppercase px-2 py-1 rounded-md ${added ? 'bg-emerald-500/20 text-emerald-400' : 'bg-sky-500/20 text-sky-300'}`}>
-                          {added ? (lt(lang, 68)) : (lt(lang, 4))}
+                          {added ? (isAr ? 'مضاف ✓' : 'Added ✓') : (isAr ? '+ إضافة' : '+ Add')}
                         </span>
                       </button>
                     );
@@ -1008,7 +1044,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                 onClick={restoreAllSymbols}
                 className="text-xs font-black text-sky-400 hover:text-sky-300 underline underline-offset-2"
               >
-                {ltp(lang, 668, String(hiddenSymbols.length))}
+                {isAr ? `↩ استعادة الرموز المحذوفة (${hiddenSymbols.length})` : `↩ Restore removed symbols (${hiddenSymbols.length})`}
               </button>
             )}
 
@@ -1017,11 +1053,8 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
 
             {/* RIGHT: Order Ticket panel (400px, collapsible) */}
-          <div className={`order-3 flex-shrink-0 rounded-2xl border backdrop-blur-sm transition-all duration-300 ease-in-out ${ticketCollapsed ? 'panel-strip w-full h-14 lg:w-12 lg:h-auto flex flex-row lg:flex-col items-center justify-center gap-2 px-3 lg:px-0' : 'w-full p-4 space-y-3 border-white/10 bg-black/30 lg:w-auto lg:flex-[0_0_26%] lg:min-w-[240px] lg:max-w-[400px] lg:h-[82vh] lg:min-h-[580px]'}`}>
-            <div className={`flex items-center gap-2 ${ticketCollapsed ? 'flex-row lg:flex-col justify-center gap-2' : 'justify-between'}`}>
-              {ticketCollapsed && (
-                <span className="strip-title cursor-pointer text-sm font-black uppercase tracking-wider lg:[writingMode:vertical-rl]" onClick={() => setTicketCollapsed(false)}>{lt(lang, 400)}</span>
-              )}
+          <div className={`order-3 flex-shrink-0 rounded-2xl border backdrop-blur-sm transition-all duration-300 ease-in-out ${ticketCollapsed ? 'hidden' : 'w-full p-4 space-y-3 border-white/10 bg-black/30 lg:w-auto lg:flex-[0_0_26%] lg:min-w-[240px] lg:max-w-[400px] lg:h-[82vh] lg:min-h-[580px]'}`}>
+            <div className="flex items-center gap-2 justify-between">
               {!ticketCollapsed && (
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-black text-brand-text uppercase tracking-wide text-xl truncate">{symbol || '—'}</span>
@@ -1035,7 +1068,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               <button
                 onClick={() => setTicketCollapsed(!ticketCollapsed)}
                 className="w-12 h-12 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text transition-all active:scale-90 shrink-0"
-                title={ticketCollapsed ? (lt(lang, 245)) : (lt(lang, 153))}
+                title={ticketCollapsed ? (isAr ? 'توسيع فتح الصفقات' : 'Expand order ticket') : (isAr ? 'طي فتح الصفقات' : 'Collapse order ticket')}
               >
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
                   <path d={ticketCollapsed ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
@@ -1049,9 +1082,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               <label className="text-xs font-black uppercase text-brand-text/50 tracking-wider">
                 {(() => {
                   const cat = detectCategory(symbol || '');
-                  if (cat === 'forex' || cat === 'metals') return lt(lang, 606);
-                  if (cat === 'crypto') return lt(lang, 440);
-                  return lt(lang, 507);
+                  if (cat === 'forex' || cat === 'metals') return isAr ? 'الحجم (لوت)' : 'Volume (lots)';
+                  if (cat === 'crypto') return isAr ? 'الكمية (وحدات)' : 'Quantity (units)';
+                  return isAr ? 'عدد الأسهم' : 'Shares';
                 })()}
               </label>
               <div className="flex items-center gap-2 mt-1">
@@ -1081,7 +1114,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             {/* TP/SL dollar amounts */}
             <div className="grid grid-cols-2 gap-2 items-start">
               <div className="min-w-0">
-                <label className="block text-xs font-black uppercase text-emerald-400/90 tracking-wider truncate">{lt(lang, 545)}</label>
+                <label className="block text-xs font-black uppercase text-emerald-400/90 tracking-wider truncate">{isAr ? 'جني الأرباح ($)' : 'Take Profit ($)'}</label>
                 <div className="flex items-stretch gap-1.5 mt-1 min-w-0">
                   <button onClick={() => adjustPrice('tp', -1)} className="w-11 h-11 shrink-0 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">−</button>
                   <input
@@ -1096,7 +1129,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                 </div>
               </div>
               <div className="min-w-0">
-                <label className="block text-xs font-black uppercase text-red-400/90 tracking-wider truncate">{lt(lang, 526)}</label>
+                <label className="block text-xs font-black uppercase text-red-400/90 tracking-wider truncate">{isAr ? 'وقف الخسارة ($)' : 'Stop Loss ($)'}</label>
                 <div className="flex items-stretch gap-1.5 mt-1 min-w-0">
                   <button onClick={() => adjustPrice('sl', -1)} className="w-11 h-11 shrink-0 rounded-xl bg-white/10 text-brand-text text-lg font-black hover:bg-white/20">−</button>
                   <input
@@ -1119,38 +1152,38 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                 disabled={!livePrice || busy || qty <= 0}
                 className="py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-black text-lg font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
               >
-                {lt(lang, 116)}
+                {isAr ? 'شراء' : 'Buy'}
               </button>
               <button
                 onClick={() => openTrade('sell')}
                 disabled={!livePrice || busy || qty <= 0}
                 className="py-4 rounded-2xl bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-lg font-black uppercase tracking-wider shadow-lg shadow-red-500/25 active:scale-95 transition-all"
               >
-                {lt(lang, 495)}
+                {isAr ? 'بيع' : 'Sell'}
               </button>
             </div>
             {!livePrice && !priceLoading && symbol && (
               <p className="text-xs font-bold text-yellow-400/90 text-center">
-                {lt(lang, 301)}
+                {isAr ? 'السعر غير متاح لهذا الرمز حالياً' : 'Live price unavailable for this symbol'}
               </p>
             )}
 
           {/* Stats mini */}
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4 grid grid-cols-4 gap-2 text-center">
             <div>
-              <div className="text-[10px] font-black uppercase text-brand-text/50">{lt(lang, 574)}</div>
+              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'صفقات' : 'Trades'}</div>
               <div className="text-lg font-black text-brand-text">{stats.total}</div>
             </div>
             <div>
-              <div className="text-[10px] font-black uppercase text-brand-text/50">{lt(lang, 622)}</div>
+              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'نسبة الفوز' : 'Win rate'}</div>
               <div className="text-lg font-black text-emerald-400">{stats.winRate}%</div>
             </div>
             <div>
-              <div className="text-[10px] font-black uppercase text-brand-text/50">{lt(lang, 345)}</div>
+              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'صافي الربح' : 'Net P&L'}</div>
               <div className={`text-lg font-black ${stats.totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtMoney(stats.totalPnl)}</div>
             </div>
             <div>
-              <div className="text-[10px] font-black uppercase text-brand-text/50">{lt(lang, 312)}</div>
+              <div className="text-[10px] font-black uppercase text-brand-text/50">{isAr ? 'الهامش' : 'Margin'}</div>
               <div className={`text-lg font-black ${stats.marginLevel > 200 ? 'text-emerald-400' : stats.marginLevel > 100 ? 'text-yellow-400' : 'text-red-400'}`}>
                 {stats.totalMargin > 0 ? `${stats.marginLevel}%` : '—'}
               </div>
@@ -1161,7 +1194,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
 
           {/* Chart / MT5 - يبقى خط التاريخ السفلي ظاهراً مهما فُتحت الأقسام */}
-          <div ref={chartPanelRef} className="order-2 flex-none lg:flex-1 rounded-2xl overflow-hidden border border-white/10 bg-black/20 pb-3 relative flex flex-col h-[55vh] min-h-[300px] lg:h-[82vh] lg:min-h-[580px] lg:min-w-[420px] transition-all duration-300 ease-in-out">
+          <div ref={chartPanelRef} className={`order-2 flex-none lg:flex-1 rounded-2xl overflow-hidden border border-white/10 bg-black/20 pb-3 relative flex flex-col transition-all duration-300 ease-in-out ${chartCollapsed ? 'hidden' : 'h-[55vh] min-h-[300px] lg:h-[82vh] lg:min-h-[580px] lg:min-w-[420px]'}`}>
             {/* Toggle bar */}
             <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 border-b border-white/10 flex-shrink-0">
               {platform === 'chart' && (
@@ -1169,10 +1202,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   <button
                     onClick={toggleChartFullscreen}
                     className="flex items-center gap-1 rounded-md bg-white/10 hover:bg-white/20 text-brand-text/70 hover:text-white px-2.5 py-1 text-xs font-black uppercase tracking-wider transition-colors"
-                    title={chartFullscreen ? lt(lang, 684) : lt(lang, 685)}
+                    title={isAr ? (chartFullscreen ? 'خروج من ملء الشاشة' : 'ملء الشاشة') : (chartFullscreen ? 'Exit fullscreen' : 'Fullscreen')}
                   >
                     {chartFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
-                    {chartFullscreen ? lt(lang, 686) : lt(lang, 685)}
+                    {isAr ? (chartFullscreen ? 'خروج' : 'ملء الشاشة') : (chartFullscreen ? 'Exit' : 'Fullscreen')}
                   </button>
                   <div className="ml-auto flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -1214,27 +1247,27 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
       </div>
 
       {/* Positions / History */}
-      <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm overflow-hidden">
-        <div className="flex border-b border-white/10">
+      <div className={`rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm overflow-hidden ${chartCollapsed ? 'flex flex-col h-[70vh] lg:h-[82vh]' : ''}`}>
+        <div className="flex border-b border-white/10 shrink-0">
           <button
             onClick={() => setTab('positions')}
             className={`flex-1 py-3 text-base font-black uppercase tracking-wider transition-colors ${tab === 'positions' ? 'bg-white/10 text-brand-text border-b-2 border-[#F59E0B]' : 'text-brand-text/50 hover:text-brand-text/80'}`}
           >
-            {ltp(lang, 669, String(openTrades.length))}
+            {isAr ? `الصفقات المفتوحة (${openTrades.length})` : `Positions (${openTrades.length})`}
           </button>
           <button
             onClick={() => setTab('history')}
             className={`flex-1 py-3 text-base font-black uppercase tracking-wider transition-colors ${tab === 'history' ? 'bg-white/10 text-brand-text border-b-2 border-[#F59E0B]' : 'text-brand-text/50 hover:text-brand-text/80'}`}
           >
-            {lt(lang, 277)}
+            {isAr ? 'السجل' : 'History'}
           </button>
         </div>
 
         {/* Floating P&L under the "Close All" icon */}
         {tab === 'positions' && (
-          <div className="flex items-stretch justify-between gap-2 px-4 py-2 border-b border-white/10">
+          <div className="flex items-stretch justify-between gap-2 px-4 py-2 border-b border-white/10 shrink-0">
             <span className="text-sm font-bold text-brand-text/50 self-center">
-              {ltp(lang, 670, String(openTrades.length))}
+              {isAr ? `الصفقات المفتوحة: ${openTrades.length}` : `Open positions: ${openTrades.length}`}
             </span>
             <div className="flex flex-col items-stretch gap-1">
               {openTrades.length > 0 && (
@@ -1244,12 +1277,12 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   className="flex items-center justify-center gap-1.5 rounded-lg bg-red-500/80 hover:bg-red-500 px-3 py-1.5 text-xs font-black text-white uppercase tracking-wider transition-colors disabled:opacity-50"
                 >
                   <XCircle size={14} />
-                  {lt(lang, 148)}
+                  {isAr ? 'إغلاق الكل' : 'Close All'}
                 </button>
               )}
               <div className="flex items-center justify-end gap-1.5">
                 <span className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider">
-                  {lt(lang, 261)}
+                  {isAr ? 'ربح/خسارة عائمة' : 'Floating P&L'}
                 </span>
                 <span className={`text-sm font-black ${unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">
                   {fmtMoney(unrealizedPnl)}
@@ -1261,10 +1294,10 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
 
         {/* History: count + period selector for closed-trades P&L */}
         {tab === 'history' && (
-          <div className="space-y-2 px-4 py-2 border-b border-white/10">
+          <div className="space-y-2 px-4 py-2 border-b border-white/10 shrink-0">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-bold text-brand-text/50">
-                {ltp(lang, 671, String(closedTrades.length))}
+                {isAr ? `إجمالي السجل: ${closedTrades.length}` : `History entries: ${closedTrades.length}`}
               </span>
               {closedTrades.length > 0 && (
                 <button
@@ -1280,20 +1313,20 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black text-white uppercase tracking-wider transition-colors disabled:opacity-50 ${confirmClear ? 'bg-red-500 hover:bg-red-600' : 'bg-white/10 hover:bg-white/20'}`}
                 >
                   <Trash2 size={14} />
-                  {confirmClear ? (lt(lang, 162)) : (lt(lang, 133))}
+                  {confirmClear ? (isAr ? 'تأكيد المسح' : 'Confirm') : (isAr ? 'مسح السجل' : 'Clear History')}
                 </button>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[10px] font-black uppercase text-brand-text/50 tracking-wider mr-1">
-                {lt(lang, 418)}
+                {isAr ? 'مجموع الربح/الخسارة للفترة:' : 'Period P&L:'}
               </span>
               {([
-                ['day', lt(lang, 193)],
-                ['week', lt(lang, 618)],
-                ['month', lt(lang, 338)],
-                ['year', lt(lang, 624)],
-                ['all', lt(lang, 75)],
+                ['day', isAr ? 'اليوم' : 'Day'],
+                ['week', isAr ? 'الأسبوع' : 'Week'],
+                ['month', isAr ? 'الشهر' : 'Month'],
+                ['year', isAr ? 'السنة' : 'Year'],
+                ['all', isAr ? 'الكل' : 'All'],
               ] as const).map(([key, label]) => (
                 <button
                   key={key}
@@ -1314,25 +1347,25 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           </div>
         )}
 
-        <div className="max-h-[400px] overflow-y-auto overflow-x-auto">
+        <div className={`${chartCollapsed ? 'flex-1 min-h-0 overflow-y-auto overflow-x-auto' : 'max-h-[400px] overflow-y-auto overflow-x-auto'}`}>
           {tab === 'positions' ? (
             openTrades.length === 0 ? (
               <div className="py-8 text-center text-lg font-bold text-brand-text/40">
-                {lt(lang, 363)}
+                {isAr ? 'لا توجد صفقات مفتوحة' : 'No open positions'}
               </div>
             ) : (
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-sm font-black uppercase text-brand-text/40 tracking-wider border-b border-white/10">
-                    <th className="px-4 py-3">{lt(lang, 543)}</th>
-                    <th className="px-4 py-3">{lt(lang, 511)}</th>
-                    <th className="px-4 py-3">{lt(lang, 439)}</th>
-                    <th className="px-4 py-3">{lt(lang, 240)}</th>
-                    <th className="px-4 py-3">{lt(lang, 184)}</th>
-                    <th className="px-4 py-3">{lt(lang, 312)}</th>
-                    <th className="px-4 py-3">{lt(lang, 520)}</th>
-                    <th className="px-4 py-3">{lt(lang, 560)}</th>
-                    <th className="px-4 py-3">{lt(lang, 402)}</th>
+                    <th className="px-4 py-3">{isAr ? 'الرمز' : 'Symbol'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الاتجاه' : 'Side'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الحجم' : 'Qty'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الدخول' : 'Entry'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الحالي' : 'Current'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الهامش' : 'Margin'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الوقف/الهدف' : 'SL / TP'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الوقت' : 'Time'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الربح/الخسارة' : 'P&L'}</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -1355,7 +1388,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                               setQty(getDefaultQty(cat, balance));
                               setPopId(t.id);
                               setTimeout(() => setPopId(null), 600);
-                              setToast(`${lt(lang, 397)} ${t.symbol}`);
+                              setToast(`${isAr ? 'تم فتح شارت' : 'Opening chart for'} ${t.symbol}`);
                               setTimeout(() => setToast(null), 2000);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
@@ -1373,7 +1406,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-3 py-1.5 rounded-lg text-lg font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                            {t.side === 'buy' ? (lt(lang, 117)) : (lt(lang, 496))}
+                            {t.side === 'buy' ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xl font-bold text-brand-text/80" dir="ltr">{t.qty}</td>
@@ -1404,14 +1437,14 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                               <button
                                 onClick={() => saveEditLevels(t)}
                                 className="w-8 h-8 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 flex items-center justify-center transition-colors"
-                                title={lt(lang, 481)}
+                                title={isAr ? 'حفظ' : 'Save'}
                               >
                                 <Check size={17} />
                               </button>
                               <button
                                 onClick={() => setEditId(null)}
                                 className="w-8 h-8 rounded-md bg-white/10 text-brand-text/70 hover:bg-white/20 flex items-center justify-center transition-colors"
-                                title={lt(lang, 120)}
+                                title={isAr ? 'إلغاء' : 'Cancel'}
                               >
                                 <X size={17} />
                               </button>
@@ -1442,7 +1475,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                               <button
                                 onClick={() => startEditLevels(t)}
                                 className="w-7 h-7 rounded-md bg-white/10 text-brand-text/60 hover:text-sky-300 hover:bg-sky-500/20 flex items-center justify-center transition-colors ml-1"
-                                title={lt(lang, 219)}
+                                title={isAr ? 'تعديل الوقف/الهدف (بالدولار)' : 'Edit SL / TP (USD)'}
                               >
                                 <Pencil size={14} />
                               </button>
@@ -1467,7 +1500,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                             disabled={!cur}
                             className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/40 disabled:opacity-40 text-lg font-black uppercase transition-colors"
                           >
-                            {lt(lang, 147)}
+                            {isAr ? 'إغلاق' : 'Close'}
                           </button>
                         </td>
                       </tr>
@@ -1479,20 +1512,20 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
           ) : (
             closedTrades.length === 0 ? (
               <div className="py-8 text-center text-base font-bold text-brand-text/40">
-                {lt(lang, 362)}
+                {isAr ? 'لا يوجد سجل بعد' : 'No history yet'}
               </div>
             ) : (
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-sm font-black uppercase text-brand-text/40 tracking-wider border-b border-white/10">
-                    <th className="px-4 py-3">{lt(lang, 543)}</th>
-                    <th className="px-4 py-3">{lt(lang, 511)}</th>
-                    <th className="px-4 py-3">{lt(lang, 240)}</th>
-                    <th className="px-4 py-3">{lt(lang, 244)}</th>
-                    <th className="px-4 py-3">{lt(lang, 396)}</th>
-                    <th className="px-4 py-3">{lt(lang, 150)}</th>
-                    <th className="px-4 py-3">{lt(lang, 450)}</th>
-                    <th className="px-4 py-3">{lt(lang, 472)}</th>
+                    <th className="px-4 py-3">{isAr ? 'الرمز' : 'Symbol'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الاتجاه' : 'Side'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الدخول' : 'Entry'}</th>
+                    <th className="px-4 py-3">{isAr ? 'الخروج' : 'Exit'}</th>
+                    <th className="px-4 py-3">{isAr ? 'وقت الفتح' : 'Opened'}</th>
+                    <th className="px-4 py-3">{isAr ? 'وقت الإغلاق' : 'Closed'}</th>
+                    <th className="px-4 py-3">{isAr ? 'السبب' : 'Reason'}</th>
+                    <th className="px-4 py-3">{isAr ? 'النتيجة' : 'Result'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1505,7 +1538,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-3 py-1.5 rounded-lg text-lg font-black uppercase ${t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {t.side === 'buy' ? (lt(lang, 117)) : (lt(lang, 496))}
+                          {t.side === 'buy' ? (isAr ? 'شراء' : 'BUY') : (isAr ? 'بيع' : 'SELL')}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xl font-bold text-brand-text/80" dir="ltr">{fmtPrice(t.entryPrice)}</td>
@@ -1513,7 +1546,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                       <td className="px-4 py-3 text-lg font-bold text-brand-text/60" dir="ltr">{(() => { const d = new Date(t.openedAt); const y = d.getUTCFullYear(); const mo = String(d.getUTCMonth() + 1).padStart(2, '0'); const day = String(d.getUTCDate()).padStart(2, '0'); const hh = String(d.getUTCHours()).padStart(2, '0'); const mm = String(d.getUTCMinutes()).padStart(2, '0'); const ss = String(d.getUTCSeconds()).padStart(2, '0'); return `${y}-${mo}-${day} ${hh}:${mm}:${ss}`; })()}</td>
                       <td className="px-4 py-3 text-lg font-bold text-brand-text/60" dir="ltr">{t.closedAt ? (() => { const d = new Date(t.closedAt); const y = d.getUTCFullYear(); const mo = String(d.getUTCMonth() + 1).padStart(2, '0'); const day = String(d.getUTCDate()).padStart(2, '0'); const hh = String(d.getUTCHours()).padStart(2, '0'); const mm = String(d.getUTCMinutes()).padStart(2, '0'); const ss = String(d.getUTCSeconds()).padStart(2, '0'); return `${y}-${mo}-${day} ${hh}:${mm}:${ss}`; })() : '—'}</td>
                       <td className="px-4 py-3 text-lg font-black uppercase text-brand-text/50">
-                        {t.closeReason === 'tp' ? 'TP' : t.closeReason === 'sl' ? 'SL' : (lt(lang, 310))}
+                        {t.closeReason === 'tp' ? 'TP' : t.closeReason === 'sl' ? 'SL' : (isAr ? 'يدوي' : 'Manual')}
                       </td>
                       <td className={`px-4 py-3 text-xl font-black ${(t.pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`} dir="ltr">{fmtMoney(t.pnl ?? 0)}</td>
                     </tr>
@@ -1529,7 +1562,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
       <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 flex items-start gap-3">
         <Info size={16} className="text-sky-400 flex-shrink-0 mt-0.5" />
         <span className="text-xs font-bold text-brand-text/60 leading-relaxed">
-          {lt(lang, 269)}
+          {isAr
+            ? 'تداول تجريبي بالكامل بأموال وهمية وأسعار حقيقية لحظية. يمكنك إضافة أي رمز من حقل الإضافة أعلاه.'
+            : 'Fully simulated trading with virtual funds and real-time prices. Add any symbol using the field above.'}
         </span>
       </div>
 
@@ -1543,14 +1578,16 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-black text-brand-text flex items-center gap-2">
                 <RotateCcw size={20} className="text-red-400" />
-                {lt(lang, 467)}
+                {isAr ? 'إعادة تعيين الحساب' : 'Reset Account'}
               </h3>
               <button onClick={() => setShowReset(false)} disabled={busy} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-brand-text">
                 <X size={16} />
               </button>
             </div>
             <p className="text-xs font-bold text-yellow-400/90 leading-relaxed">
-              {lt(lang, 79)}
+              {isAr
+                ? 'سيتم حذف جميع الصفقات وإعادة الرصيد إلى القيمة المحددة.'
+                : 'All trades will be deleted and balance reset to the chosen value.'}
             </p>
 
             {/* Custom balance input */}
@@ -1561,7 +1598,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                   type="text" inputMode="numeric" lang="en" dir="ltr"
                   value={resetInput}
                   onChange={(e) => setResetInput(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder={lt(lang, 234)}
+                  placeholder={isAr ? 'اكتب الرصيد المطلوب' : 'Enter balance'}
                   className="flex-1 h-14 rounded-xl bg-black/40 border border-white/15 px-4 text-2xl font-black text-brand-text outline-none focus:border-sky-500 placeholder:text-brand-text/25 placeholder:text-base"
                   style={{ direction: 'ltr' }}
                   autoFocus
@@ -1569,12 +1606,12 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               </div>
               {resetInput && resetVal >= MIN_BALANCE && (
                 <p className="mt-2 text-xs font-bold text-brand-text/50">
-                  {ltp(lang, 672, (getDefaultQty('forex', resetVal)).toFixed(2))}
+                  {isAr ? `الحجم الافتراضي: ${(getDefaultQty('forex', resetVal)).toFixed(2)} لوت` : `Default volume: ${(getDefaultQty('forex', resetVal)).toFixed(2)} lots`}
                 </p>
               )}
               {resetInput && resetVal < MIN_BALANCE && (
                 <p className="mt-2 text-xs font-bold text-red-400">
-                  {ltp(lang, 673, String(MIN_BALANCE))}
+                  {isAr ? `الحد الأدنى $${MIN_BALANCE}` : `Minimum $${MIN_BALANCE}`}
                 </p>
               )}
             </div>
@@ -1598,7 +1635,7 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
               className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-black font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-lg"
             >
               {busy ? <Loader2 size={20} className="animate-spin" /> : <RotateCcw size={20} />}
-              {lt(lang, 161)}
+              {isAr ? 'تأكيد' : 'Confirm'}
             </button>
           </div>
         </div>
