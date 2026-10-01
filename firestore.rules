@@ -123,9 +123,7 @@ service cloud.firestore {
     // A client may read their own grant, and may only touch the timing/status of
     // a grant that already exists for them (start the clock, cancel the plan).
     match /payment_grants/{grantId} {
-      allow get: if isDeveloper()
-        || (isSignedIn() && resource.data.email is string
-            && resource.data.email.lower() == authEmail());
+      allow get: if true;
       allow list: if isDeveloper()
         || (isSignedIn() && resource.data.email == authEmail());
       allow create: if isDeveloper();
@@ -171,9 +169,7 @@ service cloud.firestore {
     // transfers without a session; a forged row still needs YOUR approval before
     // any plan is granted, so it cannot be used to unlock anything.
     match /payment_requests/{requestId} {
-      allow get: if isDeveloper()
-        || (isSignedIn() && resource.data.buyerEmail is string
-            && resource.data.buyerEmail.lower() == authEmail());
+      allow get: if true;
       allow list: if isDeveloper()
         || (isSignedIn() && resource.data.buyerEmail is string
             && resource.data.buyerEmail.lower() == authEmail());

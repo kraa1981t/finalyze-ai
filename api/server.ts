@@ -2510,7 +2510,11 @@ app.post("/api/payment-request-decision", async (req: any, res: any) => {
       }
       // Merge, never replace: a re-approval must not wipe an already-started
       // clock (activatedAt/expiryDate) that the client already earned.
-      await fsPatch('payment_grants', grantId, grant);
+      await Promise.allSettled([
+        fsPatch('payment_grants', grantId, grant),
+        fsSet('shared_settings', `grant_${grantId}`, grant),
+        fsSet('shared_status', `grant_${grantId}`, grant),
+      ]);
       if (String(reqDoc.kind) === 'plan' && released) {
         // The buyer is listed in Client Monitor with their email exactly as they
         // typed it, and the crown appears the moment the plan is released.

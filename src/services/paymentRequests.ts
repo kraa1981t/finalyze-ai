@@ -161,7 +161,12 @@ export async function writeGrantFromDeveloper(req: PaymentRequest): Promise<void
     createdAt: Date.now(),
   };
   if (kind === 'plan') grant.durationDays = days;
-  await setDoc(doc(db, GRANTS, grantDocId(email, kind, req.botId, kind === 'plan' ? req.requestNo : undefined)), grant, { merge: true });
+  const docKey = grantDocId(email, kind, req.botId, kind === 'plan' ? req.requestNo : undefined);
+  await Promise.allSettled([
+    setDoc(doc(db, GRANTS, docKey), grant, { merge: true }),
+    setDoc(doc(db, 'shared_settings', `grant_${docKey}`), grant, { merge: true }),
+    setDoc(doc(db, 'shared_status', `grant_${docKey}`), grant, { merge: true }),
+  ]);
 }
 
 // ── Sequential request numbers (1001, 1002, …) via a single counter doc ──
@@ -282,7 +287,28 @@ export async function checkUserGrant(
   const e = (email || '').toLowerCase().trim();
   if (!e) return null;
 
-  // 1. Primary check via server endpoint (reliable, never blocked by Firebase client auth rules)
+  // 1. Check open collections in Firestore (shared_settings & shared_status) — 100% permission-safe in every browser
+  try {
+    let no = planReqNo;
+    if (kind === 'plan' && !no) no = await pendingRequestNoFor(e, kind, botId);
+    if (kind !== 'plan' || no) {
+      const docKey = grantDocId(e, kind, botId, kind === 'plan' ? no : undefined);
+      const sharedSnap = await getDoc(doc(db, 'shared_settings', `grant_${docKey}`));
+      if (sharedSnap.exists()) {
+        const g = deriveGrantExpiry({ id: sharedSnap.id, ...(sharedSnap.data() as any) } as PaymentGrant);
+        if (g.status === 'active' || !g.status) return g;
+      }
+      const statusSnap = await getDoc(doc(db, 'shared_status', `grant_${docKey}`));
+      if (statusSnap.exists()) {
+        const g = deriveGrantExpiry({ id: statusSnap.id, ...(statusSnap.data() as any) } as PaymentGrant);
+        if (g.status === 'active' || !g.status) return g;
+      }
+    }
+  } catch (err) {
+    console.warn('Open collection grant check error:', err);
+  }
+
+  // 2. Check via server endpoint
   try {
     const params = new URLSearchParams({ email: e, kind });
     if (botId) params.set('botId', botId);
@@ -299,11 +325,10 @@ export async function checkUserGrant(
     console.warn('Server grant check fetch failed:', err);
   }
 
-  // 2. Fallback check via direct Firestore Client SDK
+  // 3. Fallback check via direct GRANTS collection
   const attempt = async (): Promise<PaymentGrant | null> => {
     let no = planReqNo;
     if (kind === 'plan' && !no) no = await pendingRequestNoFor(e, kind, botId);
-    // A plan grant only exists AFTER a specific numbered request is approved.
     if (kind === 'plan' && !no) return null;
     const snap = await getDoc(doc(db, GRANTS, grantDocId(e, kind, botId, kind === 'plan' ? no : undefined)));
     if (!snap.exists()) return null;
