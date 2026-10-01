@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { KeyRound, Plus, Trash2, Power, PowerOff, ShieldCheck, Loader2, AlertTriangle, CheckCircle, Server, Lock } from 'lucide-react';
 import { Language } from '../lib/i18n';
 import { addPoolKey, fetchPoolKeys, removePoolKey, setPoolKeyEnabled, PoolKeySummary } from '../services/aiPool';
+import { auth } from '../lib/firebase';
 
 export default function KeyPoolPanel({ lang }: { lang: Language }) {
   const isAr = lang === 'ar';
@@ -23,6 +24,10 @@ export default function KeyPoolPanel({ lang }: { lang: Language }) {
 
   useEffect(() => {
     reload();
+    const unsub = auth.onAuthStateChanged((u) => {
+      if (u) reload();
+    });
+    return () => unsub();
   }, []);
 
   const flash = (msg: string) => {

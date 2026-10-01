@@ -22,9 +22,19 @@ export interface PoolKeySummary {
 }
 
 async function idToken(): Promise<string> {
-  const user = auth.currentUser;
+  let user = auth.currentUser;
+  if (!user) {
+    await new Promise<void>((resolve) => {
+      const unsub = auth.onAuthStateChanged((u) => {
+        unsub();
+        user = u;
+        resolve();
+      });
+      setTimeout(() => { unsub(); resolve(); }, 3000);
+    });
+  }
+  user = auth.currentUser || user;
   if (!user) return '';
-  // A force refresh keeps a long analysis session from dying on an expired token.
   try { return await user.getIdToken(); } catch { return ''; }
 }
 
