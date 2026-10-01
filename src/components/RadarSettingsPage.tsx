@@ -15,9 +15,10 @@ interface RadarSettingsPageProps {
   lang: Language;
   hasActivePlan?: boolean;
   onUpgrade?: () => void;
+  isDeveloper?: boolean;
 }
 
-export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, onSave, isWaiting, lang, hasActivePlan = true, onUpgrade }: RadarSettingsPageProps) {
+export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, onSave, isWaiting, lang, hasActivePlan = true, onUpgrade, isDeveloper = false }: RadarSettingsPageProps) {
   const [saved, setSaved] = useState(false);
   const [showUpgradeOverlay, setShowUpgradeOverlay] = useState(false);
 
@@ -82,7 +83,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
         </button>
       </div>
 
-      {/* Audio Section — Fixed Default Alerts */}
+      {/* Audio Section */}
       <div className="bg-brand-alt rounded-2xl border border-white/10 p-6 space-y-6">
         <div className="flex items-center gap-3 text-brand-muted">
           <Music size={18} className="text-[#F59E0B]" />
@@ -91,44 +92,48 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           </span>
         </div>
 
-        {/* Alert 1: New Opportunity */}
-        <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-brand-bg border border-brand-text/5">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="text-xs font-bold text-brand-text">
-              {lang === 'ar' ? '1. تنبيه فرصة جديدة' : '1. New Opportunity Alert'}
-            </span>
-          </div>
-          <button onClick={() => playSuccess(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
-            <Volume2 size={14} />
-          </button>
-        </div>
+        {isDeveloper && (
+          <div className="space-y-3">
+            {/* Alert 1: New Opportunity */}
+            <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-brand-bg border border-brand-text/5">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-xs font-bold text-brand-text">
+                  {lang === 'ar' ? '1. تنبيه فرصة جديدة' : '1. New Opportunity Alert'}
+                </span>
+              </div>
+              <button onClick={() => playSuccess(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
+                <Volume2 size={14} />
+              </button>
+            </div>
 
-        {/* Alert 2: Session End */}
-        <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-brand-bg border border-brand-text/5">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-amber-400" />
-            <span className="text-xs font-bold text-brand-text">
-              {lang === 'ar' ? '2. تنبيه انتهاء الدورة' : '2. Cycle Completion Alert'}
-            </span>
-          </div>
-          <button onClick={() => playCompletion(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
-            <Volume2 size={14} />
-          </button>
-        </div>
+            {/* Alert 2: Session End */}
+            <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-brand-bg border border-brand-text/5">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="text-xs font-bold text-brand-text">
+                  {lang === 'ar' ? '2. تنبيه انتهاء الدورة' : '2. Cycle Completion Alert'}
+                </span>
+              </div>
+              <button onClick={() => playCompletion(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
+                <Volume2 size={14} />
+              </button>
+            </div>
 
-        {/* Alert 3: Analysis Complete */}
-        <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-brand-bg border border-brand-text/5">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-blue-400" />
-            <span className="text-xs font-bold text-brand-text">
-              {lang === 'ar' ? '3. تنبيه إتمام التحليل' : '3. Analysis Complete Alert'}
-            </span>
+            {/* Alert 3: Analysis Complete */}
+            <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-brand-bg border border-brand-text/5">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-blue-400" />
+                <span className="text-xs font-bold text-brand-text">
+                  {lang === 'ar' ? '3. تنبيه إتمام التحليل' : '3. Analysis Complete Alert'}
+                </span>
+              </div>
+              <button onClick={() => playFail(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
+                <Volume2 size={14} />
+              </button>
+            </div>
           </div>
-          <button onClick={() => playFail(autoSettings.volume || 0.5)} className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-colors" title={lang === 'ar' ? 'اختبار' : 'Test'}>
-            <Volume2 size={14} />
-          </button>
-        </div>
+        )}
 
         {/* Volume */}
         <div className="pt-4 border-t border-brand-text/5">

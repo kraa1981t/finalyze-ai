@@ -69,6 +69,10 @@ interface HeaderProps {
   storeVisited?: boolean;
   compact?: boolean;
   planClient?: boolean;
+  hasActivePlan?: boolean;
+  isPaidMode?: boolean;
+  onActivatePaidPlan?: () => void;
+  onReturnToFreePlan?: () => void;
   onOpenMyPlan?: () => void;
   onStartClientAutoAnalysis?: () => void;
 }
@@ -110,6 +114,10 @@ export default function Header({
   storeVisited = false,
   compact = false,
   planClient = false,
+  hasActivePlan = false,
+  isPaidMode = false,
+  onActivatePaidPlan,
+  onReturnToFreePlan,
   onOpenMyPlan,
   onStartClientAutoAnalysis,
 }: HeaderProps) {
@@ -451,6 +459,37 @@ export default function Header({
                     <Store size={18} className="text-sky-500" />
                     <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'متجر البوتات' : 'Bots Store'}</span>
                   </button>
+                  {hasActivePlan && (
+                    <button
+                      onClick={() => {
+                        setShowMobileMenu(false);
+                        if (isPaidMode) onReturnToFreePlan?.();
+                        else onActivatePaidPlan?.();
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-3 rounded-xl border border-black/10 transition-all shadow-sm",
+                        isPaidMode
+                          ? "bg-white text-black hover:bg-slate-100"
+                          : "bg-[#22c55e] hover:bg-[#16a34a] text-black font-black shadow-emerald-500/30"
+                      )}
+                    >
+                      {isPaidMode ? (
+                        <>
+                          <Store size={18} className="text-black" />
+                          <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">
+                            {lang === 'ar' ? 'الخطة المجانية' : 'Free Plan'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Crown size={18} className="text-black" />
+                          <span className="text-xs font-black text-black uppercase min-w-0 leading-snug">
+                            {lang === 'ar' ? 'خطتي' : 'My Plan'}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  )}
 {planClient && (
                     <>
                       <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('radar'); }}
@@ -708,6 +747,34 @@ export default function Header({
                       {lang === 'ar' ? 'مجاني' : 'Free'}
                     </span>
                   </button>
+                  {hasActivePlan && (
+                    <button
+                      onClick={isPaidMode ? onReturnToFreePlan : onActivatePaidPlan}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider shadow-md active:scale-95 transition-all border border-black/10 flex-shrink-0",
+                        isPaidMode
+                          ? "bg-white text-black hover:bg-slate-100 shadow-white/20"
+                          : "bg-[#22c55e] hover:bg-[#16a34a] text-black shadow-emerald-500/30 font-black"
+                      )}
+                      title={
+                        isPaidMode
+                          ? (lang === 'ar' ? 'الرجوع إلى الخطة المجانية' : 'Switch to Free Plan')
+                          : (lang === 'ar' ? 'فتح خطتي المدفوعة' : 'Open My Paid Plan')
+                      }
+                    >
+                      {isPaidMode ? (
+                        <>
+                          <Store size={15} className="text-black flex-shrink-0" />
+                          <span className="leading-none">{lang === 'ar' ? 'الخطة المجانية' : 'Free Plan'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Crown size={15} className="text-black flex-shrink-0" />
+                          <span className="leading-none">{lang === 'ar' ? 'خطتي' : 'My Plan'}</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               )}
 

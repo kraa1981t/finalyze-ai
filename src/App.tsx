@@ -2212,6 +2212,10 @@ const started = planGrants
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isDeveloper={isDeveloperSession()}
         planClient={isPlanClient}
+        hasActivePlan={ownsPaidPlan && subscriptionActive}
+        isPaidMode={paidMode}
+        onActivatePaidPlan={activatePaidPlan}
+        onReturnToFreePlan={returnToFreePlan}
         onOpenMyPlan={() => setShowMyPlan(true)}
         onStartClientAutoAnalysis={() => {
           try { initAudio(); } catch {}
@@ -2433,6 +2437,7 @@ const started = planGrants
                 lang={lang}
                 hasActivePlan={hasActivePlan}
                 onUpgrade={() => navigateTo('plans')}
+                isDeveloper={isDeveloperSession()}
               />
             )}
 
