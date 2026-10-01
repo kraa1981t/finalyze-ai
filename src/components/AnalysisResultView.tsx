@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { AnalysisResult, SignalType, StrategySettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Zap, ShieldAlert, MessageSquare, BarChart2, ChevronDown, Info, ArrowLeft } from 'lucide-react';
+import { Zap, ShieldAlert, MessageSquare, BarChart2, ChevronDown, Info, ArrowLeft, Trash2, X } from 'lucide-react';
 import TradingViewEmbed from './TradingViewEmbed';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../lib/i18n';
@@ -13,6 +13,8 @@ interface AnalysisResultViewProps {
   settings?: StrategySettings;
   onDetail?: (result: AnalysisResult) => void;
   onTrade?: (symbol: string) => void;
+  onRemove?: (symbol: string) => void;
+  onClearAll?: () => void;
 }
 
 const SIGNAL_CONFIG: Record<SignalType, { labelKey: keyof typeof translations.en, color: string, bg: string, border: string, icon: any, labelAr: string, labelEn: string, symbolColor: string }> = {
@@ -24,7 +26,7 @@ const SIGNAL_CONFIG: Record<SignalType, { labelKey: keyof typeof translations.en
     [SignalType.NO_ENTRY]: { labelKey: "no_entry" as any, color: "text-slate-500", bg: "bg-slate-500/10", border: "border-slate-500/10", icon: null, labelAr: "لا توجد فرصة", labelEn: "No Entry", symbolColor: '#ffffff' },
 };
 
-export default function AnalysisResultView({ results, lang, settings, onDetail, onTrade }: AnalysisResultViewProps) {
+export default function AnalysisResultView({ results, lang, settings, onDetail, onTrade, onRemove, onClearAll }: AnalysisResultViewProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -52,16 +54,16 @@ export default function AnalysisResultView({ results, lang, settings, onDetail, 
 
   const selectedResult = sortedResults[selectedIndex] || sortedResults[0];
 
-  if (!selectedResult) {
+  if (!selectedResult || sortedResults.length === 0) {
     return (
       <div className="space-y-6 pb-20">
         <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center p-16 text-center space-y-4 bg-brand-bg rounded-2xl shadow-2xl border border-brand-text/5 min-h-[300px]">
           <ShieldAlert size={48} className="text-red-500/50" />
           <h3 className="text-lg font-black text-brand-text uppercase tracking-widest">
-            {isAr ? '\u0644\u0627 \u062a\u0648\u062c\u062f \u0646\u062a\u0627\u0626\u062c \u062a\u062d\u0644\u064a\u0644' : 'No analysis results'}
+            {isAr ? 'لا توجد نتائج تحليل' : 'No analysis results'}
           </h3>
           <p className="text-brand-muted text-sm max-w-lg">
-            {isAr ? '\u0644\u0645 \u064a\u062a\u0645 \u062c\u0644\u0628 \u0646\u062a\u0627\u0626\u062c \u0627\u0644\u062a\u062d\u0644\u064a\u0644 \u0645\u0646 \u0627\u0644\u0645\u0632\u0648\u062f. \u062a\u0639\u064a\u062f \u0644\u0644\u0645\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.' : 'Could not get analysis results from the provider. Try again.'}
+            {isAr ? 'تم مسح النتائج أو لم يتم جلب نتائج جديدة. يمكنك بدء تحليل جديد في أي وقت.' : 'Results were cleared or no new results found. You can run a new analysis anytime.'}
           </p>
         </div>
       </div>
@@ -83,9 +85,21 @@ export default function AnalysisResultView({ results, lang, settings, onDetail, 
         </div>
       </div>
 
-      {/* 2. Section Title */}
+      {/* 2. Section Title with Clear All Button */}
       <div className={cn("flex items-center justify-between px-4", isAr ? "flex-row" : "flex-row-reverse")}>
-        <span className="text-[10px] font-bold text-brand-muted font-mono">Analyzed: {results.length}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-bold text-brand-muted font-mono">Analyzed: {results.length}</span>
+          {onClearAll && (
+            <button
+              onClick={onClearAll}
+              className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-red-400 hover:text-red-300 text-[10px] font-black uppercase tracking-wider transition-all active:scale-95"
+              title={isAr ? 'مسح جميع النتائج' : 'Clear Results'}
+            >
+              <Trash2 size={12} />
+              <span>{isAr ? 'مسح النتائج' : 'Clear Results'}</span>
+            </button>
+          )}
+        </div>
         <h3 className="text-lg font-black text-brand-text flex items-center gap-2">
           <Zap size={18} className="text-secondary fill-secondary" />
           {t.finalDecision}
@@ -108,8 +122,19 @@ export default function AnalysisResultView({ results, lang, settings, onDetail, 
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.03 }}
               style={{ alignSelf: 'start', backgroundColor: 'rgba(var(--card-bg),0.92)', minHeight: 'auto' }}
-              className="signal-card rounded-2xl border-2 border-amber-500/50 transition-all overflow-hidden shadow-lg"
+              className="signal-card rounded-2xl border-2 border-amber-500/50 transition-all overflow-hidden shadow-lg relative"
             >
+              {/* Remove button (X) */}
+              {onRemove && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRemove(res.symbol); }}
+                  className="absolute top-2 left-2 p-1 hover:bg-red-500/20 rounded-md text-white/30 hover:text-red-400 transition-colors z-20"
+                  title={isAr ? `حذف إشارة ${res.symbol}` : `Delete ${res.symbol} Signal`}
+                >
+                  <X size={14} />
+                </button>
+              )}
+
               {/* Card content - same as TopSignals | MOBILE: rectangle expanded, full width, all text visible */}
               <button
                 onClick={() => { setSelectedIndex(idx); handleClick(); }}

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { AnalysisResult, SignalType, MarketType } from '../types';
-import { Activity, Zap, BarChart2, Info, Lock, Crown, Settings } from 'lucide-react';
+import { Activity, Zap, BarChart2, Info, Lock, Crown, Settings, Trash2, X } from 'lucide-react';
 import TradingViewEmbed from './TradingViewEmbed';
 import { Language, translations } from '../lib/i18n';
 import { playClick, initAudio } from '../lib/audioEngine';
@@ -24,6 +24,8 @@ interface ClientDashboardProps {
   onNavigateManual?: () => void;
   onNavigateRadar?: () => void;
   onToggleAutoAnalysis?: () => void;
+  onRemove?: (symbol: string) => void;
+  onClearAll?: () => void;
 }
 
 const SIGNAL_META: Record<string, { color: string; bg: string; border: string; labelAr: string; labelEn: string; symbolColor: string }> = {
@@ -34,10 +36,10 @@ const SIGNAL_META: Record<string, { color: string; bg: string; border: string; l
 };
 
 const CATEGORY_CONFIG: Record<string, { emoji: string; labelAr: string; labelEn: string; color: string; borderColor: string }> = {
-  forex: { emoji: '\uD83D\uDCB1', labelAr: 'الفوركس', labelEn: 'Forex', color: 'text-blue-400', borderColor: 'border-blue-500/30' },
-  crypto: { emoji: '\uD83E\uDDF1', labelAr: 'الكريبتو', labelEn: 'Crypto', color: 'text-purple-400', borderColor: 'border-purple-500/30' },
-  stocks: { emoji: '\uD83D\uDCC8', labelAr: 'الأسهم', labelEn: 'Stocks', color: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
-  metals: { emoji: '\uD83D\uDC8E', labelAr: 'المعادن', labelEn: 'Metals', color: 'text-orange-400', borderColor: 'border-orange-500/30' },
+  forex: { emoji: '💱', labelAr: 'الفوركس', labelEn: 'Forex', color: 'text-blue-400', borderColor: 'border-blue-500/30' },
+  crypto: { emoji: '🪙', labelAr: 'الكريبتو', labelEn: 'Crypto', color: 'text-purple-400', borderColor: 'border-purple-500/30' },
+  stocks: { emoji: '📈', labelAr: 'الأسهم', labelEn: 'Stocks', color: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
+  metals: { emoji: '💎', labelAr: 'المعادن', labelEn: 'Metals', color: 'text-orange-400', borderColor: 'border-orange-500/30' },
 };
 
 function getSymbolCategory(symbol: string): string {
@@ -127,7 +129,7 @@ function PlanActionRow({ isAr, autoAnalysisOn, onOpenMyPlan, onNavigateManual, o
   );
 }
 
-export default function ClientDashboard({ results, lang, hasActivePlan = false, onDetail, onTrade, showPlanActions = false, freeModeChosen = false, onActivatePaidPlan, autoAnalysisOn = false, onOpenMyPlan, onNavigateManual, onNavigateRadar, onToggleAutoAnalysis }: ClientDashboardProps) {
+export default function ClientDashboard({ results, lang, hasActivePlan = false, onDetail, onTrade, showPlanActions = false, freeModeChosen = false, onActivatePaidPlan, autoAnalysisOn = false, onOpenMyPlan, onNavigateManual, onNavigateRadar, onToggleAutoAnalysis, onRemove, onClearAll }: ClientDashboardProps) {
   const isAr = lang === 'ar';
   const t = translations[lang];
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -180,7 +182,7 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
             <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
           </div>
           <span className="text-sm font-black text-emerald-400">{isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}</span>
-          <span className="text-xs text-emerald-400/60 font-bold">{isAr ? 'يتم تحليل الفرض في الوقت الفعلي من المطور' : 'Opportunities synchronized in real-time from developer'}</span>
+          <span className="text-xs text-emerald-400/60 font-bold">{isAr ? (showPlanActions ? 'تحليل الفرص وفق إعدادات خطتك' : 'يتم تحليل الفرص في الوقت الفعلي') : (showPlanActions ? 'Auto opportunity analysis based on your plan' : 'Opportunities synchronized in real-time')}</span>
         </div>
       )}
         <MarketHoursIndicator lang={lang} />
@@ -191,8 +193,8 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
             <div className="absolute inset-0 border-b-2 border-emerald-400 rounded-full animate-spin" />
             <div className="absolute inset-0 flex items-center justify-center"><Activity size={24} className="text-emerald-400" /></div>
           </div>
-          <h3 className="text-xl font-black text-white/60">{isAr ? 'في انتظار نشر فرض جديدة...' : 'Waiting for new opportunities...'}</h3>
-          <p className="text-sm text-white/40 mt-2">{isAr ? 'ستظهر الفرص القوية والعادية بمجرد نشرها من المطور' : 'Strong and regular opportunities will appear once published by developer'}</p>
+          <h3 className="text-xl font-black text-white/60">{isAr ? 'في انتظار تشغيل التحليل أو ظهور فرص جديدة...' : 'Waiting for new opportunities...'}</h3>
+          <p className="text-sm text-white/40 mt-2">{isAr ? 'ستظهر الفرص المحللة من خطتك هنا بمجرد توفرها' : 'Opportunities analyzed on your plan will appear here'}</p>
         </div>
         )}
       </div>
@@ -209,11 +211,30 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
           <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
         </div>
         <span className="text-sm font-black text-emerald-400">{isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}</span>
-        <span className="text-xs text-emerald-400/60 font-bold">{isAr ? 'يتم مزامنة الفرص تلقائياً' : 'Opportunities synchronized in real-time'}</span>
+        <span className="text-xs text-emerald-400/60 font-bold">{isAr ? (showPlanActions ? 'تحليل الفرص وفق إعدادات خطتك' : 'يتم مزامنة الفرص تلقائياً') : (showPlanActions ? 'Auto opportunity analysis based on your plan' : 'Opportunities synchronized in real-time')}</span>
       </div>
       )}
-        <MarketHoursIndicator lang={lang} />
-        {showPlanActions && <PlanActionRow isAr={isAr} autoAnalysisOn={autoAnalysisOn} onOpenMyPlan={onOpenMyPlan} onNavigateManual={onNavigateManual} onNavigateRadar={onNavigateRadar} onToggleAutoAnalysis={onToggleAutoAnalysis} />}
+      <MarketHoursIndicator lang={lang} />
+      {showPlanActions && <PlanActionRow isAr={isAr} autoAnalysisOn={autoAnalysisOn} onOpenMyPlan={onOpenMyPlan} onNavigateManual={onNavigateManual} onNavigateRadar={onNavigateRadar} onToggleAutoAnalysis={onToggleAutoAnalysis} />}
+
+      {/* Opportunities Header with Clear All Button */}
+      <div className={cn("flex items-center justify-between px-2 pt-2", isAr ? "flex-row-reverse" : "flex-row")}>
+        <span className="text-xs font-black text-yellow-400 flex items-center gap-2 uppercase tracking-[0.15em]">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          {isAr ? 'أفضل فرص التداول' : 'Top Trading Opportunities'}
+          <span className="text-[10px] text-white/40 font-mono">({allFiltered.length})</span>
+        </span>
+        {onClearAll && (
+          <button 
+            onClick={onClearAll}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-400 hover:text-red-300 text-[11px] font-black uppercase tracking-wider transition-all active:scale-95"
+            title={isAr ? 'مسح جميع الإشارات المعروضة' : 'Clear All Displayed Signals'}
+          >
+            <Trash2 size={13} />
+            <span>{isAr ? 'مسح الإشارات' : 'Clear Signals'}</span>
+          </button>
+        )}
+      </div>
 
       {/* Signal Cards grouped by category */}
       <div className="space-y-4">
@@ -233,7 +254,30 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {displaySignals.map((res, idx) => (
-                  <ClientSignalCard key={`all_${res.symbol}_${idx}`} res={res} isAr={isAr} lang={lang} selectedSymbol={selectedSymbol} onSelect={(sym) => { if (selectedSymbol === sym) { setSelectedSymbol(null); setSymbolExplicitlySelected(false); } else { setSelectedSymbol(sym); setSymbolExplicitlySelected(true); } handleClick(); }} onDetail={onDetail} hasActivePlan={hasActivePlan} formatPublishDate={formatPublishDate} cardKey={`all_${res.symbol}_${idx}`} onClick={handleClick} />
+                  <ClientSignalCard
+                    key={`all_${res.symbol}_${idx}`}
+                    res={res}
+                    isAr={isAr}
+                    lang={lang}
+                    selectedSymbol={selectedSymbol}
+                    onSelect={(sym) => {
+                      if (selectedSymbol === sym) {
+                        setSelectedSymbol(null);
+                        setSymbolExplicitlySelected(false);
+                      } else {
+                        setSelectedSymbol(sym);
+                        setSymbolExplicitlySelected(true);
+                      }
+                      handleClick();
+                    }}
+                    onDetail={onDetail}
+                    hasActivePlan={hasActivePlan}
+                    formatPublishDate={formatPublishDate}
+                    cardKey={`all_${res.symbol}_${idx}`}
+                    onClick={handleClick}
+                    onTrade={onTrade}
+                    onRemove={onRemove}
+                  />
                 ))}
               </div>
             </div>
@@ -262,11 +306,11 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
   );
 }
 
-function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail, hasActivePlan, formatPublishDate, cardKey, onClick, onTrade }: {
+function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail, hasActivePlan, formatPublishDate, cardKey, onClick, onTrade, onRemove }: {
   res: AnalysisResult; isAr: boolean; lang: Language; selectedSymbol: string | null;
   onSelect: (sym: string) => void; onDetail?: (r: AnalysisResult) => void; hasActivePlan: boolean;
   formatPublishDate: (ts: string, lang: string) => string; cardKey: string;
-  onClick?: () => void; onTrade?: (symbol: string) => void;
+  onClick?: () => void; onTrade?: (symbol: string) => void; onRemove?: (symbol: string) => void;
 }) {
   const meta = SIGNAL_META[res.signal] || SIGNAL_META[SignalType.BUY];
   const isSelected = selectedSymbol === res.symbol;
@@ -286,6 +330,17 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
         </div>
       )}
 
+      {/* Remove button (X) */}
+      {onRemove && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(res.symbol); }}
+          className="absolute top-1 left-1 p-1 hover:bg-red-500/20 rounded-md text-white/30 hover:text-red-400 transition-colors z-20"
+          title={isAr ? `حذف إشارة ${res.symbol}` : `Delete ${res.symbol} Signal`}
+        >
+          <X size={14} />
+        </button>
+      )}
+
       {/* MOBILE: horizontal card - symbol on left, key info on right */}
       <button onClick={() => { onSelect(res.symbol); onClick?.(); }} className="md:hidden w-full px-3 py-2.5 flex items-center gap-3">
         <div className="flex flex-col items-start min-w-0 flex-1">
@@ -296,8 +351,8 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
         <div className="flex flex-col items-end gap-1 shrink-0">
           <span className="text-xl font-black font-mono leading-none text-white">{res.confidence}%</span>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-black font-mono leading-none text-[#00ff88]">{tp ? tp.toFixed(decimals) : '\u2014'}</span>
-            <span className="text-xs font-black font-mono leading-none text-[#ff4444]">{sl ? sl.toFixed(decimals) : '\u2014'}</span>
+            <span className="text-xs font-black font-mono leading-none text-[#00ff88]">{tp ? tp.toFixed(decimals) : '—'}</span>
+            <span className="text-xs font-black font-mono leading-none text-[#ff4444]">{sl ? sl.toFixed(decimals) : '—'}</span>
           </div>
           {res.isSideways !== undefined && (
             <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border leading-none ${
@@ -314,9 +369,9 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
       {/* DESKTOP: original vertical card (unchanged) */}
       <button onClick={() => { onSelect(res.symbol); onClick?.(); }} className="hidden md:flex w-full px-3 py-1.5 flex-col items-center gap-1">
         <div className="flex items-center justify-center w-full gap-2 overflow-hidden">
-          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tp ? tp.toFixed(decimals) : '\u2014'}</span>
+          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#00ff88'}}>{tp ? tp.toFixed(decimals) : '—'}</span>
           <span className="text-lg sm:text-xl font-black italic flex-shrink-0 text-center" style={{ color: meta.symbolColor }}>{res.symbol}</span>
-          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{sl ? sl.toFixed(decimals) : '\u2014'}</span>
+          <span className="text-sm sm:text-base font-black font-mono" style={{color:'#ff4444'}}>{sl ? sl.toFixed(decimals) : '—'}</span>
         </div>
         <span className="text-base sm:text-lg font-black" style={{color: meta.symbolColor}}>{isAr ? meta.labelAr : meta.labelEn}</span>
         <div className="flex items-center gap-2">
@@ -357,4 +412,3 @@ function ClientSignalCard({ res, isAr, lang, selectedSymbol, onSelect, onDetail,
     </div>
   );
 }
-

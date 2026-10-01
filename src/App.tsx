@@ -315,6 +315,12 @@ const isDeveloperSession = () => {
     setFreeModeChosen(true);
     setPaidMode(false);
     setShowMyPlan(false);
+    try {
+      const saved = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
+      setClientSignals(Array.isArray(saved) ? saved.filter((s: any) => !s.isSideways) : []);
+    } catch {
+      setClientSignals([]);
+    }
     navigateTo('main');
   };
   const activatePaidPlan = () => {
@@ -324,6 +330,12 @@ const isDeveloperSession = () => {
     setFreeModeChosen(false);
     setPaidMode(true);
     setShowMyPlan(false);
+    try {
+      const saved = JSON.parse(localStorage.getItem(cxnSigKey) || '[]');
+      setClientSignals(Array.isArray(saved) ? saved.filter((s: any) => !s.isSideways) : []);
+    } catch {
+      setClientSignals([]);
+    }
     if (user?.email) {
       activateClientPlan(user.email, activeSubscription?.requestNo ?? null).catch(() => {});
     }
@@ -449,19 +461,31 @@ const isDeveloperSession = () => {
   }, [user, lang, isPlanClient]);
 
   // CLIENT PLAN: load per-client scoped signals & auto settings when the plan view is active
+  // When in free mode, load developer shared signals
   useEffect(() => {
-    if (!isPlanClient) return;
-    try {
-      const saved = JSON.parse(localStorage.getItem(cxnSigKey) || '[]');
-      if (Array.isArray(saved)) setClientSignals(saved.filter((s: any) => !s.isSideways));
-    } catch {}
-    try {
-      const savedAuto = localStorage.getItem(cxnAutoKey);
-      if (savedAuto) {
-        const parsed = JSON.parse(savedAuto);
-        if (parsed && typeof parsed === 'object') setAutoSettings((prev) => ({ ...prev, ...parsed }));
+    if (isDeveloperSession()) return;
+    if (isPlanClient) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(cxnSigKey) || '[]');
+        setClientSignals(Array.isArray(saved) ? saved.filter((s: any) => !s.isSideways) : []);
+      } catch {
+        setClientSignals([]);
       }
-    } catch {}
+      try {
+        const savedAuto = localStorage.getItem(cxnAutoKey);
+        if (savedAuto) {
+          const parsed = JSON.parse(savedAuto);
+          if (parsed && typeof parsed === 'object') setAutoSettings((prev) => ({ ...prev, ...parsed }));
+        }
+      } catch {}
+    } else {
+      try {
+        const saved = JSON.parse(localStorage.getItem('finalyze_client_signals') || '[]');
+        setClientSignals(Array.isArray(saved) ? saved.filter((s: any) => !s.isSideways) : []);
+      } catch {
+        setClientSignals([]);
+      }
+    }
   }, [isPlanClient, cxnSigKey, cxnAutoKey]);
 
   // CLIENT: Sync freemium state from Firestore
@@ -508,9 +532,9 @@ const isDeveloperSession = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // CLIENT: Poll radar status from developer
+  // CLIENT: Poll radar status from developer — only when in Free Mode!
   useEffect(() => {
-    if (isDeveloperSession()) return;
+    if (isDeveloperSession() || isPlanClient) return;
     if (!user && clientLoginRequired) return;
     let prevRunning = false;
 
@@ -1187,6 +1211,43 @@ const isDeveloperSession = () => {
       } catch (e) {
         console.warn('Failed to clear Firestore shared_results:', e);
       }
+    }
+  };
+
+  const removeClientSignal = (symbol: string) => {
+    setClientSignals(prev => {
+      const updated = prev.filter(s => s.symbol !== symbol);
+      if (isPlanClient) {
+        localStorage.setItem(cxnSigKey, JSON.stringify(updated));
+      } else {
+        localStorage.setItem('finalyze_client_signals', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const handleClearClientSignals = () => {
+    setClientSignals([]);
+    if (isPlanClient) {
+      localStorage.removeItem(cxnSigKey);
+    } else {
+      localStorage.removeItem('finalyze_client_signals');
+    }
+  };
+
+  const removeAnalysisResult = (symbol: string) => {
+    if (!analysisResults) return;
+    const updated = analysisResults.filter(r => r.symbol !== symbol);
+    setAnalysisResults(updated.length > 0 ? updated : null);
+    if (isPlanClient) {
+      removeClientSignal(symbol);
+    }
+  };
+
+  const handleClearAnalysisResults = () => {
+    setAnalysisResults(null);
+    if (isPlanClient) {
+      handleClearClientSignals();
     }
   };
 
@@ -2625,6 +2686,17 @@ const started = planGrants
                     setAnalysisError(null);
                     setProgress(null);
                     updateTopSignals(filtered);
+                    if (isPlanClient) {
+                      setClientSignals(prev => {
+                        const nonSideways = filtered.filter(r => !r.isSideways && r.signal !== 'no_entry' && r.signal !== 'neutral');
+                        const map = new Map<string, AnalysisResult>();
+                        prev.forEach(s => map.set(s.symbol, s));
+                        nonSideways.forEach(s => map.set(s.symbol, s));
+                        const combined = Array.from(map.values()).slice(-100);
+                        localStorage.setItem(cxnSigKey, JSON.stringify(combined));
+                        return combined;
+                      });
+                    }
                     // Same end-of-scan notification as the developer account:
                     // completion tone, then a "new opportunity" alert + success tone
                     // only when a strong signal (strong_buy/strong_sell) was found.
@@ -2686,6 +2758,8 @@ const started = planGrants
                       settings={settings}
                       onDetail={(r) => { setAnalysisResults(null); setDetailResult(r); }}
                       onTrade={(sym) => { try { sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol: sym })); } catch {} navigateTo('trade'); }}
+                      onRemove={removeAnalysisResult}
+                      onClearAll={handleClearAnalysisResults}
                     />
                   </>
                 ) : null}
@@ -2737,7 +2811,23 @@ const started = planGrants
         {!isDeveloperSession() && !analysisResults && !isAnalyzing && effectivePage === 'main' && (
           <div className="max-w-7xl mx-auto px-4">
             <AdSlot position="header" lang={lang} />
-            <ClientDashboard results={clientSignals} lang={lang} hasActivePlan={hasActivePlan} onDetail={setClientDetailResult} showPlanActions={showPlanControls} freeModeChosen={freeModeChosen} onActivatePaidPlan={activatePaidPlan} autoAnalysisOn={autoSettings.isEnabled} onOpenMyPlan={openMyPlan} onNavigateManual={() => navigateTo('manualAnalysis')} onNavigateRadar={() => navigateTo('radar')} onToggleAutoAnalysis={() => { initAudio(); setAutoSettings({ ...autoSettings, isEnabled: !autoSettings.isEnabled }); }} onTrade={(sym) => { try { sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol: sym })); } catch {} navigateTo('trade'); }} />
+            <ClientDashboard
+              results={clientSignals}
+              lang={lang}
+              hasActivePlan={hasActivePlan}
+              onDetail={setClientDetailResult}
+              showPlanActions={showPlanControls}
+              freeModeChosen={freeModeChosen}
+              onActivatePaidPlan={activatePaidPlan}
+              autoAnalysisOn={autoSettings.isEnabled}
+              onOpenMyPlan={openMyPlan}
+              onNavigateManual={() => navigateTo('manualAnalysis')}
+              onNavigateRadar={() => navigateTo('radar')}
+              onToggleAutoAnalysis={() => { initAudio(); setAutoSettings({ ...autoSettings, isEnabled: !autoSettings.isEnabled }); }}
+              onTrade={(sym) => { try { sessionStorage.setItem('joseph_session_ui', JSON.stringify({ symbol: sym })); } catch {} navigateTo('trade'); }}
+              onRemove={removeClientSignal}
+              onClearAll={handleClearClientSignals}
+            />
           </div>
         )}
 
