@@ -74,7 +74,7 @@ export default function KeyPoolPanel({ lang }: { lang: Language }) {
   const groq = keys.filter((k) => k.provider === 'groq' && k.enabled).length;
 
   return (
-    <div className="space-y-5" dir="rtl">
+    <div className="space-y-5" dir={isAr ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="text-xl md:text-[26px] font-black text-brand-text/70 uppercase tracking-widest flex items-center gap-3">
           <span className="text-[#F59E0B] text-2xl">◆</span>

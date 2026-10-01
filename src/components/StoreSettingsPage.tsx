@@ -275,7 +275,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
     } catch {}
   };
 
-  const formatPrice = (price: number) => (price <= 0 ? 'مجاني' : `$${(price / 100).toFixed(2)}`);
+  const formatPrice = (price: number) => (price <= 0 ? (isAr ? 'مجاني' : 'Free') : `$${(price / 100).toFixed(2)}`);
 
   const saveSubPrices = () => {
     const clean = {
@@ -366,7 +366,9 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {(['weekly', 'monthly', 'yearly'] as const).map((key) => (
               <div key={key} className="flex items-center gap-2">
-                <span className="text-base font-black text-slate-300 uppercase w-24">{isAr ? (key === 'weekly' ? 'أسبوعي' : key === 'monthly' ? 'شهري' : 'سنوي') : key}</span>
+                <span className="text-base font-black text-slate-300 uppercase w-24">
+                  {isAr ? (key === 'weekly' ? 'أسبوعي' : key === 'monthly' ? 'شهري' : 'سنوي') : (key === 'weekly' ? 'Weekly' : key === 'monthly' ? 'Monthly' : 'Yearly')}
+                </span>
                 <div className="flex items-center gap-1">
                   <span className="text-lg font-black text-white">$</span>
                   <input
@@ -574,7 +576,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'الاسم (عربي)' : 'Name (AR)'}</label>
-                  <input type="text" value={plan.labelAr} onChange={(e) => patchPlan(plan.id, { labelAr: e.target.value })} placeholder="شهري" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold text-white outline-none focus:border-sky-500" />
+                  <input type="text" value={plan.labelAr} onChange={(e) => patchPlan(plan.id, { labelAr: e.target.value })} placeholder={isAr ? 'شهري' : 'Monthly (Arabic)'} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold text-white outline-none focus:border-sky-500" />
                 </div>
                 <div>
                   <label className="text-xs font-black uppercase text-slate-500 block mb-1">Name (EN)</label>
@@ -590,7 +592,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                 </div>
                 <div>
                   <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'شارة (عربي)' : 'Badge (AR)'}</label>
-                  <input type="text" value={plan.badgeAr || ''} onChange={(e) => patchPlan(plan.id, { badgeAr: e.target.value })} placeholder="الأكثر شعبية" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold text-white outline-none focus:border-sky-500" />
+                  <input type="text" value={plan.badgeAr || ''} onChange={(e) => patchPlan(plan.id, { badgeAr: e.target.value })} placeholder={isAr ? 'الأكثر شعبية' : 'Popular (Arabic)'} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold text-white outline-none focus:border-sky-500" />
                 </div>
                 <div>
                   <label className="text-xs font-black uppercase text-slate-500 block mb-1">Badge (EN)</label>
@@ -601,7 +603,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                 <div>
                   <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'المميزات (عربي) — ميزة في كل سطر' : 'Features (AR) — one per line'}</label>
-                  <textarea rows={4} value={plan.featuresAr} onChange={(e) => patchPlan(plan.id, { featuresAr: e.target.value })} dir="rtl" placeholder="تحليل احترافي&#10;إشارات فورية" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-sky-500 resize-none" />
+                  <textarea rows={4} value={plan.featuresAr} onChange={(e) => patchPlan(plan.id, { featuresAr: e.target.value })} dir="rtl" placeholder={isAr ? "تحليل احترافي\nإشارات فورية" : "Professional analysis (Arabic)\nInstant alerts (Arabic)"} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-sky-500 resize-none" />
                 </div>
                 <div>
                   <label className="text-xs font-black uppercase text-slate-500 block mb-1">Features (EN) — one per line</label>
@@ -653,12 +655,12 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
           </div>
 
           <div>
-            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">Description (English)</label>
+            <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'الوصف (بالإنجليزية)' : 'Description (English)'}</label>
             <textarea
               value={descriptionEn}
               onChange={(e) => setDescriptionEn(e.target.value)}
               rows={2}
-              placeholder="A concise description of what the bot does..."
+              placeholder={isAr ? 'وصف مختصر بالإنجليزية...' : 'A concise description of what the bot does...'}
               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white outline-none focus:border-amber-500 resize-none"
             />
           </div>
@@ -667,7 +669,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
             <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'القسم (التصنيف)' : 'Section (Category)'}</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {STORE_CATEGORIES.map((c) => (
-<button
+                <button
                   key={c.key}
                   type="button"
                   onClick={() => { setCategory(c.key); setType(''); }}
@@ -683,7 +685,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
             </div>
 
           {typesForCategory(category).length > 0 && (
-            <div>
+            <div className="mt-3">
               <label className="text-[15px] font-black text-slate-400 mb-1.5 block">{isAr ? 'نوع المنتج' : 'Product Type'}</label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {typesForCategory(category).map((t) => (
@@ -705,7 +707,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
               </div>
             </div>
           )}
-            <p className="text-[13px] text-slate-500 mt-1.5">{isAr ? 'يظهر المنتج في هذا القسم داخل المتجر، مع صفين: مجاني (سعر 0) أعلى ثم مدفوع.' : 'The product appears under this section in the store, with two rows: free (price 0) on top then paid.'}</p>
+            <p className="text-[13px] text-slate-500 mt-1.5">{isAr ? 'يظهر المنتج في هذا القسم داخل المتجر، مع صفين: مجاني (سعر $0) أعلى ثم مدفوع.' : 'The product appears under this section in the store, with two rows: free (price $0) on top then paid.'}</p>
           </div>
 
           <div>
@@ -721,7 +723,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                 placeholder="0.00"
                 className="w-40 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl text-white outline-none focus:border-amber-500"
               />
-              <span className="text-[15px] text-slate-500">{isAr ? 'أدنى سعر 1 سنت' : 'Minimum price 1 cent'}</span>
+              <span className="text-[15px] text-slate-500">{isAr ? 'أدنى سعر $0.01' : 'Minimum price $0.01'}</span>
             </div>
           </div>
 
@@ -783,7 +785,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                   </button>
                 </div>
               )}
-              {!image && <span className="text-[15px] text-slate-500">{isAr ? 'جميع الصور تُحجَّم تلقائياً لحجم موحّد بأبعاد أفقية أنيقة' : 'All images are auto-resized to one elegant horizontal size'}</span>}
+              {!image && <span className="text-[15px] text-slate-500">{isAr ? 'جميع الصور تُحجَّم تلقائياً لحجم موحّد بأبعاد أفقية أنيقة' : 'All images are auto-resized to standard 16:9 ratio'}</span>}
             </div>
           </div>
 
@@ -797,7 +799,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
               ? (isAr ? 'جاري الحفظ...' : 'Saving...')
               : editingBot
                 ? (isAr ? 'حفظ التعديلات' : 'Save Changes')
-                : (isAr ? 'إضافة البوت' : 'Add Bot')}
+                : (isAr ? 'إضافة المنتج' : 'Add Product')}
           </button>
           {editingBot && (
             <button
