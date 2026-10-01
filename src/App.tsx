@@ -1175,7 +1175,7 @@ const isDeveloperSession = () => {
       setTopSignals([...strong, ...regular]);
 
       if (hasBrandNewSymbol) {
-        setNewSignalAlert(lang === 'ar' ? '\u2705 \u0644\u0642\u062f \u0631\u0635\u0629 \u062a\u062f\u0627\u0648\u0644 \u0642\u0648\u064a\u0629 \u062c\u062f\u064a\u062f\u0629!' : '\u2705 New strong trading opportunity detected!');
+        setNewSignalAlert(lang === 'ar' ? '✅ لقد تم رصد فرصة تداول قوية جديدة!' : '✅ New strong trading opportunity detected!');
         setTimeout(() => setNewSignalAlert(null), 8000);
         setTimeout(() => {
           try { initAudio(); } catch {}
@@ -1437,7 +1437,7 @@ const isDeveloperSession = () => {
                 });
                 if (isPlanClient) {
                   const isStrong = sig === 'strong_buy' || sig === 'strong_sell';
-                  setNewSignalAlert(lang === 'ar' ? (isStrong ? `✅ تنبيه فرصة قوية جديدة — ${r.symbol}` : `✅ تنبيه فرصة جديدة — ${r.symbol}`) : (isStrong ? `✅ New strong opportunity — ${r.symbol}` : `✅ New opportunity — ${r.symbol}`));
+                  setNewSignalAlert(lang === 'ar' ? (isStrong ? `✅ لقد تم رصد فرصة تداول قوية جديدة! — ${r.symbol}` : `✅ لقد تم رصد فرصة تداول جديدة! — ${r.symbol}`) : (isStrong ? `✅ New strong trading opportunity detected! — ${r.symbol}` : `✅ New trading opportunity detected! — ${r.symbol}`));
                   setTimeout(() => setNewSignalAlert(null), 8000);
                   try { playAudio('success'); } catch {}
                 }
@@ -1558,6 +1558,8 @@ const isDeveloperSession = () => {
         setFoundAnyStrong(signalsRef.current.length > 0);
         try { initAudio(); } catch {}
         playAudio('completion');
+        setShowRadarComplete(true);
+        setTimeout(() => setShowRadarComplete(false), 30000);
 
         if (autoSettingsRef.current.isEnabled) {
           const ms = (autoSettingsRef.current.interval || 15) * 60000;

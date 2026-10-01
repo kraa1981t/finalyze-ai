@@ -92,7 +92,7 @@ export default function RadarSettingsPage({ autoSettings, onAutoSettingsChange, 
           </span>
         </div>
 
-        {isDeveloper && (
+        {(isDeveloper || hasActivePlan) && (
           <div className="space-y-3">
             {/* Alert 1: New Opportunity */}
             <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-brand-bg border border-brand-text/5">
