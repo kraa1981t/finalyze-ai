@@ -23,7 +23,9 @@ interface PaymentModalProps {
   amount: number;
   asPage?: boolean;
   manageMode?: boolean;
-  onConfirm?: () => void;
+  /** For plan purchases, called automatically when the developer releases the grant.
+   *  Receives the server-computed expiryDate and requestNo from the actual grant. */
+  onConfirm?: (grantInfo?: { expiryDate?: string; requestNo?: number }) => void;
   lang?: 'en' | 'ar';
   freemiumDisabled?: boolean;
   onFreemiumToggle?: (v: boolean) => void;
@@ -158,17 +160,22 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
 
-  const grantAccess = () => {
+  const grantAccess = (grant?: { expiryDate?: string; requestNo?: number }) => {
     setPaymentConfirmed(true);
     setRequestStatus('approved');
     setTimerRunning(false);
     if (sessionId) { completeSession(sessionId); setSessionId(null); }
-    if (!botPurchase?.id) { onConfirm?.(); return; }
+    if (!botPurchase?.id) {
+      // Plans: activate immediately without requiring a button click.
+      onConfirm?.(grant);
+      return;
+    }
     grantBotDownload(botPurchase.id);
     setBotGrantTs(getDownloadGrant(botPurchase.id));
   };
 
   const productLabel = botPurchase?.name || planLabel;
+
   const isBotProduct = section === 'bot' && !!botPurchase?.id;
   const buyerEmailFinal = (buyerEmail || contactEmail).trim().toLowerCase();
 
@@ -276,7 +283,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     // no request yet (requestNo null) so it can never auto-open from an older
     // email grant — it waits for its own developer approval.
     checkUserGrant(buyerEmailFinal, isBotProduct ? 'bot' : 'plan', isBotProduct ? botPurchase?.id : undefined, isBotProduct ? undefined : (requestNo ?? undefined)).then((g) => {
-      if (!stopped && g) grantAccess();
+      if (!stopped && g) grantAccess(g);
     });
     return () => { stopped = true; };
   }, [isOpen, buyerEmailFinal, isBotProduct, botPurchase?.id, requestNo]);
@@ -286,7 +293,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     let stopped = false;
     const check = async () => {
       const g = await checkUserGrant(buyerEmailFinal, isBotProduct ? 'bot' : 'plan', isBotProduct ? botPurchase?.id : undefined, isBotProduct ? undefined : (requestNo ?? undefined));
-      if (!stopped && g) grantAccess();
+      if (!stopped && g) grantAccess(g);
     };
     const interval = setInterval(check, 15000);
     check();
@@ -297,7 +304,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     if (!buyerEmailFinal) return;
     setGrantChecking(true);
     const g = await checkUserGrant(buyerEmailFinal, isBotProduct ? 'bot' : 'plan', isBotProduct ? botPurchase?.id : undefined, isBotProduct ? undefined : (requestNo ?? undefined));
-    if (g) grantAccess();
+    if (g) grantAccess(g);
     else setError(isAr ? 'لم يتم الإفراج بعد. قد يستغرق التأكيد حتى 24 ساعة.' : 'Not released yet. Confirmation may take up to 24 hours.');
     setGrantChecking(false);
   };

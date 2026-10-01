@@ -2364,11 +2364,17 @@ const started = planGrants
                 onBotPaid={() => { setResumeSessionId(null); setBotPurchase(null); setPaymentPlan(null); goBack(); }}
                 onGoToStore={() => { setResumeSessionId(null); setPaymentPlan(null); setBotPurchase(null); navigateTo('store'); }}
                 onGoToPlans={() => { setResumeSessionId(null); setPaymentPlan(null); setBotPurchase(null); navigateTo('plans'); }}
-                onConfirm={async () => {
+                onConfirm={async (grantInfo?: { expiryDate?: string; requestNo?: number }) => {
                   const plan = paymentPlan!;
                   const buyerEmail = user?.email || '';
-                  const subExpiry = new Date();
-                  subExpiry.setDate(subExpiry.getDate() + (plan.durationDays || 30));
+                  // Use the server-computed expiryDate from the grant if available;
+                  // fall back to a local calculation only when no grant info is passed.
+                  const serverExpiry = grantInfo?.expiryDate ? new Date(grantInfo.expiryDate) : null;
+                  const subExpiry = serverExpiry ?? (() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + (plan.durationDays || 30));
+                    return d;
+                  })();
                   if (buyerEmail) {
                     // A successful payment REGISTERS the client on the site under
                     // their payment email: this becomes their identity, so the
@@ -2402,23 +2408,17 @@ const started = planGrants
                     amount: plan.amount,
                     activatedAt: new Date().toISOString(),
                     expiryDate: subExpiry.toISOString(),
-                    requestNo: undefined,
+                    requestNo: grantInfo?.requestNo,
                     durationDays: plan.durationDays,
                   };
                   localStorage.setItem('active_subscription', JSON.stringify(sub));
                   setActiveSubscription(sub);
-                  // Re-derive from THIS client's own key only, so a first-time
-                  // buyer is forced through the key gate even if some shared key
-                  // happens to be present in the browser.
-                          // A new payment reopens paid mode immediately. If this client has
-                  // their own key saved under their email, the gate is skipped and
-                  // plan features open directly; otherwise the gate page appears
-                  // (first purchase OR renewed plan without a saved key).
+                  // A new payment reopens paid mode immediately.
                   setPaidMode(true);
                   setFreeModeChosen(false);
-                   setResumeSessionId(null);
-                   setPaymentPlan(null);
-                   navigateTo('main');
+                  setResumeSessionId(null);
+                  setPaymentPlan(null);
+                  navigateTo('main');
                 }}
               />
             )}
