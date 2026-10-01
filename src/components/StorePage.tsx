@@ -285,11 +285,11 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, onBuyPlan, u
                 </div>
                 <div>
                   <h4 className="text-lg font-black text-white uppercase tracking-wider leading-none">{planLabel(plan, isAr)}</h4>
-                  <p className="text-xs text-slate-400 mt-1">{isAr ? `مدة ${plan.durationDays} يوم` : `${plan.durationDays} days`}</p>
+                  <p className="text-xs text-slate-400 mt-1">{isAr ? `مدة ${toWesternDigits(plan.durationDays)} يوم` : `${toWesternDigits(plan.durationDays)} days`}</p>
                 </div>
               </div>
               <div className="mb-4">
-                <span className="text-4xl font-black text-white">${Number(plan.priceUsd).toFixed(2)}</span>
+                <span className="text-4xl font-black text-white font-mono tabular-nums" dir="ltr">${Number(toWesternDigits(plan.priceUsd)).toFixed(2)}</span>
                 <span className="text-sm text-slate-400 ml-1">/ {isAr ? 'الخطة' : 'plan'}</span>
               </div>
               {/* Features shown BEFORE purchase */}
@@ -310,7 +310,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, onBuyPlan, u
                 onClick={() => onBuyPlan?.(plan)}
                 className="mt-auto w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg bg-gradient-to-r from-amber-500 to-[#F59E0B] text-black hover:opacity-90 active:scale-95"
               >
-                {isAr ? `اشتراك $${Number(plan.priceUsd).toFixed(2)}` : `Subscribe $${Number(plan.priceUsd).toFixed(2)}`}
+                {isAr ? `اشتراك $${Number(toWesternDigits(plan.priceUsd)).toFixed(2)}` : `Subscribe $${Number(toWesternDigits(plan.priceUsd)).toFixed(2)}`}
               </button>
             </div>
           );

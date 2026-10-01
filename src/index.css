@@ -11,8 +11,15 @@
 }
 
 *, ::before, ::after {
-  font-variant-numeric: tabular-nums lining-nums;
-  font-feature-settings: "lnum" 1, "tnum" 1;
+  font-variant-numeric: lining-nums tabular-nums !important;
+  font-feature-settings: "lnum" 1, "tnum" 1, "numr" 0, "onum" 0, "locl" 0 !important;
+  -webkit-font-feature-settings: "lnum" 1, "tnum" 1, "numr" 0, "onum" 0, "locl" 0 !important;
+}
+
+input, textarea, select, button, span, p, div, label, h1, h2, h3, h4, h5, h6, bdi, bdo, td, th {
+  font-variant-numeric: lining-nums tabular-nums !important;
+  font-feature-settings: "lnum" 1, "tnum" 1, "numr" 0, "onum" 0, "locl" 0 !important;
+  -webkit-font-feature-settings: "lnum" 1, "tnum" 1, "numr" 0, "onum" 0, "locl" 0 !important;
 }
 
 body {
