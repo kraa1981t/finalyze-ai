@@ -221,9 +221,9 @@ export function downloadBot(bot: StoreBot): void {
 
 export function formatFileSize(bytes: number): string {
   if (!bytes) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  if (bytes < 1024) return `${toWesternDigits(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${toWesternDigits((bytes / 1024).toFixed(1))} KB`;
+  return `${toWesternDigits((bytes / (1024 * 1024)).toFixed(2))} MB`;
 }
 
 // Standard elegant horizontal rectangle used for all bot preview images (16:9)

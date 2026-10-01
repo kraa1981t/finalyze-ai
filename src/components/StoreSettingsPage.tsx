@@ -284,7 +284,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
     } catch {}
   };
 
-  const formatPrice = (price: number) => (price <= 0 ? (isAr ? 'مجاني' : 'Free') : `$${(price / 100).toFixed(2)}`);
+  const formatPrice = (price: number) => (price <= 0 ? (isAr ? 'مجاني' : 'Free') : `$${toWesternDigits((price / 100).toFixed(2))}`);
 
   const saveSubPrices = () => {
     const clean = {
@@ -381,12 +381,12 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                 <div className="flex items-center gap-1" dir="ltr">
                   <span className="text-lg font-black text-white">$</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     dir="ltr"
                     value={toWesternDigits(editSubPrices[key])}
                     onChange={(e) => setEditSubPrices({ ...editSubPrices, [key]: toWesternDigits(e.target.value) })}
                     className="w-24 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-lg font-bold font-mono tabular-nums text-white outline-none focus:border-amber-500"
-                    min="0.01" step="0.01"
                   />
                 </div>
               </div>
@@ -408,12 +408,12 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
           </h5>
           <div className="flex items-center gap-3">
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               dir="ltr"
               value={toWesternDigits(editTimer)}
-              onChange={(e) => setEditTimer(Math.max(1, Number(toWesternDigits(e.target.value)) || 1))}
+              onChange={(e) => setEditTimer(toWesternDigits(e.target.value) as any)}
               className="w-24 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-lg font-bold font-mono tabular-nums text-white outline-none focus:border-emerald-500"
-              min="1"
             />
             <span className="text-base text-slate-400">{isAr ? 'دقيقة' : 'minutes'}</span>
             <button
@@ -595,11 +595,11 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
                 </div>
                 <div>
                   <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'السعر ($)' : 'Price ($)'}</label>
-                  <input type="number" value={plan.priceUsd} min="0" step="0.01" dir="ltr" onChange={(e) => patchPlan(plan.id, { priceUsd: Number(toWesternDigits(e.target.value)) })} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold font-mono tabular-nums text-white outline-none focus:border-sky-500" />
+                  <input type="text" inputMode="decimal" value={toWesternDigits(plan.priceUsd)} dir="ltr" onChange={(e) => patchPlan(plan.id, { priceUsd: Number(toWesternDigits(e.target.value)) })} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold font-mono tabular-nums text-white outline-none focus:border-sky-500" />
                 </div>
                 <div>
                   <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'المدة (يوم)' : 'Duration (days)'}</label>
-                  <input type="number" value={plan.durationDays} min="1" dir="ltr" onChange={(e) => patchPlan(plan.id, { durationDays: Number(toWesternDigits(e.target.value)) })} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold font-mono tabular-nums text-white outline-none focus:border-sky-500" />
+                  <input type="text" inputMode="numeric" value={toWesternDigits(plan.durationDays)} dir="ltr" onChange={(e) => patchPlan(plan.id, { durationDays: Number(toWesternDigits(e.target.value)) })} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold font-mono tabular-nums text-white outline-none focus:border-sky-500" />
                 </div>
                 <div>
                   <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'شارة (عربي)' : 'Badge (AR)'}</label>
@@ -726,11 +726,10 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
             <div className="flex items-center gap-2">
               <span className="text-2xl font-black text-white">$</span>
               <input
-                type="number"
-                value={priceInput}
+                type="text"
+                inputMode="decimal"
+                value={toWesternDigits(priceInput)}
                 onChange={(e) => setPriceInput(toWesternDigits(e.target.value))}
-                min="0"
-                step="0.01"
                 placeholder="0.00"
                 dir="ltr"
                 className="w-40 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-2xl font-mono tabular-nums text-white outline-none focus:border-amber-500"
@@ -827,7 +826,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
 
       {/* Existing bots */}
       <h3 className="text-2xl font-black uppercase text-slate-400 tracking-widest mb-4">
-        {isAr ? `المنتجات في المتجر (${bots.length})` : `Products in store (${bots.length})`}
+        {isAr ? `المنتجات في المتجر (${toWesternDigits(bots.length)})` : `Products in store (${toWesternDigits(bots.length)})`}
       </h3>
 
       {loading ? (
