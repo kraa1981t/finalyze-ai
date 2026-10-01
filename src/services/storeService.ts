@@ -119,11 +119,25 @@ export function hasDownloadedBot(botId: string): boolean {
   return !!readMap(DOWNLOADED_KEY)[botId];
 }
 
+import { toWesternDigits } from './storePlans';
+
+function sanitizeBot(d: any): StoreBot {
+  return {
+    ...d,
+    name: toWesternDigits(d.name),
+    description: toWesternDigits(d.description),
+    descriptionAr: d.descriptionAr ? toWesternDigits(d.descriptionAr) : '',
+    descriptionEn: d.descriptionEn ? toWesternDigits(d.descriptionEn) : '',
+    price: Math.max(0, Number(toWesternDigits(d.price)) || 0),
+    fileSize: Math.max(0, Number(toWesternDigits(d.fileSize)) || 0),
+  };
+}
+
 export async function fetchStoreBots(): Promise<StoreBot[]> {
   try {
     const q = query(collection(db, BOTS_COLLECTION), orderBy('createdAt', 'desc'));
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as StoreBot));
+    return snap.docs.map((d) => sanitizeBot({ id: d.id, ...d.data() }));
   } catch {
     return [];
   }
@@ -131,11 +145,11 @@ export async function fetchStoreBots(): Promise<StoreBot[]> {
 
 export async function addStoreBot(bot: Omit<StoreBot, 'id'>): Promise<void> {
   await addDoc(collection(db, BOTS_COLLECTION), {
-    name: bot.name,
-    description: bot.description,
-    descriptionAr: bot.descriptionAr || '',
-    descriptionEn: bot.descriptionEn || '',
-    price: bot.price,
+    name: toWesternDigits(bot.name),
+    description: toWesternDigits(bot.description),
+    descriptionAr: toWesternDigits(bot.descriptionAr || ''),
+    descriptionEn: toWesternDigits(bot.descriptionEn || ''),
+    price: Math.max(0, Number(toWesternDigits(bot.price)) || 0),
     category: bot.category || 'bot',
     type: bot.type || '',
     fileName: bot.fileName,

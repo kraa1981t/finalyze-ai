@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Wallet, Copy, Crown, Shield, ShieldOff, Timer } from 'lucide-react';
 import { StoreBot, StoreCategory, STORE_CATEGORIES, typesForCategory, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
 import { loadPaymentSettings, savePaymentSettings, PaymentAddress, PAYMENT_METHODS } from '../services/paymentSettings';
-import { StorePlan, fallbackPlans, fetchPlans, addStorePlan, updateStorePlan, deleteStorePlan, planLabel } from '../services/storePlans';
+import { StorePlan, fallbackPlans, fetchPlans, addStorePlan, updateStorePlan, deleteStorePlan, planLabel, toWesternDigits } from '../services/storePlans';
 
 interface StoreSettingsPageProps {
   lang: 'ar' | 'en';
@@ -22,12 +22,12 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
   const isAr = lang === 'ar';
   const [freemiumDisabled, setFreemiumDisabled] = useState(externalFreemium ?? localStorage.getItem('finalyze_freemium_disabled') === 'true');
   const [editSubPrices, setEditSubPrices] = useState(() => {
-    try { const s = localStorage.getItem(SUBSCRIPTION_STORAGE_KEY); return s ? JSON.parse(s) : DEFAULT_PRICES; }
+    try { const s = localStorage.getItem(SUBSCRIPTION_STORAGE_KEY); return s ? JSON.parse(toWesternDigits(s)) : DEFAULT_PRICES; }
     catch { return DEFAULT_PRICES; }
   });
   const [editTimer, setEditTimer] = useState(() => {
     const saved = localStorage.getItem(TIMER_STORAGE_KEY);
-    return saved ? parseInt(saved) : 30;
+    return saved ? parseInt(toWesternDigits(saved)) : 30;
   });
   const [bots, setBots] = useState<StoreBot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +65,16 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
   }, []);
 
   const patchPlan = (id: string | undefined, patch: Partial<Omit<StorePlan, 'id'>>) => {
-    setPlans((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    const sanitizedPatch: any = { ...patch };
+    if (patch.priceUsd !== undefined) sanitizedPatch.priceUsd = Number(toWesternDigits(patch.priceUsd)) || 0;
+    if (patch.durationDays !== undefined) sanitizedPatch.durationDays = Math.max(1, Math.round(Number(toWesternDigits(patch.durationDays)) || 1));
+    if (patch.labelAr !== undefined) sanitizedPatch.labelAr = toWesternDigits(patch.labelAr);
+    if (patch.labelEn !== undefined) sanitizedPatch.labelEn = toWesternDigits(patch.labelEn);
+    if (patch.badgeAr !== undefined) sanitizedPatch.badgeAr = toWesternDigits(patch.badgeAr);
+    if (patch.badgeEn !== undefined) sanitizedPatch.badgeEn = toWesternDigits(patch.badgeEn);
+    if (patch.featuresAr !== undefined) sanitizedPatch.featuresAr = toWesternDigits(patch.featuresAr);
+    if (patch.featuresEn !== undefined) sanitizedPatch.featuresEn = toWesternDigits(patch.featuresEn);
+    setPlans((prev) => prev.map((p) => (p.id === id ? { ...p, ...sanitizedPatch } : p)));
   };
 
   const addEmptyPlan = () => {
@@ -82,14 +91,14 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
     try {
       const data: Omit<StorePlan, 'id'> = {
         key: plan.key,
-        labelAr: plan.labelAr.trim(),
-        labelEn: plan.labelEn.trim(),
-        durationDays: Math.max(1, Math.round(Number(plan.durationDays) || 30)),
-        priceUsd: Math.max(0, Number(plan.priceUsd) || 0),
-        badgeAr: plan.badgeAr || '',
-        badgeEn: plan.badgeEn || '',
-        featuresAr: plan.featuresAr,
-        featuresEn: plan.featuresEn,
+        labelAr: toWesternDigits(plan.labelAr.trim()),
+        labelEn: toWesternDigits(plan.labelEn.trim()),
+        durationDays: Math.max(1, Math.round(Number(toWesternDigits(plan.durationDays)) || 30)),
+        priceUsd: Math.max(0, Number(toWesternDigits(plan.priceUsd)) || 0),
+        badgeAr: toWesternDigits(plan.badgeAr || ''),
+        badgeEn: toWesternDigits(plan.badgeEn || ''),
+        featuresAr: toWesternDigits(plan.featuresAr),
+        featuresEn: toWesternDigits(plan.featuresEn),
         active: plan.active,
         sortOrder: plan.sortOrder,
         createdAt: plan.createdAt || Date.now(),
@@ -279,9 +288,9 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
 
   const saveSubPrices = () => {
     const clean = {
-      weekly: Math.max(0.01, Number(editSubPrices.weekly) || DEFAULT_PRICES.weekly),
-      monthly: Math.max(0.01, Number(editSubPrices.monthly) || DEFAULT_PRICES.monthly),
-      yearly: Math.max(0.01, Number(editSubPrices.yearly) || DEFAULT_PRICES.yearly),
+      weekly: Math.max(0.01, Number(toWesternDigits(editSubPrices.weekly)) || DEFAULT_PRICES.weekly),
+      monthly: Math.max(0.01, Number(toWesternDigits(editSubPrices.monthly)) || DEFAULT_PRICES.monthly),
+      yearly: Math.max(0.01, Number(toWesternDigits(editSubPrices.yearly)) || DEFAULT_PRICES.yearly),
     };
     setEditSubPrices(clean);
     localStorage.setItem(SUBSCRIPTION_STORAGE_KEY, JSON.stringify(clean));
@@ -290,7 +299,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
   };
 
   const saveTimer = () => {
-    const mins = Math.max(1, Number(editTimer) || 30);
+    const mins = Math.max(1, Number(toWesternDigits(editTimer)) || 30);
     setEditTimer(mins);
     localStorage.setItem(TIMER_STORAGE_KEY, String(mins));
     setSuccess(isAr ? `✅ تم حفظ مدة المهلة: ${mins} دقيقة` : `✅ Wait period saved: ${mins} minutes`);

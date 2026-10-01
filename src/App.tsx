@@ -1382,8 +1382,13 @@ const isDeveloperSession = () => {
     const scanResults: AnalysisResult[] = [];
     let scanFailed = 0;
 
-    for (const { cat, region, exchange } of openJobs) {
+    for (let jobIdx = 0; jobIdx < openJobs.length; jobIdx++) {
       if (!autoSettingsRef.current.isEnabled) break;
+      const { cat, region, exchange } = openJobs[jobIdx];
+      // Alert 3: Category complete and beginning of next category analysis
+      if (jobIdx > 0) {
+        try { playAudio('fail'); } catch {}
+      }
 
       const mt = cat === 'crypto' ? MarketType.CRYPTO :
                  cat.startsWith('stocks') ? MarketType.STOCKS :
