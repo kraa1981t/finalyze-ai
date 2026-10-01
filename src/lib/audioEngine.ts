@@ -99,16 +99,68 @@ export async function loadCustomAudio(key: string, blob: Blob) {
   }
 }
 
-export function removeCustomAudio(key: string) {
-  customBuffers.delete(key);
+// Preload project audio files: 1.mp3 (opportunity), 2.mp3 (completion), 3.mp3 (category change)
+const projectAudioBuffers: Map<string, AudioBuffer> = new Map();
+const projectAudioElements: Map<string, HTMLAudioElement> = new Map();
+
+async function preloadSound(key: string, url: string) {
+  try {
+    const el = new Audio(url);
+    el.preload = 'auto';
+    projectAudioElements.set(key, el);
+
+    const resp = await fetch(url);
+    if (resp.ok) {
+      const arrayBuf = await resp.arrayBuffer();
+      const ac = getAudioContext();
+      if (ac) {
+        const buffer = await ac.decodeAudioData(arrayBuf);
+        projectAudioBuffers.set(key, buffer);
+      }
+    }
+  } catch (e) {
+    console.warn(`Preload of ${url} failed:`, e);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  preloadSound('1', '/1.mp3');
+  preloadSound('2', '/2.mp3');
+  preloadSound('3', '/3.mp3');
+}
+
+function playProjectSound(key: string, volume: number, fallbackTone: () => void) {
+  const customBuf = customBuffers.get(`custom_${key}`);
+  if (customBuf) { playBuffer(customBuf, volume); return; }
+
+  const buf = projectAudioBuffers.get(key);
+  if (buf) {
+    playBuffer(buf, volume);
+    return;
+  }
+
+  const el = projectAudioElements.get(key);
+  if (el) {
+    try {
+      el.currentTime = 0;
+      el.volume = volume;
+      el.play().catch(() => fallbackTone());
+      return;
+    } catch {
+      fallbackTone();
+      return;
+    }
+  }
+
+  fallbackTone();
 }
 
 export function playSuccess(volume: number = 0.5) {
-  const buf = customBuffers.get('custom_success');
-  if (buf) { playBuffer(buf, volume); return; }
-  playTone(880, 0.12, 'sine', volume);
-  setTimeout(() => playTone(1100, 0.15, 'sine', volume), 100);
-  setTimeout(() => playTone(1320, 0.2, 'sine', volume), 220);
+  playProjectSound('1', volume, () => {
+    playTone(880, 0.12, 'sine', volume);
+    setTimeout(() => playTone(1100, 0.15, 'sine', volume), 100);
+    setTimeout(() => playTone(1320, 0.2, 'sine', volume), 220);
+  });
 }
 
 export function playStart(volume: number = 0.5) {
@@ -120,19 +172,19 @@ export function playStart(volume: number = 0.5) {
 }
 
 export function playFail(volume: number = 0.5) {
-  const buf = customBuffers.get('custom_fail');
-  if (buf) { playBuffer(buf, volume); return; }
-  playTone(300, 0.25, 'square', volume);
-  setTimeout(() => playTone(250, 0.3, 'square', volume), 200);
+  playProjectSound('3', volume, () => {
+    playTone(300, 0.25, 'square', volume);
+    setTimeout(() => playTone(250, 0.3, 'square', volume), 200);
+  });
 }
 
 export function playCompletion(volume: number = 0.5) {
-  const buf = customBuffers.get('custom_completion');
-  if (buf) { playBuffer(buf, volume); return; }
-  playTone(523, 0.15, 'sine', volume);
-  setTimeout(() => playTone(659, 0.15, 'sine', volume), 120);
-  setTimeout(() => playTone(784, 0.15, 'sine', volume), 240);
-  setTimeout(() => playTone(1047, 0.3, 'sine', volume), 360);
+  playProjectSound('2', volume, () => {
+    playTone(523, 0.15, 'sine', volume);
+    setTimeout(() => playTone(659, 0.15, 'sine', volume), 120);
+    setTimeout(() => playTone(784, 0.15, 'sine', volume), 240);
+    setTimeout(() => playTone(1047, 0.3, 'sine', volume), 360);
+  });
 }
 
 export function playClick(volume: number = 0.3) {
