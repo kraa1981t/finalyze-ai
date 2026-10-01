@@ -212,21 +212,25 @@ export default function App() {
   });
 
   // When an active subscribed plan reaches its expiry, close the paid features
-  // automatically and return to the free plan (the client's key is kept, so no
-  // re-entry is required for later renewals).
+  // automatically and return to the free plan
   useEffect(() => {
     if (!activeSubscription?.expiryDate) return;
-    const t = setInterval(() => {
+    const checkExpiry = () => {
       try {
         const saved = localStorage.getItem('active_subscription');
         if (!saved) return;
         const sub = JSON.parse(saved);
-        if (sub?.expiryDate && new Date(sub.expiryDate) < new Date()) {
+        if (sub?.expiryDate && new Date(sub.expiryDate).getTime() <= Date.now()) {
+          console.log('[EXPIRY] Plan reached expiry time at', sub.expiryDate, '- removing active subscription');
           localStorage.removeItem('active_subscription');
           setActiveSubscription(null);
+          setPaidMode(false);
+          setFreeModeChosen(true);
         }
       } catch {}
-    }, 60 * 1000);
+    };
+    checkExpiry();
+    const t = setInterval(checkExpiry, 1000);
     return () => clearInterval(t);
   }, [activeSubscription?.expiryDate]);
 
@@ -1431,6 +1435,12 @@ const isDeveloperSession = () => {
                   localStorage.setItem(ownsPaidPlan ? cxnSigKey : 'finalyze_client_signals', JSON.stringify(u.slice(-100)));
                   return u.slice(-100);
                 });
+                if (isPlanClient) {
+                  const isStrong = sig === 'strong_buy' || sig === 'strong_sell';
+                  setNewSignalAlert(lang === 'ar' ? (isStrong ? `✅ تنبيه فرصة قوية جديدة — ${r.symbol}` : `✅ تنبيه فرصة جديدة — ${r.symbol}`) : (isStrong ? `✅ New strong opportunity — ${r.symbol}` : `✅ New opportunity — ${r.symbol}`));
+                  setTimeout(() => setNewSignalAlert(null), 8000);
+                  try { playAudio('success'); } catch {}
+                }
               }
               lastError = null;
               break;
@@ -2670,7 +2680,13 @@ const started = planGrants
                   onUpgrade={() => navigateTo('plans')}
                   autoStartToken={isPlanClient ? autoAnalyzeToken : 0}
                   onAutoStartConsumed={() => setAutoAnalyzeToken(0)}
-                  onBegin={() => { setIsAnalyzing(true); setAnalysisError(null); try { playStart(autoSettings.volume || 0.5); } catch {} navigateTo('manualResults'); }}
+                  onBegin={() => {
+                    setIsAnalyzing(true);
+                    setAnalysisError(null);
+                    try { initAudio(); } catch {}
+                    try { playAudio('start'); } catch {}
+                    navigateTo('manualResults');
+                  }}
                   onProgress={(current, total, index, failed) => setProgress({ current, total, index, failed })}
                   onResult={(results) => {
                     const day = new Date().getUTCDay();
@@ -2701,11 +2717,23 @@ const started = planGrants
                     // completion tone, then a "new opportunity" alert + success tone
                     // only when a strong signal (strong_buy/strong_sell) was found.
                     const strong = filtered.filter(r => r.signal === 'strong_buy' || r.signal === 'strong_sell');
+                    const regular = filtered.filter(r => r.signal === 'buy' || r.signal === 'sell');
                     if (strong.length > 0) {
                       const alerted = strong.map(r => r.symbol).join(' · ');
-                      setNewSignalAlert(lang === 'ar' ? '✅ لقد ربحت رصة تداول قوية جديدة! — ' + alerted : `✅ New strong trading opportunity detected! — ${alerted}`);
+                      setNewSignalAlert(lang === 'ar' ? `✅ تنبيه فرصة قوية جديدة — ${alerted}` : `✅ New strong trading opportunity detected! — ${alerted}`);
                       setTimeout(() => setNewSignalAlert(null), 8000);
                       try { playAudio('success'); } catch {}
+                      setTimeout(() => {
+                        try { playAudio('completion'); } catch {}
+                      }, 1200);
+                    } else if (regular.length > 0) {
+                      const alerted = regular.slice(0, 3).map(r => r.symbol).join(' · ');
+                      setNewSignalAlert(lang === 'ar' ? `✅ تنبيه فرصة تداول جديدة — ${alerted}` : `✅ New trading opportunity detected! — ${alerted}`);
+                      setTimeout(() => setNewSignalAlert(null), 8000);
+                      try { playAudio('success'); } catch {}
+                      setTimeout(() => {
+                        try { playAudio('completion'); } catch {}
+                      }, 1200);
                     } else {
                       try { playAudio('completion'); } catch {}
                     }
