@@ -310,7 +310,7 @@ export default function SeoPricesPage({ lang, onBack }: SeoPricesPageProps) {
           </button>
         </div>
         <p className="text-sm text-white/40">
-          {live.XAUUSD?.ts ? new Date(live.XAUUSD.ts).toLocaleString(isAr ? 'ar-DZ' : 'en-US', { dateStyle: 'medium', timeStyle: 'medium' }) : '—'}
+          {live.XAUUSD?.ts ? new Date(live.XAUUSD.ts).toLocaleString(isAr ? 'ar-DZ-u-nu-latn' : 'en-US', { dateStyle: 'medium', timeStyle: 'medium' }) : '—'}
         </p>
       </motion.div>
 

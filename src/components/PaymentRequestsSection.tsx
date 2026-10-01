@@ -163,7 +163,7 @@ export default function PaymentRequestsSection({ lang, developerEmail }: Payment
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className="text-[10px] text-slate-500 flex items-center gap-1" title={new Date(req.createdAt).toLocaleString()}>
-                      <Clock size={11} /> {new Date(req.createdAt).toLocaleString(isAr ? 'ar-DZ' : 'en-GB')}
+                      <Clock size={11} /> {new Date(req.createdAt).toLocaleString(isAr ? 'ar-DZ-u-nu-latn' : 'en-GB')}
                     </span>
                     <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-black font-mono ${
                       req.status === 'pending'

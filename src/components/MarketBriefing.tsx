@@ -129,8 +129,8 @@ export default function MarketBriefing({ lang }: { lang: Language }) {
             <p className="text-xs font-bold text-white/40 flex items-center gap-1">
               <CalendarDays size={11} className="text-[#F59E0B]" />
               {data?.generatedAt
-                ? new Date(data.generatedAt).toLocaleDateString(isAr ? 'ar-DZ' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-                : new Date().toLocaleDateString(isAr ? 'ar-DZ' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                ? new Date(data.generatedAt).toLocaleDateString(isAr ? 'ar-DZ-u-nu-latn' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                : new Date().toLocaleDateString(isAr ? 'ar-DZ-u-nu-latn' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
         </div>

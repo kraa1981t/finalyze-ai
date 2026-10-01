@@ -86,7 +86,7 @@ export default function SiteRequestsSection({ lang }: SiteRequestsSectionProps) 
                   <MessageSquare size={13} className="text-slate-400 mt-0.5 shrink-0" /> {r.message}
                 </p>
                 <p className="text-[10px] font-bold text-slate-500 mt-1.5">
-                  {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleString(isAr ? 'ar-EG' : 'en-US') : ''}
+                  {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleString(isAr ? 'ar-EG-u-nu-latn' : 'en-US') : ''}
                 </p>
               </div>
               <button

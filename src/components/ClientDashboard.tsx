@@ -175,27 +175,27 @@ export default function ClientDashboard({ results, lang, hasActivePlan = false, 
   if (allFiltered.length === 0) {
     return (
       <div className="space-y-6" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
-      {!freeModeChosen && (
-      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-5 py-3 flex items-center gap-3">
-          <div className="relative">
-            <Activity size={20} className="text-emerald-400" />
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+        {!freeModeChosen && (
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-5 py-3 flex items-center gap-3">
+            <div className="relative">
+              <Activity size={20} className="text-emerald-400" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            </div>
+            <span className="text-sm font-black text-emerald-400">{isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}</span>
+            <span className="text-xs text-emerald-400/60 font-bold">{isAr ? (showPlanActions ? 'تحليل الفرص وفق إعدادات خطتك' : 'يتم تحليل الفرص في الوقت الفعلي') : (showPlanActions ? 'Auto opportunity analysis based on your plan' : 'Opportunities synchronized in real-time')}</span>
           </div>
-          <span className="text-sm font-black text-emerald-400">{isAr ? 'التحليل التلقائي نشط' : 'Auto Analysis Active'}</span>
-          <span className="text-xs text-emerald-400/60 font-bold">{isAr ? (showPlanActions ? 'تحليل الفرص وفق إعدادات خطتك' : 'يتم تحليل الفرص في الوقت الفعلي') : (showPlanActions ? 'Auto opportunity analysis based on your plan' : 'Opportunities synchronized in real-time')}</span>
-        </div>
-      )}
+        )}
         <MarketHoursIndicator lang={lang} />
         {showPlanActions && <PlanActionRow isAr={isAr} autoAnalysisOn={autoAnalysisOn} onOpenMyPlan={onOpenMyPlan} onNavigateManual={onNavigateManual} onNavigateRadar={onNavigateRadar} onToggleAutoAnalysis={onToggleAutoAnalysis} />}
-        {showPlanActions && !freeModeChosen && (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="relative w-16 h-16 mb-4">
-            <div className="absolute inset-0 border-b-2 border-emerald-400 rounded-full animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center"><Activity size={24} className="text-emerald-400" /></div>
+        {!showPlanActions && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="relative w-16 h-16 mb-4">
+              <div className="absolute inset-0 border-b-2 border-emerald-400 rounded-full animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center"><Activity size={24} className="text-emerald-400" /></div>
+            </div>
+            <h3 className="text-xl font-black text-white/70">{isAr ? 'في انتظار ظهور أفضل إشارات حالية' : 'Waiting for current best signals...'}</h3>
+            <p className="text-sm text-white/40 mt-2">{isAr ? 'ستظهر أفضل الفرص والإشارات القوية والعادية هنا فور توفرها' : 'Top trading opportunities and strong signals will appear here as soon as they are available'}</p>
           </div>
-          <h3 className="text-xl font-black text-white/60">{isAr ? 'في انتظار تشغيل التحليل أو ظهور فرص جديدة...' : 'Waiting for new opportunities...'}</h3>
-          <p className="text-sm text-white/40 mt-2">{isAr ? 'ستظهر الفرص المحللة من خطتك هنا بمجرد توفرها' : 'Opportunities analyzed on your plan will appear here'}</p>
-        </div>
         )}
       </div>
     );
