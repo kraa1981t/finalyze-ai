@@ -538,15 +538,32 @@ export async function fetchDevHistory(): Promise<PaymentRequest[]> {
 }
 
 // Dev-only: fetch all transactions (requests + grants) for a specific client email.
+// Note: no orderBy here — Firestore requires a composite index for where+orderBy
+// on different fields. We sort the results in JavaScript instead.
 export async function fetchClientTransactionsByEmail(email: string): Promise<{ requests: PaymentRequest[]; grants: PaymentGrant[] }> {
   const e = (email || '').toLowerCase().trim();
   if (!e) return { requests: [], grants: [] };
+
+  // Primary: direct Firestore query (no orderBy → no composite-index needed)
   try {
     const [reqSnap, grantSnap] = await Promise.all([
-      getDocs(query(collection(db, REQUESTS), where('buyerEmail', '==', e), orderBy('createdAt', 'desc'))),
+      getDocs(query(collection(db, REQUESTS), where('buyerEmail', '==', e))),
       getDocs(query(collection(db, GRANTS), where('email', '==', e))),
     ]);
-    const requests = reqSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) } as PaymentRequest));
+    const requests = reqSnap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as any) } as PaymentRequest))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const grants = grantSnap.docs.map((d) => deriveGrantExpiry({ id: d.id, ...(d.data() as any) } as PaymentGrant));
+    if (requests.length > 0 || grants.length > 0) return { requests, grants };
+  } catch {}
+
+  // Fallback: use the developer history endpoint (already filtered by server)
+  try {
+    const history = await fetchDevHistory();
+    const requests = history
+      .filter((r) => String(r.buyerEmail || '').toLowerCase() === e)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const grantSnap = await getDocs(query(collection(db, GRANTS), where('email', '==', e)));
     const grants = grantSnap.docs.map((d) => deriveGrantExpiry({ id: d.id, ...(d.data() as any) } as PaymentGrant));
     return { requests, grants };
   } catch {

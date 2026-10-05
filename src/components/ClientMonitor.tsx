@@ -44,6 +44,7 @@ export default function ClientMonitor({ clients, lang, onRefresh, onMergeDuplica
   const [txLoading, setTxLoading] = useState(false);
   const [txDeleting, setTxDeleting] = useState<string | null>(null);
   const [txConfirmDeleteAll, setTxConfirmDeleteAll] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
 
   const openTxModal = async (client: ClientRecord) => {
     setTxClient(client);
@@ -51,6 +52,7 @@ export default function ClientMonitor({ clients, lang, onRefresh, onMergeDuplica
     setTxGrants([]);
     setTxLoading(true);
     setTxConfirmDeleteAll(false);
+    setTxError(null);
     const { requests, grants: g } = await fetchClientTransactionsByEmail(client.email);
     setTxRequests(requests);
     setTxGrants(g);
@@ -62,21 +64,36 @@ export default function ClientMonitor({ clients, lang, onRefresh, onMergeDuplica
     setTxRequests([]);
     setTxGrants([]);
     setTxConfirmDeleteAll(false);
+    setTxError(null);
   };
 
   const handleTxDeleteOne = async (id: string) => {
     setTxDeleting(id);
+    setTxError(null);
     const ok = await deleteTransaction(id);
-    if (ok) setTxRequests((prev) => prev.filter((r) => r.id !== id));
+    if (ok) {
+      setTxRequests((prev) => prev.filter((r) => r.id !== id));
+    } else {
+      setTxError(isAr ? 'فشل الحذف — تحقق من الاتصال' : 'Delete failed — check connection');
+    }
     setTxDeleting(null);
   };
 
   const handleTxDeleteAll = async () => {
     setTxDeleting('all');
-    await Promise.allSettled(txRequests.map((r) => r.id ? deleteTransaction(r.id) : Promise.resolve(false)));
-    setTxRequests([]);
+    setTxError(null);
+    const results = await Promise.allSettled(
+      txRequests.map((r) => r.id ? deleteTransaction(r.id) : Promise.resolve(false))
+    );
+    const deletedIds = new Set(
+      txRequests.filter((_, i) => results[i].status === 'fulfilled' && (results[i] as PromiseFulfilledResult<any>).value === true).map((r) => r.id!)
+    );
+    setTxRequests((prev) => prev.filter((r) => !deletedIds.has(r.id!)));
     setTxConfirmDeleteAll(false);
     setTxDeleting(null);
+    if (results.some((r) => r.status === 'rejected' || (r as PromiseFulfilledResult<any>).value === false)) {
+      setTxError(isAr ? 'تعذّر حذف بعض المعاملات' : 'Some transactions could not be deleted');
+    }
   };
 
   useEffect(() => {
@@ -444,6 +461,15 @@ export default function ClientMonitor({ clients, lang, onRefresh, onMergeDuplica
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Error banner */}
+              {txError && (
+                <div className="mx-6 mt-3 flex items-center gap-2 bg-red-500/15 border border-red-500/30 rounded-xl px-4 py-2.5 shrink-0">
+                  <AlertTriangle size={14} className="text-red-400 shrink-0" />
+                  <span className="text-xs font-bold text-red-400 flex-1">{txError}</span>
+                  <button onClick={() => setTxError(null)} className="text-red-400/60 hover:text-red-400"><X size={13} /></button>
                 </div>
               )}
 

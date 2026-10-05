@@ -134,13 +134,15 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
     }
   };
 
-  // Any suggestion can be deleted, by anyone, at any time — the row is removed
-  // for real instead of being hidden from one account only.
+  // حذف فردي: العميل يحذف اقتراحاته فقط — المطور لا يحذف اقتراحات العملاء
   const handleDeleteOne = async (id: string) => {
+    const suggestion = suggestions.find((s) => s.id === id);
+    if (!suggestion) return;
+    // منع المطور من حذف اقتراح ليس له
+    if (!isMine(suggestion)) return;
     setDeleting(id);
     try {
       await deleteDoc(doc(db, 'analysisResults', id));
-      if (isDeveloper && onHideCount) onHideCount(1);
       setSuggestions((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       console.error('Failed to delete:', err);
@@ -150,18 +152,16 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
     }
   };
 
-  // Clear the board: the developer empties everything, a client empties their own
-  // suggestions (never anybody else's).
+  // حذف كلي: العميل يحذف اقتراحاته الخاصة فقط — لا يتأثر أحد آخر
   const handleDeleteAll = async () => {
     setDeleting('all');
     try {
-      const targets = isDeveloper ? suggestions : suggestions.filter(isMine);
+      const targets = suggestions.filter(isMine); // دائماً اقتراحاتي أنا فقط
       const results = await Promise.allSettled(targets.map((s) => deleteDoc(doc(db, 'analysisResults', s.id))));
       const gone = new Set(
         targets.filter((_, i) => results[i].status === 'fulfilled').map((s) => s.id),
       );
       setSuggestions((prev) => prev.filter((s) => !gone.has(s.id)));
-      if (isDeveloper && onHideCount) onHideCount(gone.size);
       setConfirmDeleteAll(false);
       if (results.some((r) => r.status === 'rejected')) {
         setError(isAr ? 'تم حذف بعضها، وتعذّر حذف الباقي' : 'Some were deleted, others were refused');
@@ -233,7 +233,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         </div>
       </div>
 
-      {/* Action buttons */}
+      {/* Action buttons — المطور يشاهد فقط، العميل يضيف ويحذف اقتراحاته */}
       <div className="flex justify-center gap-3">
         {!isDeveloper && (
           <button
@@ -244,13 +244,14 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
             {isAr ? 'أضف اقتراح' : 'Add Suggestion'}
           </button>
         )}
-        {(isDeveloper ? visibleSuggestions.length > 0 : visibleSuggestions.some(isMine)) && (
+        {/* زر "مسح اقتراحاتي" — للعميل فقط وعلى اقتراحاته هو حصراً */}
+        {!isDeveloper && visibleSuggestions.some(isMine) && (
           <>
             {confirmDeleteAll ? (
               <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/40 rounded-xl px-4 py-3">
                 <AlertTriangle size={18} className="text-red-400" />
                 <span className="text-sm font-bold text-red-400">
-                  {isAr ? 'حذف الكل؟' : 'Delete all?'}
+                  {isAr ? 'حذف اقتراحاتك؟' : 'Delete your suggestions?'}
                 </span>
                 <button
                   onClick={handleDeleteAll}
@@ -272,9 +273,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                 className="inline-flex items-center gap-2 bg-red-500/20 border border-red-500/40 text-red-400 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-500/30 transition-all"
               >
                 <Trash2 size={18} />
-                {isDeveloper
-                  ? (isAr ? 'حذف كل المقترحات' : 'Delete all suggestions')
-                  : (isAr ? 'مسح اقتراحاتي' : 'Clear my suggestions')}
+                {isAr ? 'مسح اقتراحاتي' : 'Clear my suggestions'}
               </button>
             )}
           </>
