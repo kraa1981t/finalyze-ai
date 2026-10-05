@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Lightbulb, Plus, Check, User, ThumbsUp, Trophy, X, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Lightbulb, Plus, Check, User, ThumbsUp, Trophy, X, Trash2, AlertTriangle, EyeOff, Bell } from 'lucide-react';
 import { Language } from '../lib/i18n';
 import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, increment, serverTimestamp, query, where } from 'firebase/firestore';
+import {
+  collection, addDoc, getDocs, updateDoc, deleteDoc,
+  doc, getDoc, setDoc, increment, serverTimestamp, query, where
+} from 'firebase/firestore';
 
 interface Suggestion {
   id: string;
@@ -28,9 +31,16 @@ interface SuggestionsPageProps {
   userEmail?: string;
 }
 
-export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = false, onClearCount, onHideCount, userUid, userEmail }: SuggestionsPageProps) {
+const DEV_HIDDEN_DOC = 'dev_hidden_suggestions';
+const USER_PREFS = 'userPreferences';
+
+export default function SuggestionsPage({
+  lang, onBack, userName, isDeveloper = false,
+  onClearCount, onHideCount, userUid, userEmail,
+}: SuggestionsPageProps) {
   const isAr = lang === 'ar';
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [devHiddenIds, setDevHiddenIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState(userName || '');
@@ -41,16 +51,31 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  // A suggestion remembers WHO wrote it (uid + email), never just the typed
-  // display name: two people can share a name, and anyone can type any name.
   const myUid = (userUid || '').trim();
-  // Ownership is matched on the ACCOUNT (uid, else the verified email) only —
-  // never on the typed display name, which anybody can type.
   const myEmail = (userEmail || '').trim().toLowerCase();
   const isMine = (s: Suggestion) =>
     (!!myUid && !!s.ownerUid && s.ownerUid === myUid) ||
     (!!myEmail && !!s.ownerEmail && String(s.ownerEmail).toLowerCase() === myEmail);
 
+  // ── Load dev hidden IDs from Firestore ─────────────────────────────────────
+  const loadDevHidden = useCallback(async () => {
+    if (!isDeveloper) return;
+    try {
+      const snap = await getDoc(doc(db, USER_PREFS, DEV_HIDDEN_DOC));
+      if (snap.exists()) {
+        const ids: string[] = snap.data().hiddenIds || [];
+        setDevHiddenIds(new Set(ids));
+      }
+    } catch {}
+  }, [isDeveloper]);
+
+  const saveDevHidden = async (ids: Set<string>) => {
+    try {
+      await setDoc(doc(db, USER_PREFS, DEV_HIDDEN_DOC), { hiddenIds: [...ids], updatedAt: Date.now() });
+    } catch {}
+  };
+
+  // ── Fetch all suggestions ───────────────────────────────────────────────────
   const fetchSuggestions = async () => {
     try {
       const q = query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion'));
@@ -84,11 +109,20 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
 
   useEffect(() => {
     fetchSuggestions();
+    loadDevHidden();
     if (isDeveloper && onClearCount) onClearCount();
   }, []);
 
-  const visibleSuggestions = suggestions;
+  // ── What the current user sees ──────────────────────────────────────────────
+  // المطور: يرى كل الاقتراحات ماعدا التي أخفاها هو من طرفه فقط
+  // العميل: يرى كل الاقتراحات (لكنه يحذف اقتراحاته فقط)
+  const visibleSuggestions = isDeveloper
+    ? suggestions.filter(s => !devHiddenIds.has(s.id))
+    : suggestions;
+
   const totalVotes = visibleSuggestions.reduce((sum, s) => sum + s.votes, 0);
+  // عدد المقترحات التي لم يراها المطور بعد (الظاهرة حالياً)
+  const newCount = isDeveloper ? visibleSuggestions.length : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +138,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         voters: [],
         ownerUid: myUid,
         ownerEmail: myEmail,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       });
       setText('');
       setShowForm(false);
@@ -112,7 +146,6 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
       setTimeout(() => setSubmitted(false), 3000);
       await fetchSuggestions();
     } catch (err: any) {
-      console.error('Failed to submit suggestion:', err);
       setError(isAr ? 'فشل إرسال الاقتراح' : 'Failed to submit suggestion');
     } finally {
       setSubmitting(false);
@@ -126,48 +159,65 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
       const ref = doc(db, 'analysisResults', suggestion.id);
       await updateDoc(ref, {
         votes: increment(1),
-        voters: [...(suggestion.voters || []), voterId]
+        voters: [...(suggestion.voters || []), voterId],
       });
       await fetchSuggestions();
-    } catch (err) {
-      console.error('Failed to vote:', err);
-    }
+    } catch {}
   };
 
-  // حذف فردي: العميل يحذف اقتراحاته فقط — المطور لا يحذف اقتراحات العملاء
-  const handleDeleteOne = async (id: string) => {
-    const suggestion = suggestions.find((s) => s.id === id);
-    if (!suggestion) return;
-    // منع المطور من حذف اقتراح ليس له
-    if (!isMine(suggestion)) return;
+  // ── حذف المطور: إخفاء من طرفه فقط — لا يُحذف من Firestore ─────────────────
+  const handleDevHideOne = async (id: string) => {
+    setDeleting(id);
+    const newHidden = new Set(devHiddenIds);
+    newHidden.add(id);
+    setDevHiddenIds(newHidden);
+    await saveDevHidden(newHidden);
+    if (onHideCount) onHideCount(1);
+    setDeleting(null);
+  };
+
+  const handleDevHideAll = async () => {
+    setDeleting('all');
+    const newHidden = new Set(devHiddenIds);
+    visibleSuggestions.forEach(s => newHidden.add(s.id));
+    setDevHiddenIds(newHidden);
+    await saveDevHidden(newHidden);
+    if (onHideCount) onHideCount(visibleSuggestions.length);
+    setConfirmDeleteAll(false);
+    setDeleting(null);
+  };
+
+  // ── حذف العميل: يحذف اقتراحاته هو فقط نهائياً من Firestore ─────────────────
+  const handleClientDeleteOne = async (id: string) => {
+    const suggestion = suggestions.find(s => s.id === id);
+    if (!suggestion || !isMine(suggestion)) return;
     setDeleting(id);
     try {
       await deleteDoc(doc(db, 'analysisResults', id));
-      setSuggestions((prev) => prev.filter((s) => s.id !== id));
-    } catch (err) {
-      console.error('Failed to delete:', err);
+      setSuggestions(prev => prev.filter(s => s.id !== id));
+    } catch {
       setError(isAr ? 'فشل الحذف' : 'Failed to delete');
     } finally {
       setDeleting(null);
     }
   };
 
-  // حذف كلي: العميل يحذف اقتراحاته الخاصة فقط — لا يتأثر أحد آخر
-  const handleDeleteAll = async () => {
+  const handleClientDeleteAll = async () => {
     setDeleting('all');
     try {
-      const targets = suggestions.filter(isMine); // دائماً اقتراحاتي أنا فقط
-      const results = await Promise.allSettled(targets.map((s) => deleteDoc(doc(db, 'analysisResults', s.id))));
-      const gone = new Set(
-        targets.filter((_, i) => results[i].status === 'fulfilled').map((s) => s.id),
+      const targets = suggestions.filter(isMine);
+      const results = await Promise.allSettled(
+        targets.map(s => deleteDoc(doc(db, 'analysisResults', s.id)))
       );
-      setSuggestions((prev) => prev.filter((s) => !gone.has(s.id)));
+      const gone = new Set(
+        targets.filter((_, i) => results[i].status === 'fulfilled').map(s => s.id)
+      );
+      setSuggestions(prev => prev.filter(s => !gone.has(s.id)));
       setConfirmDeleteAll(false);
-      if (results.some((r) => r.status === 'rejected')) {
-        setError(isAr ? 'تم حذف بعضها، وتعذّر حذف الباقي' : 'Some were deleted, others were refused');
+      if (results.some(r => r.status === 'rejected')) {
+        setError(isAr ? 'تم حذف بعضها، وتعذّر حذف الباقي' : 'Some deleted, others failed');
       }
-    } catch (err) {
-      console.error('Failed to delete all:', err);
+    } catch {
       setError(isAr ? 'فشل حذف الكل' : 'Failed to delete all');
     } finally {
       setDeleting(null);
@@ -179,13 +229,11 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
     return Math.round((votes / totalVotes) * 100);
   };
 
-  const isImplementable = (votes: number) => {
-    return totalVotes > 0 && getPercentage(votes) >= 50;
-  };
+  const isImplementable = (votes: number) => totalVotes > 0 && getPercentage(votes) >= 50;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8" style={{ direction: isAr ? 'rtl' : 'ltr' }}>
-      {/* Back button */}
+      {/* Back */}
       <button
         onClick={onBack}
         className="flex items-center gap-2 text-white/60 hover:text-white transition-colors group"
@@ -194,12 +242,28 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         <span className="text-sm font-bold">{isAr ? 'رجوع' : 'Back'}</span>
       </button>
 
+      {/* ── بانر أحمر للمطور عند وجود مقترحات جديدة ── */}
+      {isDeveloper && newCount > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 bg-red-500/15 border border-red-500/40 rounded-2xl px-5 py-3"
+        >
+          <span className="relative flex h-3 w-3 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+          </span>
+          <Bell size={18} className="text-red-400 shrink-0" />
+          <p className="text-sm font-black text-red-300 flex-1">
+            {isAr
+              ? `لديك ${newCount} مقترح${newCount > 1 ? 'ات' : ''} من العملاء بانتظار المراجعة`
+              : `You have ${newCount} client suggestion${newCount > 1 ? 's' : ''} awaiting review`}
+          </p>
+        </motion.div>
+      )}
+
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center space-y-4"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-4">
         <div className="w-20 h-20 mx-auto bg-[#F59E0B]/20 rounded-3xl flex items-center justify-center border border-[#F59E0B]/30">
           <Lightbulb size={40} className="text-[#F59E0B]" />
         </div>
@@ -210,8 +274,12 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         </h1>
         <p className="text-white/60 text-sm max-w-2xl mx-auto">
           {isDeveloper
-            ? (isAr ? 'إدارة وحذف مقترحات العملاء' : 'Manage and delete client suggestions')
-            : (isAr ? 'شاركنا أفكارك لتطوير الموقع. إذا حصل اقتراحك على أكثر من 50% من مجموع الأصوات، سنقوم بتطبيقه!' : 'Share your ideas to improve the site. If your suggestion gets more than 50% of total votes, we will implement it!')}
+            ? (isAr
+              ? 'عرض مقترحات العملاء — الإخفاء يخفيها من هنا فقط ولا يحذفها من حساب العميل'
+              : 'View client suggestions — hiding removes them from your view only, not from the client\'s account')
+            : (isAr
+              ? 'شاركنا أفكارك لتطوير الموقع. إذا حصل اقتراحك على أكثر من 50% من مجموع الأصوات، سنقوم بتطبيقه!'
+              : 'Share your ideas. If your suggestion gets more than 50% of total votes, we will implement it!')}
         </p>
       </motion.div>
 
@@ -233,37 +301,68 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         </div>
       </div>
 
-      {/* Action buttons — المطور يشاهد فقط، العميل يضيف ويحذف اقتراحاته */}
-      <div className="flex justify-center gap-3">
+      {/* Action buttons */}
+      <div className="flex justify-center gap-3 flex-wrap">
+        {/* إضافة — للعميل فقط */}
         {!isDeveloper && (
           <button
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 bg-[#F59E0B] text-black px-6 py-3 rounded-xl font-black text-sm hover:bg-[#d97706] transition-all shadow-lg hover:shadow-xl active:scale-95"
+            className="inline-flex items-center gap-2 bg-[#F59E0B] text-black px-6 py-3 rounded-xl font-black text-sm hover:bg-[#d97706] transition-all shadow-lg active:scale-95"
           >
             <Plus size={18} />
             {isAr ? 'أضف اقتراح' : 'Add Suggestion'}
           </button>
         )}
-        {/* زر "مسح اقتراحاتي" — للعميل فقط وعلى اقتراحاته هو حصراً */}
+
+        {/* إخفاء كل المرئي — للمطور فقط (لا يحذف) */}
+        {isDeveloper && visibleSuggestions.length > 0 && (
+          <>
+            {confirmDeleteAll ? (
+              <div className="flex items-center gap-2 bg-amber-500/20 border border-amber-500/40 rounded-xl px-4 py-3">
+                <AlertTriangle size={18} className="text-amber-400" />
+                <span className="text-sm font-bold text-amber-400">
+                  {isAr ? 'إخفاء كل المقترحات من طرفك؟' : 'Hide all suggestions from your view?'}
+                </span>
+                <button
+                  onClick={handleDevHideAll}
+                  disabled={deleting === 'all'}
+                  className="bg-amber-500 text-black px-4 py-1.5 rounded-lg text-xs font-black hover:bg-amber-400 transition-all"
+                >
+                  {deleting === 'all' ? (isAr ? 'جاري...' : 'Hiding...') : (isAr ? 'نعم' : 'Yes')}
+                </button>
+                <button onClick={() => setConfirmDeleteAll(false)} className="bg-white/10 text-white px-4 py-1.5 rounded-lg text-xs font-black hover:bg-white/20 transition-all">
+                  {isAr ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteAll(true)}
+                className="inline-flex items-center gap-2 bg-amber-500/20 border border-amber-500/40 text-amber-400 px-6 py-3 rounded-xl font-black text-sm hover:bg-amber-500/30 transition-all"
+              >
+                <EyeOff size={18} />
+                {isAr ? 'إخفاء الكل من طرفي' : 'Hide all from my view'}
+              </button>
+            )}
+          </>
+        )}
+
+        {/* مسح اقتراحاتي — للعميل فقط */}
         {!isDeveloper && visibleSuggestions.some(isMine) && (
           <>
             {confirmDeleteAll ? (
               <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/40 rounded-xl px-4 py-3">
                 <AlertTriangle size={18} className="text-red-400" />
                 <span className="text-sm font-bold text-red-400">
-                  {isAr ? 'حذف اقتراحاتك؟' : 'Delete your suggestions?'}
+                  {isAr ? 'حذف اقتراحاتك نهائياً؟' : 'Delete your suggestions permanently?'}
                 </span>
                 <button
-                  onClick={handleDeleteAll}
+                  onClick={handleClientDeleteAll}
                   disabled={deleting === 'all'}
                   className="bg-red-500 text-white px-4 py-1.5 rounded-lg text-xs font-black hover:bg-red-600 transition-all"
                 >
                   {deleting === 'all' ? (isAr ? 'جاري الحذف...' : 'Deleting...') : (isAr ? 'نعم' : 'Yes')}
                 </button>
-                <button
-                  onClick={() => setConfirmDeleteAll(false)}
-                  className="bg-white/10 text-white px-4 py-1.5 rounded-lg text-xs font-black hover:bg-white/20 transition-all"
-                >
+                <button onClick={() => setConfirmDeleteAll(false)} className="bg-white/10 text-white px-4 py-1.5 rounded-lg text-xs font-black hover:bg-white/20 transition-all">
                   {isAr ? 'إلغاء' : 'Cancel'}
                 </button>
               </div>
@@ -280,15 +379,11 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         )}
       </div>
 
-      {/* Success message */}
+      {/* Success */}
       <AnimatePresence>
         {submitted && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-5 py-3 flex items-center justify-center gap-3"
-          >
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-5 py-3 flex items-center justify-center gap-3">
             <Check size={20} className="text-emerald-400" />
             <span className="text-sm font-black text-emerald-400">
               {isAr ? 'تم إضافة اقتراحك بنجاح!' : 'Your suggestion has been added!'}
@@ -297,20 +392,14 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         )}
       </AnimatePresence>
 
-      {/* Error message */}
+      {/* Error */}
       <AnimatePresence>
         {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-red-500/10 border border-red-500/30 rounded-2xl px-5 py-3 flex items-center justify-center gap-3"
-          >
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className="bg-red-500/10 border border-red-500/30 rounded-2xl px-5 py-3 flex items-center justify-center gap-3">
             <X size={20} className="text-red-400" />
             <span className="text-sm font-black text-red-400">{error}</span>
-            <button onClick={() => setError(null)} className="text-red-400/60 hover:text-red-400">
-              <X size={14} />
-            </button>
+            <button onClick={() => setError(null)} className="text-red-400/60 hover:text-red-400"><X size={14} /></button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -319,63 +408,35 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
       <AnimatePresence>
         {showForm && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={() => setShowForm(false)}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               className="bg-brand-alt rounded-3xl border border-white/10 p-6 w-full max-w-md space-y-5"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-black text-white">
-                  {isAr ? 'اقتراح جديد' : 'New Suggestion'}
-                </h3>
-                <button onClick={() => setShowForm(false)} className="text-white/40 hover:text-white">
-                  <X size={20} />
-                </button>
+                <h3 className="text-lg font-black text-white">{isAr ? 'اقتراح جديد' : 'New Suggestion'}</h3>
+                <button onClick={() => setShowForm(false)} className="text-white/40 hover:text-white"><X size={20} /></button>
               </div>
-
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="text-xs font-bold text-white/60 block mb-1.5">
-                    {isAr ? 'اسمك' : 'Your Name'}
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder={isAr ? 'أدخل اسمك' : 'Enter your name'}
-                    required
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#F59E0B]/50"
-                  />
+                  <label className="text-xs font-bold text-white/60 block mb-1.5">{isAr ? 'اسمك' : 'Your Name'}</label>
+                  <input type="text" value={name} onChange={e => setName(e.target.value)}
+                    placeholder={isAr ? 'أدخل اسمك' : 'Enter your name'} required
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#F59E0B]/50" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-white/60 block mb-1.5">
-                    {isAr ? 'اقتراحك' : 'Your Suggestion'}
-                  </label>
-                  <textarea
-                    value={text}
-                    onChange={e => setText(e.target.value)}
-                    placeholder={isAr ? 'اكتب اقتراحك هنا...' : 'Write your suggestion here...'}
-                    required
-                    rows={4}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#F59E0B]/50 resize-none"
-                  />
+                  <label className="text-xs font-bold text-white/60 block mb-1.5">{isAr ? 'اقتراحك' : 'Your Suggestion'}</label>
+                  <textarea value={text} onChange={e => setText(e.target.value)}
+                    placeholder={isAr ? 'اكتب اقتراحك هنا...' : 'Write your suggestion here...'} required rows={4}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#F59E0B]/50 resize-none" />
                 </div>
-                <button
-                  type="submit"
-                  disabled={submitting || !name.trim() || !text.trim()}
-                  className="w-full bg-[#F59E0B] text-black py-3 rounded-xl font-black text-sm hover:bg-[#d97706] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting
-                    ? (isAr ? 'جاري الإرسال...' : 'Submitting...')
-                    : (isAr ? 'إرسال' : 'Submit')}
+                <button type="submit" disabled={submitting || !name.trim() || !text.trim()}
+                  className="w-full bg-[#F59E0B] text-black py-3 rounded-xl font-black text-sm hover:bg-[#d97706] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                  {submitting ? (isAr ? 'جاري الإرسال...' : 'Submitting...') : (isAr ? 'إرسال' : 'Submit')}
                 </button>
               </form>
             </motion.div>
@@ -393,7 +454,9 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         <div className="text-center py-12 space-y-3">
           <Lightbulb size={40} className="text-white/20 mx-auto" />
           <p className="text-white/40 text-sm">
-            {isAr ? 'لا توجد اقتراحات بعد.' : 'No suggestions yet.'}
+            {isDeveloper
+              ? (isAr ? 'لا توجد مقترحات جديدة بعد.' : 'No new suggestions yet.')
+              : (isAr ? 'لا توجد اقتراحات بعد.' : 'No suggestions yet.')}
           </p>
         </div>
       ) : (
@@ -424,22 +487,40 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                       {implementable && (
                         <span className="flex items-center gap-1 bg-[#F59E0B]/20 text-[#F59E0B] text-[10px] font-black px-2 py-0.5 rounded-full">
                           <Trophy size={10} />
-                          {isAr ? 'تم التطبيقة' : 'Implemented'}
+                          {isAr ? 'تم التطبيق' : 'Implemented'}
                         </span>
                       )}
                     </div>
                     <p className="text-sm text-white/80 leading-relaxed">{s.text}</p>
                   </div>
+
                   <div className="flex items-center gap-2 shrink-0">
-                    {isOwn && (
+                    {isOwn && !isDeveloper && (
                       <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-white/5 text-white/40 border border-white/10">
                         {isAr ? 'اقتراحك' : 'Yours'}
                       </span>
                     )}
-                    {/* Delete button: developer sees it on every card; a client sees it only on their own */}
-                    {(isDeveloper || isOwn) && (
+
+                    {/* المطور: زر إخفاء (من طرفه فقط) */}
+                    {isDeveloper && (
                       <button
-                        onClick={() => handleDeleteOne(s.id)}
+                        onClick={() => handleDevHideOne(s.id)}
+                        disabled={deleting === s.id}
+                        className="p-2 rounded-xl bg-amber-500/10 text-amber-400/60 hover:bg-amber-500/20 hover:text-amber-400 transition-all"
+                        title={isAr ? 'إخفاء من طرفي فقط' : 'Hide from my view only'}
+                      >
+                        {deleting === s.id ? (
+                          <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <EyeOff size={14} />
+                        )}
+                      </button>
+                    )}
+
+                    {/* العميل: زر حذف فقط على اقتراحاته */}
+                    {!isDeveloper && isOwn && (
+                      <button
+                        onClick={() => handleClientDeleteOne(s.id)}
                         disabled={deleting === s.id}
                         className="p-2 rounded-xl bg-red-500/10 text-red-400/60 hover:bg-red-500/20 hover:text-red-400 transition-all"
                         title={isAr ? 'حذف' : 'Delete'}
@@ -451,6 +532,8 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                         )}
                       </button>
                     )}
+
+                    {/* تصويت */}
                     <button
                       onClick={() => handleVote(s)}
                       disabled={hasVoted}
@@ -465,13 +548,12 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                     </button>
                   </div>
                 </div>
+
                 {/* Progress bar */}
                 <div className="space-y-1">
                   <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        implementable ? 'bg-[#F59E0B]' : 'bg-white/20'
-                      }`}
+                      className={`h-full rounded-full transition-all duration-500 ${implementable ? 'bg-[#F59E0B]' : 'bg-white/20'}`}
                       style={{ width: `${Math.max(pct, 2)}%` }}
                     />
                   </div>

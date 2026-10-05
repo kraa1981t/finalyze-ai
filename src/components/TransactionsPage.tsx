@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, XCircle, Receipt, CheckCircle2, Clock, Store, Trash2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, XCircle, Receipt, CheckCircle2, Clock, Store, Trash2, AlertTriangle } from 'lucide-react';
 import { Language } from '../lib/i18n';
-import { loadAllSessions, cancelSession, PaymentSession } from '../services/paymentSession';
-import { fetchPaymentRequests, fetchUserPaymentRequests, fetchUserGrants, fetchDevHistory, fetchDevHiddenTransactionIds, hideTransactionFromDev, PaymentRequest, PaymentGrant } from '../services/paymentRequests';
+import { loadAllSessions, cancelSession, getLastEmail, PaymentSession } from '../services/paymentSession';
+import { fetchPaymentRequests, fetchUserPaymentRequests, fetchUserGrants, fetchDevHistory, deleteTransaction, deleteAllTransactions, deleteMyTransaction, deleteAllMyTransactions, PaymentRequest, PaymentGrant } from '../services/paymentRequests';
+import { db } from '../lib/firebase';
+import { deleteDoc, doc, getDocs, collection, query, where } from 'firebase/firestore';
 import PaymentRequestsSection from './PaymentRequestsSection';
 import SiteRequestsSection from './SiteRequestsSection';
 
@@ -43,17 +45,23 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [devHistory, setDevHistory] = useState<PaymentRequest[]>([]);
-  const [devHidden, setDevHidden] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const isAr = lang === 'ar';
+
+  // Whose transactions this page shows. A client falls back to the email they
+  // paid with, so a customer always reaches their own list and nothing else.
+  const myEmail = (isDeveloper ? autoEmail : (autoEmail || getLastEmail()) || '').toLowerCase().trim();
 
   const load = useCallback(async () => {
-    if (!autoEmail) return;
+    if (!myEmail) { setLoaded(true); return; }
     setLoading(true);
     const [sessions, requests, grants] = await Promise.all([
-      loadAllSessions(autoEmail),
-      isDeveloper ? fetchPaymentRequests() : fetchUserPaymentRequests(autoEmail),
-      fetchUserGrants(autoEmail),
+      loadAllSessions(myEmail),
+      isDeveloper ? fetchPaymentRequests() : fetchUserPaymentRequests(myEmail),
+      fetchUserGrants(myEmail),
     ]);
-    const email = autoEmail.toLowerCase();
+    const email = myEmail;
     const myRequests = (requests || []).filter((r) => String(r.buyerEmail || '').toLowerCase() === email);
     const myGrants = (grants || []).filter((g) => String(g.email || '').toLowerCase() === email);
 
@@ -88,7 +96,7 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
           title: g.kind === 'bot' ? (g.botName || 'Bot') : (g.planLabel || 'Plan'),
           amountUsd: g.amountUsd || 0,
           requestNo: g.requestNo,
-          createdAt: g.grantedAt || Date.now(),
+          createdAt: g.releasedAt || g.activatedAt || g.createdAt || Date.now(),
           status: 'confirmed',
           grant: g,
         });
@@ -143,30 +151,93 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
     setRows(list);
 
     if (isDeveloper) {
-      const [history, hidden] = await Promise.all([fetchDevHistory(), fetchDevHiddenTransactionIds()]);
+      const history = await fetchDevHistory();
       if (history) setDevHistory(history || []);
-      setDevHidden(hidden || []);
     }
 
     setLoaded(true);
     setLoading(false);
-  }, [autoEmail, isDeveloper]);
+  }, [myEmail, isDeveloper]);
 
   useEffect(() => {
-    if (autoEmail) load();
-  }, [autoEmail, load]);
+    if (myEmail) load();
+  }, [myEmail, load]);
 
   const handleCancel = async (id: string) => {
     await cancelSession(id);
     load();
   };
 
-  const handleDevDelete = async (id: string) => {
-    await hideTransactionFromDev(id);
-    load();
+  // حذف معاملة فردية — يحاول السيرفر أولاً، إن فشل يحذف مباشرة من Firestore
+  const handleDeleteRow = async (row: TxRow) => {
+    const target = row.request?.id || row.session?.id || row.key;
+    setDeleting(row.key);
+    const key = row.key;
+
+    if (isDeveloper) {
+      // المطور: عبر السيرفر فقط
+      const ok = await deleteTransaction(target);
+      if (ok) {
+        setRows(prev => prev.filter(r => r.key !== key));
+        if (row.request?.id) setDevHistory(prev => prev.filter(r => r.id !== row.request!.id));
+      } else {
+        await load();
+      }
+    } else {
+      // العميل: يحاول السيرفر أولاً
+      let ok = await deleteMyTransaction(target);
+      if (!ok) {
+        // Fallback: حذف مباشر من Firestore (يعمل حتى بدون Firebase auth)
+        try {
+          if (row.request?.id) {
+            await deleteDoc(doc(db, 'payment_requests', row.request.id));
+            ok = true;
+          } else if (row.session?.id) {
+            await deleteDoc(doc(db, 'payment_sessions', row.session.id));
+            ok = true;
+          }
+        } catch {}
+      }
+      if (ok) {
+        setRows(prev => prev.filter(r => r.key !== key));
+      } else {
+        await load();
+      }
+    }
+    setDeleting(null);
   };
 
-  const isAr = lang === 'ar';
+  // حذف كل المعاملات
+  const handleDeleteAll = async () => {
+    setDeleting('all');
+    if (isDeveloper) {
+      const ok = await deleteAllTransactions();
+      setConfirmDeleteAll(false);
+      setDeleting(null);
+      if (ok) { setRows([]); setDevHistory([]); } else await load();
+    } else {
+      // العميل: يحاول السيرفر أولاً
+      let ok = await deleteAllMyTransactions();
+      if (!ok) {
+        // Fallback: حذف مباشر من Firestore لكل معاملة بالبريد الإلكتروني
+        try {
+          const [reqSnap, sesSnap] = await Promise.all([
+            getDocs(query(collection(db, 'payment_requests'), where('buyerEmail', '==', myEmail))),
+            getDocs(query(collection(db, 'payment_sessions'), where('buyerEmail', '==', myEmail))),
+          ]);
+          await Promise.allSettled([
+            ...reqSnap.docs.map(d => deleteDoc(d.ref)),
+            ...sesSnap.docs.map(d => deleteDoc(d.ref)),
+          ]);
+          ok = true;
+        } catch {}
+      }
+      setConfirmDeleteAll(false);
+      setDeleting(null);
+      if (ok) { setRows([]); } else await load();
+    }
+  };
+
   const pendingCount = rows.filter((r) => r.status === 'active' || r.status === 'pending').length;
   const stLabel = (st: RowStatus): string => {
     switch (st) {
@@ -234,9 +305,7 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
               </p>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {devHistory
-                  .filter((r) => !devHidden.includes(r.id || ''))
-                  .map((r) => (
+                {devHistory.map((r) => (
                     <div key={r.id || `r_${r.requestNo}`} className="flex items-center gap-3 flex-wrap rounded-2xl bg-black/30 border border-white/10 p-4">
                       <div className="min-w-0 flex-1">
                         <p className="text-base sm:text-lg font-black text-white truncate">
@@ -256,11 +325,18 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
                         {stLabel(r.status === 'approved' ? 'confirmed' : r.status === 'rejected' ? 'cancelled' : 'pending')}
                       </span>
                       <button
-                        onClick={() => handleDevDelete(r.id || '')}
-                        className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 text-sm font-black uppercase tracking-wider transition-all"
+                        onClick={async () => {
+                          setDeleting(r.id || `r_${r.requestNo}`);
+                          const ok = await deleteTransaction(r.id || '');
+                          if (ok) setDevHistory((prev) => prev.filter((x) => (x.id || `r_${x.requestNo}`) !== (r.id || `r_${r.requestNo}`)));
+                          else await load();
+                          setDeleting(null);
+                        }}
+                        disabled={deleting === (r.id || `r_${r.requestNo}`)}
+                        className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 text-sm font-black uppercase tracking-wider transition-all disabled:opacity-50"
                       >
                         <Trash2 size={14} />
-                        {isAr ? 'مسح' : 'Clear'}
+                        {isAr ? 'حذف' : 'Delete'}
                       </button>
                     </div>
                   ))}
@@ -283,17 +359,46 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <label className="text-base sm:text-lg font-black uppercase tracking-wider text-slate-200">
             {isAr ? 'قائمة المعاملات' : 'Transaction list'}
           </label>
-          <button
-            onClick={load}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-slate-200 hover:text-white text-sm font-black uppercase tracking-wider transition-all"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            {isAr ? 'تحديث' : 'Refresh'}
-          </button>
+          <div className="flex items-center gap-2">
+            {rows.length > 0 && (confirmDeleteAll ? (
+              <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/40 rounded-xl px-3 py-2">
+                <AlertTriangle size={16} className="text-red-400" />
+                <span className="text-xs font-black text-red-400">{isAr ? 'حذف الكل؟' : 'Delete all?'}</span>
+                <button
+                  onClick={handleDeleteAll}
+                  disabled={deleting === 'all'}
+                  className="bg-red-500 text-white px-3 py-1 rounded-lg text-xs font-black hover:bg-red-600 transition-all disabled:opacity-50"
+                >
+                  {deleting === 'all' ? (isAr ? 'جاري الحذف...' : 'Deleting...') : (isAr ? 'نعم' : 'Yes')}
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteAll(false)}
+                  className="bg-white/10 text-white px-3 py-1 rounded-lg text-xs font-black hover:bg-white/20 transition-all"
+                >
+                  {isAr ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteAll(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 text-sm font-black uppercase tracking-wider transition-all"
+              >
+                <Trash2 size={14} />
+                {isDeveloper ? (isAr ? 'حذف كل المعاملات' : 'Delete all') : (isAr ? 'مسح معاملاتي' : 'Clear mine')}
+              </button>
+            ))}
+            <button
+              onClick={load}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-slate-200 hover:text-white text-sm font-black uppercase tracking-wider transition-all"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              {isAr ? 'تحديث' : 'Refresh'}
+            </button>
+          </div>
         </div>
 
         {!loaded ? (
@@ -316,7 +421,7 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
                   <div className="min-w-0 flex-1">
                     <p className="text-lg sm:text-xl font-black text-white truncate">{t.title}</p>
                     <p className="text-sm sm:text-base text-slate-300 font-bold truncate mt-1">
-                      {autoEmail} · ${t.amountUsd.toFixed(2)} USDT
+                      {myEmail} · ${t.amountUsd.toFixed(2)} USDT
                       {t.requestNo ? ` · #${t.requestNo}` : ''}
                       {t.method ? ` · ${t.method}` : ''}
                     </p>
@@ -370,6 +475,18 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
                       {isAr ? 'تم الرفض / الإلغاء' : 'Rejected / cancelled'}
                     </span>
                   )}
+                  <button
+                    onClick={() => handleDeleteRow(t)}
+                    disabled={deleting === t.key}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 text-sm font-black uppercase tracking-wider transition-all disabled:opacity-50"
+                  >
+                    {deleting === t.key ? (
+                      <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
+                    {isAr ? 'حذف' : 'Delete'}
+                  </button>
                 </div>
               </div>
             ))}
