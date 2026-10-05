@@ -30,6 +30,8 @@ export interface PaymentRequest {
   botName?: string;
   planLabel?: string;
   durationDays?: number;
+  planUnit?: string;
+  planUnits?: number;
   amountUsd: number;
   coinId?: string;
   coinName?: string;
@@ -52,12 +54,12 @@ export interface PaymentGrant {
   botId?: string;
   botName?: string;
   planLabel?: string;
-  planUnit?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  planUnit?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'hour' | 'hourly' | 'day' | 'week' | 'month' | 'year';
   planUnits?: number;
   amountUsd?: number;
   expiryDate?: string;
   durationDays?: number;
-  status: 'active' | 'consumed';
+  status: 'active' | 'consumed' | 'revoked';
   requestNo?: number;
   activatedAt?: any;
   /** The instant the developer approved. Approval IS the release. */
@@ -104,7 +106,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 // frozen after the first write). The END of the period is computed from
 // start + duration at read time, so no hand-written "expires in 2099" date
 // can ever reach the app. A release-time expiryDate (developer-written) wins.
-function toMillis(v: any): number {
+export function toMillis(v: any): number {
   if (v === null || v === undefined || v === '') return 0;
   if (typeof v === 'number') return v;
   if (typeof v === 'object' && typeof v.toMillis === 'function') return v.toMillis();
@@ -195,6 +197,8 @@ export async function createPaymentRequest(
       botName: input.botName,
       planLabel: input.planLabel,
       durationDays: input.durationDays,
+      planUnit: input.planUnit,
+      planUnits: input.planUnits,
       amountUsd: input.amountUsd,
       coinId: input.coinId,
       coinName: input.coinName,
@@ -471,6 +475,58 @@ export async function revokeClientPlanGrants(email: string): Promise<void> {
   } catch {}
 }
 
+// ── Deleting transactions ───────────────────────────────────────────────────
+// A transaction row is the request/session record. Clearing it removes it for
+// good (the ledger is the developer's to keep clean) and never touches grants,
+// so a plan somebody paid for is never lost by tidying the list.
+export async function deleteTransaction(id: string): Promise<boolean> {
+  if (!id) return false;
+  try {
+    const resp = await fetch('/api/transaction-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ id }),
+    });
+    return resp.ok;
+  } catch { return false; }
+}
+
+export async function deleteAllTransactions(): Promise<boolean> {
+  try {
+    const resp = await fetch('/api/transaction-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ all: true }),
+    });
+    return resp.ok;
+  } catch { return false; }
+}
+
+// The client's own transactions. The server takes the email from the verified
+// session, so this can only ever clear the caller's own rows.
+export async function deleteMyTransaction(id: string): Promise<boolean> {
+  if (!id) return false;
+  try {
+    const resp = await fetch('/api/user/transaction-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ id }),
+    });
+    return resp.ok;
+  } catch { return false; }
+}
+
+export async function deleteAllMyTransactions(): Promise<boolean> {
+  try {
+    const resp = await fetch('/api/user/transaction-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ all: true }),
+    });
+    return resp.ok;
+  } catch { return false; }
+}
+
 // Dev-only: full purchase history (all clients, newest first) with GMT dates.
 export async function fetchDevHistory(): Promise<PaymentRequest[]> {
   try {
@@ -479,6 +535,23 @@ export async function fetchDevHistory(): Promise<PaymentRequest[]> {
     if (data.ok && Array.isArray(data.items)) return data.items as PaymentRequest[];
   } catch {}
   return [];
+}
+
+// Dev-only: fetch all transactions (requests + grants) for a specific client email.
+export async function fetchClientTransactionsByEmail(email: string): Promise<{ requests: PaymentRequest[]; grants: PaymentGrant[] }> {
+  const e = (email || '').toLowerCase().trim();
+  if (!e) return { requests: [], grants: [] };
+  try {
+    const [reqSnap, grantSnap] = await Promise.all([
+      getDocs(query(collection(db, REQUESTS), where('buyerEmail', '==', e), orderBy('createdAt', 'desc'))),
+      getDocs(query(collection(db, GRANTS), where('email', '==', e))),
+    ]);
+    const requests = reqSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) } as PaymentRequest));
+    const grants = grantSnap.docs.map((d) => deriveGrantExpiry({ id: d.id, ...(d.data() as any) } as PaymentGrant));
+    return { requests, grants };
+  } catch {
+    return { requests: [], grants: [] };
+  }
 }
 
 // Dev-only: list transaction IDs hidden from the developer history.

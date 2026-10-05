@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Lightbulb, Plus, Check, User, ThumbsUp, Trophy, X, Trash2, AlertTriangle } from 'lucide-react';
 import { Language } from '../lib/i18n';
 import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs, getDoc, updateDoc, deleteDoc, doc, increment, serverTimestamp, query, where, setDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, increment, serverTimestamp, query, where } from 'firebase/firestore';
 
 interface Suggestion {
   id: string;
@@ -13,6 +13,8 @@ interface Suggestion {
   voters: string[];
   createdAt: any;
   _type?: string;
+  ownerUid?: string;
+  ownerEmail?: string;
 }
 
 interface SuggestionsPageProps {
@@ -23,12 +25,12 @@ interface SuggestionsPageProps {
   onClearCount?: () => void;
   onHideCount?: (n: number) => void;
   userUid?: string;
+  userEmail?: string;
 }
 
-export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = false, onClearCount, onHideCount, userUid }: SuggestionsPageProps) {
+export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = false, onClearCount, onHideCount, userUid, userEmail }: SuggestionsPageProps) {
   const isAr = lang === 'ar';
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState(userName || '');
@@ -39,29 +41,15 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  // Keyed by the Firebase uid so the preferences document belongs to exactly one
-  // account. Keying by a typed display name let anyone read or overwrite another
-  // account's list.
-  const hiddenDocId = userUid ? `hidden_${userUid}` : 'dev_hidden_suggestions';
-
-  const fetchHidden = async () => {
-    try {
-      const snap = userUid ? await getDoc(doc(db, 'userPreferences', hiddenDocId)) : null;
-      if (snap?.exists()) {
-        const data = snap.data();
-        setHiddenIds(new Set(data.hiddenIds || []));
-      }
-    } catch {}
-  };
-
-  const saveHidden = async (ids: Set<string>) => {
-    // Only write a preferences document we are actually allowed to own: the
-    // uid-keyed one. Never the shared developer document.
-    if (!userUid) return;
-    try {
-      await setDoc(doc(db, 'userPreferences', hiddenDocId), { hiddenIds: [...ids] }, { merge: true });
-    } catch {}
-  };
+  // A suggestion remembers WHO wrote it (uid + email), never just the typed
+  // display name: two people can share a name, and anyone can type any name.
+  const myUid = (userUid || '').trim();
+  // Ownership is matched on the ACCOUNT (uid, else the verified email) only —
+  // never on the typed display name, which anybody can type.
+  const myEmail = (userEmail || '').trim().toLowerCase();
+  const isMine = (s: Suggestion) =>
+    (!!myUid && !!s.ownerUid && s.ownerUid === myUid) ||
+    (!!myEmail && !!s.ownerEmail && String(s.ownerEmail).toLowerCase() === myEmail);
 
   const fetchSuggestions = async () => {
     try {
@@ -77,6 +65,8 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
           voters: raw.voters || [],
           createdAt: raw.createdAt,
           _type: raw._type,
+          ownerUid: raw.ownerUid || '',
+          ownerEmail: raw.ownerEmail || '',
         } as Suggestion;
       }).sort((a, b) => {
         const ta = a.createdAt?.seconds || 0;
@@ -94,13 +84,10 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
 
   useEffect(() => {
     fetchSuggestions();
-    if (isDeveloper) {
-      fetchHidden();
-      if (onClearCount) onClearCount();
-    }
+    if (isDeveloper && onClearCount) onClearCount();
   }, []);
 
-  const visibleSuggestions = isDeveloper ? suggestions.filter(s => !hiddenIds.has(s.id)) : suggestions;
+  const visibleSuggestions = suggestions;
   const totalVotes = visibleSuggestions.reduce((sum, s) => sum + s.votes, 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,6 +102,8 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         text: text.trim(),
         votes: 0,
         voters: [],
+        ownerUid: myUid,
+        ownerEmail: myEmail,
         createdAt: serverTimestamp()
       });
       setText('');
@@ -131,7 +120,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
   };
 
   const handleVote = async (suggestion: Suggestion) => {
-    const voterId = userName || 'anonymous';
+    const voterId = myUid || myEmail || 'anonymous';
     if (suggestion.voters?.includes(voterId)) return;
     try {
       const ref = doc(db, 'analysisResults', suggestion.id);
@@ -145,19 +134,14 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
     }
   };
 
+  // Any suggestion can be deleted, by anyone, at any time — the row is removed
+  // for real instead of being hidden from one account only.
   const handleDeleteOne = async (id: string) => {
     setDeleting(id);
     try {
-      if (isDeveloper) {
-        const newHidden = new Set(hiddenIds);
-        newHidden.add(id);
-        setHiddenIds(newHidden);
-        await saveHidden(newHidden);
-        if (onHideCount) onHideCount(1);
-      } else {
-        await deleteDoc(doc(db, 'analysisResults', id));
-        await fetchSuggestions();
-      }
+      await deleteDoc(doc(db, 'analysisResults', id));
+      if (isDeveloper && onHideCount) onHideCount(1);
+      setSuggestions((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       console.error('Failed to delete:', err);
       setError(isAr ? 'فشل الحذف' : 'Failed to delete');
@@ -166,33 +150,28 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
     }
   };
 
+  // Clear the board: the developer empties everything, a client empties their own
+  // suggestions (never anybody else's).
   const handleDeleteAll = async () => {
     setDeleting('all');
     try {
-      if (isDeveloper) {
-        const newHidden = new Set(hiddenIds);
-        const toHide = visibleSuggestions.length;
-        visibleSuggestions.forEach(s => newHidden.add(s.id));
-        setHiddenIds(newHidden);
-        await saveHidden(newHidden);
-        if (onHideCount) onHideCount(toHide);
-      } else {
-        const promises = suggestions.map(s => deleteDoc(doc(db, 'analysisResults', s.id)));
-        await Promise.all(promises);
-        await fetchSuggestions();
-      }
+      const targets = isDeveloper ? suggestions : suggestions.filter(isMine);
+      const results = await Promise.allSettled(targets.map((s) => deleteDoc(doc(db, 'analysisResults', s.id))));
+      const gone = new Set(
+        targets.filter((_, i) => results[i].status === 'fulfilled').map((s) => s.id),
+      );
+      setSuggestions((prev) => prev.filter((s) => !gone.has(s.id)));
+      if (isDeveloper && onHideCount) onHideCount(gone.size);
       setConfirmDeleteAll(false);
+      if (results.some((r) => r.status === 'rejected')) {
+        setError(isAr ? 'تم حذف بعضها، وتعذّر حذف الباقي' : 'Some were deleted, others were refused');
+      }
     } catch (err) {
       console.error('Failed to delete all:', err);
       setError(isAr ? 'فشل حذف الكل' : 'Failed to delete all');
     } finally {
       setDeleting(null);
     }
-  };
-
-  const canDelete = (s: Suggestion) => {
-    if (isDeveloper) return true;
-    return s.name === userName;
   };
 
   const getPercentage = (votes: number) => {
@@ -265,7 +244,7 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
             {isAr ? 'أضف اقتراح' : 'Add Suggestion'}
           </button>
         )}
-        {isDeveloper && visibleSuggestions.length > 0 && (
+        {(isDeveloper ? visibleSuggestions.length > 0 : visibleSuggestions.some(isMine)) && (
           <>
             {confirmDeleteAll ? (
               <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/40 rounded-xl px-4 py-3">
@@ -293,7 +272,9 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                 className="inline-flex items-center gap-2 bg-red-500/20 border border-red-500/40 text-red-400 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-500/30 transition-all"
               >
                 <Trash2 size={18} />
-                {isAr ? 'حذف الكل' : 'Delete All'}
+                {isDeveloper
+                  ? (isAr ? 'حذف كل المقترحات' : 'Delete all suggestions')
+                  : (isAr ? 'مسح اقتراحاتي' : 'Clear my suggestions')}
               </button>
             )}
           </>
@@ -418,11 +399,12 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
         </div>
       ) : (
         <div className="space-y-3">
-          {suggestions.filter(s => isDeveloper ? !hiddenIds.has(s.id) : true).map((s, i) => {
+          {visibleSuggestions.map((s, i) => {
             const pct = getPercentage(s.votes);
             const implementable = isImplementable(s.votes);
-            const hasVoted = s.voters?.includes(userName || 'anonymous');
-            const isOwn = canDelete(s);
+            const voterId = myUid || myEmail || 'anonymous';
+            const hasVoted = s.voters?.includes(voterId);
+            const isOwn = isMine(s);
             return (
               <motion.div
                 key={s.id}
@@ -451,6 +433,12 @@ export default function SuggestionsPage({ lang, onBack, userName, isDeveloper = 
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {isOwn && (
+                      <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-white/5 text-white/40 border border-white/10">
+                        {isAr ? 'اقتراحك' : 'Yours'}
+                      </span>
+                    )}
+                    {/* Delete button: developer sees it on every card; a client sees it only on their own */}
+                    {(isDeveloper || isOwn) && (
                       <button
                         onClick={() => handleDeleteOne(s.id)}
                         disabled={deleting === s.id}

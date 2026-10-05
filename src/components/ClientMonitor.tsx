@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ShieldOff, Trash2, RefreshCw, RotateCcw, X, CheckCircle, Clock, Ban, Shield, Crown, Layers } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Users, ShieldOff, Trash2, RefreshCw, RotateCcw, X, CheckCircle, Clock, Ban, Shield, Crown, Layers, Receipt, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../lib/i18n';
-import { fetchAllPlanGrants, PaymentGrant } from '../services/paymentRequests';
+import { fetchAllPlanGrants, fetchClientTransactionsByEmail, deleteTransaction, PaymentGrant, PaymentRequest } from '../services/paymentRequests';
 
 interface ClientRecord {
   id: string;
@@ -36,6 +36,48 @@ export default function ClientMonitor({ clients, lang, onRefresh, onMergeDuplica
   const [freemiumDisabled, setFreemiumDisabled] = useState(externalFreemium ?? localStorage.getItem('finalyze_freemium_disabled') === 'true');
   const [clientLoginRequired, setClientLoginRequired] = useState(externalClientLogin ?? localStorage.getItem('finalyze_client_login_required') === 'true');
   const [grants, setGrants] = useState<PaymentGrant[]>([]);
+
+  // ── Client transaction modal ─────────────────────────────────────────────
+  const [txClient, setTxClient] = useState<ClientRecord | null>(null);
+  const [txRequests, setTxRequests] = useState<PaymentRequest[]>([]);
+  const [txGrants, setTxGrants] = useState<PaymentGrant[]>([]);
+  const [txLoading, setTxLoading] = useState(false);
+  const [txDeleting, setTxDeleting] = useState<string | null>(null);
+  const [txConfirmDeleteAll, setTxConfirmDeleteAll] = useState(false);
+
+  const openTxModal = async (client: ClientRecord) => {
+    setTxClient(client);
+    setTxRequests([]);
+    setTxGrants([]);
+    setTxLoading(true);
+    setTxConfirmDeleteAll(false);
+    const { requests, grants: g } = await fetchClientTransactionsByEmail(client.email);
+    setTxRequests(requests);
+    setTxGrants(g);
+    setTxLoading(false);
+  };
+
+  const closeTxModal = () => {
+    setTxClient(null);
+    setTxRequests([]);
+    setTxGrants([]);
+    setTxConfirmDeleteAll(false);
+  };
+
+  const handleTxDeleteOne = async (id: string) => {
+    setTxDeleting(id);
+    const ok = await deleteTransaction(id);
+    if (ok) setTxRequests((prev) => prev.filter((r) => r.id !== id));
+    setTxDeleting(null);
+  };
+
+  const handleTxDeleteAll = async () => {
+    setTxDeleting('all');
+    await Promise.allSettled(txRequests.map((r) => r.id ? deleteTransaction(r.id) : Promise.resolve(false)));
+    setTxRequests([]);
+    setTxConfirmDeleteAll(false);
+    setTxDeleting(null);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -173,39 +215,6 @@ export default function ClientMonitor({ clients, lang, onRefresh, onMergeDuplica
             <div className="text-xs text-white/80 font-bold tracking-wider mt-1">{stat.label}</div>
           </div>
         ))}
-      </div>
-
-      {/* Freemium System Toggle */}
-      <div className="bg-brand-alt rounded-2xl p-4 border border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {freemiumDisabled ? <Shield size={20} className="text-emerald-400" /> : <ShieldOff size={20} className="text-amber-400" />}
-          <div>
-            <span className="text-sm font-bold text-white">
-              {isAr ? 'نظام الخطط المجانية' : 'Freemium System'}
-            </span>
-            <p className="text-xs text-white/60 mt-0.5">
-              {freemiumDisabled
-                ? (isAr ? 'الكل وصول كامل - الخطط مخفية عن العملاء' : 'All full access - plans hidden from clients')
-                : (isAr ? 'القيود مفعلة - الخطط مرئية للعملاء' : 'Restrictions active - plans visible to clients')}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => {
-            const newVal = !freemiumDisabled;
-            setFreemiumDisabled(newVal);
-            localStorage.setItem('finalyze_freemium_disabled', newVal ? 'true' : 'false');
-            localStorage.setItem('finalyze_hide_plans', newVal ? 'true' : 'false');
-            onFreemiumToggle?.(newVal);
-          }}
-          className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-            freemiumDisabled
-              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-              : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-          }`}
-        >
-          {freemiumDisabled ? (isAr ? 'ON: وصول كامل' : 'ON: Full Access') : (isAr ? 'OFF: مقفلة' : 'OFF: Locked')}
-        </button>
       </div>
 
       {/* Client Login Required Toggle */}
@@ -357,6 +366,13 @@ export default function ClientMonitor({ clients, lang, onRefresh, onMergeDuplica
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <button
+                          onClick={() => openTxModal(client)}
+                          className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-colors"
+                          title={isAr ? 'عرض المعاملات' : 'View Transactions'}
+                        >
+                          <Receipt size={14} />
+                        </button>
+                        <button
                           onClick={() => { if (confirm(isAr ? 'حظر هذا العميل؟' : 'Ban this client?')) onBan(client.id); }}
                           className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
                           title={isAr ? 'حظر' : 'Ban'}
@@ -379,6 +395,156 @@ export default function ClientMonitor({ clients, lang, onRefresh, onMergeDuplica
           </div>
         </div>
       )}
+
+      {/* ── Client Transactions Modal ────────────────────────────────────────── */}
+      <AnimatePresence>
+        {txClient && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={closeTxModal}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#0f1117] rounded-3xl border border-white/10 w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
+                <div className="flex items-center gap-3">
+                  <Receipt size={20} className="text-sky-400" />
+                  <div>
+                    <h3 className="text-base font-black text-white">
+                      {isAr ? 'معاملات العميل' : 'Client Transactions'}
+                    </h3>
+                    <p className="text-xs text-sky-300 font-bold truncate max-w-xs">{txClient.email}</p>
+                  </div>
+                </div>
+                <button onClick={closeTxModal} className="p-2 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Grants summary */}
+              {txGrants.length > 0 && (
+                <div className="px-6 pt-4 shrink-0">
+                  <p className="text-xs font-black uppercase tracking-wider text-white/40 mb-2">
+                    {isAr ? 'المنح النشطة' : 'Active Grants'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {txGrants.map((g) => (
+                      <span key={g.id} className={`px-3 py-1.5 rounded-xl text-xs font-black border ${g.status === 'active' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-white/5 text-white/40 border-white/10'}`}>
+                        {g.kind === 'bot' ? (g.botName || 'Bot') : (g.planLabel || 'Plan')}
+                        {g.expiryDate ? ` · ${new Date(g.expiryDate).toLocaleDateString('en-GB')}` : ''}
+                        {` · ${g.status}`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Delete-all toolbar */}
+              <div className="px-6 pt-3 shrink-0 flex items-center justify-between flex-wrap gap-2">
+                <p className="text-xs text-white/40 font-bold">
+                  {isAr ? `${txRequests.length} معاملة` : `${txRequests.length} transaction(s)`}
+                </p>
+                {txRequests.length > 0 && (
+                  txConfirmDeleteAll ? (
+                    <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/40 rounded-xl px-3 py-2">
+                      <AlertTriangle size={14} className="text-red-400" />
+                      <span className="text-xs font-black text-red-400">{isAr ? 'حذف كل المعاملات؟' : 'Delete all transactions?'}</span>
+                      <button
+                        onClick={handleTxDeleteAll}
+                        disabled={txDeleting === 'all'}
+                        className="bg-red-500 text-white px-3 py-1 rounded-lg text-xs font-black hover:bg-red-600 transition-all disabled:opacity-50"
+                      >
+                        {txDeleting === 'all' ? (isAr ? 'جاري...' : 'Deleting...') : (isAr ? 'نعم' : 'Yes')}
+                      </button>
+                      <button onClick={() => setTxConfirmDeleteAll(false)} className="bg-white/10 text-white px-3 py-1 rounded-lg text-xs font-black hover:bg-white/20 transition-all">
+                        {isAr ? 'إلغاء' : 'Cancel'}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setTxConfirmDeleteAll(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 text-xs font-black uppercase tracking-wider transition-all"
+                    >
+                      <Trash2 size={13} />
+                      {isAr ? 'حذف كل المعاملات' : 'Delete all transactions'}
+                    </button>
+                  )
+                )}
+              </div>
+
+              {/* Transactions list */}
+              <div className="flex-1 overflow-y-auto px-6 py-3 space-y-3">
+                {txLoading ? (
+                  <div className="py-10 text-center">
+                    <div className="w-7 h-7 border-b-2 border-sky-400 rounded-full animate-spin mx-auto" />
+                    <p className="text-white/40 text-sm mt-3">{isAr ? 'جاري التحميل...' : 'Loading...'}</p>
+                  </div>
+                ) : txRequests.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <Receipt size={32} className="text-white/20 mx-auto mb-3" />
+                    <p className="text-white/40 text-sm">{isAr ? 'لا توجد معاملات' : 'No transactions found'}</p>
+                  </div>
+                ) : (
+                  txRequests.map((r) => {
+                    const statusColors: Record<string, string> = {
+                      pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                      approved: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                      rejected: 'bg-red-500/20 text-red-400 border-red-500/30',
+                    };
+                    const statusLabels: Record<string, string> = {
+                      pending: isAr ? 'قيد التأكيد' : 'Pending',
+                      approved: isAr ? 'تم التأكيد' : 'Approved',
+                      rejected: isAr ? 'مرفوض' : 'Rejected',
+                    };
+                    const key = r.id || `r_${r.requestNo}`;
+                    return (
+                      <div key={key} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-center gap-3 flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-white truncate">
+                            {r.kind === 'bot' ? (r.botName || 'Bot') : (r.planLabel || 'Plan')}
+                            {r.requestNo ? <span className="text-white/40 font-bold"> · #{r.requestNo}</span> : null}
+                          </p>
+                          <p className="text-xs text-slate-300 font-bold mt-0.5">
+                            ${Number(r.amountUsd || 0).toFixed(2)} USDT
+                            {r.method ? ` · ${r.method}` : ''}
+                          </p>
+                          <p className="text-[11px] text-white/40 font-bold mt-1 flex items-center gap-1">
+                            <Clock size={11} />
+                            {r.createdAt ? new Date(r.createdAt).toLocaleString('en-GB', { timeZone: 'GMT', hour12: false }) + ' GMT' : '—'}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-black uppercase border ${statusColors[r.status] || 'bg-white/5 text-white/40 border-white/10'}`}>
+                          {statusLabels[r.status] || r.status}
+                        </span>
+                        <button
+                          onClick={() => r.id && handleTxDeleteOne(r.id)}
+                          disabled={txDeleting === r.id || !r.id}
+                          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 text-xs font-black uppercase transition-all disabled:opacity-50"
+                        >
+                          {txDeleting === r.id ? (
+                            <div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 size={13} />
+                          )}
+                          {isAr ? 'حذف' : 'Delete'}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
