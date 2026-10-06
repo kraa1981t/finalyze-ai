@@ -3,7 +3,8 @@ import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, OAuthPro
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where, setDoc, query, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { playSuccess, playFail, playCompletion, playStart, initAudio } from './lib/audioEngine';
+import { playSuccess, playFail, playCompletion, playStart, playDrop, initAudio } from './lib/audioEngine';
+import { installUiClickSound } from './lib/uiClickSound';
 import { trackPageView, trackClick } from './lib/tracking';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
 import Header from './components/Header';
@@ -29,7 +30,7 @@ import { resolveConflicts } from './services/portfolioRiskService';
 import ApiKeyModal from './components/ApiKeyModal';
 import SubscriptionModal from './components/SubscriptionModal';
 import PaymentModal from './components/PaymentModal';
-import { getUnreadDevNotificationCount, getUnreadSiteRequestCount, fetchUserGrants, fetchUserGrantsForEmails, activateClientPlan, revokeClientPlanGrants } from './services/paymentRequests';
+import { getUnreadDevNotificationCount, getUnreadSiteRequestCount, fetchUserGrants, fetchUserGrantsForEmails, activateClientPlan, revokeClientPlanGrants, toMillis as grantTimeMillis } from './services/paymentRequests';
 import ProfilePage from './components/ProfilePage';
 import TransactionsPage from './components/TransactionsPage';
 import AboutPage from './components/AboutPage';
@@ -74,7 +75,7 @@ export default function App() {
   const [redirecting, setRedirecting] = useState(false);
   const [redirectingProvider, setRedirectingProvider] = useState<AuthProviderId | null>(null);
   const [manualAuthUrl, setManualAuthUrl] = useState<string | null>(null);
-  const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string; durationDays: number } | null>(null);
+  const [paymentPlan, setPaymentPlan] = useState<{ amount: number; label: string; durationDays: number; planUnit?: string; planUnits?: number } | null>(null);
   const [botPurchase, setBotPurchase] = useState<StoreBot | null>(null);
   const [resumeSessionId, setResumeSessionId] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(() => {
@@ -198,7 +199,7 @@ export default function App() {
   const [showRadarComplete, setShowRadarComplete] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'phone' | 'tablet' | null>(null);
   const prevRadarRunningRef = useRef(false);
-  const [activeSubscription, setActiveSubscription] = useState<{ label: string; amount: number; expiryDate: string; requestNo?: number; durationDays?: number } | null>(() => {
+  const [activeSubscription, setActiveSubscription] = useState<{ label: string; amount: number; expiryDate: string; requestNo?: number; durationDays?: number; firstReleasedAt?: string; planUnit?: string; planUnits?: number } | null>(() => {
     try {
       const saved = localStorage.getItem('active_subscription');
       if (!saved) return null;
@@ -882,6 +883,9 @@ const isDeveloperSession = () => {
     autoSettingsRef.current = autoSettings;
   }, [autoSettings]);
 
+  // A click tick on every button, icon, page link and section that gets pressed.
+  useEffect(() => installUiClickSound(), []);
+
   // Web Audio API ΓÇö unlock AudioContext on first user click (browser autoplay policy)
   useEffect(() => {
     const unlock = () => {
@@ -933,11 +937,12 @@ const isDeveloperSession = () => {
 
   // Web Audio API ΓÇö no unlock needed
 
-  const playAudio = (type?: 'success' | 'fail' | 'completion' | 'start') => {
+  const playAudio = (type?: 'success' | 'fail' | 'completion' | 'start' | 'drop') => {
     const vol = Math.max(0, Math.min(1, autoSettings.volume || 0.5));
     if (type === 'success') playSuccess(vol);
     else if (type === 'completion') playCompletion(vol);
     else if (type === 'start') playStart(vol);
+    else if (type === 'drop') playDrop(vol);
     else playFail(vol);
   };
 
@@ -1387,7 +1392,7 @@ const isDeveloperSession = () => {
       const { cat, region, exchange } = openJobs[jobIdx];
       // Alert 3: Category complete and beginning of next category analysis
       if (jobIdx > 0) {
-        try { playAudio('fail'); } catch {}
+        try { playAudio('drop'); } catch {}
       }
 
       const mt = cat === 'crypto' ? MarketType.CRYPTO :
@@ -1896,6 +1901,18 @@ const isDeveloperSession = () => {
     return () => { window.removeEventListener('freemium-toggle', sync); window.removeEventListener('storage', sync); };
   }, []);
 
+  // The "Enable / Disable Plans for Clients" switch is gone: the store always
+  // sells. Any flag left by an older session is forced off, and the developer
+  // clears the shared setting once so clients can never load a hidden state.
+  useEffect(() => {
+    localStorage.setItem('finalyze_freemium_disabled', 'false');
+    localStorage.setItem('finalyze_hide_plans', 'false');
+    setFreemiumDisabled(false);
+    if (isDeveloperSession()) {
+      setDoc(doc(db, 'shared_settings', 'freemium'), { disabled: false, updatedAt: Date.now() }).catch(() => {});
+    }
+  }, []);
+
   // Redirect away from plans page when freemium is ON (full free access)
   useEffect(() => {
     if (activePage === 'plans' && freemiumDisabled && !isDeveloperSession()) {
@@ -2112,12 +2129,14 @@ const started = planGrants
         if (!best) return;
         // Every period the developer approved is kept, so the first release is the
         // earliest start and the visible end is the latest expiry (stacking).
+        // Dates arrive as ISO strings, epoch numbers or Firestore Timestamps, so
+        // they are normalised before being compared.
         const starts = planGrants
-          .map((g) => (g.activatedAt ? new Date(g.activatedAt).getTime() : 0))
+          .map((g) => grantTimeMillis(g.activatedAt || g.releasedAt))
           .filter((n) => isFinite(n) && n > 0);
         const firstReleaseIso = starts.length
           ? new Date(Math.min(...starts)).toISOString()
-          : new Date(best.createdAt).toISOString();
+          : (best.createdAt ? new Date(grantTimeMillis(best.createdAt) || Date.now()).toISOString() : new Date().toISOString());
         const subs = {
           label: best.planLabel || 'Plan',
           amount: best.amountUsd || 0,
@@ -2133,14 +2152,22 @@ const started = planGrants
           planUnits: best.planUnits,
         };
         setActiveSubscription((prev) => {
-          // Keep the FURTHEST end date ever seen, so a renewal is never shortened
-          // by a slower poll landing on an older grant first.
+          // The grant list is the only truth: keep the FURTHEST end date so a
+          // renewal is never shortened by a poll landing on an older grant, but
+          // never keep a date the server no longer reports (an expired plan must
+          // disappear instead of lingering for years from local storage).
           const prevEnd = prev && prev.expiryDate ? new Date(prev.expiryDate).getTime() : 0;
           const thisEnd = subs.expiryDate ? new Date(subs.expiryDate).getTime() : 0;
-          if (prevEnd && prevEnd > thisEnd) return prev;
-          try { localStorage.setItem('active_subscription', JSON.stringify(subs)); } catch {}
+          if (!thisEnd) {
+            try { localStorage.removeItem('active_subscription'); } catch {}
+            return null;
+          }
+          const merged = prevEnd > thisEnd && prev
+            ? { ...subs, expiryDate: prev.expiryDate, label: prev.label || subs.label, firstReleasedAt: subs.firstReleasedAt || prev.firstReleasedAt }
+            : subs;
+          try { localStorage.setItem('active_subscription', JSON.stringify(merged)); } catch {}
           if (!freeModeOverride()) setPaidMode(true);
-          return subs;
+          return merged;
         });
       } catch {}
     };
@@ -2442,6 +2469,8 @@ const started = planGrants
                 }
                 buyerName={user?.displayName || ''}
                 planDurationDays={paymentPlan?.durationDays}
+                planUnit={paymentPlan?.planUnit}
+                planUnits={paymentPlan?.planUnits}
                 resumeSessionId={resumeSessionId}
                 onBotPaid={() => { setResumeSessionId(null); setBotPurchase(null); setPaymentPlan(null); goBack(); }}
                 onGoToStore={() => { setResumeSessionId(null); setPaymentPlan(null); setBotPurchase(null); navigateTo('store'); }}
@@ -2452,11 +2481,11 @@ const started = planGrants
                   // Use the server-computed expiryDate from the grant if available;
                   // fall back to a local calculation only when no grant info is passed.
                   const serverExpiry = grantInfo?.expiryDate ? new Date(grantInfo.expiryDate) : null;
-                  const subExpiry = serverExpiry ?? (() => {
-                    const d = new Date();
-                    d.setDate(d.getDate() + (plan.durationDays || 30));
-                    return d;
-                  })();
+                  // Without a grant the period is still the plan's own: one hour
+                  // must never fall back to a thirty-day month.
+                  const fallbackDays = Number(plan.durationDays) > 0 ? Number(plan.durationDays) : 30;
+                  const subExpiry = serverExpiry ?? new Date(Date.now() + fallbackDays * 86400000);
+                  const firstReleaseIso = new Date().toISOString();
                   if (buyerEmail) {
                     // A successful payment REGISTERS the client on the site under
                     // their payment email: this becomes their identity, so the
@@ -2488,10 +2517,13 @@ const started = planGrants
                   const sub = {
                     label: plan.label,
                     amount: plan.amount,
-                    activatedAt: new Date().toISOString(),
+                    activatedAt: firstReleaseIso,
+                    firstReleasedAt: firstReleaseIso,
                     expiryDate: subExpiry.toISOString(),
                     requestNo: grantInfo?.requestNo,
                     durationDays: plan.durationDays,
+                    planUnit: plan.planUnit,
+                    planUnits: plan.planUnits,
                   };
                   localStorage.setItem('active_subscription', JSON.stringify(sub));
                   setActiveSubscription(sub);
@@ -2557,18 +2589,18 @@ const started = planGrants
                       const bot = bots.find((b) => b.id === session.botId) || null;
                       if (bot) setBotPurchase(bot);
                       else setBotPurchase(null);
-                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0, planUnit: session.planUnit, planUnits: session.planUnits });
                       setResumeSessionId(session.id);
                       navigateTo('plans');
                     }).catch(() => {
                       setBotPurchase(null);
-                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0, planUnit: session.planUnit, planUnits: session.planUnits });
                       setResumeSessionId(session.id);
                       navigateTo('plans');
                     });
                   } else {
                     setBotPurchase(null);
-                    setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                    setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0, planUnit: session.planUnit, planUnits: session.planUnits });
                     setResumeSessionId(session.id);
                     navigateTo('plans');
                   }
@@ -2597,18 +2629,18 @@ const started = planGrants
                       const bot = bots.find((b) => b.id === session.botId) || null;
                       if (bot) setBotPurchase(bot);
                       else setBotPurchase(null);
-                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0, planUnit: session.planUnit, planUnits: session.planUnits });
                       setResumeSessionId(session.id);
                       navigateTo('plans');
                     }).catch(() => {
                       setBotPurchase(null);
-                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                      setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0, planUnit: session.planUnit, planUnits: session.planUnits });
                       setResumeSessionId(session.id);
                       navigateTo('plans');
                     });
                   } else {
                     setBotPurchase(null);
-                    setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0 });
+                    setPaymentPlan({ amount: session.amountUsd, label: session.planLabel || '', durationDays: session.durationDays || 0, planUnit: session.planUnit, planUnits: session.planUnits });
                     setResumeSessionId(session.id);
                     navigateTo('plans');
                   }
@@ -2626,7 +2658,9 @@ const started = planGrants
                 onBack={() => navigateTo('about')}
                 userName={user?.displayName || user?.email || ''}
                 userUid={user?.uid || ''}
+                userEmail={user?.email || currentUserEmail() || getLastEmail() || ''}
                 isDeveloper={isDeveloperSession()}
+                onClearCount={() => setNewSuggestionsCount(0)}
                 onHideCount={(n) => setNewSuggestionsCount(prev => Math.max(0, prev - n))}
               />
             )}
@@ -2651,7 +2685,7 @@ const started = planGrants
                 onBuyPlan={(plan) => {
                   setResumeSessionId(null);
                   setBotPurchase(null);
-                  setPaymentPlan({ amount: plan.priceUsd, label: (isAr ? plan.labelAr : plan.labelEn) || plan.key, durationDays: plan.durationDays });
+                  setPaymentPlan({ amount: plan.priceUsd, label: (isAr ? plan.labelAr : plan.labelEn) || plan.key, durationDays: plan.durationDays, planUnit: plan.planUnit, planUnits: plan.planUnits });
                   navigateTo('plans');
                 }}
                 customerPlan={activeSubscription}

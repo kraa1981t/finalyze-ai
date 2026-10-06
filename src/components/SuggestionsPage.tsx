@@ -53,9 +53,18 @@ export default function SuggestionsPage({
 
   const myUid = (userUid || '').trim();
   const myEmail = (userEmail || '').trim().toLowerCase();
-  const isMine = (s: Suggestion) =>
-    (!!myUid && !!s.ownerUid && s.ownerUid === myUid) ||
-    (!!myEmail && !!s.ownerEmail && String(s.ownerEmail).toLowerCase() === myEmail);
+  const myName = (userName || '').trim().toLowerCase();
+
+  const isMine = (s: Suggestion) => {
+    // 1. uid match — أقوى معرّف
+    if (myUid && s.ownerUid && s.ownerUid === myUid) return true;
+    // 2. email match
+    if (myEmail && s.ownerEmail && String(s.ownerEmail).toLowerCase() === myEmail) return true;
+    // 3. fallback: الاقتراحات القديمة التي لا تحتوي على ownerUid أو ownerEmail
+    //    نستخدم الاسم كـ fallback أخير
+    if (myName && !s.ownerUid && !s.ownerEmail && s.name && s.name.toLowerCase() === myName) return true;
+    return false;
+  };
 
   // ── Load dev hidden IDs from Firestore ─────────────────────────────────────
   const loadDevHidden = useCallback(async () => {
