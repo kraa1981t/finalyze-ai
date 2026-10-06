@@ -2054,20 +2054,19 @@ const isDeveloperSession = () => {
 
   // Fetch new suggestions count for developer notifications
   useEffect(() => {
-    if (!user) return;
     const fetchSuggestionsCount = async () => {
       try {
         const isDev = isDeveloperSession();
         if (!isDev) return;
         const snap = await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')));
         const total = snap.size;
-        // Fetch hidden count
+        // Fetch hidden count from shared_settings (open read — no auth needed)
         let hiddenCount = 0;
         try {
-          const hiddenSnap = await getDocs(query(collection(db, 'userPreferences'), where('__name__', '==', 'dev_hidden_suggestions')));
-          if (!hiddenSnap.empty) {
-            const hiddenData = hiddenSnap.docs[0].data();
-            hiddenCount = (hiddenData.hiddenIds || []).length;
+          const { getDoc: fsGetDoc, doc: fsDoc } = await import('firebase/firestore');
+          const hiddenSnap = await fsGetDoc(fsDoc(db, 'shared_settings', 'dev_hidden_suggestions'));
+          if (hiddenSnap.exists()) {
+            hiddenCount = (hiddenSnap.data().hiddenIds || []).length;
           }
         } catch {}
         setNewSuggestionsCount(Math.max(0, total - hiddenCount));
@@ -2076,7 +2075,7 @@ const isDeveloperSession = () => {
     fetchSuggestionsCount();
     const interval = setInterval(fetchSuggestionsCount, 30000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, []);
 
   // Developer: unread payment request notifications (shown on the header bell)
   useEffect(() => {
