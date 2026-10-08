@@ -981,8 +981,11 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             </div>
 
             {/* Add custom symbol with search suggestions */}
-            <div className="relative">
-              <div className="flex items-center gap-2">
+            <div className="relative overflow-visible">
+              <span className="block text-[10px] font-black uppercase tracking-widest text-[#FACC15] mb-1 px-1">
+                {isAr ? 'إضافة رمز جديد' : 'Add a new symbol'}
+              </span>
+              <div className="flex items-center gap-2 w-full min-w-0 overflow-hidden">
                 <input
                   type="text"
                   dir="ltr"
@@ -996,22 +999,23 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                     if (e.key === 'Escape') setShowSuggestions(false);
                   }}
                   onFocus={() => setShowSuggestions(true)}
-                  placeholder={isAr ? 'أي رمز TradingView — NYSE:JNJ أو BINANCE:BTCUSDT أو اكتب الرمز مباشرة' : 'Any TradingView symbol — NYSE:JNJ, BINANCE:BTCUSDT, or type directly'}
-                  className="flex-1 h-11 rounded-xl bg-black/40 border border-white/15 px-4 text-base font-bold text-brand-text outline-none focus:border-sky-500 placeholder:text-brand-text/30 placeholder:font-medium placeholder:text-sm"
+                  placeholder={isAr ? 'مثال: BINANCE:BTCUSDT' : 'e.g. BINANCE:BTCUSDT'}
+                  className="flex-1 min-w-0 w-full h-11 rounded-xl bg-black/60 border-2 border-[#FACC15]/60 px-4 text-base font-bold text-brand-text outline-none focus:border-[#FACC15] placeholder:text-[#FACC15]/50 placeholder:font-bold placeholder:text-sm"
                 />
                 <button
                   onClick={addCustomSymbol}
                   disabled={!newSymbol.trim()}
-                  className="h-11 px-5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-black font-black uppercase flex items-center gap-2 transition-all active:scale-95"
+                  className="h-11 shrink-0 px-4 sm:px-5 rounded-xl bg-[#FACC15] hover:bg-yellow-300 disabled:opacity-40 text-black font-black uppercase flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-yellow-500/20 whitespace-nowrap"
                 >
                   <Plus size={18} />
                   {isAr ? 'إضافة' : 'Add'}
                 </button>
               </div>
 
-              {/* Suggestions dropdown */}
+              {/* Opens UPWARD: the search box sits at the bottom of the panel, so a downward
+                    list spilled out of the panel and covered the chart. */}
               {showSuggestions && newSymbol.trim() && suggestions.length > 0 && (
-                <div className="absolute top-full mt-1 left-0 right-0 bg-[#0a0f1a] border border-white/20 rounded-xl shadow-2xl z-40 max-h-[260px] overflow-y-auto">
+                <div className="absolute bottom-full mb-1 left-0 right-0 max-w-full overflow-hidden bg-[#0a0f1a] border-2 border-[#FACC15]/60 rounded-xl shadow-2xl z-40 max-h-[200px] lg:max-h-[260px] overflow-y-auto">
                   {suggestions.map((s) => {
                     const added = customSymbols.includes(s.symbol);
                     const isCustom = !ORIGINAL_SYMBOLS.has(s.symbol);
@@ -1019,14 +1023,15 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
                       <button
                         key={s.symbol + s.tv}
                         onClick={() => addFromSuggestion(s)}
-                        className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors border-b border-white/5 last:border-b-0"
+                        className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors border-b border-white/5 last:border-b-0 overflow-hidden"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="text-lg flex-shrink-0">{isCustom ? '➕' : catEmoji(s.cat)}</span>
                           <span className="text-sm font-black text-brand-text" dir="ltr">{s.symbol}</span>
                           <span className="text-xs font-bold text-brand-text/50 truncate">{isAr ? s.name : s.name}</span>
                         </div>
-                        <span className={`flex-shrink-0 text-[10px] font-black uppercase px-2 py-1 rounded-md ${added ? 'bg-emerald-500/20 text-emerald-400' : 'bg-sky-500/20 text-sky-300'}`}>
+                        {/* Solid yellow box, text kept inside it so the action is readable at a glance. */}
+                        <span className={`flex-shrink-0 inline-flex items-center leading-none whitespace-nowrap text-[10px] font-black uppercase px-2.5 py-1.5 rounded-lg shadow-md ${added ? 'bg-emerald-500 text-black' : 'bg-[#FACC15] text-black ring-1 ring-black/20'}`}>
                           {added ? (isAr ? 'مضاف ✓' : 'Added ✓') : (isAr ? '+ إضافة' : '+ Add')}
                         </span>
                       </button>

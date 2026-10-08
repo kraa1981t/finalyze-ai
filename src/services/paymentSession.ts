@@ -11,6 +11,8 @@ export interface PaymentSession {
   botName?: string;
   planLabel?: string;
   durationDays?: number;
+  planUnit?: string;
+  planUnits?: number;
   amountUsd: number;
   method?: string;
   symbol?: string;
@@ -85,6 +87,24 @@ function upsertLocal(s: PaymentSession): void {
 
 function removeLocal(id: string): void {
   writeLocalSessions(readLocalSessions().filter((x) => x.id !== id));
+}
+
+// ── Client-driven cleanup ───────────────────────────────────────────────────
+// The transaction list lives partly in THIS browser (local sessions) and partly
+// in Firestore. When a customer clears their transactions the local copies must
+// go too, otherwise the row simply reappears on the next load and the delete
+// looks broken.
+export function removeLocalSessionById(id: string): void {
+  removeLocal(id);
+}
+
+/** Drop every locally cached session belonging to `email` (or all of them). */
+export function clearLocalSessions(email?: string): void {
+  try {
+    const e = (email || '').toLowerCase().trim();
+    const list = readLocalSessions();
+    writeLocalSessions(e ? list.filter((s) => (s.buyerEmail || '').toLowerCase() !== e) : []);
+  } catch {}
 }
 
 const remoteRef = (id: string) => doc(db, COLLECTION, id);

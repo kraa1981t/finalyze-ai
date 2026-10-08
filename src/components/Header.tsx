@@ -391,13 +391,6 @@ export default function Header({
                     <Settings size={18} className="text-[#F59E0B]" />
                     <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'الإعدادات' : 'Settings'}</span>
                   </button>
-                  {!freemiumDisabled && (
-                    <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('plans'); }}
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
-                      <DollarSign size={18} className="text-[#F59E0B]" />
-                      <span className="text-xs font-black text-black uppercase">{lang === 'ar' ? 'الخطط' : 'Plans'}</span>
-                    </button>
-                  )}
                   <button onClick={() => { setShowMobileMenu(false); onNavigatePage?.('storeSettings'); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-[#F59E0B]/10 transition-all shadow-sm">
                     <Store size={18} className="text-[#F59E0B]" />

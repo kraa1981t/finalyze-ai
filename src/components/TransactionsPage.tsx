@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, RefreshCw, XCircle, Receipt, CheckCircle2, Clock, Store, Trash2, AlertTriangle } from 'lucide-react';
 import { Language } from '../lib/i18n';
-import { loadAllSessions, cancelSession, getLastEmail, PaymentSession } from '../services/paymentSession';
-import { fetchPaymentRequests, fetchUserPaymentRequests, fetchUserGrants, fetchDevHistory, deleteTransaction, deleteAllTransactions, deleteMyTransaction, deleteAllMyTransactions, PaymentRequest, PaymentGrant } from '../services/paymentRequests';
+import { loadAllSessions, cancelSession, getLastEmail, clearLocalSessions, removeLocalSessionById, PaymentSession } from '../services/paymentSession';
+import { fetchPaymentRequests, fetchUserPaymentRequests, fetchUserGrants, fetchDevHistory, deleteTransaction, deleteAllTransactions, deleteMyTransaction, deleteAllMyTransactions, fetchHiddenTxKeys, hideTxKeys, PaymentRequest, PaymentGrant } from '../services/paymentRequests';
 import { db } from '../lib/firebase';
 import { deleteDoc, doc, getDocs, collection, query, where } from 'firebase/firestore';
 import PaymentRequestsSection from './PaymentRequestsSection';
@@ -147,7 +147,23 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
       }
     } catch {}
 
-    const list = [...merged.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    let list = [...merged.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    // A client's deleted rows stay deleted. Grant-backed rows and the local
+    // active-subscription row are REBUILT on every load (their source records
+    // are never deleted — a paid plan must survive a tidy-up), so the delete
+    // also lands in the client's hide ledger and the list skips those keys.
+    if (!isDeveloper && myEmail) {
+      try {
+        const hidden = new Set(await fetchHiddenTxKeys(myEmail));
+        if (hidden.size) {
+          list = list.filter(
+            (t) => !hidden.has(t.key) && !(t.requestNo && hidden.has(`no_${t.requestNo}`)),
+          );
+        }
+      } catch {}
+    }
+
     setRows(list);
 
     if (isDeveloper) {
@@ -198,6 +214,20 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
           }
         } catch {}
       }
+      // Whatever the server managed, the row must leave THIS client's list and
+      // never come back: the local copy goes, and every key that can rebuild it
+      // (session id, request number, grant id, subscription row) is recorded in
+      // the hide ledger. The paid plan itself is untouched by design.
+      try {
+        removeLocalSessionById(row.session?.id || '');
+        await hideTxKeys(myEmail, [
+          key,
+          row.session?.id || '',
+          row.request?.id || '',
+          row.grant?.id || '',
+          ...(row.requestNo ? [`no_${row.requestNo}`] : []),
+        ].filter(Boolean));
+      } catch {}
       if (ok) {
         setRows(prev => prev.filter(r => r.key !== key));
       } else {
@@ -232,6 +262,19 @@ export default function TransactionsPage({ lang, onBack, onResumeSession, onGoTo
           ok = true;
         } catch {}
       }
+      // "Clear mine" means the LIST is cleared — every current row key goes into
+      // the hide ledger (grant/subscription rows are rebuilt on every load and
+      // can never be deleted), and the local session cache is emptied too.
+      try {
+        clearLocalSessions(myEmail);
+        await hideTxKeys(myEmail, [
+          ...rows.map(r => r.key),
+          ...rows.map(r => r.session?.id || ''),
+          ...rows.map(r => r.request?.id || ''),
+          ...rows.map(r => r.grant?.id || ''),
+          ...rows.filter(r => r.requestNo).map(r => `no_${r.requestNo}`),
+        ].filter(Boolean));
+      } catch {}
       setConfirmDeleteAll(false);
       setDeleting(null);
       if (ok) { setRows([]); } else await load();

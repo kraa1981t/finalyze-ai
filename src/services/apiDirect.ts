@@ -452,7 +452,7 @@ export async function callAIDirect(prompt: string, apiKey: string): Promise<any>
 }
 
 async function callGeminiDirect(prompt: string, apiKey: string): Promise<any> {
-  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
   for (const model of models) {
     try {
       const ac = new AbortController();
@@ -496,7 +496,7 @@ async function callGeminiDirect(prompt: string, apiKey: string): Promise<any> {
 }
 
 async function callGroqDirect(prompt: string, apiKey: string): Promise<any> {
-  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+  const models = ["qwen/qwen3-32b", "openai/gpt-oss-120b", "meta-llama/llama-4-scout-17b-16e-instruct"];
   for (const model of models) {
     try {
       const ac = new AbortController();

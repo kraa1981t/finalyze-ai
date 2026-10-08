@@ -1,5 +1,7 @@
-import { db } from '../lib/firebase';
-import { collection, getDocs, addDoc, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { db, auth } from '../lib/firebase';
+import { collection, getDocs, addDoc, doc, setDoc, deleteDoc, getDoc, query, orderBy } from 'firebase/firestore';
+
+export type PlanPeriodUnit = 'hour' | 'day' | 'week' | 'month' | 'year';
 
 export interface StorePlan {
   id?: string;
@@ -15,6 +17,70 @@ export interface StorePlan {
   active: boolean;
   sortOrder: number;
   createdAt: number;
+  /** Explicit calendar unit + count, so approval grants exactly the period bought. */
+  planUnit?: PlanPeriodUnit;
+  planUnits?: number;
+}
+
+// Duration presets offered in the plan editor: one hour up to one year.
+// `days` is only the display/fallback number; the real period is unit+count.
+// `nameAr/nameEn` are the PLAN NAME for that period — the editor writes them
+// automatically, so a plan is named after its own duration (Hourly, Weekly…)
+// and two plans can never end up sharing a name by mistake.
+export const DURATION_OPTIONS: { days: number; unit: PlanPeriodUnit; count: number; labelAr: string; labelEn: string; nameAr: string; nameEn: string }[] = [
+  { days: 1 / 24, unit: 'hour', count: 1, labelAr: 'ساعة واحدة', labelEn: '1 hour', nameAr: 'الخطة الساعية', nameEn: 'Hourly' },
+  { days: 0.5, unit: 'hour', count: 12, labelAr: '12 ساعة', labelEn: '12 hours', nameAr: 'الخطة نصف اليومية', nameEn: 'Half-Day' },
+  { days: 1, unit: 'day', count: 1, labelAr: 'يوم واحد', labelEn: '1 day', nameAr: 'الخطة اليومية', nameEn: 'Daily' },
+  { days: 7, unit: 'week', count: 1, labelAr: 'أسبوع', labelEn: '1 week', nameAr: 'الخطة الأسبوعية', nameEn: 'Weekly' },
+  { days: 14, unit: 'week', count: 2, labelAr: 'أسبوعان', labelEn: '2 weeks', nameAr: 'الخطة نصف الأسبوعية', nameEn: 'Biweekly' },
+  { days: 30, unit: 'month', count: 1, labelAr: 'شهر', labelEn: '1 month', nameAr: 'الخطة الشهرية', nameEn: 'Monthly' },
+  { days: 90, unit: 'month', count: 3, labelAr: '3 أشهر', labelEn: '3 months', nameAr: 'الخطة الربع سنوية', nameEn: 'Quarterly' },
+  { days: 180, unit: 'month', count: 6, labelAr: '6 أشهر', labelEn: '6 months', nameAr: 'الخطة نصف السنوية', nameEn: 'Semi-Annual' },
+  { days: 365, unit: 'year', count: 1, labelAr: 'سنة', labelEn: '1 year', nameAr: 'الخطة السنوية', nameEn: 'Yearly' },
+];
+
+// Every plan advertises the SAME feature list: one fixed description, written
+// once in both languages, so a new plan needs no copywriting and can never show
+// a stale or half-translated feature list.
+export const DEFAULT_FEATURES_EN = [
+  'Access to the client area with manual analysis',
+  'Access to the client area with automatic analysis',
+  'Instant buy and sell signals with entry and exit points',
+  'Radar alerts on every important market movement',
+  'Full technical analysis of Bitcoin and the major cryptocurrencies',
+  'Every timeframe from one minute up to one month',
+  'Early access to new features before anyone else',
+  'Priority customer support',
+].join('\n');
+
+export const DEFAULT_FEATURES_AR = [
+  'فتح قسم التحليل اليدوي في منطقة العميل',
+  'فتح قسم التحليل التلقائي في منطقة العميل',
+  'إشارات شراء وبيع فورية مع نقاط الدخول والخروج',
+  'تنبيهات رادار على كل حركة مهمة في السوق',
+  'تحليل فني كامل للبيتكوين والعملات الرقمية الكبرى',
+  'كل الفترات الزمنية من دقيقة حتى شهر',
+  'وصول مبكر إلى المزايا الجديدة قبل الجميع',
+  'دعم فني ذو أولوية',
+].join('\n');
+
+export function durationOptionFor(days: number) {
+  const d = Number(days) || 0;
+  return DURATION_OPTIONS.find((o) => Math.abs(o.days - d) < 0.002) || null;
+}
+
+/** The plan name for a duration, in the language the site is showing. */
+export function planNameForDuration(days: number, isAr: boolean): string {
+  const opt = durationOptionFor(days);
+  if (opt) return isAr ? opt.nameAr : opt.nameEn;
+  return durationLabel({ durationDays: days } as StorePlan, isAr);
+}
+
+export function durationLabel(plan: StorePlan, isAr: boolean): string {
+  const opt = durationOptionFor(plan.durationDays);
+  if (opt) return isAr ? opt.labelAr : opt.labelEn;
+  const d = toWesternDigits(plan.durationDays);
+  return isAr ? `${d} يوم` : `${d} days`;
 }
 
 export const DEFAULT_PLANS: StorePlan[] = [
@@ -83,21 +149,83 @@ export function sanitizePlan(p: StorePlan): StorePlan {
     badgeEn: p.badgeEn ? toWesternDigits(p.badgeEn) : '',
     featuresAr: toWesternDigits(p.featuresAr),
     featuresEn: toWesternDigits(p.featuresEn),
-    durationDays: Math.max(1, Math.round(Number(toWesternDigits(p.durationDays)) || 30)),
+    durationDays: sanitizeDurationDays(p.durationDays),
     priceUsd: Math.max(0, Number(toWesternDigits(p.priceUsd)) || 0),
   };
 }
 
+// Durations may be fractional (1 hour = 1/24 day), so no integer rounding here.
+function sanitizeDurationDays(v: any): number {
+  const n = Number(toWesternDigits(v));
+  if (!Number.isFinite(n) || n <= 0) return 30;
+  return Math.max(1 / 24, Math.round(n * 1000000) / 1000000);
+}
+
 export function fallbackPlans(): StorePlan[] {
-  return DEFAULT_PLANS.map((p) => sanitizePlan({ ...p, id: `default_${p.key}` }));
+  const removed = removedDefaultKeys();
+  return DEFAULT_PLANS.filter((p) => !removed.includes(p.key)).map((p) => sanitizePlan({ ...p, id: `default_${p.key}` }));
+}
+
+// ── Removing the built-in plans ────────────────────────────────────────────
+// The three starter plans are code, not documents, so there is nothing in
+// Firestore to delete. A removal is therefore recorded as a KEY in
+// shared_settings/removed_default_plans: fetchPlans skips those keys, so a plan
+// the developer deleted stays deleted (on every device) instead of reappearing
+// on the next load. Removing a real document also records its key, otherwise the
+// built-in plan of the same key would spring back the moment it is deleted.
+const REMOVED_DOC_ID = 'removed_default_plans';
+const REMOVED_LS_KEY = 'finalyze_removed_default_plans';
+
+export function removedDefaultKeys(): string[] {
+  try {
+    const raw = localStorage.getItem(REMOVED_LS_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.filter((k) => typeof k === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function cacheRemovedKeys(keys: string[]) {
+  try { localStorage.setItem(REMOVED_LS_KEY, JSON.stringify(keys)); } catch {}
+}
+
+async function syncRemovedKeys(): Promise<string[]> {
+  try {
+    const snap = await getDoc(doc(db, 'shared_settings', REMOVED_DOC_ID));
+    const data = snap.data() as any;
+    const keys: string[] = Array.isArray(data?.keys) ? data.keys.filter((k: any) => typeof k === 'string') : [];
+    cacheRemovedKeys(keys);
+    return keys;
+  } catch {
+    return removedDefaultKeys();
+  }
+}
+
+export async function markPlansRemoved(keys: string[]): Promise<void> {
+  const merged = Array.from(new Set([...removedDefaultKeys(), ...keys.filter(Boolean)]));
+  cacheRemovedKeys(merged);
+  try {
+    await setDoc(doc(db, 'shared_settings', REMOVED_DOC_ID), { keys: merged, updatedAt: Date.now() }, { merge: true });
+  } catch {}
+}
+
+export async function restoreDefaultPlans(): Promise<string[]> {
+  cacheRemovedKeys([]);
+  try {
+    await setDoc(doc(db, 'shared_settings', REMOVED_DOC_ID), { keys: [], updatedAt: Date.now() }, { merge: true });
+  } catch {}
+  return removedDefaultKeys();
 }
 
 export async function fetchPlans(): Promise<StorePlan[]> {
+  const removed = await syncRemovedKeys();
   try {
     const snap = await getDocs(query(collection(db, 'store_plans'), orderBy('sortOrder', 'asc')));
     if (snap.empty) return fallbackPlans();
     const list = snap.docs.map((d) => sanitizePlan({ id: d.id, ...(d.data() as Omit<StorePlan, 'id'>) }));
     for (const p of DEFAULT_PLANS) {
+      if (removed.includes(p.key)) continue;
       if (!list.some((x) => x.key === p.key)) {
         const fp = sanitizePlan({ ...p, id: `default_${p.key}` });
         list.push(fp);
@@ -118,7 +246,7 @@ export async function addStorePlan(plan: Omit<StorePlan, 'id'>): Promise<string>
     badgeEn: plan.badgeEn ? toWesternDigits(plan.badgeEn) : '',
     featuresAr: toWesternDigits(plan.featuresAr),
     featuresEn: toWesternDigits(plan.featuresEn),
-    durationDays: Math.max(1, Math.round(Number(toWesternDigits(plan.durationDays)) || 30)),
+    durationDays: sanitizeDurationDays(plan.durationDays),
     priceUsd: Math.max(0, Number(toWesternDigits(plan.priceUsd)) || 0),
   };
   const ref = await addDoc(collection(db, 'store_plans'), sanitized);
@@ -133,13 +261,27 @@ export async function updateStorePlan(id: string, patch: Partial<Omit<StorePlan,
   if (patch.badgeEn !== undefined) sanitized.badgeEn = toWesternDigits(patch.badgeEn);
   if (patch.featuresAr !== undefined) sanitized.featuresAr = toWesternDigits(patch.featuresAr);
   if (patch.featuresEn !== undefined) sanitized.featuresEn = toWesternDigits(patch.featuresEn);
-  if (patch.durationDays !== undefined) sanitized.durationDays = Math.max(1, Math.round(Number(toWesternDigits(patch.durationDays)) || 30));
+  if (patch.durationDays !== undefined) sanitized.durationDays = sanitizeDurationDays(patch.durationDays);
   if (patch.priceUsd !== undefined) sanitized.priceUsd = Math.max(0, Number(toWesternDigits(patch.priceUsd)) || 0);
   await setDoc(doc(db, 'store_plans', id), sanitized, { merge: true });
 }
 
-export async function deleteStorePlan(id: string): Promise<void> {
+/**
+ * Deletes a plan for good. A real document is removed from Firestore; a
+ * built-in plan (or a document whose key matches one) is recorded as removed so
+ * it cannot reappear on the next load. Either way the plan is gone.
+ */
+export async function deleteStorePlan(id: string, key?: string): Promise<void> {
+  const isDefaultRow = id.startsWith('default_');
+  const planKey = key || (isDefaultRow ? id.replace('default_', '') : '');
+  if (isDefaultRow) {
+    await markPlansRemoved([planKey]);
+    return;
+  }
   await deleteDoc(doc(db, 'store_plans', id));
+  // A deleted document that shadows a built-in key would let that built-in plan
+  // come back on the next fetch, so the key is retired as well.
+  if (planKey && DEFAULT_PLANS.some((p) => p.key === planKey)) await markPlansRemoved([planKey]);
 }
 
 export function planFeatures(plan: StorePlan, isAr: boolean): string[] {
@@ -153,4 +295,31 @@ export function planFeatures(plan: StorePlan, isAr: boolean): string[] {
 export function planLabel(plan: StorePlan, isAr: boolean): string {
   const lbl = (isAr ? plan.labelAr : plan.labelEn) || plan.key;
   return toWesternDigits(lbl);
+}
+
+// Auto-translate English plan features into Arabic through the server's
+// developer-only /api/translate (pooled AI keys). Returns null on failure so
+// the caller can fall back to showing the English text.
+export async function translateToArabic(text: string): Promise<string | null> {
+  const src = (text || '').trim();
+  if (!src) return null;
+  try {
+    const token = await auth.currentUser?.getIdToken();
+    const resp = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ text: src }),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    let ar = typeof data?.ar === 'string' ? data.ar.trim() : '';
+    if (!ar) return null;
+    // Strip model chatter: quotes, backticks, leading "translation:" labels.
+    ar = ar.replace(/^```[\s\S]*?```$/m, (m) => m.replace(/^```[a-z]*\n?|\n?```$/g, ''));
+    ar = ar.replace(/^["'`“”]+|["'`“”]+$/g, '');
+    ar = ar.replace(/^(translation|الترجمة)\s*:\s*/i, '');
+    return ar.trim() || null;
+  } catch {
+    return null;
+  }
 }

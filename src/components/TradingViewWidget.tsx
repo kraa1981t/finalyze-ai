@@ -642,7 +642,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   };
 
   return (
-    <div className="relative h-full w-full flex flex-col">
+    // The chart plays its own click/drag ticks, so the global UI click sound is
+    // muted here — otherwise every drag over the canvas would double-tick.
+    <div className="relative h-full w-full flex flex-col" data-no-click-sound>
       {/* top toolbar: timeframe x2 + drawing tools */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 bg-[#0b0e14] border-b border-white/5">
         <div className="flex flex-wrap items-center gap-1">

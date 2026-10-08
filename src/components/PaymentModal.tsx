@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { X, Copy, Check, ArrowLeft, ShieldOff, Shield, RefreshCw, Wallet } from 'lucide-react';
+import { X, Copy, Check, ArrowLeft, ShieldOff, Shield, RefreshCw, Wallet, Mail } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { StoreBot, downloadBot, recordBotPurchase, getDownloadGrant, grantBotDownload, consumeBotDownload, hasDownloadedBot } from '../services/storeService';
@@ -14,7 +14,27 @@ import { isGoogleOrMicrosoftEmail } from '../lib/authPolicy';
 
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
-const TIMER_STORAGE_KEY = 'payment_timer_minutes';
+// The wait period is set in HOURS (a payment review is never a "30 minutes"
+// problem). The old minutes value is migrated once so nobody loses their setting.
+const TIMER_STORAGE_KEY = 'payment_timer_hours';
+const LEGACY_TIMER_KEY = 'payment_timer_minutes';
+
+function loadTimerHours(): number {
+  try {
+    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
+    const hours = saved ? parseInt(saved) : NaN;
+    if (Number.isFinite(hours) && hours > 0) return hours;
+    const legacy = localStorage.getItem(LEGACY_TIMER_KEY);
+    const mins = legacy ? parseInt(legacy) : NaN;
+    if (Number.isFinite(mins) && mins > 0) {
+      const migrated = Math.max(1, Math.round(mins / 60));
+      localStorage.setItem(TIMER_STORAGE_KEY, String(migrated));
+      localStorage.removeItem(LEGACY_TIMER_KEY);
+      return migrated;
+    }
+  } catch {}
+  return 1;
+}
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -37,10 +57,12 @@ interface PaymentModalProps {
   buyerEmail?: string;
   buyerName?: string;
   planDurationDays?: number;
+  planUnit?: string;
+  planUnits?: number;
   resumeSessionId?: string | null;
 }
 
-export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle, botPurchase, sectionTab = 'bot', onBotPaid, onGoToStore, onGoToPlans, buyerEmail, buyerName, planDurationDays, resumeSessionId }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPage, manageMode, onConfirm, lang, freemiumDisabled: externalFreemium, onFreemiumToggle, botPurchase, sectionTab = 'bot', onBotPaid, onGoToStore, onGoToPlans, buyerEmail, buyerName, planDurationDays, planUnit, planUnits, resumeSessionId }: PaymentModalProps) {
   const isAr = lang === 'ar';
   const [section, setSection] = useState<'bot' | 'plan'>(sectionTab || 'bot');
   const [usdtAddresses, setUsdtAddresses] = useState<PaymentAddress[]>([]);
@@ -49,14 +71,27 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   const [copiedAmountId, setCopiedAmountId] = useState<string | null>(null);
   const [prices, setPrices] = useState<Record<string, { usd: number }>>({});
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
-  const [timerMinutes, setTimerMinutes] = useState(() => {
-    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
-    return saved ? parseInt(saved) : 30;
-  });
+  const [timerHours, setTimerHours] = useState(loadTimerHours);
+  const timerMinutes = timerHours * 60;
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [editTimer, setEditTimer] = useState(timerMinutes);
+  const [editTimerHours, setEditTimerHours] = useState(timerHours);
+  // The wait period is edited in Store Settings and stored once for the whole
+  // site. Read it again while the modal is open (and on the browser's storage
+  // event, which fires when the setting is saved in another tab) so the value
+  // shown here is never a stale copy from mount time.
+  useEffect(() => {
+    if (!isOpen) return;
+    const sync = () => {
+      const h = loadTimerHours();
+      setTimerHours((prev) => (prev === h ? prev : h));
+      setEditTimerHours((prev) => (prev === h ? prev : h));
+    };
+    sync();
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, [isOpen]);
   const [requestNo, setRequestNo] = useState<number | null>(null);
   const [requestStatus, setRequestStatus] = useState<'idle' | 'pending' | 'approved' | 'rejected'>('idle');
   const [requestCreating, setRequestCreating] = useState(false);
@@ -232,6 +267,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
         botName: botPurchase?.name,
         planLabel: isBotProduct ? undefined : productLabel,
         durationDays: isBotProduct ? undefined : (planDurationDays || 30),
+        planUnit: isBotProduct ? undefined : planUnit,
+        planUnits: isBotProduct ? undefined : planUnits,
         amountUsd: amount,
         coinId: item.symbol.toLowerCase(),
         coinName: item.label,
@@ -255,6 +292,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
             botName: isBotProduct ? botPurchase?.name : undefined,
             planLabel: isBotProduct ? undefined : planLabel,
             durationDays: isBotProduct ? undefined : (planDurationDays || 30),
+            planUnit: isBotProduct ? undefined : planUnit,
+            planUnits: isBotProduct ? undefined : planUnits,
             amountUsd: amount,
             method: method.method,
             symbol: method.symbol,
@@ -320,6 +359,25 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
     persistSession(email);
   };
 
+  // The wait period must never sit dead at 00:00 with the request button stuck
+  // disabled. A network plus a valid email is enough to start it, however the
+  // email arrived: typed, pasted, restored from the browser, or pre-filled from
+  // the remembered buyer email. The ref makes sure a finished period is never
+  // silently restarted.
+  const autoStartedFor = useRef('');
+  useEffect(() => {
+    if (!isOpen || manageMode || !selectedNetwork) return;
+    const email = (contactEmail || buyerEmailFinal || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return;
+    const key = `${email}|${selectedNetwork}`;
+    if (autoStartedFor.current === key) return;
+    if (timerRunning || timerSeconds > 0) { autoStartedFor.current = key; return; }
+    autoStartedFor.current = key;
+    setTimerSeconds(timerMinutes * 60);
+    setTimerRunning(true);
+    persistSession(email);
+  }, [isOpen, manageMode, selectedNetwork, contactEmail, buyerEmailFinal, timerRunning, timerSeconds]);
+
   // Save the in-progress transaction so it survives outages / crashes. Restart it
   // on "continue" and cancel explicitly; otherwise it stays alive until settled.
   // The email is a hard requirement: without it the wait period never begins and
@@ -335,6 +393,8 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
       botName: isBotProduct ? botPurchase?.name : undefined,
       planLabel: isBotProduct ? undefined : planLabel,
       durationDays: isBotProduct ? undefined : (planDurationDays || 30),
+      planUnit: isBotProduct ? undefined : planUnit,
+      planUnits: isBotProduct ? undefined : planUnits,
       amountUsd: amount,
       method: method.method,
       symbol: method.symbol,
@@ -386,9 +446,14 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
   };
 
   const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
+    // The wait period is set in hours, so the countdown is shown as H:MM:SS.
+    // Without the hours part a 24h period used to read as a frozen "1440:00".
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    const mm = m.toString().padStart(2, '0');
+    const ss = s.toString().padStart(2, '0');
+    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
   };
 
   const copyAddress = async (addr: string, network: string) => {
@@ -635,20 +700,18 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                 </button>
               </div>
 
-              <div className="flex items-center justify-center mb-4">
-                <div className="text-center">
-                  <div className={`text-5xl font-black font-mono tabular-nums ${timerSeconds <= 60 ? 'text-red-400' : 'text-white'}`}>
-                    {formatTime(timerSeconds)}
-                  </div>
-                  <p className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">{isAr ? 'الوقت المتبقي' : 'Time Remaining'}</p>
-                </div>
-              </div>
-
+              {/* The email comes FIRST and loud: it is what the plan is attached to, and the
+                  wait period cannot even start until it is a valid address. */}
               {!sessionId && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(buyerEmailFinal || '') && (
-                <div className="space-y-2 mb-3">
+                <div className="bg-emerald-500/10 border-2 border-emerald-500/40 rounded-2xl p-3 mb-4">
+                  <label className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-emerald-300 mb-2">
+                    <Mail size={14} />
+                    {isAr ? 'بريدك الإلكتروني (إلزامي)' : 'Your email (required)'}
+                  </label>
                   <input
                     type="email"
                     required
+                    dir="ltr"
                     value={contactEmail}
                     onChange={(e) => {
                       const v = e.target.value;
@@ -657,11 +720,25 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
                         startTimer(v);
                       }
                     }}
-                    placeholder={isAr ? 'بريدك الإلكتروني (إلزامي - أدخله لبدء المهلة)' : 'Your email (required - enter to start the wait period)'}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+                    placeholder="name@example.com"
+                    className="w-full bg-black/50 border-2 border-emerald-500/40 rounded-xl px-4 py-3.5 text-base font-bold text-white outline-none focus:border-emerald-400 placeholder:text-slate-600"
                   />
+                  <p className="text-[11px] text-emerald-200/80 font-bold mt-2 leading-relaxed text-center">
+                    {isAr
+                      ? 'أدخل بريدك هنا أولاً — عليه ستُفعَّل الخطة، ومنه تبدأ مهلة الانتظار.'
+                      : 'Enter your email first — the plan is activated on it, and the wait period starts from it.'}
+                  </p>
                 </div>
               )}
+
+              <div className="flex items-center justify-center mb-4">
+                <div className="text-center">
+                  <div className={`text-5xl font-black font-mono tabular-nums ${timerSeconds <= 60 ? 'text-red-400' : 'text-white'}`}>
+                    {formatTime(timerSeconds)}
+                  </div>
+                  <p className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">{isAr ? 'الوقت المتبقي' : 'Time Remaining'}</p>
+                </div>
+              </div>
 
               {!paymentConfirmed && requestStatus === 'idle' && (
                 <>
@@ -791,48 +868,23 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
           </div>
         </div>
 
-        <div className="mt-4 bg-white/5 border border-white/10 rounded-2xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest">{isAr ? 'نظام الخطط المجانية' : 'Freemium System'}</h5>
-              <p className="text-[10px] text-slate-500 mt-1">{freemiumDisabled ? (isAr ? 'الكل وصول كامل - الخطط مخفية عن العملاء' : 'All full access - plans hidden from clients') : (isAr ? 'القيود مفعلة - الخطط مرئية للعملاء' : 'Restrictions active - plans visible to clients')}</p>
-            </div>
-            <button
-              onClick={() => {
-                const newVal = !freemiumDisabled;
-                setFreemiumDisabled(newVal);
-                localStorage.setItem('finalyze_freemium_disabled', newVal ? 'true' : 'false');
-                localStorage.setItem('finalyze_hide_plans', newVal ? 'true' : 'false');
-                onFreemiumToggle?.(newVal);
-              }}
-              className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg ${
-                freemiumDisabled
-                  ? 'bg-emerald-500 text-white shadow-emerald-500/40'
-                  : 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
-              }`}
-            >
-              {freemiumDisabled ? <Shield size={16} /> : <ShieldOff size={16} />}
-              {freemiumDisabled ? (isAr ? 'مفعل: وصول كامل' : 'ON: Full Access') : (isAr ? 'معطل: قيود مفعلة' : 'OFF: Restricted')}
-            </button>
-          </div>
-        </div>
-
         <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-4">
-          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3">Timer Duration</h5>
+          <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">{isAr ? 'مدة مهلة الدفع' : 'Payment Wait Period'}</h5>
+          <p className="text-[10px] text-slate-500 mb-3">{isAr ? 'تُحسب بالساعات' : 'Counted in hours'}</p>
           <div className="flex items-center gap-3">
             <input
               type="number"
-              value={editTimer}
-              onChange={(e) => setEditTimer(Math.max(1, Number(e.target.value) || 1))}
+              value={editTimerHours}
+              onChange={(e) => setEditTimerHours(Math.max(1, Math.round(Number(e.target.value) || 1)))}
               className="w-24 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-emerald-500"
               min="1"
             />
-            <span className="text-sm text-slate-400">minutes</span>
+            <span className="text-sm text-slate-400">{isAr ? 'ساعة' : 'hours'}</span>
             <button
-              onClick={() => { setTimerMinutes(editTimer); localStorage.setItem(TIMER_STORAGE_KEY, String(editTimer)); }}
+              onClick={() => { setTimerHours(editTimerHours); localStorage.setItem(TIMER_STORAGE_KEY, String(editTimerHours)); localStorage.removeItem(LEGACY_TIMER_KEY); }}
               className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
             >
-              Save Timer
+              {isAr ? 'حفظ المهلة' : 'Save Timer'}
             </button>
           </div>
         </div>
@@ -840,7 +892,7 @@ export default function PaymentModal({ isOpen, onClose, planLabel, amount, asPag
 
       {!manageMode && showAddresses && (
         <p className="text-center text-[10px] text-slate-500 mt-4">
-          {isAr ? `USDT فقط — عملة مستقرة ثابتة بسعر $1.00. الوقت المتبقي: ${Math.floor(timerSeconds / 60)} دقيقة` : `USDT only — stable coin fixed at $1.00. Time remaining: ${Math.floor(timerSeconds / 60)} min`}
+          {isAr ? `USDT فقط — عملة مستقرة ثابتة بسعر $1.00. الوقت المتبقي: ${Math.floor(timerSeconds / 3600)} ساعة و ${Math.floor((timerSeconds % 3600) / 60)} دقيقة` : `USDT only — stable coin fixed at $1.00. Time remaining: ${Math.floor(timerSeconds / 3600)}h ${Math.floor((timerSeconds % 3600) / 60)}m`}
         </p>
       )}
     </>

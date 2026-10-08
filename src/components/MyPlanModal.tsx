@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Crown, X, RefreshCcw, TimerReset, Zap, CalendarCheck, Hourglass, Trash2, AlertTriangle, ChevronRight, Sparkles } from 'lucide-react';
+import { Crown, X, RefreshCcw, TimerReset, Zap, CalendarCheck, Hourglass, Trash2, AlertTriangle, ChevronRight } from 'lucide-react';
 
 interface MyPlanModalProps {
   lang: 'ar' | 'en';
@@ -109,15 +109,6 @@ export default function MyPlanModal({ lang, plan, features, paidMode = true, onC
               <span className="text-sm font-black text-amber-400">{isAr ? 'لم تبدأ' : 'Not started'}</span>
             )}
           </div>
-        </div>
-
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 mb-5 flex items-start gap-3">
-          <Sparkles size={18} className="text-emerald-400 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-emerald-200 leading-relaxed font-bold">
-            {isAr
-              ? 'التحليل يعمل مباشرة بمفاتيح المنصة المخزّنة في الخادم — لا يوجد أي مفتاح خاص بك. خطة كل تجديد تُضاف إلى نهاية مدتك الحالية ولا تُلغيت.'
-              : 'Analysis runs directly on the platform keys held server-side — there is no key of yours anywhere. Every renewal is added on top of your current period instead of replacing it.'}
-          </p>
         </div>
 
         {email && (

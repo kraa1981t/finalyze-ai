@@ -187,6 +187,45 @@ export function playCompletion(volume: number = 0.5) {
   });
 }
 
+// Short water-drop "plink". Synthesised (no audio file) so it stays crisp and
+// instant: a sine whose pitch glides sharply downward the instant the droplet
+// "hits", plus a tiny bright partial for the spatter.
+export function playDrop(volume: number = 0.5) {
+  try {
+    const ac = getCtx();
+    if (!ac) return;
+    const t = ac.currentTime;
+
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1500, t);
+    osc.frequency.exponentialRampToValueAtTime(520, t + 0.11);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(volume, t + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.17);
+    osc.connect(gain);
+    gain.connect(ac.destination);
+    osc.start(t);
+    osc.stop(t + 0.18);
+
+    const spark = ac.createOscillator();
+    const sparkGain = ac.createGain();
+    spark.type = 'triangle';
+    spark.frequency.setValueAtTime(2600, t);
+    spark.frequency.exponentialRampToValueAtTime(1400, t + 0.06);
+    sparkGain.gain.setValueAtTime(0.0001, t);
+    sparkGain.gain.exponentialRampToValueAtTime(volume * 0.35, t + 0.005);
+    sparkGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+    spark.connect(sparkGain);
+    sparkGain.connect(ac.destination);
+    spark.start(t);
+    spark.stop(t + 0.08);
+  } catch (e) {
+    console.warn('Web Audio drop failed:', e);
+  }
+}
+
 export function playClick(volume: number = 0.3) {
   playTone(1200, 0.05, 'sine', volume);
 }

@@ -527,6 +527,73 @@ export async function deleteAllMyTransactions(): Promise<boolean> {
   } catch { return false; }
 }
 
+// ── Client "hide" ledger ────────────────────────────────────────────────────
+// Deleting a row the client can see is only half the job: some rows are built
+// from records that must NEVER be deleted (a payment_grant IS the plan somebody
+// paid for, and the local active_subscription is the running subscription).
+// So the client owns a per-email set of HIDDEN row keys: a delete always lands
+// there, the list filters by it on every load, and the paid plan itself stays
+// untouched. Stored in shared_settings (public write, keyed by email hash so
+// the raw address never appears in a public doc id) with a localStorage mirror
+// so the hide still survives when offline or signed out.
+const HIDDEN_LOCAL_PREFIX = 'finalyze_hidden_tx_';
+const HIDDEN_DOC_PREFIX = 'client_hidden_tx_';
+const HIDDEN_MAX = 300; // cap so a long-lived client cannot grow one doc forever
+
+function hiddenOwnerId(email: string): string {
+  // Stable non-reversible id for the email (djb2) — the public collection never
+  // carries the address itself, only this token.
+  const e = (email || '').toLowerCase().trim();
+  let h = 5381;
+  for (let i = 0; i < e.length; i++) h = ((h * 33) ^ e.charCodeAt(i)) >>> 0;
+  return h.toString(36) + '_' + e.length.toString(36);
+}
+
+function readHiddenLocal(email: string): string[] {
+  try {
+    const raw = localStorage.getItem(HIDDEN_LOCAL_PREFIX + hiddenOwnerId(email));
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((k) => typeof k === 'string') : [];
+  } catch { return []; }
+}
+
+function writeHiddenLocal(email: string, keys: string[]): void {
+  try {
+    localStorage.setItem(HIDDEN_LOCAL_PREFIX + hiddenOwnerId(email), JSON.stringify(keys.slice(-HIDDEN_MAX)));
+  } catch {}
+}
+
+/** Every row key this client has deleted — merged from Firestore + this device. */
+export async function fetchHiddenTxKeys(email: string): Promise<string[]> {
+  const e = (email || '').toLowerCase().trim();
+  if (!e) return [];
+  const merged = new Set<string>(readHiddenLocal(e));
+  try {
+    const snap = await getDoc(doc(db, 'shared_settings', HIDDEN_DOC_PREFIX + hiddenOwnerId(e)));
+    const remote: unknown = (snap.exists() ? (snap.data() as any).keys : null);
+    if (Array.isArray(remote)) remote.forEach((k) => { if (typeof k === 'string') merged.add(k); });
+  } catch {}
+  return [...merged];
+}
+
+/** Remember deleted row keys so they never come back in this client's list. */
+export async function hideTxKeys(email: string, keys: string[]): Promise<void> {
+  const e = (email || '').toLowerCase().trim();
+  const clean = [...new Set(keys.filter((k) => typeof k === 'string' && k))];
+  if (!e || !clean.length) return;
+  const local = new Set(readHiddenLocal(e));
+  clean.forEach((k) => local.add(k));
+  const all = [...local].slice(-HIDDEN_MAX);
+  writeHiddenLocal(e, all);
+  try {
+    await setDoc(
+      doc(db, 'shared_settings', HIDDEN_DOC_PREFIX + hiddenOwnerId(e)),
+      { keys: all, updatedAt: Date.now() },
+      { merge: true },
+    );
+  } catch {}
+}
+
 // Dev-only: full purchase history (all clients, newest first) with GMT dates.
 export async function fetchDevHistory(): Promise<PaymentRequest[]> {
   try {

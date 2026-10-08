@@ -29,9 +29,6 @@ export default function SidebarPanel({ lang, onClose, onNavigate, isDeveloper, f
     { icon: Key, label: lang === 'ar' ? 'مفتاح API' : 'API Key', page: 'apiKey' as const, color: 'from-amber-400 to-amber-600' },
     { icon: User, label: lang === 'ar' ? 'الملف الشخصي' : 'Profile', page: 'profile' as const, color: 'from-amber-400 to-amber-600' },
     { icon: Settings, label: lang === 'ar' ? 'الإعدادات' : 'Settings', page: 'settings' as const, color: 'from-amber-400 to-amber-600' },
-    ...(!freemiumDisabled ? [
-      { icon: DollarSign, label: lang === 'ar' ? 'الخطط' : 'Plans', page: 'plans' as const, color: 'from-amber-400 to-amber-600' },
-    ] : []),
     { icon: Store, label: lang === 'ar' ? 'إعدادات المتجر' : 'Store Settings', page: 'storeSettings' as const, color: 'from-sky-400 to-sky-600' },
     { icon: Receipt, label: lang === 'ar' ? 'معاملاتي' : 'My Transactions', page: 'transactions' as const, color: 'from-emerald-400 to-emerald-600' },
     { icon: Store, label: lang === 'ar' ? 'عرض المتجر (اختبار)' : 'View Store (test)', page: 'store' as const, color: 'from-emerald-400 to-emerald-600' },

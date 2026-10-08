@@ -1106,6 +1106,59 @@ function requireDeveloper(req: any, res: any): Promise<string | null> {
     .catch(() => { res.status(401).json({ ok: false, error: 'sign_in_required' }); return null; });
 }
 
+// Models often answer with a markdown fence or a JSON wrapper
+// (`{"translations": [...]}`) even when told not to. The plans editor needs
+// ONE clean Arabic line per feature, so the payload is unwrapped here and the
+// list decoration ("1. ", "- ", quotes) is stripped.
+function normalizeArabicTranslation(raw: unknown): string {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  s = s.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '').trim();
+  if (/^[[{]/.test(s)) {
+    try {
+      const parsed: any = JSON.parse(s);
+      const list: unknown[] = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.translations) ? parsed.translations
+        : Array.isArray(parsed?.ar) ? parsed.ar
+        : Array.isArray(parsed?.result) ? parsed.result
+        : [parsed?.translation ?? parsed?.text ?? parsed?.ar ?? ''];
+      const joined = list
+        .map((x) => String(x ?? '').replace(/^["']|["']$/g, '').trim())
+        .filter(Boolean);
+      if (joined.length) s = joined.join('\n');
+    } catch {
+      // Not JSON after all — keep the raw text.
+    }
+  }
+  s = s
+    .split('\n')
+    .map((line) => line.replace(/^\s*(?:[-*•‣▪]|\d{1,2}[.)])\s+/, '').replace(/^["'](.*)["']$/, '$1').trim())
+    .join('\n');
+  return s.trim();
+}
+
+// Auto-translate English plan features to Arabic for the plans editor.
+// Developer-only: it burns pooled AI keys, and only the developer edits plans.
+app.post("/api/translate", async (req: any, res: any) => {
+  try {
+    const email = await requireDeveloper(req, res);
+    if (!email) return;
+    const text = String((req.body || {}).text || '').trim().slice(0, 6000);
+    if (!text) return res.status(400).json({ ok: false, error: 'text required' });
+    const out = await poolCompletion(
+      'Translate the following subscription-plan features from English to Modern Standard Arabic.\n' +
+      'Rules: keep the line structure exactly (one feature per line), keep numbers, "$" and brand names as-is, ' +
+      'and output ONLY the Arabic translation as plain text — no JSON, no markdown, no quotes, no commentary, no English.\n\n' + text
+    );
+    const ar = normalizeArabicTranslation(out);
+    if (!ar) return res.status(502).json({ ok: false, error: 'translate_failed' });
+    return res.json({ ok: true, ar });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 const poolEntrySummary = (p: PoolEntry) => ({
   id: p.id,
   label: p.label,
@@ -1217,7 +1270,7 @@ app.delete("/api/key-pool", async (req: any, res: any) => {
 });
 
 async function callGroq(apiKey: string, prompt: string, timeoutMs = 5000) {
-  const models = [process.env.GROQ_MODEL || "llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+  const models = [process.env.GROQ_MODEL || "qwen/qwen3-32b", "openai/gpt-oss-120b", "meta-llama/llama-4-scout-17b-16e-instruct"]; // llama-3.1/3.3 are Enterprise-only since 2026-08
   let lastError = 'Groq: all models exhausted due to rate limits or invalid key';
   for (const model of models) {
     const body = {
@@ -1261,7 +1314,7 @@ async function callGroq(apiKey: string, prompt: string, timeoutMs = 5000) {
 }
 
 async function callGoogle(apiKey: string, prompt: string, timeoutMs = 5000) {
-  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite']; // gemini-1.5-flash was retired
   let lastError = 'Google: all models exhausted due to rate limits or invalid key';
   for (const model of models) {
     try {
@@ -1693,7 +1746,7 @@ async function markPoolFailure(entry: PoolEntry, errorText: string): Promise<voi
 // Verifies a Firebase ID token for real (signature + expiry are checked by
 // Google) and returns the account it belongs to. Nothing in this server trusts
 // an email from a request body.
-async function verifyCallerToken(idToken: string): Promise<{ email: string; uid: string } | null> {
+async function verifyCallerToken(idToken: string): Promise<{ email: string; uid: string; rawEmail: string } | null> {
   const token = String(idToken || '').trim();
   if (!token) return null;
   try {
@@ -1705,9 +1758,10 @@ async function verifyCallerToken(idToken: string): Promise<{ email: string; uid:
     if (!resp.ok) return null;
     const data: any = await resp.json();
     const user = data && data.users && data.users[0];
-    const email = String((user && user.email) || '').toLowerCase().trim();
+    const rawEmail = String((user && user.email) || '').trim();
+    const email = rawEmail.toLowerCase();
     if (!email) return null;
-    return { email, uid: String((user && user.localId) || '') };
+    return { email, uid: String((user && user.localId) || ''), rawEmail };
   } catch {
     return null;
   }
@@ -1742,31 +1796,44 @@ async function runningPlanFor(email: string): Promise<{ expiry: string; label: s
 // A monthly plan is one calendar month, not 30 days, and a yearly plan is one
 // calendar year (so 29 February is handled). Everything is computed with UTC
 // getters/setters, which is exactly the GMT clock the plan is displayed in.
-type PlanUnit = 'day' | 'week' | 'month' | 'year';
+type PlanUnit = 'hour' | 'day' | 'week' | 'month' | 'year';
 
 function inferPlanUnit(planLabel: unknown, durationDays: unknown, explicit?: unknown): PlanUnit {
   const ex = String(explicit || '').toLowerCase().trim();
+  if (ex === 'hour' || ex === 'hourly') return 'hour';
   if (ex === 'day' || ex === 'daily') return 'day';
   if (ex === 'week' || ex === 'weekly') return 'week';
   if (ex === 'month' || ex === 'monthly') return 'month';
   if (ex === 'year' || ex === 'yearly' || ex === 'annual') return 'year';
   const label = String(planLabel || '').toLowerCase();
-  if (/يومي|يوميّة|يومياً|daily|single day|24 hour/.test(label)) return 'day';
+  if (/يومي|يوميّة|يومياً|daily|single day|24 hour|24-hour/.test(label)) return 'day';
+  if (/ساعة|ساعات|hourly|\bhour/.test(label)) return 'hour';
   if (/أسبوع|اسبوع|اسبوع|weekly|week/.test(label)) return 'week';
   if (/سنوي|سنوية|سنويا|yearly|annual|year/.test(label)) return 'year';
   if (/شهري|شهرية|شهريا|monthly|month/.test(label)) return 'month';
   const days = Number(durationDays || 0);
-  if (days > 0 && days <= 1) return 'day';
+  if (days > 0 && days < 1) return 'hour'; // 1h = 0.0417, 12h = 0.5
+  if (days === 1) return 'day';
   if (days > 1 && days <= 7) return 'week';
   if (days > 7 && days <= 31) return 'month';
   if (days > 31) return 'year';
   return 'month';
 }
 
+/** How many units a request buys: explicit count, else derived from durationDays. */
+function planPeriodCount(unit: PlanUnit, durationDays: unknown, explicit?: unknown): number {
+  const n = Number(explicit);
+  if (Number.isFinite(n) && n > 0) return Math.round(n);
+  const days = Number(durationDays || 0);
+  if (unit === 'hour' && days > 0) return Math.max(1, Math.round(days * 24));
+  return 1;
+}
+
 /** Adds `count` whole calendar units to `fromMs`, in UTC, clamping the day. */
 function addPlanPeriod(fromMs: number, unit: PlanUnit, count = 1): number {
   const n = Number.isFinite(count) && count > 0 ? Math.round(count) : 1;
   const d = new Date(fromMs);
+  if (unit === 'hour') { d.setUTCHours(d.getUTCHours() + n); return d.getTime(); }
   if (unit === 'day') { d.setUTCDate(d.getUTCDate() + n); return d.getTime(); }
   if (unit === 'week') { d.setUTCDate(d.getUTCDate() + 7 * n); return d.getTime(); }
   const day = d.getUTCDate();
@@ -2389,17 +2456,18 @@ app.post("/api/payment-request/create", async (req: any, res: any) => {
     const last = Number(counter?.last) || 1000;
     const requestNo = last + 1;
     await fsPatch('shared_settings', 'payment_counter', { last: requestNo, updatedAt: Date.now() }, ['last', 'updatedAt']);
+    // The calendar unit is decided ONCE, when the order is placed, and travels
+    // with the request — so the period granted at approval is exactly the one
+    // the client bought (a month is a month, not 30 days).
+    const inferredUnit = kind === 'plan' ? inferPlanUnit(b.planLabel, b.durationDays, b.planUnit) : undefined;
     const payload: Json = {
       kind,
       botId: b.botId,
       botName: b.botName,
       planLabel: b.planLabel,
       durationDays: b.durationDays,
-      // The calendar unit is decided ONCE, when the order is placed, and travels
-      // with the request — so the period granted at approval is exactly the one
-      // the client bought (a month is a month, not 30 days).
-      planUnit: kind === 'plan' ? inferPlanUnit(b.planLabel, b.durationDays, b.planUnit) : undefined,
-      planUnits: kind === 'plan' ? (Number(b.planUnits) > 0 ? Number(b.planUnits) : 1) : undefined,
+      planUnit: inferredUnit,
+      planUnits: kind === 'plan' ? planPeriodCount(inferredUnit!, b.durationDays, b.planUnits) : undefined,
       amountUsd: amount,
       coinId: b.coinId,
       coinName: b.coinName,
@@ -2432,8 +2500,11 @@ app.post("/api/payment-request/create", async (req: any, res: any) => {
 });
 
 // List every payment request (newest first) for the developer review panel.
-app.get("/api/payment-requests-list", async (_req: any, res: any) => {
+// Developer-only: every request carries a buyer email and a transaction id.
+app.get("/api/payment-requests-list", async (req: any, res: any) => {
   try {
+    const dev = await requireDeveloper(req, res);
+    if (!dev) return;
     const items = await fsList('payment_requests');
     items.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
     const hidden = await fsGet('shared_settings', 'dev_hidden_transactions');
@@ -2445,8 +2516,12 @@ app.get("/api/payment-requests-list", async (_req: any, res: any) => {
 });
 
 // Developer decision: approve (creates the release grant), or reject.
+// Developer-only AND identity-bound: an approval is literally what grants paid
+// access, so the deciding email is the VERIFIED caller — never the body.
 app.post("/api/payment-request-decision", async (req: any, res: any) => {
   try {
+    const developerEmail = await requireDeveloper(req, res);
+    if (!developerEmail) return;
     const b = req.body || {};
     const id = String(b.id || '');
     const action = String(b.action || '');
@@ -2456,7 +2531,6 @@ app.post("/api/payment-request-decision", async (req: any, res: any) => {
     const reqDoc = await fsGet('payment_requests', id);
     if (!reqDoc) return res.status(404).json({ ok: false, error: `request ${id} not found` });
     const now = Date.now();
-    const developerEmail = String(b.developerEmail || 'dev@finalyze').trim();
     await fsPatch('payment_requests', id, {
       status: action === 'approve' ? 'approved' : 'rejected',
       decidedAt: now,
@@ -2480,33 +2554,27 @@ app.post("/api/payment-request-decision", async (req: any, res: any) => {
         // DIRECT RELEASE: approving is the release. There is no key to enter and
         // no waiting screen — the plan is live from this instant.
         //
-        // The clock is a real calendar period counted in GMT: daily = 24h,
-        // weekly = 7 days, monthly = one calendar month, yearly = one calendar
-        // year. Buying again while a plan is still running EXTENDS it from the
-        // moment the current one ends, so paid time is never thrown away.
+        // The clock is a real calendar period counted in GMT: hourly = 1 hour,
+        // daily = 24h, weekly = 7 days, monthly = one calendar month, yearly =
+        // one calendar year. Every grant carries ITS OWN period, measured from
+        // its own release: one hour plan = one hour, one year plan = one year.
+        // Stacking is not applied to the expiry, otherwise a single hourly
+        // purchase would inherit the end date of an older, longer plan (and
+        // repeated approvals would push a plan years into the future).
         const unit = inferPlanUnit(reqDoc.planLabel, reqDoc.durationDays, reqDoc.planUnit);
-        const count = Number(reqDoc.planUnits) > 0 ? Number(reqDoc.planUnits) : 1;
         const days = Number(reqDoc.durationDays) > 0 ? Number(reqDoc.durationDays) : 0;
-        const existing = await fsList('payment_grants');
-        const runningUntil = existing
-          .filter(
-            (g) =>
-              String(g.email || '').toLowerCase() === buyerEmail &&
-              String(g.kind || '') === 'plan' &&
-              String(g.status || '') === 'active' &&
-              !!g.expiryDate &&
-              new Date(String(g.expiryDate)).getTime() > now
-          )
-          .reduce((max, g) => Math.max(max, new Date(String(g.expiryDate)).getTime()), 0);
-        const startAt = Math.max(now, runningUntil);
+        const count = planPeriodCount(unit, days, reqDoc.planUnits);
+        const startAt = now;
         const expiryDate = new Date(addPlanPeriod(startAt, unit, count)).toISOString();
         released = { startAt, expiryDate, unit };
         grant.durationDays = days || undefined;
         grant.planUnit = unit;
         grant.planUnits = count;
-        grant.activatedAt = startAt;
+        // ISO strings, not epoch numbers: epoch values are read back as raw
+        // integers and break the first-release date shown to the client.
+        grant.activatedAt = new Date(startAt).toISOString();
         grant.expiryDate = expiryDate;
-        grant.releasedAt = now;
+        grant.releasedAt = new Date(now).toISOString();
       }
       // Merge, never replace: a re-approval must not wipe an already-started
       // clock (activatedAt/expiryDate) that the client already earned.
@@ -2521,10 +2589,10 @@ app.post("/api/payment-request-decision", async (req: any, res: any) => {
         await upsertClientRecord(buyerEmail, {
           autoRegistered: true,
           approvedAt: now,
-          releasedAt: released.startAt,
+          releasedAt: new Date(released.startAt).toISOString(),
           // Kept at the very first release by upsertClientRecord, so a renewal
           // only moves the expiry and never the start date.
-          firstReleasedAt: released.startAt,
+          firstReleasedAt: new Date(released.startAt).toISOString(),
           plan: 'paid',
           planExpiry: released.expiryDate,
           planLabel: reqDoc.planLabel || '',
@@ -2554,6 +2622,8 @@ app.post("/api/payment-request-decision", async (req: any, res: any) => {
 // developer account view.
 app.post("/api/payment-request-hide", async (req: any, res: any) => {
   try {
+    const dev = await requireDeveloper(req, res);
+    if (!dev) return;
     const id = String((req.body || {}).id || '');
     if (!id) return res.status(400).json({ ok: false, error: 'missing id' });
     const doc = await fsGet('shared_settings', 'dev_hidden_transactions');
@@ -2561,6 +2631,141 @@ app.post("/api/payment-request-hide", async (req: any, res: any) => {
     if (!ids.includes(id)) ids.push(id);
     await fsPatch('shared_settings', 'dev_hidden_transactions', { ids, updatedAt: Date.now() }, ['ids', 'updatedAt']);
     return res.json({ ok: true });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── Deleting transactions (real removal, not hiding) ─────────────────────────
+// A transaction is the REQUEST/SESSION record. Removing it only clears the
+// ledger entry: payment_grants are never touched here, so cleaning a row can
+// never take away a plan somebody already paid for.
+async function deleteTransactionRecords(
+  opts: { email?: string; rawEmail?: string; id?: string },
+): Promise<number> {
+  const norm = (v: unknown) => String(v == null ? '' : v).toLowerCase().trim();
+  const buyerOf = (d: Json) => norm(d.buyerEmail);
+  const email = opts.email ? norm(opts.email) : '';
+  const id = opts.id ? String(opts.id) : '';
+  // The UI may send a row key such as `req_1099` / `r_1099` instead of a
+  // document id — the trailing number is the request number.
+  const idNo = (() => {
+    const m = /^(?:req|r)_(\d+)$/.exec(id);
+    if (m) return m[1];
+    return /^\d+$/.test(id) ? id : '';
+  })();
+
+  // A CLIENT may only list rows whose buyerEmail equals their own session
+  // email — an unfiltered list of the whole collection is refused by the rules
+  // (that is exactly what made the delete return removed: 0). The developer
+  // lists everything. The email is queried as stored (raw) and lowercased, so a
+  // row typed in any case is still found.
+  let requests: Json[] = [];
+  let sessions: Json[] = [];
+  if (email) {
+    const variants = [...new Set([email, norm(opts.rawEmail || '')].filter(Boolean))];
+    const listBoth = async (col: string) => {
+      const out: Json[] = [];
+      const seen = new Set<string>();
+      for (const v of variants) {
+        for (const row of await fsListWhere(col, 'buyerEmail', v)) {
+          if (!row.id || seen.has(row.id)) continue;
+          seen.add(row.id);
+          out.push(row);
+        }
+      }
+      return out;
+    };
+    [requests, sessions] = await Promise.all([
+      listBoth('payment_requests'),
+      listBoth('payment_sessions'),
+    ]);
+  } else {
+    [requests, sessions] = await Promise.all([fsList('payment_requests'), fsList('payment_sessions')]);
+  }
+
+  // Single-row deletes first try the exact document (get is open on these
+  // collections), so a row is found even when the list query misses it.
+  if (id && !requests.some((r) => r.id === id)) {
+    const direct = await fsGet('payment_requests', id);
+    if (direct && (!email || buyerOf(direct) === email)) requests.push({ id, ...direct });
+  }
+  if (id && !sessions.some((s) => s.id === id)) {
+    const direct = await fsGet('payment_sessions', id);
+    if (direct && (!email || buyerOf(direct) === email)) sessions.push({ id, ...direct });
+  }
+
+  let removed = 0;
+  const clearedNos = new Set<string>();
+  for (const r of requests) {
+    if (!r.id) continue;
+    const no = String(r.requestNo == null ? '' : r.requestNo);
+    if (email && buyerOf(r) !== email) continue;
+    if (id && r.id !== id && !(no && (no === id || no === idNo))) continue;
+    try {
+      await fsDelete('payment_requests', r.id);
+      await fsDelete('shared_settings', `request_${r.id}`).catch(() => {});
+      await fsDelete('shared_status', `request_${r.id}`).catch(() => {});
+      removed++;
+      if (no) clearedNos.add(no);
+    } catch {}
+  }
+
+  // Sessions of the same purchase, or the caller's own leftover sessions.
+  for (const s of sessions) {
+    if (!s.id) continue;
+    if (email && buyerOf(s) !== email) continue;
+    const no = String(s.requestNo == null ? '' : s.requestNo);
+    const samePurchase = !!(no && clearedNos.has(no));
+    const matched = !id || s.id === id || samePurchase || (idNo && no === idNo);
+    if (!matched) continue;
+    try { await fsDelete('payment_sessions', s.id); } catch {}
+  }
+
+  // A row built from a session only has no request document — the session loop
+  // above already covers it, since `matched` also accepts the id itself.
+
+  return removed;
+}
+
+// Developer: clear one transaction, or the whole ledger at any time.
+app.post("/api/transaction-delete", async (req: any, res: any) => {
+  try {
+    const dev = await requireDeveloper(req, res);
+    if (!dev) return;
+    const b = req.body || {};
+    const id = String(b.id || '');
+    if (b.all === true) {
+      const removed = await deleteTransactionRecords({});
+      await fsDelete('shared_settings', 'dev_hidden_transactions').catch(() => {});
+      return res.json({ ok: true, removed });
+    }
+    if (!id) return res.status(400).json({ ok: false, error: 'missing id' });
+    const doc = await fsGet('payment_requests', id);
+    if (!doc) return res.status(404).json({ ok: false, error: `request ${id} not found` });
+    const removed = await deleteTransactionRecords({ id });
+    return res.json({ ok: true, removed });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Client: clear their own transactions at any time. The email comes from the
+// VERIFIED session, never the body, so a client can only ever reach their own
+// rows — and their plan grants are left alone.
+app.post("/api/user/transaction-delete", async (req: any, res: any) => {
+  try {
+    const caller = await verifyCallerToken(callerToken(req));
+    if (!caller) return res.status(401).json({ ok: false, error: 'sign_in_required' });
+    const email = String(caller.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ ok: false, error: 'missing email' });
+    const b = req.body || {};
+    const removed = await deleteTransactionRecords({
+      email,
+      rawEmail: String(caller.rawEmail || ''),
+      id: b.all === true ? undefined : String(b.id || ''),
+    });
+    return res.json({ ok: true, removed });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e.message });
   }
@@ -2588,20 +2793,22 @@ app.post("/api/plan-activate", async (req: any, res: any) => {
       (!requestNo || Number(g.requestNo) === requestNo)
     );
     const now = Date.now();
-    // Running total, updated as each period is granted, so two legacy pending
-    // periods can never be handed the SAME start instant.
-    let runningUntil = mine
-      .filter((g) => !!g.expiryDate && new Date(String(g.expiryDate)).getTime() > now)
-      .reduce((max, g) => Math.max(max, new Date(String(g.expiryDate)).getTime()), 0);
     let activated = 0;
     for (const g of mine) {
       if (g.expiryDate) continue; // already started — keep original period
       const unit = inferPlanUnit(g.planLabel, g.durationDays, g.planUnit);
-      const count = Number(g.planUnits) > 0 ? Number(g.planUnits) : 1;
-      const startAt = Math.max(now, runningUntil);
+      const count = planPeriodCount(unit, g.durationDays, g.planUnits);
+      // Each unstarted period gets its OWN length measured from now, and ISO
+      // date strings so the first-release date survives the round trip.
+      const startAt = now;
       const expiryDate = new Date(addPlanPeriod(startAt, unit, count)).toISOString();
-      runningUntil = new Date(expiryDate).getTime();
-      await fsPatch('payment_grants', g.id!, { planUnit: unit, planUnits: count, expiryDate, activatedAt: startAt, releasedAt: now }, ['planUnit', 'planUnits', 'expiryDate', 'activatedAt', 'releasedAt']);
+      await fsPatch('payment_grants', g.id!, {
+        planUnit: unit,
+        planUnits: count,
+        expiryDate,
+        activatedAt: new Date(startAt).toISOString(),
+        releasedAt: new Date(now).toISOString(),
+      }, ['planUnit', 'planUnits', 'expiryDate', 'activatedAt', 'releasedAt']);
       // The plan is now RUNNING: the client gets the crown in Client Monitor,
       // and it disappears by itself once this expiryDate passes.
       await upsertClientRecord(email, {
@@ -2609,6 +2816,8 @@ app.post("/api/plan-activate", async (req: any, res: any) => {
         planExpiry: expiryDate,
         planLabel: g.planLabel || '',
         planUnit: unit,
+        firstReleasedAt: new Date(startAt).toISOString(),
+        releasedAt: new Date(startAt).toISOString(),
         autoRegistered: true,
       });
       activated++;
@@ -2622,8 +2831,10 @@ app.post("/api/plan-activate", async (req: any, res: any) => {
 // Developer-only purchase history: every plan/bot purchase with a GMT date,
 // newest first. Client data (requests + grants) is untouched — a deleted entry
 // only disappears from the developer view.
-app.get("/api/transaction-history", async (_req: any, res: any) => {
+app.get("/api/transaction-history", async (req: any, res: any) => {
   try {
+    const dev = await requireDeveloper(req, res);
+    if (!dev) return;
     const items = await fsList('payment_requests');
     items.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
     return res.json({ ok: true, items });

@@ -240,7 +240,9 @@ export default function SuggestionsPage({
   const handleClientDeleteAll = async () => {
     setDeleting('all');
     try {
-      const targets = suggestions.filter(isMine);
+      // A client may clear the whole board at any time (the Firestore rule
+      // allows any signed-in visitor to delete a suggestion).
+      const targets = suggestions;
       const results = await Promise.allSettled(
         targets.map(s => deleteDoc(doc(db, 'analysisResults', s.id)))
       );
@@ -361,13 +363,13 @@ export default function SuggestionsPage({
           </>
         )}
 
-        {/* Client: delete own suggestions */}
-        {!isDeveloper && suggestions.some(isMine) && (
+        {/* Client: clear every suggestion at any time */}
+        {!isDeveloper && visibleSuggestions.length > 0 && (
           <>
             {confirmDeleteAll ? (
               <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/40 rounded-xl px-4 py-3">
                 <AlertTriangle size={18} className="text-red-400" />
-                <span className="text-sm font-bold text-red-400">{isAr ? 'حذف اقتراحاتك نهائياً؟' : 'Permanently delete your suggestions?'}</span>
+                <span className="text-sm font-bold text-red-400">{isAr ? 'حذف كل المقترحات؟' : 'Delete all suggestions?'}</span>
                 <button onClick={handleClientDeleteAll} disabled={deleting === 'all'}
                   className="bg-red-500 text-white px-4 py-1.5 rounded-lg text-xs font-black hover:bg-red-600 transition-all disabled:opacity-50">
                   {deleting === 'all' ? (isAr ? 'جاري...' : 'Deleting...') : (isAr ? 'نعم' : 'Yes')}
@@ -381,7 +383,7 @@ export default function SuggestionsPage({
               <button onClick={() => setConfirmDeleteAll(true)}
                 className="inline-flex items-center gap-2 bg-red-500/20 border border-red-500/40 text-red-400 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-500/30 transition-all">
                 <Trash2 size={18} />
-                {isAr ? 'مسح اقتراحاتي' : 'Clear my suggestions'}
+                {isAr ? 'حذف كل المقترحات' : 'Delete all suggestions'}
               </button>
             )}
           </>
@@ -504,8 +506,8 @@ export default function SuggestionsPage({
                       </button>
                     )}
 
-                    {/* Client: delete button — shown only on own suggestions */}
-                    {!isDeveloper && isOwn && (
+                    {/* Client: delete button — any client can delete any suggestion */}
+                    {!isDeveloper && (
                       <button onClick={() => handleClientDeleteOne(s.id)} disabled={deleting === s.id}
                         className="p-2 rounded-xl bg-red-500/10 text-red-400/60 hover:bg-red-500/20 hover:text-red-400 transition-all"
                         title={isAr ? 'حذف' : 'Delete'}>

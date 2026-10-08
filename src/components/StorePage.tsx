@@ -4,7 +4,7 @@ import { ShoppingCart, FileText, ChevronDown, ChevronUp, Bot, Activity, Crown, P
 import { StoreBot, StoreCategory, fetchStoreBots, formatFileSize, isFree, categoryOf, typeOf, typeLabelForCat, typesForCategory, STORE_CATEGORIES, downloadBot, getDownloadGrant, consumeBotDownload, DOWNLOAD_GRANT_TTL_MS } from '../services/storeService';
 import { generateBotBanner } from '../services/storeBanner';
 import { submitSiteRequest } from '../services/paymentRequests';
-import { StorePlan, fetchPlans, planLabel, planFeatures } from '../services/storePlans';
+import { StorePlan, fetchPlans, planLabel, planFeatures, durationLabel, toWesternDigits } from '../services/storePlans';
 
 interface StorePageProps {
   lang: 'ar' | 'en';
@@ -285,7 +285,7 @@ export default function StorePage({ lang, onBack, isDark, onBuyBot, onBuyPlan, u
                 </div>
                 <div>
                   <h4 className="text-lg font-black text-white uppercase tracking-wider leading-none">{planLabel(plan, isAr)}</h4>
-                  <p className="text-xs text-slate-400 mt-1">{isAr ? `مدة ${toWesternDigits(plan.durationDays)} يوم` : `${toWesternDigits(plan.durationDays)} days`}</p>
+                  <p className="text-xs text-slate-400 mt-1">{isAr ? `مدة ${durationLabel(plan, isAr)}` : durationLabel(plan, isAr)}</p>
                 </div>
               </div>
               <div className="mb-4">

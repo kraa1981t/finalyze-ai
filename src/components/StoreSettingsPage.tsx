@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Trash2, Check, Upload, FileText, X, ImagePlus, Pencil, Wallet, Copy, Crown, Shield, ShieldOff, Timer } from 'lucide-react';
 import { StoreBot, StoreCategory, STORE_CATEGORIES, typesForCategory, fetchStoreBots, addStoreBot, updateStoreBot, deleteStoreBot, formatFileSize, resizeImageToStandard } from '../services/storeService';
 import { loadPaymentSettings, savePaymentSettings, PaymentAddress, PAYMENT_METHODS } from '../services/paymentSettings';
-import { StorePlan, fallbackPlans, fetchPlans, addStorePlan, updateStorePlan, deleteStorePlan, planLabel, toWesternDigits } from '../services/storePlans';
+import { StorePlan, fallbackPlans, fetchPlans, addStorePlan, updateStorePlan, deleteStorePlan, planLabel, toWesternDigits, DURATION_OPTIONS, durationOptionFor, durationLabel, planNameForDuration, DEFAULT_FEATURES_EN, DEFAULT_FEATURES_AR } from '../services/storePlans';
 
 interface StoreSettingsPageProps {
   lang: 'ar' | 'en';
@@ -16,19 +16,37 @@ const MAX_FILE_BYTES = 300 * 1024;
 const MAX_DOC_BYTES = 900 * 1024;
 const DEFAULT_PRICES = { weekly: 2, monthly: 6, yearly: 60 };
 const SUBSCRIPTION_STORAGE_KEY = 'subscription_prices';
-const TIMER_STORAGE_KEY = 'payment_timer_minutes';
+// The wait period is set in HOURS; a value saved in minutes by an older build is
+// migrated once (30 min -> 1 h) so the setting is never lost.
+const TIMER_STORAGE_KEY = 'payment_timer_hours';
+const LEGACY_TIMER_KEY = 'payment_timer_minutes';
+
+function loadTimerHours(): number {
+  try {
+    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
+    const hours = saved ? parseInt(toWesternDigits(saved)) : NaN;
+    if (Number.isFinite(hours) && hours > 0) return hours;
+    const legacy = localStorage.getItem(LEGACY_TIMER_KEY);
+    const mins = legacy ? parseInt(toWesternDigits(legacy)) : NaN;
+    if (Number.isFinite(mins) && mins > 0) {
+      const migrated = Math.max(1, Math.round(mins / 60));
+      localStorage.setItem(TIMER_STORAGE_KEY, String(migrated));
+      localStorage.removeItem(LEGACY_TIMER_KEY);
+      return migrated;
+    }
+  } catch {}
+  return 1;
+}
 
 export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: externalFreemium, onFreemiumToggle }: StoreSettingsPageProps) {
   const isAr = lang === 'ar';
+  const inputCls = 'w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold text-white outline-none focus:border-sky-500';
   const [freemiumDisabled, setFreemiumDisabled] = useState(externalFreemium ?? localStorage.getItem('finalyze_freemium_disabled') === 'true');
   const [editSubPrices, setEditSubPrices] = useState(() => {
     try { const s = localStorage.getItem(SUBSCRIPTION_STORAGE_KEY); return s ? JSON.parse(toWesternDigits(s)) : DEFAULT_PRICES; }
     catch { return DEFAULT_PRICES; }
   });
-  const [editTimer, setEditTimer] = useState(() => {
-    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
-    return saved ? parseInt(toWesternDigits(saved)) : 30;
-  });
+  const [editTimer, setEditTimer] = useState(loadTimerHours);
   const [bots, setBots] = useState<StoreBot[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -53,6 +71,15 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
 
   const [plans, setPlans] = useState<StorePlan[]>(fallbackPlans());
   const [planMsg, setPlanMsg] = useState('');
+  // The plan editor: opens as its own section when adding or editing a plan,
+  // so the list stays a simple read-only summary (name/duration/price + controls).
+  const [planEditor, setPlanEditor] = useState<{ plan: StorePlan; isNew: boolean } | null>(null);
+  const [planBusy, setPlanBusy] = useState(false);
+  // Save/validation feedback lives INSIDE the editor: the editor scrolls itself
+  // into view, so a message rendered above it would be off-screen exactly when
+  // the developer needs to read it.
+  const [planErr, setPlanErr] = useState('');
+  const planEditorRef = useRef<HTMLDivElement>(null);
 
   const refresh = () => {
     fetchStoreBots().then((list) => { setBots(list); setLoading(false); });
@@ -64,69 +91,147 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
     fetchPlans().then((list) => { try { setPlans(list); } catch {} });
   }, []);
 
-  const patchPlan = (id: string | undefined, patch: Partial<Omit<StorePlan, 'id'>>) => {
-    const sanitizedPatch: any = { ...patch };
-    if (patch.priceUsd !== undefined) sanitizedPatch.priceUsd = Number(toWesternDigits(patch.priceUsd)) || 0;
-    if (patch.durationDays !== undefined) sanitizedPatch.durationDays = Math.max(1, Math.round(Number(toWesternDigits(patch.durationDays)) || 1));
-    if (patch.labelAr !== undefined) sanitizedPatch.labelAr = toWesternDigits(patch.labelAr);
-    if (patch.labelEn !== undefined) sanitizedPatch.labelEn = toWesternDigits(patch.labelEn);
-    if (patch.badgeAr !== undefined) sanitizedPatch.badgeAr = toWesternDigits(patch.badgeAr);
-    if (patch.badgeEn !== undefined) sanitizedPatch.badgeEn = toWesternDigits(patch.badgeEn);
-    if (patch.featuresAr !== undefined) sanitizedPatch.featuresAr = toWesternDigits(patch.featuresAr);
-    if (patch.featuresEn !== undefined) sanitizedPatch.featuresEn = toWesternDigits(patch.featuresEn);
-    setPlans((prev) => prev.map((p) => (p.id === id ? { ...p, ...sanitizedPatch } : p)));
+  const openPlanEditor = (plan: StorePlan, isNew: boolean) => {
+    setPlanErr('');
+    setPlanEditor({ plan: { ...plan }, isNew });
+    setTimeout(() => planEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
   };
 
-  const addEmptyPlan = () => {
-    const key = 'custom_' + Date.now();
-    setPlans((prev) => [...prev, { key, labelAr: '', labelEn: '', durationDays: 30, priceUsd: 5, badgeAr: '', badgeEn: '', featuresAr: '', featuresEn: '', active: true, sortOrder: prev.length + 1, createdAt: Date.now() }]);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  const patchEditor = (patch: Partial<StorePlan>) => {
+    setPlanEditor((prev) => (prev ? { ...prev, plan: { ...prev.plan, ...patch } } : prev));
   };
 
-  const savePlan = async (plan: StorePlan) => {
-    if (!plan.labelAr.trim() && !plan.labelEn.trim()) {
-      setPlanMsg(isAr ? 'أدخل اسم الخطة على الأقل (عربي أو إنجليزي)' : 'Enter at least a plan name (AR or EN)');
+  // Choosing the duration renames the plan and swaps in the shared feature
+  // list: the developer only ever picks a period and a price.
+  const applyDuration = (days: number) => {
+    const opt = DURATION_OPTIONS.find((o) => Math.abs(o.days - days) < 0.002) || durationOptionFor(days);
+    patchEditor({
+      durationDays: days,
+      planUnit: opt?.unit,
+      planUnits: opt?.count,
+      labelAr: planNameForDuration(days, true),
+      labelEn: planNameForDuration(days, false),
+      featuresAr: DEFAULT_FEATURES_AR,
+      featuresEn: DEFAULT_FEATURES_EN,
+    });
+  };
+
+  // New plan: opens the editor section with a duration preset (hour → year).
+  // Nothing is added to the list until the developer presses Save.
+  const openNewPlan = () => {
+    const opt = DURATION_OPTIONS[5]; // 1 month as the default period
+    openPlanEditor({
+      key: 'custom_' + Date.now(),
+      labelAr: planNameForDuration(opt.days, true),
+      labelEn: planNameForDuration(opt.days, false),
+      durationDays: opt.days,
+      planUnit: opt.unit,
+      planUnits: opt.count,
+      priceUsd: 5,
+      badgeAr: '',
+      badgeEn: '',
+      featuresAr: DEFAULT_FEATURES_AR,
+      featuresEn: DEFAULT_FEATURES_EN,
+      active: true,
+      sortOrder: plans.length + 1,
+      createdAt: Date.now(),
+    }, true);
+  };
+
+  // Active/off toggle — persists immediately (was local-only before).
+  const togglePlanActive = async (plan: StorePlan) => {
+    const next = !plan.active;
+    setPlans((prev) => prev.map((p) => (p.id === plan.id ? { ...p, active: next } : p)));
+    const realId = plan.id && !plan.id.startsWith('default_') ? plan.id : undefined;
+    try {
+      if (realId) {
+        await updateStorePlan(realId, { active: next });
+      } else if (plan.id?.startsWith('default_')) {
+        const draft: Omit<StorePlan, 'id'> = {
+          key: plan.key, labelAr: plan.labelAr, labelEn: plan.labelEn,
+          durationDays: plan.durationDays, priceUsd: plan.priceUsd,
+          badgeAr: plan.badgeAr || '', badgeEn: plan.badgeEn || '',
+          featuresAr: plan.featuresAr, featuresEn: plan.featuresEn,
+          planUnit: plan.planUnit, planUnits: plan.planUnits,
+          active: next, sortOrder: plan.sortOrder, createdAt: plan.createdAt,
+        };
+        const newId = await addStorePlan(draft);
+        setPlans((prev) => prev.map((p) => (p.id === plan.id ? { ...p, id: newId } : p)));
+      }
+    } catch {}
+  };
+
+  // Save from the editor section. The name comes from the chosen duration and the
+  // feature list is the same fixed one for every plan, so there is nothing to
+  // write: only the period and the price are the developer's to choose.
+  const savePlanEditor = async () => {
+    const editor = planEditor;
+    if (!editor || planBusy) return;
+    const plan = editor.plan;
+    const price = Number(toWesternDigits(plan.priceUsd)) || 0;
+    if (price <= 0) {
+      setPlanErr(isAr ? 'أدخل سعراً أكبر من صفر' : 'Enter a price greater than zero');
       return;
     }
+    setPlanErr('');
+    setPlanBusy(true);
+    setPlanMsg(isAr ? '⏳ جارٍ الحفظ…' : 'Saving…');
+    const opt = durationOptionFor(plan.durationDays);
+    const data: Omit<StorePlan, 'id'> = {
+      key: plan.key,
+      labelAr: toWesternDigits(planNameForDuration(plan.durationDays, true)),
+      labelEn: toWesternDigits(planNameForDuration(plan.durationDays, false)),
+      durationDays: opt ? opt.days : plan.durationDays,
+      planUnit: plan.planUnit || opt?.unit,
+      planUnits: plan.planUnits || opt?.count,
+      priceUsd: price,
+      badgeAr: '',
+      badgeEn: '',
+      featuresAr: DEFAULT_FEATURES_AR,
+      featuresEn: DEFAULT_FEATURES_EN,
+      active: plan.active,
+      sortOrder: plan.sortOrder,
+      createdAt: plan.createdAt || Date.now(),
+    };
     try {
-      const data: Omit<StorePlan, 'id'> = {
-        key: plan.key,
-        labelAr: toWesternDigits(plan.labelAr.trim()),
-        labelEn: toWesternDigits(plan.labelEn.trim()),
-        durationDays: Math.max(1, Math.round(Number(toWesternDigits(plan.durationDays)) || 30)),
-        priceUsd: Math.max(0, Number(toWesternDigits(plan.priceUsd)) || 0),
-        badgeAr: toWesternDigits(plan.badgeAr || ''),
-        badgeEn: toWesternDigits(plan.badgeEn || ''),
-        featuresAr: toWesternDigits(plan.featuresAr),
-        featuresEn: toWesternDigits(plan.featuresEn),
-        active: plan.active,
-        sortOrder: plan.sortOrder,
-        createdAt: plan.createdAt || Date.now(),
-      };
-      const realId = !plan.id?.startsWith('default_') ? plan.id : undefined;
+      const realId = plan.id && !plan.id.startsWith('default_') ? plan.id : undefined;
       if (realId) {
         await updateStorePlan(realId, data);
         setPlans((prev) => prev.map((p) => (p.id === realId ? { ...p, ...data } : p)));
       } else {
         const newId = await addStorePlan(data);
-        setPlans((prev) => prev.map((p) => (p.id === plan.id ? { ...p, id: newId, ...data } : p)));
+        setPlans((prev) =>
+          plan.id && prev.some((p) => p.id === plan.id)
+            ? prev.map((p) => (p.id === plan.id ? { id: newId, ...data } : p))
+            : [...prev, { id: newId, ...data }]
+        );
       }
+      setPlanEditor(null);
       setPlanMsg(isAr ? '✅ تم حفظ الخطة' : '✅ Plan saved');
-      setTimeout(() => setPlanMsg(''), 3000);
+      setTimeout(() => setPlanMsg(''), 4000);
     } catch (err: any) {
-      setPlanMsg(isAr ? '❌ فشل الحفظ: ' + (err?.message || '') : '❌ Save failed: ' + (err?.message || ''));
+      // Kept inside the editor: this is the one message that must never be missed.
+      setPlanErr(isAr
+        ? 'فشل الحفظ: ' + (err?.message || 'تحقّق أنك مسجّل الدخول بحساب المطوّر واتصال الإنترنت') + ' — لم تُضف الخطة.'
+        : 'Save failed: ' + (err?.message || 'check you are signed in as the developer and online') + ' — the plan was not added.');
     }
+    setPlanBusy(false);
   };
 
+  // Any plan can be deleted, including the three built-in ones: the service
+// records the removal so it does not reappear on the next load.
   const removePlan = async (plan: StorePlan) => {
-    if (plan.id?.startsWith('default_')) {
-      setPlanMsg(isAr ? 'لا يمكن حذف خطة افتراضية — عطّلها بدلاً من ذلك' : 'Default plans cannot be deleted — deactivate them instead');
-      return;
-    }
+    const name = planLabel(plan, isAr) || plan.key;
+    if (!confirm(isAr ? `حذف الخطة "${name}" نهائياً؟` : `Delete the plan "${name}" permanently?`)) return;
     try {
-      if (plan.id) await deleteStorePlan(plan.id);
+      if (plan.id) await deleteStorePlan(plan.id, plan.key);
       setPlans((prev) => prev.filter((p) => p.id !== plan.id));
-    } catch {}
+      setPlanEditor((prev) => (prev && prev.plan.id === plan.id ? null : prev));
+      setPlanMsg(isAr ? `🗑️ تم حذف خطة "${name}"` : `🗑️ Deleted plan "${name}"`);
+      setTimeout(() => setPlanMsg(''), 4000);
+    } catch (err: any) {
+      setPlanErr(isAr ? 'فشل حذف الخطة: ' + (err?.message || 'تحقّق من الاتصال') : 'Delete failed: ' + (err?.message || 'check your connection'));
+    }
   };
 
   useEffect(() => {
@@ -299,21 +404,22 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
   };
 
   const saveTimer = () => {
-    const mins = Math.max(1, Number(toWesternDigits(editTimer)) || 30);
-    setEditTimer(mins);
-    localStorage.setItem(TIMER_STORAGE_KEY, String(mins));
-    setSuccess(isAr ? `✅ تم حفظ مدة المهلة: ${mins} دقيقة` : `✅ Wait period saved: ${mins} minutes`);
+    const hours = Math.max(1, Number(toWesternDigits(editTimer)) || 1);
+    setEditTimer(hours);
+    localStorage.setItem(TIMER_STORAGE_KEY, String(hours));
+    localStorage.removeItem(LEGACY_TIMER_KEY);
+    setSuccess(isAr ? `✅ تم حفظ مدة المهلة: ${hours} ساعة` : `✅ Wait period saved: ${hours} hour${hours > 1 ? 's' : ''}`);
     setTimeout(() => setSuccess(''), 3000);
   };
 
-  const toggleFreemium = () => {
-    const newVal = !freemiumDisabled;
-    setFreemiumDisabled(newVal);
-    localStorage.setItem('finalyze_freemium_disabled', newVal ? 'true' : 'false');
-    localStorage.setItem('finalyze_hide_plans', newVal ? 'true' : 'false');
-    window.dispatchEvent(new Event('freemium-toggle'));
-    onFreemiumToggle?.(newVal);
-  };
+  // The store is always selling: plans stay visible to clients and the paid
+  // restrictions stay active. Any leftover "full access" flag from an earlier
+  // session is cleared so nothing can re-hide the plans by accident.
+  useEffect(() => {
+    localStorage.setItem('finalyze_freemium_disabled', 'false');
+    localStorage.setItem('finalyze_hide_plans', 'false');
+    setFreemiumDisabled(false);
+  }, []);
 
   return (
     <div className="max-w-4xl mx-auto px-4 pb-16">
@@ -336,38 +442,9 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
         </h3>
         <p className="text-sm text-slate-400 mb-6">
           {isAr
-            ? 'كل ما يخص البيع والدفع هنا: أسعار الخطط، تفعيل/تعطيل الخطط للعملاء، ومدة مهلة الدفع.'
-            : 'Everything about selling and payments lives here: plan prices, enabling/disabling plans for clients, and the payment wait period.'}
+            ? 'كل ما يخص البيع والدفع هنا: أسعار الخطط ومدة مهلة الدفع.'
+            : 'Everything about selling and payments lives here: plan prices and the payment wait period.'}
         </p>
-
-        {/* Enable / disable plans for clients */}
-        <div className="bg-black/20 border border-white/10 rounded-xl p-4 mb-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h5 className="text-lg font-black text-white">
-                {isAr ? 'تفعيل / تعطيل الخطط للعملاء' : 'Enable / Disable Plans for Clients'}
-              </h5>
-              <p className="text-sm text-slate-400 mt-1">
-                {freemiumDisabled
-                  ? (isAr ? 'المفعّل الآن: جميع المنتجات مجانية ولا تظهر خطط للعملاء.' : 'Currently ON: all products free and plans are hidden from clients.')
-                  : (isAr ? 'المعطّل الآن: الخطط مرئية والقيود مفعلة للعملاء.' : 'Currently OFF: plans are visible and restrictions are active for clients.')}
-              </p>
-            </div>
-            <button
-              onClick={toggleFreemium}
-              className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg ${
-                freemiumDisabled
-                  ? 'bg-emerald-500 text-white shadow-emerald-500/40'
-                  : 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
-              }`}
-            >
-              {freemiumDisabled ? <Shield size={18} /> : <ShieldOff size={18} />}
-              {freemiumDisabled
-                ? (isAr ? 'مفعّل: وصول كامل' : 'ON: Full Access')
-                : (isAr ? 'معطّل: قيود مفعلة' : 'OFF: Restricted')}
-            </button>
-          </div>
-        </div>
 
         {/* Plan prices */}
         <div className="bg-black/20 border border-white/10 rounded-xl p-4 mb-4">
@@ -406,6 +483,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
             <Timer size={18} className="text-emerald-400" />
             {isAr ? 'مدة مهلة الدفع' : 'Payment Wait Period'}
           </h5>
+          <p className="text-xs text-slate-500 mb-3">{isAr ? 'تُحسب بالساعات' : 'Counted in hours'}</p>
           <div className="flex items-center gap-3">
             <input
               type="text"
@@ -415,7 +493,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
               onChange={(e) => setEditTimer(toWesternDigits(e.target.value) as any)}
               className="w-24 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-lg font-bold font-mono tabular-nums text-white outline-none focus:border-emerald-500"
             />
-            <span className="text-base text-slate-400">{isAr ? 'دقيقة' : 'minutes'}</span>
+            <span className="text-base text-slate-400">{isAr ? 'ساعة' : 'hours'}</span>
             <button
               onClick={saveTimer}
               className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-base font-black"
@@ -541,7 +619,7 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
             {isAr ? 'خطط الاشتراك للعملاء' : 'Customer Subscription Plans'}
           </h3>
           <button
-            onClick={addEmptyPlan}
+            onClick={openNewPlan}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 transition-all text-[15px] font-black"
           >
             <Plus size={16} /> {isAr ? 'إضافة خطة' : 'Add Plan'}
@@ -549,77 +627,118 @@ export default function StoreSettingsPage({ lang, onBack, freemiumDisabled: exte
         </div>
         <p className="text-sm text-slate-400 mb-5">
           {isAr
-            ? 'تظهر هذه الخطط للعملاء في المتجر تحت قسم "الخطط" مع صندوق مميزات قبل الشراء. الحذف متاح للخطط المخصصة فقط.'
-            : 'These plans appear to clients in the store under "Plans" with a features box before purchase. Deletion is available for custom plans only.'}
+            ? 'اضغط "إضافة خطة": اكتب اسم الخطة والشارات والمميزات بالإنجليزية فقط — النسخة العربية تُولَّد تلقائياً وتتغيّر مع لغة الموقع. اختيار المدة (من ساعة إلى سنة) والسعر وحدهما يدويان. التفعيل والتعطيل والحذف من قائمة الخطط.'
+            : 'Press "Add Plan": type the plan name, badge and features in English only — the Arabic copy is generated automatically and follows the site language. Only the duration (hour → year) and the price are manual. Activate, deactivate or delete from the list.'}
         </p>
         {planMsg && (
           <div className="bg-sky-500/10 border border-sky-500/30 text-sky-200 text-lg rounded-xl px-4 py-2.5 mb-4">{planMsg}</div>
         )}
 
-        <div className="space-y-4">
+        {/* Plan editor section — opens for Add / Edit, closes on save or cancel */}
+        {planEditor && (
+          <div ref={planEditorRef} className="bg-sky-500/5 border border-sky-500/25 rounded-2xl p-5 mb-5">
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <h4 className="text-lg font-black uppercase text-sky-300 tracking-widest flex items-center gap-2">
+                <Crown size={18} />
+                {planEditor.isNew ? (isAr ? 'خطة جديدة' : 'New Plan') : (isAr ? 'تعديل الخطة' : 'Edit Plan')}
+              </h4>
+              <button onClick={() => setPlanEditor(null)} title={isAr ? 'إغلاق' : 'Close'} className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'مدة الخطة' : 'Plan Duration'}</label>
+                <select
+                  value={String(planEditor.plan.durationDays)}
+                  onChange={(e) => applyDuration(Number(e.target.value))}
+                  className={inputCls + ' font-mono'}
+                >
+                  {!durationOptionFor(planEditor.plan.durationDays) && (
+                    <option value={String(planEditor.plan.durationDays)} className="bg-black text-white">{durationLabel(planEditor.plan, isAr)}</option>
+                  )}
+                  {DURATION_OPTIONS.map((o) => (
+                    <option key={o.days} value={String(o.days)} className="bg-black text-white">{isAr ? o.labelAr : o.labelEn}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'السعر ($)' : 'Price ($)'}</label>
+                <input type="text" inputMode="decimal" value={toWesternDigits(planEditor.plan.priceUsd)} dir="ltr" onChange={(e) => patchEditor({ priceUsd: Number(toWesternDigits(e.target.value)) || 0 })} className={inputCls + ' font-mono tabular-nums'} />
+              </div>
+            </div>
+
+            {/* Name and features are generated from the duration — nothing to type. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+              <div>
+                <label className="text-xs font-black uppercase text-emerald-400/80 block mb-1">{isAr ? 'اسم الخطة (تلقائي حسب المدة)' : 'Plan name (auto from duration)'}</label>
+                <div className="w-full bg-emerald-500/5 border border-emerald-500/25 rounded-lg px-3 py-2 text-sm font-bold text-white min-h-[38px]">
+                  {isAr ? planNameForDuration(planEditor.plan.durationDays, true) : planNameForDuration(planEditor.plan.durationDays, false)}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase text-emerald-400/80 block mb-1">{isAr ? 'مدة الخطة' : 'The period granted'}</label>
+                <div className="w-full bg-emerald-500/5 border border-emerald-500/25 rounded-lg px-3 py-2 text-sm font-bold text-white min-h-[38px]">
+                  {durationLabel(planEditor.plan, isAr)}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="text-xs font-black uppercase text-emerald-400/80 block mb-1">{isAr ? 'المميزات (نفس الوصف لكل الخطط)' : 'Features (the same list on every plan)'}</label>
+              <div dir={isAr ? 'rtl' : 'ltr'} className="text-sm text-slate-200 bg-black/30 border border-emerald-500/20 rounded-lg px-3 py-2 whitespace-pre-line">
+                {isAr ? DEFAULT_FEATURES_AR : DEFAULT_FEATURES_EN}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mt-4 flex-wrap">
+              {planErr && (
+                <div className="w-full mb-1 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm font-bold text-rose-200">
+                  {planErr}
+                </div>
+              )}
+              <button onClick={savePlanEditor} disabled={planBusy} className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-500 text-white font-black text-sm uppercase hover:bg-emerald-400 transition-all disabled:opacity-50">
+                <Check size={15} /> {planBusy ? (isAr ? 'جارٍ الحفظ…' : 'Saving…') : (isAr ? 'حفظ الخطة' : 'Save Plan')}
+              </button>
+              <button onClick={() => setPlanEditor(null)} disabled={planBusy} className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 font-black text-sm uppercase hover:bg-white/10 transition-all disabled:opacity-50">
+                {isAr ? 'إلغاء' : 'Cancel'}
+              </button>
+              {planMsg && (
+                <span className="text-sm font-bold text-emerald-300">{planMsg}</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Simple summary list: name + duration + price, then activate / edit / delete */}
+        <div className="space-y-3">
           {plans.map((plan) => (
-            <div key={plan.id || plan.key} className="bg-black/20 border border-white/10 rounded-xl p-4">
-              <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-black text-white uppercase">{planLabel(plan, isAr)}</span>
-                  <button
-                    onClick={() => patchPlan(plan.id, { active: !plan.active })}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase border transition-all ${
-                      plan.active ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : 'bg-white/5 border-white/15 text-slate-500'
-                    }`}
-                  >
-                    {plan.active ? (isAr ? 'نشطة' : 'Active') : (isAr ? 'معطلة' : 'Off')}
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => savePlan(plan)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-black"
-                  >
-                    <Check size={14} /> {isAr ? 'حفظ' : 'Save'}
-                  </button>
-                  <button onClick={() => removePlan(plan)} className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+            <div key={plan.id || plan.key} id={`plan-card-${plan.key}`} className="bg-black/20 border border-white/10 rounded-xl p-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-lg font-black text-white uppercase">{planLabel(plan, isAr)}</span>
+                <span className="text-xs font-mono px-2 py-0.5 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-300">{durationLabel(plan, isAr)}</span>
+                <span className="text-xs font-mono px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400" dir="ltr">${Number(toWesternDigits(plan.priceUsd)).toFixed(2)}</span>
+                {(isAr ? plan.badgeAr : plan.badgeEn) ? (
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300">{isAr ? plan.badgeAr : plan.badgeEn}</span>
+                ) : null}
+                <button
+                  onClick={() => togglePlanActive(plan)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase border transition-all ${plan.active ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : 'bg-white/5 border-white/15 text-slate-500'}`}
+                >
+                  {plan.active ? (isAr ? 'نشطة' : 'Active') : (isAr ? 'معطلة' : 'Off')}
+                </button>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'الاسم (عربي)' : 'Name (AR)'}</label>
-                  <input type="text" value={plan.labelAr} onChange={(e) => patchPlan(plan.id, { labelAr: e.target.value })} placeholder={isAr ? 'شهري' : 'Monthly (Arabic)'} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold text-white outline-none focus:border-sky-500" />
-                </div>
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500 block mb-1">Name (EN)</label>
-                  <input type="text" value={plan.labelEn} onChange={(e) => patchPlan(plan.id, { labelEn: e.target.value })} placeholder="Monthly" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold text-white outline-none focus:border-sky-500" />
-                </div>
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'السعر ($)' : 'Price ($)'}</label>
-                  <input type="text" inputMode="decimal" value={toWesternDigits(plan.priceUsd)} dir="ltr" onChange={(e) => patchPlan(plan.id, { priceUsd: Number(toWesternDigits(e.target.value)) })} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold font-mono tabular-nums text-white outline-none focus:border-sky-500" />
-                </div>
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'المدة (يوم)' : 'Duration (days)'}</label>
-                  <input type="text" inputMode="numeric" value={toWesternDigits(plan.durationDays)} dir="ltr" onChange={(e) => patchPlan(plan.id, { durationDays: Number(toWesternDigits(e.target.value)) })} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold font-mono tabular-nums text-white outline-none focus:border-sky-500" />
-                </div>
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'شارة (عربي)' : 'Badge (AR)'}</label>
-                  <input type="text" value={plan.badgeAr || ''} onChange={(e) => patchPlan(plan.id, { badgeAr: e.target.value })} placeholder={isAr ? 'الأكثر شعبية' : 'Popular (Arabic)'} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold text-white outline-none focus:border-sky-500" />
-                </div>
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500 block mb-1">Badge (EN)</label>
-                  <input type="text" value={plan.badgeEn || ''} onChange={(e) => patchPlan(plan.id, { badgeEn: e.target.value })} placeholder="Popular" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold text-white outline-none focus:border-sky-500" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500 block mb-1">{isAr ? 'المميزات (عربي) — ميزة في كل سطر' : 'Features (AR) — one per line'}</label>
-                  <textarea rows={4} value={plan.featuresAr} onChange={(e) => patchPlan(plan.id, { featuresAr: e.target.value })} dir="rtl" placeholder={isAr ? "تحليل احترافي\nإشارات فورية" : "Professional analysis (Arabic)\nInstant alerts (Arabic)"} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-sky-500 resize-none" />
-                </div>
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500 block mb-1">Features (EN) — one per line</label>
-                  <textarea rows={4} value={plan.featuresEn} onChange={(e) => patchPlan(plan.id, { featuresEn: e.target.value })} placeholder="Professional analysis&#10;Instant alerts" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-sky-500 resize-none" />
-                </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openPlanEditor(plan, false)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 transition-all text-xs font-black"
+                >
+                  <Pencil size={13} /> {isAr ? 'تعديل' : 'Edit'}
+                </button>
+                <button onClick={() => removePlan(plan)} title={isAr ? 'حذف' : 'Delete'} className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all">
+                  <Trash2 size={14} />
+                </button>
               </div>
             </div>
           ))}
