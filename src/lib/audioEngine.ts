@@ -226,6 +226,36 @@ export function playDrop(volume: number = 0.5) {
   }
 }
 
+// Messenger-style "pop" for developer notifications: two bright sine blips in
+// quick succession (A5 → E6), fully synthesised so it fires instantly with no
+// audio file and no settings dependency.
+export function playMessengerPing(volume: number = 0.6) {
+  try {
+    const ac = getCtx();
+    if (!ac) return;
+    const notes: Array<[number, number, number]> = [
+      [880, 0, 0.11],       // A5 — the "pop"
+      [1318.5, 0.1, 0.16],  // E6 — bright tail, slightly overlapping
+    ];
+    for (const [freq, delay, dur] of notes) {
+      const t = ac.currentTime + delay;
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(volume, t + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.start(t);
+      osc.stop(t + dur + 0.02);
+    }
+  } catch (e) {
+    console.warn('Web Audio messenger ping failed:', e);
+  }
+}
+
 export function playClick(volume: number = 0.3) {
   playTone(1200, 0.05, 'sine', volume);
 }

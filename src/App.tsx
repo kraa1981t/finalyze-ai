@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, OAuthProvider, signOut, signInAnonymously } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
-import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where, setDoc, query, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where, setDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { playSuccess, playFail, playCompletion, playStart, playDrop, initAudio } from './lib/audioEngine';
+import { playSuccess, playFail, playCompletion, playStart, playDrop, playMessengerPing, initAudio } from './lib/audioEngine';
 import { installUiClickSound } from './lib/uiClickSound';
 import { trackPageView, trackClick } from './lib/tracking';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
@@ -2052,14 +2052,44 @@ const isDeveloperSession = () => {
     }
   };
 
-  // Fetch new suggestions count for developer notifications
+  // Developer notification sounds. Fires a Messenger-style ping when any header
+  // bell count GROWS (a brand-new suggestion / payment request / site request).
+  // Ref-based so the interval/listener logic never depends on the counts and can
+  // never loop on itself. Skipped during the very first snapshot of each stream
+  // so opening the site does not ping for already-seen items.
+  const notifCountsRef = useRef({ suggestions: 0, payments: 0, sites: 0 });
+  const notifPrimedRef = useRef({ suggestions: false, payments: false, sites: false });
+  // Watch the signed-in address explicitly (deps): the first render's `user` is
+  // usually null, and a [] closure would freeze that and never ping afterwards.
+  const devEmail = (user?.email || '').toLowerCase().trim();
+  const devPing = useCallback((kind: 'suggestions' | 'payments' | 'sites', next: number) => {
+    const prevCounts = notifCountsRef.current;
+    const primed = notifPrimedRef.current;
+    const prev = prevCounts[kind];
+    prevCounts[kind] = next;
+    if (!isDeveloperSession()) {
+      if (!primed[kind] && next > 0) primed[kind] = true;
+      return;
+    }
+    if (!primed[kind]) { primed[kind] = true; return; }
+    if (next > prev) {
+      try { initAudio(); } catch {}
+      try { playMessengerPing(0.6); } catch {}
+    }
+  }, [devEmail]);
+
+  // Fetch new suggestions count for developer notifications — LIVE listener so
+  // the red badge appears the instant a client posts, even if the developer
+  // logs in AFTER the page loaded (the old fetch-once effect silently stayed 0).
   useEffect(() => {
-    const fetchSuggestionsCount = async () => {
+    let unsub: (() => void) | null = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const recompute = async (totalOverride?: number) => {
       try {
-        const isDev = isDeveloperSession();
-        if (!isDev) return;
-        const snap = await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')));
-        const total = snap.size;
+        if (!isDeveloperSession()) return;
+        const total = typeof totalOverride === 'number'
+          ? totalOverride
+          : (await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')))).size;
         // Fetch hidden count from shared_settings (open read — no auth needed)
         let hiddenCount = 0;
         try {
@@ -2069,41 +2099,83 @@ const isDeveloperSession = () => {
             hiddenCount = (hiddenSnap.data().hiddenIds || []).length;
           }
         } catch {}
-        setNewSuggestionsCount(Math.max(0, total - hiddenCount));
+        const next = Math.max(0, total - hiddenCount);
+        setNewSuggestionsCount(next);
+        devPing('suggestions', next);
       } catch {}
     };
-    fetchSuggestionsCount();
-    const interval = setInterval(fetchSuggestionsCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    try {
+      unsub = onSnapshot(
+        query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')),
+        (snap) => { void recompute(snap.size); },
+        () => { void recompute(); },
+      );
+    } catch {}
+    // Safety net for a dropped listener: re-check every minute.
+    timer = setInterval(() => { void recompute(); }, 60000);
+    // Re-run when the session resolves so a developer logging in late still gets
+    // the count and the priming (no ping for old items).
+    void recompute();
+    return () => {
+      if (unsub) { try { unsub(); } catch {} unsub = null; }
+      if (timer) clearInterval(timer);
+    };
+  }, [user?.email, devPing]);
 
-  // Developer: unread payment request notifications (shown on the header bell)
+  // Developer: unread payment request notifications — LIVE listener so the red
+  // badge + ping fire the instant a payment poller or client creates a
+  // pending request, not up to 30s later.
   useEffect(() => {
     if (!user) return;
+    let unsubDev: (() => void) | null = null;
+    let unsubSite: (() => void) | null = null;
     let stopped = false;
     const refresh = async () => {
       if (!isDeveloperSession()) return;
-      const count = await getUnreadDevNotificationCount();
-      if (!stopped) setPaymentRequestsCount(count);
+      const [payCount, siteCount] = await Promise.all([
+        getUnreadDevNotificationCount(),
+        getUnreadSiteRequestCount(),
+      ]);
+      if (stopped) return;
+      setPaymentRequestsCount(payCount);
+      setSiteRequestsCount(siteCount);
+      devPing('payments', payCount);
+      devPing('sites', siteCount);
     };
-    refresh();
-    const interval = setInterval(refresh, 30000);
-    return () => { stopped = true; clearInterval(interval); };
-  }, [user, activePage]);
-
-  // Developer: unread website creation requests (shown on the header bell)
-  useEffect(() => {
-    if (!user) return;
-    let stopped = false;
-    const refresh = async () => {
-      if (!isDeveloperSession()) return;
-      const count = await getUnreadSiteRequestCount();
-      if (!stopped) setSiteRequestsCount(count);
+    const attach = () => {
+      try {
+        unsubDev = onSnapshot(
+          query(collection(db, 'payment_requests'), where('status', '==', 'pending')),
+          (snap) => { if (!isDeveloperSession() || stopped) return; const c = snap.size; setPaymentRequestsCount(c); devPing('payments', c); },
+          () => { void refresh(); },
+        );
+      } catch {}
+      try {
+        unsubSite = onSnapshot(
+          // Single filter on purpose: _type+read together would demand a
+          // composite index and fail silently on fresh projects — filter `read`
+          // in memory instead.
+          query(collection(db, 'analysisResults'), where('_type', '==', 'siteRequest')),
+          (snap) => {
+            if (!isDeveloperSession() || stopped) return;
+            const c = snap.docs.filter((d) => (d.data() as any)?.read !== true).length;
+            setSiteRequestsCount(c);
+            devPing('sites', c);
+          },
+          () => { void refresh(); },
+        );
+      } catch {}
     };
-    refresh();
-    const interval = setInterval(refresh, 30000);
-    return () => { stopped = true; clearInterval(interval); };
-  }, [user, activePage]);
+    attach();
+    void refresh();
+    const interval = setInterval(refresh, 60000);
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+      if (unsubDev) { try { unsubDev(); } catch {} unsubDev = null; }
+      if (unsubSite) { try { unsubSite(); } catch {} unsubSite = null; }
+    };
+  }, [user, activePage, devPing]);
 
   // Client: pick up a developer-approved plan grant and activate the subscription.
   // Runs on login and when returning to the app so a release works even if the
