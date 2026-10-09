@@ -583,6 +583,48 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
               </div>
               <p className="text-base md:text-[20px] text-brand-text/40 mt-2 leading-snug">{isAr ? 'يتطلب شمعة ارتداد (Pinbar/Engulfing/Hammer) عند نقطة السحبة' : 'Require reversal candle (Pinbar/Engulfing/Hammer) at pullback point'}</p>
             </div>
+
+            {/* ══ Pullback-Entry System (minimize post-entry reversal) ══ */}
+            <div className="pt-4 mt-2 border-t border-cyan-500/20">
+              <div className="text-xs font-black text-cyan-400 uppercase tracking-wider mb-1">{isAr ? '🎯 نظام الدخول عند الارتداد (تقليل الانعكاس)' : '🎯 Pullback-Entry System (reduce reversal)'}</div>
+              <p className="text-base md:text-[19px] text-brand-text/40 mb-4 leading-snug">{isAr ? 'بدل متابعة السعر عند القمة، ينتظر النظام ارتداد السعر إليك ثم يدخلك بسعر أفضل ووقف أوسع.' : 'Instead of chasing price at the top, the system waits for price to retrace to you, then enters at a better price with a wider stop.'}</p>
+
+              {/* Entry Mode */}
+              <div className="pt-3 border-t border-white/5">
+                <div className="flex items-center justify-between gap-4">
+                  <label className="text-xl md:text-[24px] font-black text-cyan-400 leading-tight">{isAr ? 'وضع الدخول' : 'Entry Mode'}</label>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => handleChange('entryMode', 'pullback')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${(settings.entryMode || 'pullback') === 'pullback' ? 'bg-cyan-500 text-white' : 'bg-white/10 text-brand-text/60'}`}>
+                      {isAr ? 'ارتداد (آمن)' : 'Pullback (safe)'}
+                    </button>
+                    <button onClick={() => handleChange('entryMode', 'market')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${settings.entryMode === 'market' ? 'bg-amber-500 text-white' : 'bg-white/10 text-brand-text/60'}`}>
+                      {isAr ? 'فوري (مطاردة)' : 'Market (chase)'}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-base md:text-[20px] text-brand-text/40 mt-2 leading-snug">{isAr ? '«ارتداد» = حدّ دخول أقل من السعر للشراء (أعلى للبيع) فلا تُنفَّذ إلا عند وصول السعر إليك. «فوري» = الدخول عند السعر الحالي كالسابق.' : '“Pullback” = entry sits below price for buys (above for sells), filled only if price reaches you. “Market” = enter at current price (old behaviour).'}</p>
+              </div>
+
+              {/* Stop ATR Multiplier */}
+              <NumberInput label={isAr ? 'مضاعف الوقف (ATR)' : 'Stop ATR Multiplier'} value={settings.stopAtrMultiplier ?? 3} onChange={(v) => handleChange('stopAtrMultiplier', v)} color="text-rose-400" desc={isAr ? 'عرض وقف الخسارة بمضاعفات ATR. الأكبر = وقف أوسع ينجو من التراجع الطبيعي (3-5 شموع). افتراضي: 3' : 'Stop-loss width in ATR multiples. Larger = wider stop that survives normal 3-5 candle retrace. Default: 3'} suffix="×" min={1.5} max={6} step={0.5} />
+
+              {/* Pullback Depth in ATR */}
+              <NumberInput label={isAr ? 'عمق منطقة الارتداد (ATR)' : 'Pullback Zone Depth (ATR)'} value={settings.minPullbackAtr ?? 0.5} onChange={(v) => handleChange('minPullbackAtr', v)} color="text-cyan-400" desc={isAr ? 'بُعد حدّ الدخول عن السعر بمضاعفات ATR. الأكبر = سعر دخول أدنى للشراء (أفضل) لكن قد يفوتك التنفيذ. افتراضي: 0.5' : 'How far the entry limit sits from price in ATR. Larger = better buy price but fewer fills. Default: 0.5'} suffix="×" min={0.2} max={2} step={0.1} />
+
+              {/* Pullback RSI Confirm */}
+              <div className="pt-3 border-t border-white/5">
+                <div className="flex items-center justify-between gap-4">
+                  <label className="text-xl md:text-[24px] font-black text-cyan-400 leading-tight">{isAr ? 'تعميق المنطقة عند تشبع RSI' : 'Deepen Zone when RSI Stretched'}</label>
+                  <button onClick={() => handleChange('pullbackRsiConfirm', !settings.pullbackRsiConfirm)}
+                    className={`w-16 h-9 rounded-full transition-all shrink-0 ${settings.pullbackRsiConfirm ? 'bg-cyan-500' : 'bg-white/10'}`}>
+                    <div className={`w-7 h-7 rounded-full bg-white shadow transition-transform ${settings.pullbackRsiConfirm ? 'translate-x-7' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                <p className="text-base md:text-[20px] text-brand-text/40 mt-2 leading-snug">{isAr ? 'عندما يكون RSI مشبعًا في اتجاه الصفقة (≥65 شراء / ≤35 بيع) تُعمَّق منطقة الارتداد إلى 1 ATR كاملة حتى لا تشتري القمة أو تبيع القاع.' : 'When RSI is stretched in the trade direction (≥65 buy / ≤35 sell) the retrace zone deepens to a full 1 ATR so you never buy the top / sell the bottom.'}</p>
+              </div>
+            </div>
           </div>
         </div>
       )}

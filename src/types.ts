@@ -45,6 +45,7 @@ export interface AnalysisResult {
   primaryMetCount?: number;
   direction?: string;
   entryPrice?: number;
+  entryMode?: 'market' | 'pullback';
   isSideways?: boolean;
   sidewaysDirection?: 'uptrend' | 'downtrend' | 'sideways';
   adx?: number;
@@ -110,6 +111,11 @@ export interface StrategySettings {
   useVolumeGuard?: boolean;
   volumeGuardThreshold?: number;
   volumeGuardMaxThreshold?: number;
+  // ── Pullback-entry system (minimize post-entry reversal) ──
+  entryMode?: 'market' | 'pullback';   // 'pullback' enters below/above price instead of chasing
+  stopAtrMultiplier?: number;          // ATR multiple for the stop-loss (default 3)
+  minPullbackAtr?: number;             // pullback-zone depth in ATR (default 0.5)
+  pullbackRsiConfirm?: boolean;        // deepen the zone to 1 ATR when RSI is stretched
 }
 
 export interface AutoAnalysisSettings {

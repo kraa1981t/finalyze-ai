@@ -2089,8 +2089,16 @@ Return ONLY valid JSON:
       var slDist = 0;
       const isForex = type === MarketType.FOREX;
 
+      // ── Lever 2: breathable stop ──
+      // Use the configured ATR multiple (default 3). Crypto stays at 3× because
+      // its volatility is structurally higher; everything else now gets the
+      // wider, configurable multiple so a normal 3-5 candle retrace cannot clip
+      // the stop before the trend resumes.
       if (atr > 0) {
-        const atrMultiplier = isCrypto ? 3 : 2;
+        const baseMult = (typeof settings.stopAtrMultiplier === 'number' && settings.stopAtrMultiplier > 0)
+          ? settings.stopAtrMultiplier
+          : 3;
+        const atrMultiplier = isCrypto ? Math.max(3, baseMult) : baseMult;
         slDist = atr * atrMultiplier;
       }
 
@@ -2112,12 +2120,40 @@ Return ONLY valid JSON:
       slDist = Math.max(slDist, minSL);
       slDist = Math.min(slDist, maxSL);
 
-      if (finalSignal.includes('buy')) {
-        finalStopLoss = currentPrice - slDist;
-        finalTakeProfit = currentPrice + slDist * 2;
-      } else if (finalSignal.includes('sell')) {
-        finalStopLoss = currentPrice + slDist;
-        finalTakeProfit = currentPrice - slDist * 2;
+      // ── Lever 1 + 3: pullback entry instead of chasing the live price ──
+      // The old engine anchored entry to the LAST close (currentPrice), which is
+      // why the price so often dipped 3-5 candles right after entry. In 'pullback'
+      // mode we place the entry a small distance BEHIND price (a limit zone):
+      //   buy  → entry sits BELOW price (wait for the retrace down to us)
+      //   sell → entry sits ABOVE price (wait for the retrace up to us)
+      // The zone depth is `minPullbackAtr` × ATR (default 0.5). When
+      // pullbackRsiConfirm is on AND RSI is stretched (a chase is dangerous), we
+      // DEEPEN the zone to a full 1 ATR so we never buy the top / sell the bottom.
+      const isBuy = finalSignal.includes('buy');
+      const isSell = finalSignal.includes('sell');
+      const usePullback = settings.entryMode === 'pullback' && (isBuy || isSell);
+      var entryAnchor = currentPrice;
+      var pullbackDist = 0;
+      if (usePullback && atr > 0) {
+        let depthAtr = (typeof settings.minPullbackAtr === 'number' && settings.minPullbackAtr > 0)
+          ? settings.minPullbackAtr
+          : 0.5;
+        const rsi = metrics?.rsi;
+        if (settings.pullbackRsiConfirm && typeof rsi === 'number') {
+          // Stretched momentum in the trade direction ⇒ deepen the retrace zone.
+          const stretched = isBuy ? rsi >= 65 : rsi <= 35;
+          if (stretched) depthAtr = Math.max(depthAtr, 1.0);
+        }
+        pullbackDist = atr * depthAtr;
+        entryAnchor = isBuy ? currentPrice - pullbackDist : currentPrice + pullbackDist;
+      }
+
+      if (isBuy) {
+        finalStopLoss = entryAnchor - slDist;
+        finalTakeProfit = entryAnchor + slDist * 2;
+      } else if (isSell) {
+        finalStopLoss = entryAnchor + slDist;
+        finalTakeProfit = entryAnchor - slDist * 2;
       } else {
         finalStopLoss = currentPrice - slDist;
         finalTakeProfit = currentPrice + slDist;
@@ -2169,7 +2205,8 @@ Return ONLY valid JSON:
       historicalMatch: resultData.historicalMatch || "",
       timestamp: new Date().toISOString(),
       userId: "",
-      entryPrice: currentPrice,
+      entryPrice: (typeof entryAnchor === 'number' && entryAnchor > 0) ? entryAnchor : currentPrice,
+      entryMode: usePullback ? 'pullback' : 'market',
       stopLoss: finalStopLoss,
       takeProfit: finalTakeProfit,
       primaryMetCount,

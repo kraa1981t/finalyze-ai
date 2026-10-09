@@ -42,6 +42,11 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   useVolumeGuard: true,
   volumeGuardThreshold: 45,
   volumeGuardMaxThreshold: 85,
+  // ── Pullback-entry system (defaults: minimize post-entry reversal) ──
+  entryMode: 'pullback',   // 'pullback' waits for a retrace instead of chasing price
+  stopAtrMultiplier: 3,    // wider, breathable stop (crypto always 3×)
+  minPullbackAtr: 0.5,     // entry zone depth in ATR
+  pullbackRsiConfirm: true, // deepen the zone to 1 ATR when RSI is stretched
 };
 
 export const DEFAULT_AUTO_SETTINGS = {
