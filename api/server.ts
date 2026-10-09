@@ -384,6 +384,46 @@ const TWELVE_DATA_OUTPUTSIZE: Record<string, number> = {
   '1h': 200, '4h': 200, '1d': 200, '1w': 100, '1M': 60,
 };
 
+// Yahoo's native DAILY forex series (e.g. EURUSD=X interval=1d) carries an
+// unreliable Open (often equal to the prior Close), so every bar renders as a
+// near-doji / pin-bar / hammer with a huge wick. Reliable HOURLY OHLC aggregated
+// into true daily bars yields real bodies (Open = first hour, Close = last hour,
+// High/Low = extremes) — exactly how other charting platforms build daily FX.
+function aggregateHourlyToDaily(data: any): any {
+  try {
+    const result = data?.chart?.result?.[0];
+    if (!result || !Array.isArray(result.timestamp)) return data;
+    const q = result?.indicators?.quote?.[0];
+    if (!q || !Array.isArray(q.close)) return data;
+    const ts = result.timestamp;
+    const dayBuckets = new Map<number, { t: number; o: number; h: number; l: number; c: number }>();
+    for (let i = 0; i < ts.length; i++) {
+      const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], c = q.close?.[i];
+      if (o == null || h == null || l == null || c == null || ts[i] == null) continue;
+      const dayKey = Math.floor(ts[i] / 86400) * 86400; // UTC day boundary (seconds)
+      const b = dayBuckets.get(dayKey);
+      if (!b) dayBuckets.set(dayKey, { t: dayKey, o, h, l, c });
+      else {
+        b.h = Math.max(b.h, h);
+        b.l = Math.min(b.l, l);
+        b.c = c; // last hour of the day wins the close
+      }
+    }
+    const days = Array.from(dayBuckets.values()).sort((a, b) => a.t - b.t);
+    if (days.length < 5) return data; // too few to be a clean daily series
+    return {
+      chart: {
+        result: [{
+          timestamp: days.map((d) => d.t),
+          indicators: { quote: [{ open: days.map((d) => d.o), high: days.map((d) => d.h), low: days.map((d) => d.l), close: days.map((d) => d.c), volume: days.map(() => 0) }] },
+        }],
+      },
+    };
+  } catch {
+    return data;
+  }
+}
+
 // Convert EURCHF → EUR/CHF for Twelve Data
 function twelveDataSymbol(symbol: string): string | null {
   const s = symbol.toUpperCase().trim();
@@ -836,7 +876,36 @@ app.get("/api/market-data", async (req, res) => {
       if (primary === 'yahoo') {
         for (const attempt of yahooFor) {
           const cacheBust = dailyUp ? `&_cb=${Date.now()}` : '';
-          const cand = await fetchMarketData(attempt, dailyUp ? (timeframe === '1d' ? '6mo' : timeframe === '1w' ? '2y' : '5y') : '6mo', dailyUp ? (timeframe === '1d' ? '1d' : timeframe === '1w' ? '1wk' : '1mo') : '1d', 3, cacheBust);
+          // Daily forex: Yahoo's native 1d Open is unreliable (often ≈ the prior
+          // close), so every bar renders as a doji / pin-bar / hammer with a huge
+          // wick. Build TRUE daily candles from reliable HOURLY OHLC instead
+          // (Open = first hour, Close = last hour, High/Low = extremes) — exactly
+          // how other charting platforms construct daily FX bars.
+          if (timeframe === '1d') {
+            let dailyCand: any = null;
+            for (const range of ['3mo', '1mo']) {
+              const hourly = await fetchMarketData(attempt, range, '1h', 3, cacheBust);
+              if (!hourly) continue;
+              const daily = aggregateHourlyToDaily(hourly);
+              // Accept only if aggregation produced a real daily series
+              // (aggregateHourlyToDaily returns the input unchanged on failure).
+              if (daily && daily !== hourly && daily?.chart?.result?.[0]?.timestamp?.length >= 5) {
+                dailyCand = daily;
+                console.log(`[Yahoo] ${rawSymbol} 1d OK (built from ${range} hourly)`);
+                break;
+              }
+            }
+            // Last resort: fall back to Yahoo's native 1d (may show doji bodies,
+            // but better an imperfect chart than an empty one).
+            if (!dailyCand) {
+              dailyCand = await fetchMarketData(attempt, '6mo', '1d', 3, cacheBust);
+            }
+            if (dailyCand) {
+              return res.json(sanitizeCandles(dailyCand));
+            }
+            continue; // try the next Yahoo attempt
+          }
+          const cand = await fetchMarketData(attempt, timeframe === '1w' ? '2y' : '5y', timeframe === '1w' ? '1wk' : '1mo', 3, cacheBust);
           if (cand) {
             console.log(`[Yahoo] ${rawSymbol} ${timeframe} OK`);
             const sanitized = sanitizeCandles(cand);

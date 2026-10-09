@@ -313,10 +313,9 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         crosshair: { mode: CrosshairMode.Normal },
       });
       const series = chart.addSeries(CandlestickSeries, {
-        // TradingView-style candles: hollow green up-candles (subtle fill so the
-        // body reads cleanly on the dark canvas) and solid red down-candles, with
-        // a slightly brighter wick for a crisp, elegant look.
-        upColor: 'rgba(38,166,154,0.18)',
+        // Solid candles (previous house style): solid green up-candles and solid
+        // red down-candles, with a matching bright wick for a crisp, clean look.
+        upColor: '#26a69a',
         downColor: '#ef5350',
         borderUpColor: '#26a69a',
         borderDownColor: '#ef5350',
