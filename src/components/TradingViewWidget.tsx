@@ -452,11 +452,13 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
           const ts = chartRef.current?.timeScale();
           // Wider, elegant candles (was 8 — too thin). Showing ~48 recent bars
           // with a small right margin gives a clean TradingView-like density
-          // instead of the old cramped 35-bar squish.
-          ts?.applyOptions({ barSpacing: 11 });
-          const n = candles.length;
-          const visible = Math.min(48, n);
-          ts?.setVisibleLogicalRange({ from: Math.max(0, n - visible), to: n - 1 + 4 });
+          // instead of the old cramped 35-bar squish. The daily timeframe has far
+          // fewer bars, so give it a noticeably wider spacing for big, clear
+          // candles; the short timeframes keep a tighter density.
+          const barSpacing = tf === '1d' ? 16 : 11;
+          ts?.applyOptions({ barSpacing });
+          const visible = tf === '1d' ? Math.min(40, candles.length) : Math.min(48, candles.length);
+          ts?.setVisibleLogicalRange({ from: Math.max(0, candles.length - visible), to: candles.length - 1 + 4 });
         } catch {}
         updateLines();
         syncPositions();
