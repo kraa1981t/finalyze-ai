@@ -226,30 +226,57 @@ export function playDrop(volume: number = 0.5) {
   }
 }
 
-// Messenger-style "pop" for developer notifications: two bright sine blips in
-// quick succession (A5 → E6), fully synthesised so it fires instantly with no
-// audio file and no settings dependency.
+// Authentic Facebook/Messenger "ping". This is not a random blip: it is the
+// real F Major 7 chord designed by Everett Katigbak (Facebook's sound
+// designer) — four notes that spell "FACE":
+//   F5 (698.46) → A5 (880) → C6 (1046.5) → E6 (1318.51)
+// played as a bright, quick arpeggio with a soft bell timbre. Fully
+// synthesised (no audio file) so it fires instantly with no settings
+// dependency.
+const MESSENGER_FACE_NOTES: Array<[number, number, number]> = [
+  [698.46, 0.0, 0.26],     // F5  — "F"
+  [880.0, 0.09, 0.24],     // A5  — "A"
+  [1046.5, 0.18, 0.24],    // C6  — "C"
+  [1318.51, 0.27, 0.30],   // E6  — "E" (bright tail, rings a touch longer)
+];
+
+// One bright, marimba/bell-like note: a sine fundamental plus a soft partial
+// an octave up, with a snappy attack and an exponential decay — this is what
+// gives the Messenger ping its rounded, pleasant sheen.
+function playBellNote(ac: AudioContext, freq: number, start: number, dur: number, volume: number) {
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.02);
+
+  // Soft 2nd harmonic (octave up) for that rounded bell sheen.
+  const harm = ac.createOscillator();
+  const harmGain = ac.createGain();
+  harm.type = 'triangle';
+  harm.frequency.value = freq * 2;
+  harmGain.gain.setValueAtTime(0.0001, start);
+  harmGain.gain.exponentialRampToValueAtTime(volume * 0.18, start + 0.01);
+  harmGain.gain.exponentialRampToValueAtTime(0.0001, start + dur * 0.6);
+  harm.connect(harmGain);
+  harmGain.connect(ac.destination);
+  harm.start(start);
+  harm.stop(start + dur * 0.6 + 0.02);
+}
+
 export function playMessengerPing(volume: number = 0.6) {
   try {
     const ac = getCtx();
     if (!ac) return;
-    const notes: Array<[number, number, number]> = [
-      [880, 0, 0.11],       // A5 — the "pop"
-      [1318.5, 0.1, 0.16],  // E6 — bright tail, slightly overlapping
-    ];
-    for (const [freq, delay, dur] of notes) {
-      const t = ac.currentTime + delay;
-      const osc = ac.createOscillator();
-      const gain = ac.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(volume, t + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      osc.connect(gain);
-      gain.connect(ac.destination);
-      osc.start(t);
-      osc.stop(t + dur + 0.02);
+    const now = ac.currentTime;
+    for (const [freq, delay, dur] of MESSENGER_FACE_NOTES) {
+      playBellNote(ac, freq, now + delay, dur, volume);
     }
   } catch (e) {
     console.warn('Web Audio messenger ping failed:', e);
