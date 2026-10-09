@@ -2127,22 +2127,24 @@ const isDeveloperSession = () => {
   useEffect(() => {
     let unsub: (() => void) | null = null;
     let timer: ReturnType<typeof setInterval> | null = null;
-    const recompute = async (totalOverride?: number) => {
+    const recompute = async (overrideIds?: string[]) => {
       try {
         if (!isDeveloperSession()) return;
-        const total = typeof totalOverride === 'number'
-          ? totalOverride
-          : (await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')))).size;
-        // Fetch hidden count from shared_settings (open read — no auth needed)
-        let hiddenCount = 0;
+        // Load the hidden set (stored in shared_settings — open read, no auth).
+        // NOTE: we must NOT do `total - hiddenIds.length` — hidden IDs are kept
+        // forever while deleted suggestions shrink `total`, so that subtraction
+        // eventually clamps the badge to 0 permanently. Count by ID instead.
+        const hidden = new Set<string>();
         try {
           const { getDoc: fsGetDoc, doc: fsDoc } = await import('firebase/firestore');
           const hiddenSnap = await fsGetDoc(fsDoc(db, 'shared_settings', 'dev_hidden_suggestions'));
           if (hiddenSnap.exists()) {
-            hiddenCount = (hiddenSnap.data().hiddenIds || []).length;
+            ((hiddenSnap.data().hiddenIds || []) as string[]).forEach((id) => hidden.add(id));
           }
         } catch {}
-        const next = Math.max(0, total - hiddenCount);
+        const ids = overrideIds
+          ?? (await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')))).docs.map((d) => d.id);
+        const next = ids.reduce((n, id) => (hidden.has(id) ? n : n + 1), 0);
         setNewSuggestionsCount(next);
         devPing('suggestions', next);
       } catch {}
@@ -2150,7 +2152,7 @@ const isDeveloperSession = () => {
     try {
       unsub = onSnapshot(
         query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')),
-        (snap) => { void recompute(snap.size); },
+        (snap) => { void recompute(snap.docs.map((d) => d.id)); },
         () => { void recompute(); },
       );
     } catch {}
