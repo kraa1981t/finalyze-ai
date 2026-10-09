@@ -43,10 +43,11 @@ interface TradingViewWidgetProps {
 
 type LineKey = 'entry' | 'sl' | 'tp';
 
-// Day/week/month (higher) timeframes removed from the trading chart: the
-// backend daily+ data currently returns outlier-spiked candles for several
-// forex symbols, so only intraday timeframes are shown here.
-const TIMEFRAMES = ['1m', '5m', '15m', '1h'];
+// Timeframes for the trading chart. '1d' (Daily) is the default view: it is the
+// cleanest, most TradingView-like perspective and the backend fully supports it
+// (Binance 1d/365 bars, Twelve Data 1day). Outlier-spiked candles are neutralised
+// at runtime by sanitizeCandlesForChart(), so daily is safe to show.
+const TIMEFRAMES = ['1m', '5m', '15m', '1h', '1d'];
 
 const DRAW_TOOLS = [
   { id: 'cursor', label: 'مؤشر', icon: '↖' },
@@ -71,7 +72,7 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
   const priceLinesRef = useRef<Partial<Record<LineKey, any>>>({});
   const draggingRef = useRef<LineKey | null>(null);
   const lastDragSoundRef = useRef(0);
-  const [tf, setTf] = useState('1h');
+  const [tf, setTf] = useState('1d');
   const [positions, setPositions] = useState<{ sl?: number; tp?: number }>({});
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading');
   const [drawColor, setDrawColor] = useState('#60a5fa');
@@ -312,12 +313,16 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         crosshair: { mode: CrosshairMode.Normal },
       });
       const series = chart.addSeries(CandlestickSeries, {
-        upColor: '#26a69a',
+        // TradingView-style candles: hollow green up-candles (subtle fill so the
+        // body reads cleanly on the dark canvas) and solid red down-candles, with
+        // a slightly brighter wick for a crisp, elegant look.
+        upColor: 'rgba(38,166,154,0.18)',
         downColor: '#ef5350',
         borderUpColor: '#26a69a',
         borderDownColor: '#ef5350',
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
+        borderVisible: true,
         // Match the price-axis precision to the instrument's own decimals so the
         // axis and TP/SL labels show EXACTLY the same numeric values as the
         // open-trade row (5 decimals forex, 3 decimals JPY, 2 decimals others).
@@ -414,9 +419,13 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         try {
           seriesRef.current?.setData(candles);
           const ts = chartRef.current?.timeScale();
-          ts?.applyOptions({ barSpacing: 8 });
+          // Wider, elegant candles (was 8 — too thin). Showing ~48 recent bars
+          // with a small right margin gives a clean TradingView-like density
+          // instead of the old cramped 35-bar squish.
+          ts?.applyOptions({ barSpacing: 11 });
           const n = candles.length;
-          ts?.setVisibleLogicalRange({ from: Math.max(0, n - 35), to: n + 8 });
+          const visible = Math.min(48, n);
+          ts?.setVisibleLogicalRange({ from: Math.max(0, n - visible), to: n - 1 + 4 });
         } catch {}
         updateLines();
         syncPositions();
