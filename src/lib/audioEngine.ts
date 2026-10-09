@@ -127,6 +127,8 @@ if (typeof window !== 'undefined') {
   preloadSound('1', '/1.mp3');
   preloadSound('2', '/2.mp3');
   preloadSound('3', '/3.mp3');
+  preloadSound('4', '/4.mp3');  // incoming-message notification (developer bells)
+  preloadSound('5', '/5.mp3');  // analysis category-change alert
 }
 
 function playProjectSound(key: string, volume: number, fallbackTone: () => void) {
@@ -271,16 +273,27 @@ function playBellNote(ac: AudioContext, freq: number, start: number, dur: number
 }
 
 export function playMessengerPing(volume: number = 0.6) {
-  try {
-    const ac = getCtx();
-    if (!ac) return;
-    const now = ac.currentTime;
-    for (const [freq, delay, dur] of MESSENGER_FACE_NOTES) {
-      playBellNote(ac, freq, now + delay, dur, volume);
+  // Prefer the developer's own incoming-message sound (4.mp3). Fall back to the
+  // authentic FACE arpeggio only if that file has not loaded yet.
+  playProjectSound('4', volume, () => {
+    try {
+      const ac = getCtx();
+      if (!ac) return;
+      const now = ac.currentTime;
+      for (const [freq, delay, dur] of MESSENGER_FACE_NOTES) {
+        playBellNote(ac, freq, now + delay, dur, volume);
+      }
+    } catch (e) {
+      console.warn('Web Audio messenger ping failed:', e);
     }
-  } catch (e) {
-    console.warn('Web Audio messenger ping failed:', e);
-  }
+  });
+}
+
+// Analysis category-change alert: fired when one market category finishes and
+// the next one begins. Uses the developer's dedicated chime (5.mp3); falls back
+// to the synthesised water-drop if that file is unavailable.
+export function playCategoryChange(volume: number = 0.6) {
+  playProjectSound('5', volume, () => playDrop(volume));
 }
 
 export function playClick(volume: number = 0.3) {

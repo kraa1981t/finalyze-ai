@@ -3,7 +3,7 @@ import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, OAuthPro
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where, setDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { playSuccess, playFail, playCompletion, playStart, playDrop, playMessengerPing, initAudio, getAudioContext } from './lib/audioEngine';
+import { playSuccess, playFail, playCompletion, playStart, playDrop, playCategoryChange, playMessengerPing, initAudio, getAudioContext } from './lib/audioEngine';
 import { installUiClickSound } from './lib/uiClickSound';
 import { trackPageView, trackClick } from './lib/tracking';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
@@ -1404,7 +1404,8 @@ const isDeveloperSession = () => {
       const { cat, region, exchange } = openJobs[jobIdx];
       // Alert 3: Category complete and beginning of next category analysis
       if (jobIdx > 0) {
-        try { playAudio('drop'); } catch {}
+        try { initAudio(); } catch {}
+        try { playCategoryChange(autoSettingsRef.current.volume || 0.6); } catch {}
       }
 
       const mt = cat === 'crypto' ? MarketType.CRYPTO :
