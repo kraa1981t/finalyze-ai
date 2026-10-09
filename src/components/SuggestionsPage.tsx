@@ -34,6 +34,7 @@ interface SuggestionsPageProps {
 // localStorage key for tracking suggestions submitted from this browser
 const LS_MY_SUGGESTIONS = 'finalyze_my_suggestion_ids';
 const DEV_HIDDEN_SHARED = 'dev_hidden_suggestions'; // stored in shared_settings (open r/w)
+const DEV_SEEN_SHARED = 'dev_seen_suggestions'; // "read" marker so the bell badge stays gone after refresh
 
 function getLocalSuggestionIds(): Set<string> {
   try {
@@ -110,8 +111,29 @@ export default function SuggestionsPage({
     }
   };
 
+  // ── Mark suggestions as "read" (developer opened the page) ─────────────────
+  // Stored in shared_settings/dev_seen_suggestions (same open doc as hidden, so
+  // no auth / rules change needed). The header bell counts only suggestions that
+  // are neither hidden nor seen, so once the developer opens this page the badge
+  // stays gone — even after a refresh — while brand-new arrivals still ring.
+  const markDevSeen = async (ids: string[]) => {
+    if (!isDeveloper || ids.length === 0) return;
+    try {
+      const snap = await getDoc(doc(db, 'shared_settings', DEV_SEEN_SHARED));
+      const current: string[] = snap.exists() ? (snap.data().seenIds || []) : [];
+      const merged = new Set<string>(current);
+      ids.forEach((id) => merged.add(id));
+      await setDoc(doc(db, 'shared_settings', DEV_SEEN_SHARED), {
+        seenIds: [...merged],
+        updatedAt: Date.now(),
+      });
+    } catch (e) {
+      console.error('markDevSeen failed:', e);
+    }
+  };
+
   // ── Fetch all suggestions ───────────────────────────────────────────────────
-  const fetchSuggestions = async () => {
+  const fetchSuggestions = async (opts?: { markSeen?: boolean }) => {
     try {
       const q = query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion'));
       const snapshot = await getDocs(q);
@@ -130,6 +152,12 @@ export default function SuggestionsPage({
         } as Suggestion;
       }).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setSuggestions(data);
+      // When the developer opens the page, every suggestion currently visible is
+      // considered read — persist it so the header bell badge stays gone after a
+      // refresh (previously it was cleared in memory only and snapped back).
+      if (opts?.markSeen && isDeveloper) {
+        await markDevSeen(data.map((d) => d.id));
+      }
     } catch (err: any) {
       setError(isAr ? 'فشل تحميل الاقتراحات' : 'Failed to load suggestions');
     } finally {
@@ -138,7 +166,7 @@ export default function SuggestionsPage({
   };
 
   useEffect(() => {
-    fetchSuggestions();
+    fetchSuggestions({ markSeen: true });
     loadDevHidden();
     if (isDeveloper && onClearCount) onClearCount();
   }, []);

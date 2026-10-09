@@ -2136,16 +2136,26 @@ const isDeveloperSession = () => {
         // forever while deleted suggestions shrink `total`, so that subtraction
         // eventually clamps the badge to 0 permanently. Count by ID instead.
         const hidden = new Set<string>();
+        const seen = new Set<string>();
         try {
           const { getDoc: fsGetDoc, doc: fsDoc } = await import('firebase/firestore');
-          const hiddenSnap = await fsGetDoc(fsDoc(db, 'shared_settings', 'dev_hidden_suggestions'));
+          const [hiddenSnap, seenSnap] = await Promise.all([
+            fsGetDoc(fsDoc(db, 'shared_settings', 'dev_hidden_suggestions')),
+            fsGetDoc(fsDoc(db, 'shared_settings', 'dev_seen_suggestions')),
+          ]);
           if (hiddenSnap.exists()) {
             ((hiddenSnap.data().hiddenIds || []) as string[]).forEach((id) => hidden.add(id));
+          }
+          // "seen" = the developer already opened the Suggestions page. Treating it
+          // as read (not just hidden) is what makes the red badge stay gone after a
+          // refresh instead of snapping back.
+          if (seenSnap.exists()) {
+            ((seenSnap.data().seenIds || []) as string[]).forEach((id) => seen.add(id));
           }
         } catch {}
         const ids = overrideIds
           ?? (await getDocs(query(collection(db, 'analysisResults'), where('_type', '==', 'suggestion')))).docs.map((d) => d.id);
-        const next = ids.reduce((n, id) => (hidden.has(id) ? n : n + 1), 0);
+        const next = ids.reduce((n, id) => (hidden.has(id) || seen.has(id) ? n : n + 1), 0);
         setNewSuggestionsCount(next);
         devPing('suggestions', next);
       } catch {}
