@@ -293,9 +293,15 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
     const el = containerRef.current;
     if (!el) return;
     let chart: any;
+    let resizeObserver: ResizeObserver | null = null;
+    let rafId = 0;
     try {
       chart = createChart(el, {
-        autoSize: true,
+        // Explicit sizing driven by our ResizeObserver below (NOT autoSize).
+        // autoSize's internal observer fails to recover when the panel is created
+        // already collapsed (width 0), which squashed the candles into the corner.
+        width: el.clientWidth || 600,
+        height: el.clientHeight || 360,
         layout: {
           background: { type: ColorType.Solid, color: '#0b0e14' },
           textColor: '#8b93a7',
@@ -373,10 +379,36 @@ export default function TradingViewWidget({ symbol, entryPrice, sl, tp, onSlChan
         chart.timeScale().subscribeVisibleTimeRangeChange(syncPositions);
         chart.priceScale('right').subscribeSizeInvalidated(syncPositions);
       } catch {}
+      // autoSize only re-measures the container while it has a real layout box.
+      // When the panel opens already collapsed (width 0) — e.g. opening a trade's
+      // chart straight from the folded list — the chart is created with a 0-width
+      // box and autoSize can fail to catch up, leaving the candles squashed into
+      // the left corner. A ResizeObserver forces a real re-measure + content fit
+      // the instant the container regains a width.
+      const refit = () => {
+        try {
+          const w = el.clientWidth;
+          const h = el.clientHeight;
+          if (w > 0 && h > 0) {
+            chart.applyOptions({ width: w, height: h });
+            const d = dataRef.current;
+            if (d.length) chart.timeScale().fitContent();
+          }
+        } catch {}
+      };
+      try {
+        resizeObserver = new ResizeObserver(() => {
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(refit);
+        });
+        resizeObserver.observe(el);
+      } catch {}
     } catch {
       return;
     }
     return () => {
+      try { resizeObserver?.disconnect(); } catch {}
+      try { if (rafId) cancelAnimationFrame(rafId); } catch {}
       try { chart?.remove(); } catch {}
       chartRef.current = null;
       seriesRef.current = null;

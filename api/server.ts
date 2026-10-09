@@ -883,16 +883,23 @@ app.get("/api/market-data", async (req, res) => {
           // how other charting platforms construct daily FX bars.
           if (timeframe === '1d') {
             let dailyCand: any = null;
-            for (const range of ['3mo', '1mo']) {
+            // Yahoo caps hourly data at ~730 days, so ask for progressively
+            // longer windows and take the first that yields a genuinely long
+            // daily series. This restores a full multi-month/year price history
+            // instead of the previous ~60-90 day blip.
+            for (const range of ['2y', '1y', '6mo', '3mo', '1mo']) {
               const hourly = await fetchMarketData(attempt, range, '1h', 3, cacheBust);
               if (!hourly) continue;
               const daily = aggregateHourlyToDaily(hourly);
               // Accept only if aggregation produced a real daily series
               // (aggregateHourlyToDaily returns the input unchanged on failure).
-              if (daily && daily !== hourly && daily?.chart?.result?.[0]?.timestamp?.length >= 5) {
+              // Prefer a long series (>=30 bars ≈ a month+); keep a shorter one
+              // only as a last resort so the chart is never left empty.
+              const barCount = daily?.chart?.result?.[0]?.timestamp?.length || 0;
+              if (daily && daily !== hourly && barCount >= 5) {
                 dailyCand = daily;
-                console.log(`[Yahoo] ${rawSymbol} 1d OK (built from ${range} hourly)`);
-                break;
+                console.log(`[Yahoo] ${rawSymbol} 1d OK (built from ${range} hourly, ${barCount} bars)`);
+                if (barCount >= 30) break;
               }
             }
             // Last resort: fall back to Yahoo's native 1d (may show doji bodies,
