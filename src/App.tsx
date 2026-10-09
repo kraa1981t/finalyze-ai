@@ -3,7 +3,7 @@ import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, OAuthPro
 import { auth, db } from './lib/firebase';
 import { doc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, where, setDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { playSuccess, playFail, playCompletion, playStart, playDrop, playMessengerPing, initAudio } from './lib/audioEngine';
+import { playSuccess, playFail, playCompletion, playStart, playDrop, playMessengerPing, initAudio, getAudioContext } from './lib/audioEngine';
 import { installUiClickSound } from './lib/uiClickSound';
 import { trackPageView, trackClick } from './lib/tracking';
 import { TrendingUp, Activity, ArrowLeft, Users, Shield } from 'lucide-react';
@@ -886,21 +886,33 @@ const isDeveloperSession = () => {
   // A click tick on every button, icon, page link and section that gets pressed.
   useEffect(() => installUiClickSound(), []);
 
-  // Web Audio API ΓÇö unlock AudioContext on first user click (browser autoplay policy)
+  // Web Audio API — keep unlocking on EVERY user gesture until the context is
+  // truly running. The old one-shot unlock could miss entirely on
+  // mobile/desktop: a locked context silently swallows ALL later programmatic
+  // playback (including the developer notification pings).
   useEffect(() => {
+    let done = false;
     const unlock = () => {
-      initAudio();
-      window.removeEventListener('click', unlock);
-      window.removeEventListener('touchstart', unlock);
-      window.removeEventListener('mousedown', unlock);
+      if (done) return;
+      try { initAudio(); } catch {}
+      const ac = getAudioContext();
+      if (ac && ac.state === 'running') {
+        done = true;
+        window.removeEventListener('click', unlock, true);
+        window.removeEventListener('touchstart', unlock, true);
+        window.removeEventListener('mousedown', unlock, true);
+        window.removeEventListener('keydown', unlock, true);
+      }
     };
-    window.addEventListener('click', unlock, { passive: true });
-    window.addEventListener('touchstart', unlock, { passive: true });
-    window.addEventListener('mousedown', unlock, { passive: true });
+    window.addEventListener('click', unlock, { capture: true, passive: true });
+    window.addEventListener('touchstart', unlock, { capture: true, passive: true });
+    window.addEventListener('mousedown', unlock, { capture: true, passive: true });
+    window.addEventListener('keydown', unlock, { capture: true, passive: true } as any);
     return () => {
-      window.removeEventListener('click', unlock);
-      window.removeEventListener('touchstart', unlock);
-      window.removeEventListener('mousedown', unlock);
+      window.removeEventListener('click', unlock, true);
+      window.removeEventListener('touchstart', unlock, true);
+      window.removeEventListener('mousedown', unlock, true);
+      window.removeEventListener('keydown', unlock, true);
     };
   }, []);
 
@@ -2062,6 +2074,40 @@ const isDeveloperSession = () => {
   // Watch the signed-in address explicitly (deps): the first render's `user` is
   // usually null, and a [] closure would freeze that and never ping afterwards.
   const devEmail = (user?.email || '').toLowerCase().trim();
+  // Pending pings: when a bell grows while AudioContext is still locked (no
+  // user gesture yet), the browser swallows sound silently. The ping is parked
+  // here and replayed on the next unlock gesture, so it is never truly lost.
+  const pendingPingRef = useRef(false);
+  const firePing = useCallback(() => {
+    try { initAudio(); } catch {}
+    const ac = getAudioContext();
+    if (ac && ac.state === 'running') {
+      pendingPingRef.current = false;
+      try { playMessengerPing(0.6); } catch {}
+      return true;
+    }
+    pendingPingRef.current = true;
+    try { playMessengerPing(0.6); } catch {}
+    return false;
+  }, []);
+  // Replay a parked ping on any gesture (the context-opening listeners above
+  // unlock the context itself; this one rings the bell left waiting).
+  useEffect(() => {
+    const retry = () => {
+      if (!pendingPingRef.current) return;
+      firePing();
+    };
+    window.addEventListener('click', retry, { capture: true, passive: true });
+    window.addEventListener('touchstart', retry, { capture: true, passive: true });
+    window.addEventListener('mousedown', retry, { capture: true, passive: true });
+    window.addEventListener('keydown', retry, { capture: true, passive: true } as any);
+    return () => {
+      window.removeEventListener('click', retry, true);
+      window.removeEventListener('touchstart', retry, true);
+      window.removeEventListener('mousedown', retry, true);
+      window.removeEventListener('keydown', retry, true);
+    };
+  }, [firePing]);
   const devPing = useCallback((kind: 'suggestions' | 'payments' | 'sites', next: number) => {
     const prevCounts = notifCountsRef.current;
     const primed = notifPrimedRef.current;
@@ -2072,11 +2118,8 @@ const isDeveloperSession = () => {
       return;
     }
     if (!primed[kind]) { primed[kind] = true; return; }
-    if (next > prev) {
-      try { initAudio(); } catch {}
-      try { playMessengerPing(0.6); } catch {}
-    }
-  }, [devEmail]);
+    if (next > prev) firePing();
+  }, [devEmail, firePing]);
 
   // Fetch new suggestions count for developer notifications — LIVE listener so
   // the red badge appears the instant a client posts, even if the developer
