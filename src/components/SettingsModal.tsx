@@ -390,7 +390,24 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
           <NumberInput label={isAr ? 'حد الإشارة العادية' : 'Buy/Sell Threshold'} value={settings.buyThreshold} onChange={(v) => handleChange('buyThreshold', v)} color="text-primary" desc={isAr ? 'الثقة المطلوبة لشراء/بيع عادي (≥)' : 'Confidence required for regular buy/sell (≥)'} />
           <NumberInput label={isAr ? 'الثقة الأساسية' : 'Base Confidence'} value={settings.baseConfidence} onChange={(v) => handleChange('baseConfidence', v)} color="text-emerald-400" desc={isAr ? 'نسبة أساسية ثابتة تُضاف لكل إشارة' : 'Fixed base percentage added to all signals'} />
           <div className="h-px bg-white/10 my-3" />
-          <ToggleRow label={isAr ? 'تفعيل النطاق الذهبي (70-85)' : 'Enable Golden Window (70-85)'} desc={isAr ? 'اعرض الإشارات داخل نطاق الثقة الذهبي فقط؛ ما دون 70% أو فوق 85% يُحوَّل لمحايد' : 'Only surface signals inside the golden window; below min or above max becomes neutral'} checked={settings.goldenRangeEnabled !== false} onChange={(v) => handleChange('goldenRangeEnabled', v)} />
+          <button onClick={() => handleChange('goldenRangeEnabled', settings.goldenRangeEnabled === false)}
+            className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-right gap-4 ${
+              settings.goldenRangeEnabled !== false
+                ? 'bg-amber-400/10 border-amber-400/40 text-amber-300'
+                : 'bg-white/5 border-white/5 text-brand-muted'
+            }`}>
+            <div className="flex-1 min-w-0">
+              <div className="text-lg md:text-xl font-black leading-tight">{isAr ? 'تفعيل النطاق الذهبي (70-85)' : 'Enable Golden Window (70-85)'}</div>
+              <div className="text-sm md:text-base opacity-70 mt-1 leading-snug">{isAr ? 'اعرض الإشارات داخل نطاق الثقة الذهبي فقط؛ ما دون 70% أو فوق 85% يُحوَّل لمحايد' : 'Only surface signals inside the golden window; below min or above max becomes neutral'}</div>
+            </div>
+            <div className={`w-14 h-8 rounded-full transition-colors flex items-center px-1 shrink-0 ${
+              settings.goldenRangeEnabled !== false ? 'bg-amber-400' : 'bg-white/20'
+            }`}>
+              <div className={`w-6 h-6 bg-white rounded-full transition-transform shadow ${
+                settings.goldenRangeEnabled !== false ? 'translate-x-6' : 'translate-x-0'
+              }`} />
+            </div>
+          </button>
           <NumberInput label={isAr ? 'أدنى النطاق الذهبي' : 'Golden Min (%)'} value={settings.goldenConfMin ?? 70} onChange={(v) => handleChange('goldenConfMin', v)} color="text-amber-300" desc={isAr ? 'أقل من هذه النسبة → محايد (إشارة ضعيفة)' : 'Below this → neutral (weak signal)'} />
           <NumberInput label={isAr ? 'أقصى النطاق الذهبي' : 'Golden Max (%)'} value={settings.goldenConfMax ?? 85} onChange={(v) => handleChange('goldenConfMax', v)} color="text-amber-300" desc={isAr ? 'أعلى من هذه النسبة → محايد (دخول متأخر/مطاردة)' : 'Above this → neutral (late entry / chasing)'} />
         </div>
