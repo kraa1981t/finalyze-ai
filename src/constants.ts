@@ -47,6 +47,10 @@ export const DEFAULT_STRATEGY_SETTINGS: StrategySettings = {
   stopAtrMultiplier: 3,    // wider, breathable stop (crypto always 3×)
   minPullbackAtr: 0.5,     // entry zone depth in ATR
   pullbackRsiConfirm: true, // deepen the zone to 1 ATR when RSI is stretched
+  // ── Golden confidence window (surface only the best-timed entries) ──
+  goldenRangeEnabled: true, // only show signals whose confidence is inside the golden window
+  goldenConfMin: 70,        // below this → neutral (too weak)
+  goldenConfMax: 85,        // above this → neutral (late-entry / chasing risk)
 };
 
 export const DEFAULT_AUTO_SETTINGS = {

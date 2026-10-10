@@ -2215,6 +2215,30 @@ Return ONLY valid JSON:
       finalConfidence = Math.min(finalConfidence, 30);
     }
 
+    // ── GOLDEN CONFIDENCE WINDOW (last gate — the developer only sees the best-timed entries) ──
+    // Only signals whose final confidence sits inside [goldenConfMin .. goldenConfMax] are
+    // surfaced. Too low (< min) = weak/no edge → neutral. Too high (> max) = the move is
+    // already extended and you'd be chasing the top → neutral. This is the sweet spot where
+    // the pullback-entry protection is most reliable.
+    if (settings?.goldenRangeEnabled) {
+      const gMin = typeof settings.goldenConfMin === 'number' ? settings.goldenConfMin : 70;
+      const gMax = typeof settings.goldenConfMax === 'number' ? settings.goldenConfMax : 85;
+      const isTradeSignal = finalSignal === SignalType.BUY || finalSignal === SignalType.STRONG_BUY ||
+                            finalSignal === SignalType.SELL || finalSignal === SignalType.STRONG_SELL;
+      if (isTradeSignal && (finalConfidence < gMin || finalConfidence > gMax)) {
+        const reason = finalConfidence < gMin
+          ? `ثقة ${finalConfidence}% أقل من النطاق الذهبي (${gMin}%) — إشارة ضعيفة`
+          : `ثقة ${finalConfidence}% أعلى من النطاق الذهبي (${gMax}%) — دخول متأخر/مطاردة`;
+        detailedReasons.push({
+          check: 'النطاق الذهبي',
+          value: reason,
+          status: 'negative',
+          impact: `outside golden window [${gMin}-${gMax}] — hidden as neutral`
+        });
+        finalSignal = SignalType.NEUTRAL;
+      }
+    }
+
     // ΓöÇΓöÇ Generate STABLE summary from metrics (not AI text) ΓöÇΓöÇ
     const trendText = metrics?.direction === 'uptrend' ? 'صاعد' : metrics?.direction === 'downtrend' ? 'هابط' : 'عرضي';
     const zoneText = totalAge < infantAgeThreshold ? 'طفولي' : totalAge < matureAgeThreshold ? 'شاب' : totalAge <= oldAgeThreshold ? 'نضج' : 'كهل';

@@ -119,6 +119,10 @@ export interface StrategySettings {
   stopAtrMultiplier?: number;          // ATR multiple for the stop-loss (default 3)
   minPullbackAtr?: number;             // pullback-zone depth in ATR (default 0.5)
   pullbackRsiConfirm?: boolean;        // deepen the zone to 1 ATR when RSI is stretched
+  // ── Golden confidence window (surface only the best-timed entries) ──
+  goldenRangeEnabled?: boolean;        // when true, only signals inside [goldenConfMin..goldenConfMax] are shown
+  goldenConfMin?: number;              // lower edge of the golden window (default 70) — below → neutral
+  goldenConfMax?: number;              // upper edge of the golden window (default 85) — above → neutral (chasing risk)
 }
 
 export interface AutoAnalysisSettings {

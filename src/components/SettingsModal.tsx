@@ -389,6 +389,10 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
           <NumberInput label={isAr ? 'الشروط الداعمة للقوة' : 'Min Support for Strong'} value={settings.minStrongSupport} onChange={(v) => handleChange('minStrongSupport', v)} color="text-[#F59E0B]" desc={isAr ? 'نسبة الشروط الداعمة المطلوبة لإشارة قوية (≥%)' : 'Support ratio required for strong signal (≥%)'} />
           <NumberInput label={isAr ? 'حد الإشارة العادية' : 'Buy/Sell Threshold'} value={settings.buyThreshold} onChange={(v) => handleChange('buyThreshold', v)} color="text-primary" desc={isAr ? 'الثقة المطلوبة لشراء/بيع عادي (≥)' : 'Confidence required for regular buy/sell (≥)'} />
           <NumberInput label={isAr ? 'الثقة الأساسية' : 'Base Confidence'} value={settings.baseConfidence} onChange={(v) => handleChange('baseConfidence', v)} color="text-emerald-400" desc={isAr ? 'نسبة أساسية ثابتة تُضاف لكل إشارة' : 'Fixed base percentage added to all signals'} />
+          <div className="h-px bg-white/10 my-3" />
+          <ToggleRow label={isAr ? 'تفعيل النطاق الذهبي (70-85)' : 'Enable Golden Window (70-85)'} desc={isAr ? 'اعرض الإشارات داخل نطاق الثقة الذهبي فقط؛ ما دون 70% أو فوق 85% يُحوَّل لمحايد' : 'Only surface signals inside the golden window; below min or above max becomes neutral'} checked={settings.goldenRangeEnabled !== false} onChange={(v) => handleChange('goldenRangeEnabled', v)} />
+          <NumberInput label={isAr ? 'أدنى النطاق الذهبي' : 'Golden Min (%)'} value={settings.goldenConfMin ?? 70} onChange={(v) => handleChange('goldenConfMin', v)} color="text-amber-300" desc={isAr ? 'أقل من هذه النسبة → محايد (إشارة ضعيفة)' : 'Below this → neutral (weak signal)'} />
+          <NumberInput label={isAr ? 'أقصى النطاق الذهبي' : 'Golden Max (%)'} value={settings.goldenConfMax ?? 85} onChange={(v) => handleChange('goldenConfMax', v)} color="text-amber-300" desc={isAr ? 'أعلى من هذه النسبة → محايد (دخول متأخر/مطاردة)' : 'Above this → neutral (late entry / chasing)'} />
         </div>
       </div>
 
