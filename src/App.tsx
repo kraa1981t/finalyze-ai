@@ -1115,6 +1115,14 @@ const isDeveloperSession = () => {
       if (res.signal === 'neutral' || res.signal === 'no_entry') return; // neutral hidden
       if (res.isSideways) return; // sideways signals completely hidden
 
+      // ── PULLBACK SAFETY GATE (the hidden filter) ──
+      // In 'pullback' entry mode the engine only marks a signal ready once a real
+      // retrace has actually completed on the candles. Until then we keep it out
+      // of the top-signals box entirely — so the box NEVER shows a signal that
+      // isn't genuinely ready for a safe entry right now. (Undefined field, e.g.
+      // legacy/other code paths, is treated as ready to avoid hiding everything.)
+      if (res.entryMode === 'pullback' && res.pullbackReadyForEntry === false) return;
+
       const existing = updated.find(s => s.symbol === res.symbol);
       const { minHold } = getHoldPeriods(res.timeframe);
       const existingAge = existing ? now - new Date(existing.timestamp).getTime() : Infinity;

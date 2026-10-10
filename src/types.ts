@@ -46,6 +46,9 @@ export interface AnalysisResult {
   direction?: string;
   entryPrice?: number;
   entryMode?: 'market' | 'pullback';
+  // Pullback-READY gate (backward confirmation): in 'pullback' entry mode the
+  // signal is only surfaced to the box once the retrace has actually completed.
+  pullbackReadyForEntry?: boolean;
   isSideways?: boolean;
   sidewaysDirection?: 'uptrend' | 'downtrend' | 'sideways';
   adx?: number;

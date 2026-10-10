@@ -2131,7 +2131,7 @@ Return ONLY valid JSON:
       // DEEPEN the zone to a full 1 ATR so we never buy the top / sell the bottom.
       const isBuy = finalSignal.includes('buy');
       const isSell = finalSignal.includes('sell');
-      const usePullback = settings.entryMode === 'pullback' && (isBuy || isSell);
+      var usePullback = settings.entryMode === 'pullback' && (isBuy || isSell);
       var entryAnchor = currentPrice;
       var pullbackDist = 0;
       if (usePullback && atr > 0) {
@@ -2146,6 +2146,42 @@ Return ONLY valid JSON:
         }
         pullbackDist = atr * depthAtr;
         entryAnchor = isBuy ? currentPrice - pullbackDist : currentPrice + pullbackDist;
+      }
+
+      // ── Backward CONFIRMATION (the hidden safety gate) ──
+      // In 'pullback' mode we refuse to surface the signal to the box until a REAL
+      // retrace has already played out on the candles AND price is bouncing back
+      // toward the trend. We look back over the recent bars and require BOTH:
+      //   1) a genuine pullback actually happened (price dipped well below the
+      //      current level — the swing low of the window sits meaningfully lower), and
+      //   2) price has now turned back up (the last bar closed above the previous
+      //      one AND recovered off that swing low) = a bounce, not a falling knife.
+      // If the retrace is still in progress (price still making lower closes) the
+      // gate stays FALSE and the box filter hides this signal until it matures.
+      var pullbackReadyForEntry = true;
+      if (usePullback && atr > 0 && closes.length > 4) {
+        const lookback = Math.min(8, closes.length - 1);
+        const winStart = closes.length - 1 - lookback;
+        let swingLow = Infinity;
+        let swingHigh = -Infinity;
+        for (let i = winStart; i < closes.length; i++) {
+          if (lows[i] < swingLow) swingLow = lows[i];
+          if (highs[i] > swingHigh) swingHigh = highs[i];
+        }
+        const lastClose = closes[closes.length - 1];
+        const prevClose = closes[closes.length - 2];
+        if (isBuy) {
+          // Pullback = price really came down off the recent high; bounce = last
+          // bar is green and has recovered clearly above the swing low.
+          const pulledBack = swingLow < lastClose - atr * 0.15;
+          const bouncing = lastClose > prevClose && lastClose > swingLow + atr * 0.1;
+          pullbackReadyForEntry = pulledBack && bouncing;
+        } else if (isSell) {
+          // Mirror image for a sell after a rally into the zone and a roll-over.
+          const rallied = swingHigh > lastClose + atr * 0.15;
+          const rollingOver = lastClose < prevClose && lastClose < swingHigh - atr * 0.1;
+          pullbackReadyForEntry = rallied && rollingOver;
+        }
       }
 
       if (isBuy) {
@@ -2207,6 +2243,7 @@ Return ONLY valid JSON:
       userId: "",
       entryPrice: (typeof entryAnchor === 'number' && entryAnchor > 0) ? entryAnchor : currentPrice,
       entryMode: usePullback ? 'pullback' : 'market',
+      pullbackReadyForEntry: usePullback ? pullbackReadyForEntry : true,
       stopLoss: finalStopLoss,
       takeProfit: finalTakeProfit,
       primaryMetCount,
