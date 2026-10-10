@@ -130,10 +130,12 @@ export default function Header({
   // cross-tab `storage` event plus a light poll, so the header flips the instant
   // the user toggles auto-trading on the Trade page (or in another tab).
   const [autoTradeActive, setAutoTradeActive] = useState<boolean>(() => {
-    try { return localStorage.getItem('paper_trading_auto_trade') === '1'; } catch { return false; }
+    // Default ON: auto-trading is enabled unless the user explicitly turned it off
+    // ('0'). A brand-new user (no stored key) therefore starts with auto-trade ON.
+    try { return localStorage.getItem('paper_trading_auto_trade') !== '0'; } catch { return true; }
   });
   useEffect(() => {
-    const read = () => { try { setAutoTradeActive(localStorage.getItem('paper_trading_auto_trade') === '1'); } catch {} };
+    const read = () => { try { setAutoTradeActive(localStorage.getItem('paper_trading_auto_trade') !== '0'); } catch { setAutoTradeActive(true); } };
     read();
     const onStorage = (e: StorageEvent) => { if (!e.key || e.key === 'paper_trading_auto_trade') read(); };
     window.addEventListener('storage', onStorage);

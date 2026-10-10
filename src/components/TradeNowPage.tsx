@@ -159,7 +159,9 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   // (once per symbol — never duplicated) at its live price with the signal's
   // own SL/TP. It never touches real money or MT5.
   const [autoTrade, setAutoTrade] = useState<boolean>(() => {
-    try { return localStorage.getItem(AUTO_TRADE_KEY) === '1'; } catch { return false; }
+    // Default ON: auto-trading starts enabled unless the user explicitly disabled
+    // it ('0'). New users (no stored value) get auto-trade ON out of the box.
+    try { return localStorage.getItem(AUTO_TRADE_KEY) !== '0'; } catch { return true; }
   });
   // Symbols already auto-opened this session — prevents re-opening the same signal.
   const autoOpenedRef = React.useRef<Set<string>>(new Set());
