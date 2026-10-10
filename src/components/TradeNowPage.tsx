@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw, Pencil, Check, XCircle, Trash2, Maximize, Minimize, ChevronUp, ChevronDown } from 'lucide-react';
+import { TrendingUp, Info, Wallet, X, Loader2, Plus, RotateCcw, Pencil, Check, XCircle, Trash2, Maximize, Minimize, ChevronUp, ChevronDown, Zap } from 'lucide-react';
 import { User } from 'firebase/auth';
-import { AnalysisResult } from '../types';
+import { AnalysisResult, SignalType } from '../types';
 import { SYMBOL_CATEGORIES } from '../constants';
 import { Language } from '../lib/i18n';
 import TradingViewWidget from './TradingViewWidget';
@@ -25,6 +25,7 @@ const CUSTOM_KEY = 'paper_trading_custom_symbols';
 const CUSTOM_TV_KEY = 'paper_trading_custom_tv_map';
 const HIDDEN_KEY = 'paper_trading_hidden_symbols';
 const ADDED_CAT_KEY = 'paper_trading_added_by_category';
+const AUTO_TRADE_KEY = 'paper_trading_auto_trade';
 
 const CATEGORY_TABS = [
   { key: 'forex', labelAr: 'الفوركس', labelEn: 'Forex', emoji: '\uD83D\uDCB1' },
@@ -151,6 +152,19 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
   const [tpPrice, setTpPrice] = useState<string>('');
   const [slPrice, setSlPrice] = useState<string>('');
   const [tab, setTab] = useState<'positions' | 'history'>('positions');
+  // ── Automatic trading (open the site's displayed signals automatically) ──
+  // Disabled by default; the user toggles it from the header icon. Persisted in
+  // localStorage so the choice survives refresh. When ON, the auto-open engine
+  // below opens a PAPER trade for every strong buy/sell signal shown in the box
+  // (once per symbol — never duplicated) at its live price with the signal's
+  // own SL/TP. It never touches real money or MT5.
+  const [autoTrade, setAutoTrade] = useState<boolean>(() => {
+    try { return localStorage.getItem(AUTO_TRADE_KEY) === '1'; } catch { return false; }
+  });
+  // Symbols already auto-opened this session — prevents re-opening the same signal.
+  const autoOpenedRef = React.useRef<Set<string>>(new Set());
+  // In-flight guard so two rapid signal updates can't open the same symbol twice.
+  const autoOpeningRef = React.useRef<Set<string>>(new Set());
   // Inline SL/TP editing for an open trade
   const [editId, setEditId] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -353,6 +367,89 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     setTrades((prev) => prev.map((x) => x.id === t.id ? { ...x, status: 'closed', exitPrice, pnl, closeReason: reason, closedAt: Date.now() } : x));
     playCloseSound();
   }
+
+  // ── AUTO-OPEN ENGINE ──
+  // When auto-trade is ON, open a PAPER trade for every strong buy/sell signal
+  // currently shown in the box, once per symbol (never a duplicate). Uses the
+  // signal's own entry/SL/TP and the category's default lot size. Skips when the
+  // market is closed or margin is insufficient — it never touches real money.
+  const autoOpenSignals = useCallback(async () => {
+    if (!autoTrade) return;
+    for (const sig of signals) {
+      const isBuy = sig.signal === SignalType.STRONG_BUY || sig.signal === SignalType.BUY;
+      const isSell = sig.signal === SignalType.STRONG_SELL || sig.signal === SignalType.SELL;
+      if (!isBuy && !isSell) continue;
+      const sym = sig.symbol;
+      if (!sym) continue;
+      // Skip if we already auto-opened this symbol this session, one is in flight,
+      // or an open trade already exists for it.
+      if (autoOpenedRef.current.has(sym) || autoOpeningRef.current.has(sym)) continue;
+      if (tradesRef.current.some((t) => t.status === 'open' && t.symbol === sym)) continue;
+
+      const cat = detectCategory(sym);
+      // Respect market hours (crypto is 24/7).
+      if (!isMarketOpen(cat, sym)) continue;
+
+      // Live price: prefer the streaming map, otherwise fetch a fresh quote.
+      let price = priceMapRef.current[sym];
+      if (price == null) {
+        try { price = await getLivePrice(sym); } catch { price = null; }
+      }
+      if (price == null || !(price > 0)) continue;
+
+      const q = getDefaultQty(cat);
+      const requiredMargin = notionalInUSD(cat, sym, price, q) / leverage;
+      if (requiredMargin > balanceRef.current) continue; // not enough margin — skip
+
+      const side: 'buy' | 'sell' = isBuy ? 'buy' : 'sell';
+      // Prefer the signal's own pullback entry price and SL/TP; fall back to live price.
+      const entryPrice = (sig.entryPrice && sig.entryPrice > 0) ? sig.entryPrice : price;
+      const tradeData = {
+        symbol: sym, category: cat, side, qty: q, entryPrice,
+        status: 'open' as const,
+        tp: (typeof sig.takeProfit === 'number' && sig.takeProfit > 0) ? sig.takeProfit : null,
+        sl: (typeof sig.stopLoss === 'number' && sig.stopLoss > 0) ? sig.stopLoss : null,
+        openedAt: Date.now(),
+      };
+
+      autoOpeningRef.current.add(sym);
+      try {
+        const id = await store.addTrade(tradeData);
+        setTrades((prev) => [{ id, ...tradeData }, ...prev]);
+        autoOpenedRef.current.add(sym);
+        playOpenSound();
+      } catch (e) {
+        // Fallback: persist locally so the trade still shows if Firestore is down.
+        try {
+          const id = `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+          const raw = JSON.parse(localStorage.getItem('paper_trading_data') || '{"balance":10000,"trades":[]}');
+          raw.trades.unshift({ ...tradeData, id });
+          localStorage.setItem('paper_trading_data', JSON.stringify(raw));
+          setTrades((prev) => [{ id, ...tradeData }, ...prev]);
+          autoOpenedRef.current.add(sym);
+          playOpenSound();
+        } catch {}
+      } finally {
+        autoOpeningRef.current.delete(sym);
+      }
+    }
+  }, [autoTrade, signals, leverage]);
+
+  // Re-scan whenever the displayed signals change while auto-trade is ON.
+  useEffect(() => {
+    if (!autoTrade || signals.length === 0) return;
+    autoOpenSignals();
+  }, [autoTrade, signals, autoOpenSignals]);
+
+  const toggleAutoTrade = () => {
+    setAutoTrade((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(AUTO_TRADE_KEY, next ? '1' : '0'); } catch {}
+      // When switching ON, run an immediate scan of the current signals.
+      if (next) setTimeout(() => autoOpenSignals(), 0);
+      return next;
+    });
+  };
 
   function selectCategory(key: string) {
     setCategory(key);
@@ -800,6 +897,24 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
             <TrendingUp size={20} className="text-black" />
           </div>
           <span className="text-lg font-black text-brand-text">{isAr ? 'تداول تلقائي' : 'Automatic Trading'}</span>
+          {/* Auto-trade toggle — opens the site's displayed signals as PAPER trades
+              automatically when ON; user can switch it off from here anytime. */}
+          <button
+            onClick={toggleAutoTrade}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black transition-all border cursor-pointer active:scale-95 ${
+              autoTrade
+                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.45)]'
+                : 'bg-white/5 border-white/15 text-white/50 hover:bg-white/10'
+            }`}
+            title={isAr
+              ? 'تشغيل/إيقاف فتح الإشارات المعروضة تلقائياً (تداول ورقي بلا مخاطرة حقيقية)'
+              : 'Toggle auto-opening of the displayed signals (paper trading — no real money)'}
+          >
+            <Zap size={14} className={autoTrade ? 'fill-emerald-400 animate-pulse' : ''} />
+            {isAr
+              ? (autoTrade ? 'التنفيذ التلقائي مُفعَّل' : 'التنفيذ التلقائي متوقف')
+              : (autoTrade ? 'Auto-Exec ON' : 'Auto-Exec OFF')}
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <button
