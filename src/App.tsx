@@ -1115,13 +1115,17 @@ const isDeveloperSession = () => {
       if (res.signal === 'neutral' || res.signal === 'no_entry') return; // neutral hidden
       if (res.isSideways) return; // sideways signals completely hidden
 
-      // ── PULLBACK SAFETY GATE (the hidden filter) ──
-      // In 'pullback' entry mode the engine only marks a signal ready once a real
-      // retrace has actually completed on the candles. Until then we keep it out
-      // of the top-signals box entirely — so the box NEVER shows a signal that
-      // isn't genuinely ready for a safe entry right now. (Undefined field, e.g.
-      // legacy/other code paths, is treated as ready to avoid hiding everything.)
-      if (res.entryMode === 'pullback' && res.pullbackReadyForEntry === false) return;
+      // ── PULLBACK ENTRY NOTE (no longer a hard hide) ──
+      // The signal is ALWAYS surfaced to the box (we never leave it empty). The
+      // pullback strategy's real protection is applied upstream in the engine:
+      //   • entryPrice is anchored at the retrace zone (better entry, not a chase)
+      //   • stopLoss is widened to 3× ATR so the normal 3-5 candle pullback that
+      //     used to stop you out no longer touches it.
+      // We keep the computed pullbackReadyForEntry flag on the result so the
+      // chart / UI can *annotate* how ready it is, but it never removes the card.
+      if (res.entryMode === 'pullback' && res.pullbackReadyForEntry === false) {
+        // Soft note only — the signal still shows; nothing is hidden here.
+      }
 
       const existing = updated.find(s => s.symbol === res.symbol);
       const { minHold } = getHoldPeriods(res.timeframe);
