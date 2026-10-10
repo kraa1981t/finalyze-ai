@@ -14,6 +14,7 @@ import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSugg
 import { playOpenSound, playCloseSound, playDragTick } from '../lib/tradeSounds';
 import { pricesToUsd, usdToPrice, slAmountUSD, notionalInUSD } from '../lib/positionMath';
 import { toTvSymbol as toTvSymbolShared } from '../lib/tvSymbol';
+import { calcTrailingStop } from '../lib/trailingStop';
 
 interface TradeNowPageProps {
   lang: Language;
@@ -343,6 +344,40 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
     for (const t of targets) {
       // Skip auto-close right after the user sets SL/TP (cooldown window).
       if ((levelCooldownRef.current[t.id] || 0) > now) continue;
+
+      // ── DYNAMIC TRAILING STOP ──
+      // Trail the stop toward profit as the trade gains, scaling with lot size.
+      // The stop only ever ratchets (never moves backwards) so a brief dip never
+      // re-widens it. We compute the unrealised P&L in USD, map it to a trailing
+      // offset, convert that offset to a price for this asset class, then move the
+      // stop only if the new level is strictly better than the current one.
+      if (typeof t.qty === 'number' && t.qty > 0 && typeof t.entryPrice === 'number') {
+        const pnlUSD = calcPnl(t, price);
+        const trail = calcTrailingStop({ qty: t.qty, openPnlUSD: pnlUSD });
+        // active covers BOTH: first activation (offset 0 → stop to breakeven/entry)
+        // and every subsequent step (offset > 0 → stop trails into profit).
+        if (trail.active && trail.offsetUSD >= 0) {
+          // Place the stop `offsetUSD` in profit from entry:
+          //   buy  → stop ABOVE entry · sell → stop BELOW entry
+          // offset 0 → exactly at entry (breakeven lock).
+          const above = t.side === 'buy';
+          const newSl = usdToPrice(t.symbol, trail.offsetUSD, t.entryPrice, above, t.qty, t.category);
+          if (isFinite(newSl) && newSl > 0) {
+            // Only ratchet toward profit — never let a good stop fall back.
+            // breakeven (offset 0) for a buy lands ON entry; treat that as an
+            // improvement only if the current stop is still below entry.
+            const better = t.side === 'buy'
+              ? newSl > (t.sl ?? -Infinity)
+              : newSl < (t.sl ?? Infinity);
+            if (better) {
+              // Update locally first (instant UI), then persist (best-effort).
+              setTrades((prev) => prev.map((x) => x.id === t.id ? { ...x, sl: newSl } : x));
+              try { await store.updateTrade(t.id, { sl: newSl }); } catch { /* offline: local copy stands */ }
+            }
+          }
+        }
+      }
+
       const hitTp = t.tp != null && ((t.side === 'buy' && price >= t.tp) || (t.side === 'sell' && price <= t.tp));
       const hitSl = t.sl != null && ((t.side === 'buy' && price <= t.sl) || (t.side === 'sell' && price >= t.sl));
       if (hitTp || hitSl) await closeTradeInternal(t, price, hitTp ? 'tp' : 'sl');
