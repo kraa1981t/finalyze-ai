@@ -8,7 +8,7 @@ import TradingViewWidget from './TradingViewWidget';
 import MT5Web from './MT5Web';
 import {
   PaperTrade, getTradeStore, getLivePrice, subscribePrices,
-  calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE, DEFAULT_LEVERAGE, LEVERAGE_OPTIONS, isMarketOpen,
+  calcPnl, getDefaultQty, START_BALANCE, MIN_BALANCE, DEFAULT_LEVERAGE, LEVERAGE_OPTIONS, isMarketOpen, calcRiskUSD,
 } from '../services/paperTradingService';
 import { searchSymbols, catEmoji, SuggestedSymbol } from '../services/symbolSuggestions';
 import { playOpenSound, playCloseSound, playDragTick } from '../lib/tradeSounds';
@@ -399,18 +399,30 @@ export default function TradeNowPage({ lang, user, signals = [] }: TradeNowPageP
       }
       if (price == null || !(price > 0)) continue;
 
-      const q = getDefaultQty(cat);
+      // Dynamic risk sizing — scale with the live account balance.
+      // Lot grows $5/$1,000 steps of balance; SL/TP are fixed USD amounts that
+      // scale the same way, then converted to PRICE levels per category so the
+      // same $ distance means the same $ risk on forex/metals/stocks/crypto alike.
+      const bal = balanceRef.current;
+      const q = getDefaultQty(cat, bal);
       const requiredMargin = notionalInUSD(cat, sym, price, q) / leverage;
-      if (requiredMargin > balanceRef.current) continue; // not enough margin — skip
+      if (requiredMargin > bal) continue; // not enough margin — skip
 
+      const { slUsd, tpUsd } = calcRiskUSD(bal);
       const side: 'buy' | 'sell' = isBuy ? 'buy' : 'sell';
-      // Prefer the signal's own pullback entry price and SL/TP; fall back to live price.
+      // Convert the USD stop/target into price levels for this category, anchored
+      // on the entry price (signal pullback entry, else live price).
+      // Signature: usdToPrice(symbol, amountUSD, entryPrice, above, qty, category).
+      // Buy  -> stop is BELOW entry (false), target ABOVE (true).
+      // Sell -> stop is ABOVE entry (true),  target BELOW (false).
       const entryPrice = (sig.entryPrice && sig.entryPrice > 0) ? sig.entryPrice : price;
+      const slPrice = usdToPrice(sym, slUsd, entryPrice, side === 'sell', q, cat);
+      const tpPrice = usdToPrice(sym, tpUsd, entryPrice, side === 'buy', q, cat);
       const tradeData = {
         symbol: sym, category: cat, side, qty: q, entryPrice,
         status: 'open' as const,
-        tp: (typeof sig.takeProfit === 'number' && sig.takeProfit > 0) ? sig.takeProfit : null,
-        sl: (typeof sig.stopLoss === 'number' && sig.stopLoss > 0) ? sig.stopLoss : null,
+        tp: tpPrice,
+        sl: slPrice,
         openedAt: Date.now(),
       };
 

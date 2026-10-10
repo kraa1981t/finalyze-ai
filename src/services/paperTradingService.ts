@@ -67,15 +67,45 @@ export function isMarketOpen(category: string, symbol?: string, now: Date = new 
 }
 
 // ---------- Contract specs (TradingView-style) ----------
-// Fixed default quantity per category.
-export function getDefaultQty(category: string, balance: number = START_BALANCE): number {
+// Base (per-lot) quantity per category at a $1,000 balance. The lot scales with
+// the account: every extra $1,000 adds one base unit (see dynamicLotSize), so a
+// $3,000 balance trades 3× the base, a $7,000 balance 7×, etc.
+function baseQtyPerCategory(category: string): number {
   switch (category) {
-    case 'crypto': return 0.1;   // always 0.1 units of coin
-    case 'forex': return 0.01;   // always 0.01 lots (1 lot = 100,000 units)
-    case 'metals': return 0.01;  // always 0.01 lots (1 lot = 100 oz)
-    case 'stocks': return 0.01;  // always 0.01 shares
+    case 'crypto': return 0.1;   // 0.1 units of coin per $1,000
+    case 'forex': return 0.01;   // 0.01 lots per $1,000 (1 lot = 100,000 units)
+    case 'metals': return 0.01;  // 0.01 lots per $1,000 (1 lot = 100 oz)
+    case 'stocks': return 0.01;  // 0.01 lots per $1,000 (1 lot = 100 shares)
     default: return 0.01;
   }
+}
+
+// How many $1,000 steps the balance represents (minimum 1, so even a $1 balance
+// still trades the base size). e.g. $3,000 -> 3, $7,500 -> 7.
+export function balanceThousands(balance: number): number {
+  const b = Number.isFinite(balance) && balance > 0 ? balance : START_BALANCE;
+  return Math.max(1, Math.floor(b / 1000));
+}
+
+// Lot size that scales with the account balance: base × thousands.
+// $1,000 -> 0.01 (forex), $3,000 -> 0.03, $7,000 -> 0.07, $10,000 -> 0.10.
+export function getDefaultQty(category: string, balance: number = START_BALANCE): number {
+  const base = baseQtyPerCategory(category);
+  const scaled = base * balanceThousands(balance);
+  // Keep lot precision tidy (avoid 0.070000000001 style values).
+  return Math.round(scaled * 1000) / 1000;
+}
+
+// ---------- Dynamic risk (SL/TP in USD) ----------
+// Stop-loss / take-profit scale with the account in fixed $5 steps per $1,000,
+// anchored at a $1,000 balance. Take-profit is always 2× the stop (1:2 R:R).
+//   $1,000 -> SL $15 , TP $30
+//   $2,000 -> SL $20 , TP $40
+//   $7,000 -> SL $45 , TP $90
+export function calcRiskUSD(balance: number): { slUsd: number; tpUsd: number } {
+  const thousands = balanceThousands(balance);
+  const slUsd = 5 * thousands + 10;
+  return { slUsd, tpUsd: slUsd * 2 };
 }
 
 export function calcPnl(trade: Pick<PaperTrade, 'category' | 'symbol' | 'side' | 'qty' | 'entryPrice'>, currentPrice: number): number {
