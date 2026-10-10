@@ -124,6 +124,24 @@ export default function Header({
   const t = translations[lang];
   const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
+  // Reflect the Automatic-Trading (paper auto-open) state on the Trade button.
+  // The toggle lives in TradeNowPage and persists to localStorage under
+  // 'paper_trading_auto_trade'. We read it here and keep it in sync via the
+  // cross-tab `storage` event plus a light poll, so the header flips the instant
+  // the user toggles auto-trading on the Trade page (or in another tab).
+  const [autoTradeActive, setAutoTradeActive] = useState<boolean>(() => {
+    try { return localStorage.getItem('paper_trading_auto_trade') === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    const read = () => { try { setAutoTradeActive(localStorage.getItem('paper_trading_auto_trade') === '1'); } catch {} };
+    read();
+    const onStorage = (e: StorageEvent) => { if (!e.key || e.key === 'paper_trading_auto_trade') read(); };
+    window.addEventListener('storage', onStorage);
+    // Light poll as a safety net for same-tab updates that don't fire `storage`.
+    const iv = window.setInterval(read, 1000);
+    return () => { window.removeEventListener('storage', onStorage); window.clearInterval(iv); };
+  }, []);
+
   // Live scanning only counts when auto-analysis is actually enabled. This makes
   // the top button flip to OFF the instant the developer toggles it, instead of
   // staying frozen on the last SYNCED/progress state until a scan finishes.
@@ -774,11 +792,22 @@ export default function Header({
               {/* Trade Now | MOBILE: moved to sidebar (hidden md:flex) */}
               <button
                 onClick={() => onNavigatePage?.('trade')}
-                className="hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#F59E0B] hover:bg-[#d97706] text-black shadow-lg shadow-[#F59E0B]/30 active:scale-95 transition-all border border-black/10 flex-shrink-0"
+                className={cn(
+                  "hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl active:scale-95 transition-all border flex-shrink-0",
+                  autoTradeActive
+                    ? "bg-[#065f46] hover:bg-[#047857] text-[#ECFDF5] border-[#34D399]/60 shadow-lg shadow-[#10B981]/40"
+                    : "bg-[#F59E0B] hover:bg-[#d97706] text-black border-black/10 shadow-lg shadow-[#F59E0B]/30"
+                )}
               >
-                <TrendingUp size={24} className="flex-shrink-0" />
+                {autoTradeActive ? (
+                  <Zap size={24} className="flex-shrink-0 animate-pulse" />
+                ) : (
+                  <TrendingUp size={24} className="flex-shrink-0" />
+                )}
                 <span className="text-[18px] font-black uppercase tracking-wider whitespace-nowrap leading-none">
-                  {lang === 'ar' ? 'تداول' : 'Trade'}
+                  {autoTradeActive
+                    ? (lang === 'ar' ? 'تداول تلقائي' : 'Auto Trade')
+                    : (lang === 'ar' ? 'تداول' : 'Trade')}
                 </span>
               </button>
 
